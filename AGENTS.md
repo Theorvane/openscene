@@ -55,3 +55,16 @@ Do not rename these persisted or public identifiers while rebranding docs or UI:
 - Keep local Qwen TTS as a user-configured local wrapper. The app must not download models or promise model compatibility.
 - Preserve consent boundaries for voice samples. Samples must be user-owned or authorized, stored locally, and deletable from the app store.
 - When editing docs, use `OpenVideo` for the product name and keep compatibility identifiers exactly as written above.
+
+## Required Issue, Branch, And PR Workflow
+
+Every change after the initial repository bootstrap follows this sequence. Never commit directly to protected `dev` or `main`.
+
+1. Inspect open GitHub Issues and pull requests, then create or update one focused GitHub Issue before branching.
+2. Put the issue number in the branch name: `<type>/<issue-number>-<short-description>`, such as `feat/12-tool-compiler` or `chore/1-strict-workspace-baseline`.
+3. Branch from the current `origin/dev` unless a documented stacked pull request requires another base.
+4. Implement one coherent issue only. Use conventional commits in the format `type(scope): subject`.
+5. Push the branch and open a pull request against `dev` with `Closes #<issue-number>` in the body.
+6. Run and report fresh verification evidence. Obtain specification and code-quality review before merging.
+7. Squash merge only after CI and review pass. Verify the issue closes and `dev` contains the merged commit.
+8. Promote vetted `dev` to release-only `main` through a separate reviewed release pull request. Verify `main` contains the release commit before publication.
