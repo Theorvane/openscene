@@ -155,6 +155,10 @@ Use this checklist before claiming the MVP works end to end:
 9. With FFmpeg configured through `VIDEO_TOOL_FFMPEG_PATH` or an absolute `PATH` entry, start MP4 export, watch queued or running progress, cancel one job, then complete a second job and verify Open and Reveal work without showing local paths in the renderer.
 10. Confirm there is no cloud upload, AI video generation, multiple export formats, or frame-perfect or multitrack mastering guarantee presented as implemented.
 
+## Contributing and Community
+
+OpenVideo welcomes focused, local-first contributions. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the issue-to-branch-to-`dev` pull-request workflow, [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for participation standards, [SUPPORT.md](SUPPORT.md) for help, and [SECURITY.md](SECURITY.md) before discussing a potential vulnerability. This project is available under the [MIT License](LICENSE).
+
 ## Future Provider Seams
 
 `src/shared/providerSeams.ts` defines interfaces only:

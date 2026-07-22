@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security reports
+    url: https://github.com/Theorvane/openvideo/blob/dev/SECURITY.md
+    about: Do not publish security details, secrets, or exploit material in public issues.
+  - name: Support and setup
+    url: https://github.com/Theorvane/openvideo/blob/dev/SUPPORT.md
+    about: Read the support guidance before opening an issue.

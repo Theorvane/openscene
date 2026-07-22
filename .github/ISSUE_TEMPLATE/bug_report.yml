@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a reproducible problem in OpenVideo.
+title: "fix: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Do not include credentials, tokens, private media, voice samples, private file paths, or security exploit details. For potential vulnerabilities, read SECURITY.md and request a private reporting route without technical details.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Briefly describe the observed behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OpenVideo version or commit
+      placeholder: e.g. 0.1.0 or abc1234
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant non-sensitive logs or screenshots
+      description: Redact all sensitive content and local paths before attaching.
+    validations:
+      required: false

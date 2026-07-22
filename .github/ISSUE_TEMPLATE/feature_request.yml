@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a focused improvement to OpenVideo.
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Please do not include credentials, private media, voice samples, private file paths, or security exploit material.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What user problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe a focused solution or outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: checkboxes
+    id: local-first
+    attributes:
+      label: Local-first expectations
+      options:
+        - label: This proposal preserves local-first behavior or clearly explains any requested change to it.
+          required: true
