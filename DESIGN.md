@@ -1,6 +1,6 @@
 # OpenVideo Design System
 
-OpenVideo is a compact local editing bay with an enterprise editorial light and dark theme called Pineglass Ledger. The renderer should feel like a precise desktop NLE console for arranging local recordings, imported media, and narration, not like a cloud video generator or generic web dashboard.
+OpenVideo is a compact local editing bay with a bright technical editor theme called Daylight Glass. The renderer should feel like a precise desktop NLE console for arranging local recordings, imported media, and narration, not like a cloud video generator or generic web dashboard.
 
 ## Core Principles
 
@@ -82,7 +82,7 @@ OpenVideo is a compact local editing bay with an enterprise editorial light and 
 ## Theme System
 
 - The renderer uses semantic theme tokens: `--background`, `--foreground`, `--card`, `--primary`, `--secondary`, `--muted`, `--accent`, `--destructive`, `--success`, `--warning`, `--info`, `--border`, `--input`, and `--ring`.
-- Light mode uses a warm parchment tinted canvas, deep teal primary actions, cool cyan interaction and focus accents, legible ink foreground, and restrained secondary surfaces that stay warm enough to avoid a single tone stack.
+- Light mode is the Issue #5 visual contract: a white or off-white canvas, subtle lilac technical grid, navy typography, blue-purple-pink gradient accents, translucent glass panels, thin lavender borders, and restrained soft shadows.
 - Dark mode uses a cool slate and green tinted canvas, deep teal primary actions, cool cyan interaction and focus accents, pale editorial foreground, and layered cards that remain visibly non monochrome without reducing NLE contrast.
 - Legacy `--color-*` names are aliases over semantic tokens. Keep new styling on semantic tokens and only use aliases to match existing renderer classes.
 - Atmosphere, panels, timeline grids, controls, tabs, and selected states use color for semantic hierarchy and interaction, not decoration. Pair hue with contrast, opacity, borders, shadows, labels, and subtle patterns so media kind is never signaled by color alone.
@@ -93,7 +93,7 @@ OpenVideo is a compact local editing bay with an enterprise editorial light and 
 - Preserve OpenVideo as an expressive light and dark desktop NLE with restrained enterprise editorial color. Do not change the product into a cloud editor, provider console, marketing dashboard, or generative media suite.
 - Strengthen hierarchy through scale, weight, placement, and concise labels. Program monitor, timeline, dock tabs, inspector tabs, and workspace navigation should each have one clear job and a visible reading order.
 - Use measured whitespace, not empty decoration. Give the monitor and timeline enough breathing room to feel primary, keep command clusters tight, and separate dock, inspector, and status content with consistent gaps.
-- Build surface depth with semantic theme tokens only. Warm parchment light surfaces and cool slate green dark surfaces may carry quiet tint, while card elevation, hairline borders, inset shadows, muted grids, opacity changes, and subtle hatch patterns keep local editing clarity intact.
+- Build surface depth with semantic theme tokens only. Bright light surfaces may carry white glass, lilac grid texture, lavender hairline borders, soft shadows, opacity changes, and subtle hatch patterns, while dark surfaces remain cool and readable without reducing NLE contrast.
 - Keep navigation clarity accessible. Workspace buttons need visible labels, static `Local` status, `Current` text, `aria-current`, `aria-controls`, keyboard wrapping, and focus movement to the active mounted region.
 - Preserve mounted workspace state retention. Visual refinements must keep inactive Edit, Screen Recording, and Voice Generation regions hidden rather than unmounted.
 - Keep compact controls and focus treatment intact. Shortcut map controls stay dense, tabs stay compact, and the 2px focus outline with 2px offset and 4px halo remains visible in both themes.

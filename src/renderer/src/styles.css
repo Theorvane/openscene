@@ -1,16 +1,22 @@
 :root {
-  --background: #f1f3f5;
-  --foreground: #1a1b23;
+  --editor-canvas: #f8faff;
+  --editor-navy: #172554;
+  --editor-lilac-grid: rgba(168, 162, 255, 0.18);
+  --editor-glass: rgba(255, 255, 255, 0.76);
+  --editor-glass-border: rgba(168, 162, 255, 0.34);
+  --editor-gradient-accent: linear-gradient(135deg, #2563eb 0%, #7c3aed 48%, #ec4899 100%);
+  --background: var(--editor-canvas);
+  --foreground: var(--editor-navy);
   --card: #ffffff;
-  --card-foreground: #1a1b23;
+  --card-foreground: #172554;
   --popover: #ffffff;
-  --popover-foreground: #1a1b23;
-  --primary: #5c62ec;
+  --popover-foreground: #172554;
+  --primary: #2563eb;
   --primary-foreground: #ffffff;
-  --secondary: #e9ecef;
-  --secondary-foreground: #1a1b23;
-  --muted: #dee2e6;
-  --muted-foreground: #556274;
+  --secondary: #eef2ff;
+  --secondary-foreground: #172554;
+  --muted: #e8eafe;
+  --muted-foreground: #475569;
   --accent: #06b6d4;
   --accent-foreground: #0f172a;
   --destructive: #ef4444;
@@ -18,21 +24,21 @@
   --success: #10b981;
   --warning: #f59e0b;
   --info: #0ea5e9;
-  --border: #ced4da;
-  --input: #e9ecef;
-  --ring: #5c62ec;
+  --border: #d8dcff;
+  --input: #eef2ff;
+  --ring: #7c3aed;
   --color-obsidian: var(--background);
   --color-obsidian-2: var(--muted);
   --color-graphite: var(--accent);
-  --color-panel: color-mix(in srgb, var(--card) 96%, transparent);
-  --color-panel-soft: color-mix(in srgb, var(--card) 90%, transparent);
+  --color-panel: var(--editor-glass);
+  --color-panel-soft: color-mix(in srgb, var(--editor-glass) 88%, transparent);
   --color-panel-strong: var(--card);
-  --color-line: color-mix(in srgb, var(--border) 85%, transparent);
-  --color-line-strong: color-mix(in srgb, var(--foreground) 18%, var(--border));
-  --color-grid: color-mix(in srgb, var(--foreground) 6%, transparent);
+  --color-line: var(--editor-glass-border);
+  --color-line-strong: color-mix(in srgb, var(--ring) 24%, var(--editor-glass-border));
+  --color-grid: var(--editor-lilac-grid);
   --color-text: var(--foreground);
   --color-muted: var(--muted-foreground);
-  --color-faint: #556274;
+  --color-faint: #4f5b7b;
   --color-primary: var(--primary);
   --color-primary-deep: var(--muted-foreground);
   --color-audio: var(--success);
@@ -41,15 +47,15 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);
-  --status-normal: #556274;
-  --surface-control: var(--secondary);
+  --status-normal: #475569;
+  --surface-control: rgba(255, 255, 255, 0.68);
   --surface-control-hover: color-mix(in srgb, var(--primary) 8%, var(--secondary));
   --surface-control-selected: color-mix(in srgb, var(--primary) 12%, var(--card));
-  --surface-inset: var(--muted);
-  --surface-inset-strong: color-mix(in srgb, var(--muted) 88%, var(--background));
-  --surface-raised: color-mix(in srgb, var(--card) 92%, var(--background));
-  --surface-raised-soft: color-mix(in srgb, var(--card) 82%, var(--muted));
-  --surface-rule: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --surface-inset: rgba(238, 242, 255, 0.72);
+  --surface-inset-strong: rgba(232, 234, 254, 0.82);
+  --surface-raised: rgba(255, 255, 255, 0.82);
+  --surface-raised-soft: rgba(255, 255, 255, 0.64);
+  --surface-rule: color-mix(in srgb, var(--ring) 12%, transparent);
   --surface-rule-strong: color-mix(in srgb, var(--foreground) 18%, var(--border));
   --surface-nav-idle: color-mix(in srgb, var(--card) 60%, transparent);
   --surface-nav-active: var(--primary);
@@ -61,15 +67,15 @@
   --line-danger: color-mix(in srgb, var(--destructive) 40%, var(--border));
   --focus-ring: var(--ring);
   --focus-shadow: color-mix(in srgb, var(--ring) 20%, transparent);
-  --shadow-color: transparent;
-  --shadow-panel: none;
-  --shadow-editorial: none;
-  --shadow-inset-rule: none;
-  --shadow-control: none;
-  --radius-xs: 0px;
-  --radius-sm: 1px;
-  --radius-md: 2px;
-  --radius-lg: 2px;
+  --shadow-color: rgba(23, 37, 84, 0.12);
+  --shadow-panel: 0 18px 50px rgba(37, 99, 235, 0.10);
+  --shadow-editorial: 0 22px 70px rgba(124, 58, 237, 0.12);
+  --shadow-inset-rule: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  --shadow-control: 0 10px 24px rgba(37, 99, 235, 0.10);
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -103,6 +109,12 @@
 }
 
 :root[data-theme="dark"] {
+  --editor-canvas: #0f0f11;
+  --editor-navy: #e4e6eb;
+  --editor-lilac-grid: rgba(99, 102, 241, 0.18);
+  --editor-glass: rgba(24, 24, 28, 0.82);
+  --editor-glass-border: rgba(99, 102, 241, 0.26);
+  --editor-gradient-accent: linear-gradient(135deg, #60a5fa 0%, #818cf8 48%, #f472b6 100%);
   --background: #0f0f11;
   --foreground: #e4e6eb;
   --card: #18181c;
@@ -129,6 +141,8 @@
   --color-faint: #8b93a7;
   --shadow-color: transparent;
   --shadow-panel: none;
+  --shadow-editorial: none;
+  --shadow-inset-rule: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --shadow-control: none;
 }
 
@@ -158,7 +172,13 @@ body {
   min-height: 680px;
   overflow: hidden;
   color: var(--color-text);
-  background: var(--color-obsidian);
+  background:
+    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 30%),
+    radial-gradient(circle at 88% 12%, color-mix(in srgb, #ec4899 9%, transparent), transparent 28%),
+    linear-gradient(var(--editor-lilac-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--editor-lilac-grid) 1px, transparent 1px),
+    var(--color-obsidian);
+  background-size: auto, auto, 44px 44px, 44px 44px, auto;
   font-family: var(--font-body);
 }
 
@@ -190,8 +210,13 @@ button {
   height: 100vh;
   min-height: 0;
   overflow: hidden;
-  padding: 0;
+  padding: var(--space-3);
   isolation: isolate;
+  background:
+    radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 34%),
+    linear-gradient(var(--editor-lilac-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--editor-lilac-grid) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
 }
 
 .app-stack {
@@ -207,12 +232,11 @@ button {
   align-items: center;
   min-height: 46px;
   padding: var(--space-1) var(--space-4);
-  border: none;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
-  background: var(--card);
-  box-shadow: none;
-  backdrop-filter: none;
+  border: 1px solid var(--editor-glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--editor-glass);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(18px) saturate(1.2);
 }
 
 .local-pill {
@@ -303,10 +327,13 @@ button {
   gap: var(--space-2);
   min-height: 0;
   padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: 0;
-  background: var(--card);
-  box-shadow: none;
+  border: 1px solid var(--editor-glass-border);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--card) 72%, transparent), var(--editor-glass)),
+    var(--editor-glass);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(18px) saturate(1.2);
 }
 
 .workspace-nav__header {
@@ -335,7 +362,7 @@ button {
   min-height: var(--control-min-height);
   padding: var(--space-2) var(--space-3);
   border: 1px solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   color: var(--color-muted);
   background: transparent;
   box-shadow: none;
@@ -364,8 +391,8 @@ button {
 .workspace-nav-item--active:focus-visible {
   border-color: var(--ring);
   color: var(--primary-foreground);
-  background: var(--primary);
-  box-shadow: none;
+  background: var(--editor-gradient-accent);
+  box-shadow: var(--shadow-control);
 }
 
 .workspace-nav-item--active::before {
@@ -1243,17 +1270,22 @@ button {
   min-height: 0;
   overflow: hidden;
   padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  border-left: 1px solid rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--editor-glass-border);
   border-radius: var(--radius-md);
-  background: var(--card);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  backdrop-filter: none;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--card) 76%, transparent), var(--editor-glass)),
+    var(--editor-glass);
+  box-shadow: var(--shadow-editorial), var(--shadow-inset-rule);
+  backdrop-filter: blur(18px) saturate(1.18);
 }
 
 .editor-program-region::after {
-  display: none;
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent 34%, color-mix(in srgb, #ec4899 7%, transparent));
+  pointer-events: none;
 }
 
 .editor-timeline-region {
@@ -1266,7 +1298,7 @@ button {
   min-height: var(--space-2);
   border: 1px solid var(--line-subtle);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--foreground) 12%, transparent);
+  background: color-mix(in srgb, var(--ring) 16%, transparent);
   cursor: row-resize;
 }
 
@@ -1284,7 +1316,7 @@ button {
   min-width: var(--space-2);
   border: 1px solid var(--line-subtle);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--foreground) 12%, transparent);
+  background: color-mix(in srgb, var(--ring) 16%, transparent);
   cursor: col-resize;
 }
 
@@ -1320,10 +1352,11 @@ button {
   min-width: 240px;
   min-height: 220px;
   overflow: hidden;
-  border: 1px solid var(--ring);
+  border: 1px solid var(--editor-glass-border);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--card) 96%, transparent);
-  box-shadow: 0 0 0 1px var(--surface-rule), 0 18px 36px color-mix(in srgb, var(--foreground) 18%, transparent);
+  background: var(--editor-glass);
+  box-shadow: var(--shadow-editorial);
+  backdrop-filter: blur(20px) saturate(1.2);
   pointer-events: auto;
 }
 
@@ -1342,7 +1375,7 @@ button {
   padding: var(--space-2);
   border-bottom: 1px solid var(--line-subtle);
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--foreground) 5%, transparent), transparent 56%),
+    var(--editor-gradient-accent),
     var(--surface-raised-soft);
   cursor: grab;
   touch-action: none;
@@ -1400,13 +1433,11 @@ button {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  border: 1px solid var(--border);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  border-left: 1px solid rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--editor-glass-border);
   border-radius: var(--radius-md);
-  background: var(--card);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  backdrop-filter: none;
+  background: var(--editor-glass);
+  box-shadow: var(--shadow-panel), var(--shadow-inset-rule);
+  backdrop-filter: blur(16px) saturate(1.16);
 }
 
 .project-rail,
@@ -1426,8 +1457,6 @@ button {
 .inspector-panel {
   padding: var(--space-4);
 }
-
-/* Removed gradient override to keep pure matte background */
 
 .editor-main {
   grid-template-rows: auto minmax(360px, 1fr);
@@ -1593,7 +1622,7 @@ button {
   border-radius: var(--radius-md);
   color: var(--color-text);
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--foreground) 4%, transparent), transparent 56%),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 7%, transparent), transparent 56%),
     var(--surface-control);
   text-align: left;
   cursor: pointer;
@@ -1678,7 +1707,9 @@ button {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line-subtle);
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, var(--surface-raised), color-mix(in srgb, var(--surface-raised) 72%, transparent));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent 42%, color-mix(in srgb, #ec4899 6%, transparent)),
+    var(--surface-raised);
   box-shadow: var(--shadow-inset-rule);
 }
 
@@ -1698,7 +1729,7 @@ button {
   border: 1px solid var(--line-subtle);
   border-radius: var(--radius-md);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--foreground) 3%, transparent), transparent),
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 4%, transparent), transparent),
     var(--surface-inset-strong);
 }
 
@@ -1708,7 +1739,7 @@ button {
   gap: var(--space-1);
   padding: var(--space-3);
   border-right: 1px solid var(--surface-rule);
-  background: color-mix(in srgb, var(--muted) 80%, var(--card));
+  background: color-mix(in srgb, var(--editor-glass) 72%, var(--muted));
 }
 
 .timeline-track__label small {
@@ -1724,7 +1755,7 @@ button {
   min-height: 64px;
   overflow: hidden;
   background-image:
-    linear-gradient(90deg, color-mix(in srgb, var(--foreground) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, var(--editor-lilac-grid) 1px, transparent 1px),
     linear-gradient(var(--color-grid) 1px, transparent 1px);
   background-size: 10% 100%, 100% var(--space-5);
 }
@@ -1756,11 +1787,12 @@ button {
   min-width: 40px;
   overflow: hidden;
   padding: 2px 8px;
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--editor-glass-border);
   border-radius: var(--radius-md);
-  background: linear-gradient(to bottom, #2b2e4a 0%, #171822 100%);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  background:
+    repeating-linear-gradient(135deg, transparent 0 var(--space-3), color-mix(in srgb, var(--primary) 9%, transparent) var(--space-3) calc(var(--space-3) + 1px)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(238, 242, 255, 0.82));
+  box-shadow: var(--shadow-control);
   text-align: left;
   cursor: grab;
 }
@@ -1779,9 +1811,11 @@ button {
 }
 
 .timeline-clip--audio {
-  border-color: rgba(16, 185, 129, 0.4);
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-  background: linear-gradient(to bottom, #103126 0%, #091c16 100%);
+  border-color: color-mix(in srgb, var(--success) 34%, var(--editor-glass-border));
+  border-style: dashed;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 var(--space-3), color-mix(in srgb, var(--success) 10%, transparent) var(--space-3) calc(var(--space-3) + 1px)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(236, 253, 245, 0.8));
 }
 
 .timeline-clip--audio::before {
@@ -1791,7 +1825,7 @@ button {
 .timeline-clip--selected,
 .timeline-clip:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 8px rgba(6, 182, 212, 0.5);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), var(--shadow-control);
   outline: none;
 }
 
@@ -1813,7 +1847,7 @@ button {
   top: 0;
   bottom: 0;
   width: 10px;
-  background: color-mix(in srgb, var(--foreground) 18%, transparent);
+  background: color-mix(in srgb, var(--ring) 22%, transparent);
   cursor: ew-resize;
 }
 
@@ -1831,12 +1865,12 @@ button {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--surface-rule-strong);
+  border: 1px solid var(--editor-glass-border);
   border-radius: var(--radius-md);
   background:
     linear-gradient(var(--color-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--color-grid) 1px, transparent 1px),
-    radial-gradient(circle at 50% 48%, color-mix(in srgb, var(--foreground) 4%, transparent), transparent 56%),
+    radial-gradient(circle at 50% 48%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 56%),
     var(--surface-inset-strong);
   background-size: var(--space-6) var(--space-6), var(--space-6) var(--space-6), auto, auto;
   box-shadow:
@@ -1871,7 +1905,7 @@ button {
   border: 1px solid var(--line-subtle);
   border-radius: var(--radius-md);
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--foreground) 3%, transparent), transparent 58%),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 6%, transparent), transparent 58%),
     var(--surface-inset);
 }
 
@@ -1929,11 +1963,11 @@ button {
 }
 
 .export-panel__progress-label progress::-webkit-progress-value {
-  background: linear-gradient(90deg, var(--color-primary), var(--color-info));
+  background: var(--editor-gradient-accent);
 }
 
 .export-panel__progress-label progress::-moz-progress-bar {
-  background: linear-gradient(90deg, var(--color-primary), var(--color-info));
+  background: var(--editor-gradient-accent);
 }
 
 .export-panel__boundary {

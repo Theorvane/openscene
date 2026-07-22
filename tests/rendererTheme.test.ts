@@ -8,6 +8,27 @@ const rendererStyles = readFileSync(new URL('../src/renderer/src/styles.css', im
 const minimumNormalTextContrast = 4.5;
 const minimumExpressiveColorChroma = 24;
 const minimumDistinctSemanticColorDistance = 64;
+const brightEditorContractTokens = [
+  '--editor-canvas: #f8faff;',
+  '--editor-navy: #172554;',
+  '--editor-lilac-grid: rgba(168, 162, 255, 0.18);',
+  '--editor-glass: rgba(255, 255, 255, 0.76);',
+  '--editor-glass-border: rgba(168, 162, 255, 0.34);',
+  '--editor-gradient-accent: linear-gradient(135deg, #2563eb 0%, #7c3aed 48%, #ec4899 100%);'
+] as const;
+
+const brightEditorSurfaceSelectors = [
+  '.app-shell',
+  '.workspace-nav',
+  '.editor-program-region',
+  '.project-rail',
+  '.asset-bin',
+  '.timeline-panel',
+  '.inspector-panel',
+  '.editor-preview-frame',
+  '.timeline-track__lane',
+  '.timeline-clip'
+] as const;
 
 const themeModes = ['light', 'dark'] as const;
 
@@ -231,6 +252,29 @@ describe('renderer theme contract', () => {
 
   it.each(neutralSemanticTokens)('Given the renderer theme CSS, When %s is checked, Then the neutral semantic token exists', (token) => {
     expect(rendererStyles).toMatch(new RegExp(`${token}:\\s*[^;]+;`));
+  });
+
+  it('Given Issue #5 bright editor reference, When renderer CSS tokens are checked, Then light mode owns the bright OpenVideo visual contract', () => {
+    const lightTheme = getThemeTokenBlock('light');
+
+    expect(lightTheme).toContain('--background: var(--editor-canvas);');
+    expect(lightTheme).toContain('--foreground: var(--editor-navy);');
+    for (const token of brightEditorContractTokens) {
+      expect(lightTheme).toContain(token);
+    }
+  });
+
+  it('Given Issue #5 bright editor reference, When renderer CSS surfaces are checked, Then existing editor classes use glass, lilac grid, and gradient accents', () => {
+    for (const selector of brightEditorSurfaceSelectors) {
+      expect(rendererStyles).toContain(selector);
+    }
+
+    expect(rendererStyles).toContain('var(--editor-glass)');
+    expect(rendererStyles).toContain('var(--editor-glass-border)');
+    expect(rendererStyles).toContain('var(--editor-lilac-grid)');
+    expect(rendererStyles).toContain('var(--editor-gradient-accent)');
+    expect(rendererStyles).not.toContain('linear-gradient(to bottom, #2b2e4a 0%, #171822 100%)');
+    expect(rendererStyles).not.toContain('linear-gradient(to bottom, #103126 0%, #091c16 100%)');
   });
 
   it.each(guardedDesignSurfaceFiles)('Given %s, When brand source text is checked, Then third-party brand copy is absent', (filePath) => {
