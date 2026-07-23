@@ -29,7 +29,7 @@
 
 OpenVideo is an open-source Electron application for creators who want a straightforward, private video workflow on their own machine. Select a desktop window, record it to a local WebM file, arrange local media in a timeline, review it in the Program Monitor, and render a local H.264/AAC MP4 using FFmpeg.
 
-The application is deliberately local-first: no account, cloud upload, analytics, crash reporting, or provider network calls are part of the current product.
+The application is deliberately local-first today: no account, cloud upload, analytics, crash reporting, or provider network calls are part of the current product. Its approved future direction is a hybrid AI editor built around the same local workflow; see [the hybrid AI editor direction](docs/hybrid-ai-editor-direction.md).
 
 ## What works today
 

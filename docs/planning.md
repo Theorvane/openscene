@@ -10,7 +10,7 @@ OpenVideo is an Electron video production app for selecting one desktop window, 
 
 The user should be able to create work demos, lessons, product walkthroughs, and short presentation videos without setting up a full broadcast tool. The app should reduce accidental privacy exposure by recording a selected window instead of the entire screen.
 
-Longer term, OpenVideo can add AI video generation, speech synthesis, captions, and editing automation above the local recording and editing flow. Gemini Veo, OpenAI Sora, and ElevenLabs are documented as future expansion targets only. They are not implemented in the current MVP.
+Longer term, OpenVideo will evolve into a hybrid AI video editor: the local recording and editing flow stays primary, while users can optionally use local models or explicitly selected external AI services for assisted editing and media generation. The future direction, data boundary, consent requirements, shared job architecture, and release-copy rules are defined in [`hybrid-ai-editor-direction.md`](hybrid-ai-editor-direction.md). Gemini Veo, OpenAI Sora, and ElevenLabs remain possible future provider targets only; they are not implemented in the current MVP.
 
 ## 2. Core Users
 
