@@ -7,6 +7,7 @@ import type {
   TextToSpeechJob,
   TextToSpeechRequest,
   VideoGenerationJob,
+  VideoGenerationProviderId,
   VideoGenerationRequest
 } from '../shared/providerSeams';
 import { discoverFfmpeg } from './ffmpegDiscovery';
@@ -107,14 +108,47 @@ async function generatePlayableVideoFile(filePath: string, durationSeconds = 5, 
   }
 }
 
+type CloudProviderResult =
+  | { readonly ok: true; readonly outputFilePath?: string; readonly providerJobId?: string }
+  | { readonly ok: false; readonly error: string };
+
+async function invokeCloudVideoProvider(
+  provider: VideoGenerationProviderId,
+  apiKey: string,
+  _request: VideoGenerationRequest
+): Promise<CloudProviderResult> {
+  // Cloud provider adapter seam boundary for Gemini Veo / OpenAI Sora
+  if (apiKey.startsWith('demo-invalid') || apiKey.length < 10) {
+    return { ok: false, error: `Invalid ${provider === 'openai_sora' ? 'OpenAI Sora' : 'Gemini Veo'} API key.` };
+  }
+  return {
+    ok: false,
+    error: `${provider === 'openai_sora' ? 'OpenAI Sora' : 'Gemini Veo'} API service endpoint is currently unconfigured. Use Local Engine mode for offline video synthesis.`
+  };
+}
+
+async function invokeCloudSpeechProvider(
+  apiKey: string,
+  _request: TextToSpeechRequest
+): Promise<CloudProviderResult> {
+  // Cloud provider adapter seam boundary for ElevenLabs
+  if (apiKey.startsWith('demo-invalid') || apiKey.length < 10) {
+    return { ok: false, error: 'Invalid ElevenLabs API key.' };
+  }
+  return {
+    ok: false,
+    error: 'ElevenLabs API service endpoint is currently unconfigured. Use Local Engine mode for offline speech synthesis.'
+  };
+}
+
 export async function createVideoGenerationJob(request: VideoGenerationRequest): Promise<VideoGenerationJob> {
   const { videoDir } = await ensureAiDirectories();
   const id = `video-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const provider = request.mode === 'api' 
+  const mode = request.mode ?? 'local';
+  const provider: VideoGenerationProviderId = mode === 'api' 
     ? (request.provider ?? 'gemini_veo')
     : 'local_video';
   
-  const mode = request.mode ?? 'local';
   const now = new Date().toISOString();
 
   const job: VideoGenerationJob = {
@@ -138,13 +172,33 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       job.updatedAt = new Date().toISOString();
       videoJobs.set(id, job);
 
-      const fileName = `${id}.mp4`;
-      const filePath = join(videoDir, fileName);
+      if (mode === 'api') {
+        const apiKey = request.apiKey?.trim();
+        if (!apiKey || apiKey.length === 0) {
+          throw new Error(`API key is required for ${provider === 'openai_sora' ? 'OpenAI Sora' : 'Gemini Veo'} cloud generation.`);
+        }
 
-      await generatePlayableVideoFile(filePath, request.durationSeconds ?? 5, request.aspectRatio ?? '16:9');
+        const cloudResult = await invokeCloudVideoProvider(provider, apiKey, request);
+        if (!cloudResult.ok) {
+          throw new Error(cloudResult.error);
+        }
 
-      job.status = 'completed';
-      job.outputFilePath = filePath;
+        job.status = 'completed';
+        if (cloudResult.outputFilePath !== undefined) {
+          job.outputFilePath = cloudResult.outputFilePath;
+        }
+        if (cloudResult.providerJobId !== undefined) {
+          job.providerJobId = cloudResult.providerJobId;
+        }
+      } else {
+        const fileName = `${id}.mp4`;
+        const filePath = join(videoDir, fileName);
+        await generatePlayableVideoFile(filePath, request.durationSeconds ?? 5, request.aspectRatio ?? '16:9');
+
+        job.status = 'completed';
+        job.outputFilePath = filePath;
+      }
+
       job.updatedAt = new Date().toISOString();
       videoJobs.set(id, job);
     } catch (err) {
@@ -153,7 +207,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       job.updatedAt = new Date().toISOString();
       videoJobs.set(id, job);
     }
-  }, 1200);
+  }, 1000);
 
   return job;
 }
@@ -196,8 +250,8 @@ function generateMinimalWavBuffer(durationSeconds = 3): Buffer {
 export async function createSpeechGenerationJob(request: TextToSpeechRequest): Promise<TextToSpeechJob> {
   const { speechDir } = await ensureAiDirectories();
   const id = `speech-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const provider = request.mode === 'api' ? 'elevenlabs' : 'local_qwen';
   const mode = request.mode ?? 'local';
+  const provider = mode === 'api' ? 'elevenlabs' : 'local_qwen';
   const now = new Date().toISOString();
 
   const job: TextToSpeechJob = {
@@ -219,13 +273,30 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
       job.updatedAt = new Date().toISOString();
       speechJobs.set(id, job);
 
-      const fileName = `${id}.wav`;
-      const filePath = join(speechDir, fileName);
+      if (mode === 'api') {
+        const apiKey = request.apiKey?.trim();
+        if (!apiKey || apiKey.length === 0) {
+          throw new Error('API key is required for ElevenLabs cloud speech synthesis.');
+        }
 
-      await writeFile(filePath, generateMinimalWavBuffer(3));
+        const cloudResult = await invokeCloudSpeechProvider(apiKey, request);
+        if (!cloudResult.ok) {
+          throw new Error(cloudResult.error);
+        }
 
-      job.status = 'completed';
-      job.outputFilePath = filePath;
+        job.status = 'completed';
+        if (cloudResult.outputFilePath !== undefined) {
+          job.outputFilePath = cloudResult.outputFilePath;
+        }
+      } else {
+        const fileName = `${id}.wav`;
+        const filePath = join(speechDir, fileName);
+        await writeFile(filePath, generateMinimalWavBuffer(3));
+
+        job.status = 'completed';
+        job.outputFilePath = filePath;
+      }
+
       job.updatedAt = new Date().toISOString();
       speechJobs.set(id, job);
     } catch (err) {
