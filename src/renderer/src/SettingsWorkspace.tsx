@@ -1,9 +1,15 @@
 import { useState, type ReactElement } from 'react';
-import { DEFAULT_LLM_MODELS } from '../../shared/llmModels';
+import { DEFAULT_LLM_MODELS, type LlmProviderId } from '../../shared/llmModels';
 import { useLlmModel } from './LlmProviderContext';
 import { useTheme } from './ThemeProvider';
 import { THEME_PRESETS, type ThemePresetId } from './theme';
 import { Button, Panel } from './ui';
+
+function modelLabelsForProvider(providerId: LlmProviderId): string {
+  return DEFAULT_LLM_MODELS.filter((m) => m.providerId === providerId)
+    .map((m) => m.label)
+    .join(' & ');
+}
 
 type ModelTestState =
   | { status: 'idle' }
@@ -286,7 +292,7 @@ export function SettingsWorkspace(): ReactElement {
                 }}
               />
               <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                Required for GPT-4o & GPT-4o Mini
+                Required for {modelLabelsForProvider('openai')}
               </span>
             </div>
 
@@ -309,7 +315,7 @@ export function SettingsWorkspace(): ReactElement {
                 }}
               />
               <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                Required for Claude 3.5 Sonnet
+                Required for {modelLabelsForProvider('anthropic')}
               </span>
             </div>
 
@@ -332,7 +338,7 @@ export function SettingsWorkspace(): ReactElement {
                 }}
               />
               <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                Required for Gemini 2.0 Flash & Veo Video
+                Required for {modelLabelsForProvider('google_gemini')} & Veo Video
               </span>
             </div>
 
@@ -355,7 +361,7 @@ export function SettingsWorkspace(): ReactElement {
                 }}
               />
               <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                Required for DeepSeek R1 & V3
+                Required for {modelLabelsForProvider('deepseek')}
               </span>
             </div>
           </div>
