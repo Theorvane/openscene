@@ -2,19 +2,19 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Reac
 
 import { AppShell } from './AppShell';
 import { AppWorkspaceNavigation } from './AppWorkspaceNavigation';
-import { CaptureWorkspace } from './CaptureWorkspace';
 import { NarrationPanel } from './NarrationPanel';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
+import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
 import { APP_WORKSPACES, getDefaultAppWorkspaceId } from './appWorkspaces';
 import type { AppWorkspace, AppWorkspaceId } from './appWorkspaces';
 import { TimelineEditor } from './editor/TimelineEditor';
 import { useTimelineEditor } from './editor/useTimelineEditor';
 
-const [EDIT_WORKSPACE, SCREEN_RECORDING_WORKSPACE, VOICE_GENERATION_WORKSPACE] = APP_WORKSPACES;
+const [EDIT_WORKSPACE, VIDEO_GENERATION_WORKSPACE, VOICE_GENERATION_WORKSPACE] = APP_WORKSPACES;
 
 const APP_WORKSPACE_BY_ID = {
   edit: EDIT_WORKSPACE,
-  'screen-recording': SCREEN_RECORDING_WORKSPACE,
+  'video-generation': VIDEO_GENERATION_WORKSPACE,
   'voice-generation': VOICE_GENERATION_WORKSPACE
 } as const satisfies Readonly<Record<AppWorkspaceId, AppWorkspace>>;
 
@@ -91,15 +91,15 @@ export function App(): ReactElement {
               <TimelineEditor editor={editor} />
             </section>
             <section
-              aria-labelledby={SCREEN_RECORDING_WORKSPACE.navId}
-              hidden={activeWorkspaceId !== SCREEN_RECORDING_WORKSPACE.id}
-              id={SCREEN_RECORDING_WORKSPACE.panelId}
-              ref={setWorkspacePanelRef(SCREEN_RECORDING_WORKSPACE.id)}
+              aria-labelledby={VIDEO_GENERATION_WORKSPACE.navId}
+              hidden={activeWorkspaceId !== VIDEO_GENERATION_WORKSPACE.id}
+              id={VIDEO_GENERATION_WORKSPACE.panelId}
+              ref={setWorkspacePanelRef(VIDEO_GENERATION_WORKSPACE.id)}
               role="region"
               style={APP_WORKSPACE_PANEL_STYLE}
               tabIndex={-1}
             >
-              <CaptureWorkspace />
+              <VideoGenerationWorkspace />
             </section>
             <section
               aria-labelledby={VOICE_GENERATION_WORKSPACE.navId}

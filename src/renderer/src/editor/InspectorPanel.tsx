@@ -296,17 +296,19 @@ export function InspectorPanel({ activeTabId, editor, onActiveTabChange, tabs }:
 
       <Tabs activeTabId={activeTabId} idBase="inspector" tabs={tabs} onActiveTabChange={onActiveTabChange} aria-label="Inspector sections" />
 
-      <TabPanel activeTabId={activeTabId} idBase="inspector" tabId="selection">
-        <SelectionInspector editor={editor} />
-      </TabPanel>
+      <div className="inspector-panel__content">
+        <TabPanel activeTabId={activeTabId} idBase="inspector" tabId="selection">
+          <SelectionInspector editor={editor} />
+        </TabPanel>
 
-      <TabPanel activeTabId={activeTabId} idBase="inspector" tabId="asset">
-        <AssetInspector editor={editor} />
-      </TabPanel>
+        <TabPanel activeTabId={activeTabId} idBase="inspector" tabId="asset">
+          <AssetInspector editor={editor} />
+        </TabPanel>
 
-      <TabPanel activeTabId={activeTabId} idBase="inspector" tabId="project">
-        <ProjectInspector editor={editor} />
-      </TabPanel>
+        <TabPanel activeTabId={activeTabId} idBase="inspector" tabId="project">
+          <ProjectInspector editor={editor} />
+        </TabPanel>
+      </div>
 
       <StatusCard tone={editor.statusMessage.tone}>{editor.statusMessage.text}</StatusCard>
     </aside>

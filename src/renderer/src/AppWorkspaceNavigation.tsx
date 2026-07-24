@@ -25,15 +25,11 @@ function EditorTimelineIcon(): ReactElement {
   );
 }
 
-function CaptureFrameIcon(): ReactElement {
+function AiVideoIcon(): ReactElement {
   return (
     <svg className={WORKSPACE_ICON_CLASS_NAME} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M7.25 4.75h-2.5v4" />
-      <path d="M16.75 4.75h2.5v4" />
-      <path d="M19.25 15.25v4h-2.5" />
-      <path d="M4.75 15.25v4h2.5" />
-      <path d="M8 9h8v6H8z" />
-      <path d="M12 11.25v1.5" />
+      <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      <path d="M7 10l1.5 3L10 10" />
     </svg>
   );
 }
@@ -52,7 +48,7 @@ function VoiceWaveformIcon(): ReactElement {
 
 const WORKSPACE_ICONS = {
   edit: EditorTimelineIcon,
-  'screen-recording': CaptureFrameIcon,
+  'video-generation': AiVideoIcon,
   'voice-generation': VoiceWaveformIcon
 } as const satisfies Readonly<Record<AppWorkspaceId, () => ReactElement>>;
 

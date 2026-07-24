@@ -95,6 +95,10 @@ export interface VideoToolApi {
   cancelExportJob(input: ExportJobActionInput): Promise<ApiResponse<{ readonly cancelled: boolean }>>;
   openExportResult(input: ExportJobActionInput): Promise<ApiResponse<{ readonly opened: boolean }>>;
   revealExportResult(input: ExportJobActionInput): Promise<ApiResponse<{ readonly revealed: boolean }>>;
+  aiGenerateVideo(request: unknown): Promise<ApiResponse<unknown>>;
+  aiGetVideoJob(jobId: string): Promise<ApiResponse<unknown>>;
+  aiGenerateSpeech(request: unknown): Promise<ApiResponse<unknown>>;
+  aiGetSpeechJob(jobId: string): Promise<ApiResponse<unknown>>;
 }
 
 const videoTool: VideoToolApi = {
@@ -160,7 +164,11 @@ const videoTool: VideoToolApi = {
   openExportResult: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.openExportResult, input) as Promise<ApiResponse<{ readonly opened: boolean }>>,
   revealExportResult: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.revealExportResult, input) as Promise<ApiResponse<{ readonly revealed: boolean }>>
+    ipcRenderer.invoke(IPC_CHANNELS.revealExportResult, input) as Promise<ApiResponse<{ readonly revealed: boolean }>>,
+  aiGenerateVideo: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateVideo, request) as Promise<ApiResponse<unknown>>,
+  aiGetVideoJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetVideoJob, jobId) as Promise<ApiResponse<unknown>>,
+  aiGenerateSpeech: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateSpeech, request) as Promise<ApiResponse<unknown>>,
+  aiGetSpeechJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetSpeechJob, jobId) as Promise<ApiResponse<unknown>>
 };
 
 contextBridge.exposeInMainWorld('videoTool', videoTool);

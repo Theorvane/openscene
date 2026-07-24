@@ -1,15 +1,15 @@
-export const APP_WORKSPACE_IDS = ['edit', 'screen-recording', 'voice-generation'] as const;
+export const APP_WORKSPACE_IDS = ['edit', 'video-generation', 'voice-generation'] as const;
 const APP_WORKSPACE_FIRST_ID: AppWorkspaceId = 'edit';
 const APP_WORKSPACE_LAST_ID: AppWorkspaceId = 'voice-generation';
 const APP_WORKSPACE_NEXT_IDS: Record<AppWorkspaceId, AppWorkspaceId> = {
-  edit: 'screen-recording',
-  'screen-recording': 'voice-generation',
+  edit: 'video-generation',
+  'video-generation': 'voice-generation',
   'voice-generation': 'edit'
 };
 const APP_WORKSPACE_PREVIOUS_IDS: Record<AppWorkspaceId, AppWorkspaceId> = {
   edit: 'voice-generation',
-  'screen-recording': 'edit',
-  'voice-generation': 'screen-recording'
+  'video-generation': 'edit',
+  'voice-generation': 'video-generation'
 };
 
 export type AppWorkspaceId = (typeof APP_WORKSPACE_IDS)[number];
@@ -27,24 +27,24 @@ export type AppWorkspace = {
 export const APP_WORKSPACES = [
   {
     id: 'edit',
-    label: 'Edit',
+    label: 'Edit Timeline',
     navId: 'app-workspace-nav-edit',
     panelId: 'app-workspace-panel-edit',
-    statusLabel: 'Local'
+    statusLabel: 'Local NLE'
   },
   {
-    id: 'screen-recording',
-    label: 'Screen Recording',
-    navId: 'app-workspace-nav-screen-recording',
-    panelId: 'app-workspace-panel-screen-recording',
-    statusLabel: 'Local'
+    id: 'video-generation',
+    label: 'AI Video Studio',
+    navId: 'app-workspace-nav-video-generation',
+    panelId: 'app-workspace-panel-video-generation',
+    statusLabel: 'Local & API'
   },
   {
     id: 'voice-generation',
-    label: 'Voice Generation',
+    label: 'AI Voice Studio',
     navId: 'app-workspace-nav-voice-generation',
     panelId: 'app-workspace-panel-voice-generation',
-    statusLabel: 'Local'
+    statusLabel: 'Local & API'
   }
 ] as const satisfies readonly AppWorkspace[];
 

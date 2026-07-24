@@ -37,7 +37,12 @@ export const IPC_CHANNELS = {
   openExportResult: 'export:open-result',
   revealExportResult: 'export:reveal-result',
   timelineMenuCommand: 'timeline-menu:command',
-  timelineMenuState: 'timeline-menu:state'
+  timelineMenuState: 'timeline-menu:state',
+  aiGenerateVideo: 'ai:generate-video',
+  aiGetVideoJob: 'ai:get-video-job',
+  aiGenerateSpeech: 'ai:generate-speech',
+  aiGetSpeechJob: 'ai:get-speech-job',
+  projectAiResultImport: 'project-assets:import-ai-result'
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

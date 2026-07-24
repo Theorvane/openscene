@@ -143,18 +143,18 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
         <div className="timeline-empty">Open a project to see editable local tracks.</div>
       ) : (
         /* Reorganized Layout: Left vertical toolbox & Right scrollable track stack */
-        <div style={{ display: 'grid', gridTemplateColumns: '36px minmax(0, 1fr)', height: '100%', minHeight: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '32px minmax(0, 1fr)', height: '100%', minHeight: 0 }}>
           
           {/* 1. Left Vertical Toolbox */}
           <div 
             style={{ 
-              background: 'var(--muted)', 
+              background: 'var(--surface-raised-soft)', 
               borderRight: '1px solid var(--border)', 
               display: 'flex', 
               flexDirection: 'column', 
               alignItems: 'center', 
               paddingTop: 'var(--space-2)', 
-              gap: '6px' 
+              gap: '4px' 
             }}
           >
             <button 

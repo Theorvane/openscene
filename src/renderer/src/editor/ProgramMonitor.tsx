@@ -275,8 +275,8 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
               {/* Title Safe (80%) */}
               <div style={{ position: 'absolute', inset: '10%', border: '1px dashed rgba(99, 102, 241, 0.4)' }} />
               {/* Center Crosshair */}
-              <div style={{ position: 'absolute', top: '50%', left: '25%', right: '25%', height: '1px', background: 'rgba(255,255,255,0.15)', transform: 'translateY(-50%)' }} />
-              <div style={{ position: 'absolute', left: '50%', top: '25%', bottom: '25%', width: '1px', background: 'rgba(255,255,255,0.15)', transform: 'translateX(-50%)' }} />
+              <div style={{ position: 'absolute', top: '50%', left: '25%', right: '25%', height: '1px', background: 'var(--color-line-strong)', transform: 'translateY(-50%)' }} />
+              <div style={{ position: 'absolute', left: '50%', top: '25%', bottom: '25%', width: '1px', background: 'var(--color-line-strong)', transform: 'translateX(-50%)' }} />
             </div>
           )}
         </div>
@@ -285,11 +285,11 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
         <div 
           className="audio-meter"
           style={{
-            width: '20px',
+            width: '18px',
             background: 'var(--input)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-xs)',
-            padding: '4px 2px',
+            padding: '3px 2px',
             display: 'flex',
             justifyContent: 'space-between',
             height: '100%'
@@ -297,7 +297,7 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
           title="Stereo db output level"
         >
           {/* L Channel */}
-          <div style={{ width: '6px', height: '100%', background: '#222', borderRadius: '2px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ width: '5px', height: '100%', background: 'var(--muted)', borderRadius: '2px', position: 'relative', overflow: 'hidden' }}>
             <div 
               style={{
                 position: 'absolute',
@@ -311,7 +311,7 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
             />
           </div>
           {/* R Channel */}
-          <div style={{ width: '6px', height: '100%', background: '#222', borderRadius: '2px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ width: '5px', height: '100%', background: 'var(--muted)', borderRadius: '2px', position: 'relative', overflow: 'hidden' }}>
             <div 
               style={{
                 position: 'absolute',
