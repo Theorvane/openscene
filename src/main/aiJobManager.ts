@@ -1,5 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { app } from 'electron';
 import type {
   TextToSpeechJob,
@@ -7,12 +9,18 @@ import type {
   VideoGenerationJob,
   VideoGenerationRequest
 } from '../shared/providerSeams';
+import { discoverFfmpeg } from './ffmpegDiscovery';
+
+const execFileAsync = promisify(execFile);
 
 const videoJobs = new Map<string, VideoGenerationJob>();
 const speechJobs = new Map<string, TextToSpeechJob>();
 
+import { tmpdir } from 'node:os';
+
 function getAiStorageDir(): string {
-  return join(app.getPath('userData'), 'ai_generations');
+  const userDataDir = app?.getPath !== undefined ? app.getPath('userData') : join(tmpdir(), 'openvideo-ai-storage');
+  return join(userDataDir, 'ai_generations');
 }
 
 export async function ensureAiDirectories(): Promise<{ videoDir: string; speechDir: string }> {
@@ -24,45 +32,79 @@ export async function ensureAiDirectories(): Promise<{ videoDir: string; speechD
   return { videoDir, speechDir };
 }
 
-// Generate minimal valid MP4 file header buffer for realistic local preview
-function generateMinimalMp4Buffer(): Buffer {
-  return Buffer.from([
-    0x00, 0x00, 0x00, 0x1c, 0x66, 0x74, 0x79, 0x70, // ftyp
-    0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00,
-    0x69, 0x73, 0x6f, 0x6d, 0x69, 0x73, 0x6f, 0x32,
-    0x61, 0x76, 0x63, 0x31, 0x6d, 0x70, 0x34, 0x31
+// Generate valid MP4 file container buffer with ftyp, moov, and mdat boxes
+function generateValidMp4Buffer(): Buffer {
+  // ftyp box
+  const ftyp = Buffer.from([
+    0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, // size 32, 'ftyp'
+    0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00, // major_brand 'isom', minor_version 512
+    0x69, 0x73, 0x6f, 0x6d, 0x69, 0x73, 0x6f, 0x32, // compatible_brands 'isom', 'iso2'
+    0x61, 0x76, 0x63, 0x31, 0x6d, 0x70, 0x34, 0x31  // 'avc1', 'mp41'
   ]);
+
+  // mdat box with dummy NAL payload
+  const mdatData = Buffer.from([0x00, 0x00, 0x00, 0x02, 0x09, 0x10]);
+  const mdatHeader = Buffer.alloc(8);
+  mdatHeader.writeUInt32BE(8 + mdatData.length, 0);
+  mdatHeader.write('mdat', 4);
+  const mdat = Buffer.concat([mdatHeader, mdatData]);
+
+  // moov box header
+  const moovHeader = Buffer.alloc(8);
+  const moovData = Buffer.from([
+    // mvhd atom
+    0x00, 0x00, 0x00, 0x6c, 0x6d, 0x76, 0x68, 0x64,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe8,
+    0x00, 0x00, 0x03, 0xe8, 0x00, 0x01, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x02
+  ]);
+  moovHeader.writeUInt32BE(8 + moovData.length, 0);
+  moovHeader.write('moov', 4);
+  const moov = Buffer.concat([moovHeader, moovData]);
+
+  return Buffer.concat([ftyp, moov, mdat]);
 }
 
-// Generate minimal valid WAV file header buffer for audio synthesis preview
-function generateMinimalWavBuffer(durationSeconds = 3): Buffer {
-  const sampleRate = 44100;
-  const numChannels = 1;
-  const bitsPerSample = 16;
-  const numSamples = Math.floor(sampleRate * durationSeconds);
-  const dataSize = numSamples * numChannels * (bitsPerSample / 8);
-  const buffer = Buffer.alloc(44 + dataSize);
-
-  buffer.write('RIFF', 0);
-  buffer.writeUInt32LE(36 + dataSize, 4);
-  buffer.write('WAVE', 8);
-  buffer.write('fmt ', 12);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20);
-  buffer.writeUInt16LE(numChannels, 22);
-  buffer.writeUInt32LE(sampleRate, 24);
-  buffer.writeUInt32LE(sampleRate * numChannels * (bitsPerSample / 8), 28);
-  buffer.writeUInt16LE(numChannels * (bitsPerSample / 8), 32);
-  buffer.writeUInt16LE(bitsPerSample, 34);
-  buffer.write('data', 36);
-  buffer.writeUInt32LE(dataSize, 40);
-
-  for (let i = 0; i < numSamples; i++) {
-    const sample = Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 16384;
-    buffer.writeInt16LE(Math.floor(sample), 44 + i * 2);
+async function generatePlayableVideoFile(filePath: string, durationSeconds = 5, aspectRatio = '16:9'): Promise<void> {
+  const ffmpeg = await discoverFfmpeg();
+  if (ffmpeg.kind !== 'unavailable') {
+    const size = aspectRatio === '9:16' ? '360x640' : aspectRatio === '1:1' ? '480x480' : '640x360';
+    const duration = Math.min(Math.max(1, durationSeconds), 10);
+    try {
+      await execFileAsync(ffmpeg.executablePath, [
+        '-f', 'lavfi',
+        '-i', `testsrc=duration=${duration}:size=${size}:rate=30`,
+        '-f', 'lavfi',
+        '-i', 'anullsrc=r=44100:cl=mono',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac',
+        '-shortest',
+        '-y',
+        filePath
+      ]);
+    } catch {
+      await writeFile(filePath, generateValidMp4Buffer());
+    }
+  } else {
+    await writeFile(filePath, generateValidMp4Buffer());
   }
 
-  return buffer;
+  const fileStats = await stat(filePath);
+  if (!fileStats.isFile() || fileStats.size === 0) {
+    throw new Error(`Generated video file at ${filePath} is invalid or empty.`);
+  }
 }
 
 export async function createVideoGenerationJob(request: VideoGenerationRequest): Promise<VideoGenerationJob> {
@@ -99,7 +141,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       const fileName = `${id}.mp4`;
       const filePath = join(videoDir, fileName);
 
-      await writeFile(filePath, generateMinimalMp4Buffer());
+      await generatePlayableVideoFile(filePath, request.durationSeconds ?? 5, request.aspectRatio ?? '16:9');
 
       job.status = 'completed';
       job.outputFilePath = filePath;
@@ -118,6 +160,37 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
 
 export function getVideoGenerationJob(jobId: string): VideoGenerationJob | null {
   return videoJobs.get(jobId) ?? null;
+}
+
+// Generate minimal valid WAV file header buffer for audio synthesis preview
+function generateMinimalWavBuffer(durationSeconds = 3): Buffer {
+  const sampleRate = 44100;
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const numSamples = Math.floor(sampleRate * durationSeconds);
+  const dataSize = numSamples * numChannels * (bitsPerSample / 8);
+  const buffer = Buffer.alloc(44 + dataSize);
+
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write('WAVE', 8);
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(numChannels, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * numChannels * (bitsPerSample / 8), 28);
+  buffer.writeUInt16LE(numChannels * (bitsPerSample / 8), 32);
+  buffer.writeUInt16LE(bitsPerSample, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(dataSize, 40);
+
+  for (let i = 0; i < numSamples; i++) {
+    const sample = Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 16384;
+    buffer.writeInt16LE(Math.floor(sample), 44 + i * 2);
+  }
+
+  return buffer;
 }
 
 export async function createSpeechGenerationJob(request: TextToSpeechRequest): Promise<TextToSpeechJob> {

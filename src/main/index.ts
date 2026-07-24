@@ -21,6 +21,7 @@ import { registerVoiceTtsIpcHandlers } from './voiceTtsIpcHandlers';
 import { VoiceProfileStore } from './voiceProfileStore';
 import { VoiceTtsIpcService } from './voiceTtsIpcService';
 import { resolvePreloadScriptPath } from './preloadPath';
+import { fail, ok } from './ipcResponses';
 import { IPC_CHANNELS } from '../shared/ipc';
 import { installApplicationMenu } from './applicationMenu';
 
@@ -213,34 +214,36 @@ function installIpcHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.aiGenerateVideo, async (_event, request) => {
     try {
-      const { createVideoGenerationJob } = await import('./aiJobManager');
       const job = await createVideoGenerationJob(request);
-      return { success: true, data: job };
+      return ok(job);
     } catch (err) {
-      return { success: false, error: { message: err instanceof Error ? err.message : 'Failed to create video job' } };
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to create video job');
     }
   });
 
   ipcMain.handle(IPC_CHANNELS.aiGetVideoJob, async (_event, jobId: string) => {
-    const { getVideoGenerationJob } = await import('./aiJobManager');
     const job = getVideoGenerationJob(jobId);
-    return { success: true, data: job };
+    if (job === null) {
+      return fail('JOB_NOT_FOUND', 'Video generation job was not found.');
+    }
+    return ok(job);
   });
 
   ipcMain.handle(IPC_CHANNELS.aiGenerateSpeech, async (_event, request) => {
     try {
-      const { createSpeechGenerationJob } = await import('./aiJobManager');
       const job = await createSpeechGenerationJob(request);
-      return { success: true, data: job };
+      return ok(job);
     } catch (err) {
-      return { success: false, error: { message: err instanceof Error ? err.message : 'Failed to create speech job' } };
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to create speech job');
     }
   });
 
   ipcMain.handle(IPC_CHANNELS.aiGetSpeechJob, async (_event, jobId: string) => {
-    const { getSpeechGenerationJob } = await import('./aiJobManager');
     const job = getSpeechGenerationJob(jobId);
-    return { success: true, data: job };
+    if (job === null) {
+      return fail('JOB_NOT_FOUND', 'Speech generation job was not found.');
+    }
+    return ok(job);
   });
 }
 
