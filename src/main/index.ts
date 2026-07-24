@@ -25,7 +25,7 @@ import { fail, ok } from './ipcResponses';
 import { IPC_CHANNELS } from '../shared/ipc';
 import { installApplicationMenu } from './applicationMenu';
 
-import { createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getSpeechGenerationJob, getVideoGenerationJob } from './aiJobManager';
+import { createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getSpeechGenerationJob, getVideoGenerationJob, setAiJobManagerCredentialStore } from './aiJobManager';
 import { CredentialStore } from './credentialStore';
 import { LlmExecutionAdapter } from './llmAdapter';
 import { getOpenVideoMcpDefinition, OpenVideoMcpServer } from './openVideoMcpServer';
@@ -322,6 +322,7 @@ function installIpcHandlers(): void {
   });
 
   const credentialStore = new CredentialStore(app.getPath('userData'));
+  setAiJobManagerCredentialStore(credentialStore);
 
   ipcMain.handle(IPC_CHANNELS.getProviderCredentials, async () => {
     try {

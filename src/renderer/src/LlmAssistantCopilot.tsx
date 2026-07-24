@@ -75,7 +75,8 @@ export function LlmAssistantCopilot(): ReactElement {
           prompt: inputPrompt,
           aspectRatio: '16:9',
           durationSeconds: 5,
-          mode: selectedModel.defaultMode
+          mode: selectedModel.defaultMode,
+          provider: selectedModel.providerId === 'openai' ? 'openai_sora' : selectedModel.providerId === 'google_gemini' ? 'gemini_veo' : 'local_video'
         });
 
         if (response.ok) {

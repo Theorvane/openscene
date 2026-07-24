@@ -7,6 +7,10 @@ export interface ProviderCredentials {
   anthropicApiKey?: string;
   geminiApiKey?: string;
   deepseekApiKey?: string;
+  elevenlabsApiKey?: string;
+  runwayApiKey?: string;
+  klingApiKey?: string;
+  lumaApiKey?: string;
 }
 
 export type CredentialStatusMap = Record<keyof ProviderCredentials, boolean>;
@@ -46,7 +50,11 @@ export class CredentialStore {
       openaiApiKey: Boolean(creds.openaiApiKey && creds.openaiApiKey.trim().length > 0),
       anthropicApiKey: Boolean(creds.anthropicApiKey && creds.anthropicApiKey.trim().length > 0),
       geminiApiKey: Boolean(creds.geminiApiKey && creds.geminiApiKey.trim().length > 0),
-      deepseekApiKey: Boolean(creds.deepseekApiKey && creds.deepseekApiKey.trim().length > 0)
+      deepseekApiKey: Boolean(creds.deepseekApiKey && creds.deepseekApiKey.trim().length > 0),
+      elevenlabsApiKey: Boolean(creds.elevenlabsApiKey && creds.elevenlabsApiKey.trim().length > 0),
+      runwayApiKey: Boolean(creds.runwayApiKey && creds.runwayApiKey.trim().length > 0),
+      klingApiKey: Boolean(creds.klingApiKey && creds.klingApiKey.trim().length > 0),
+      lumaApiKey: Boolean(creds.lumaApiKey && creds.lumaApiKey.trim().length > 0)
     };
   }
 

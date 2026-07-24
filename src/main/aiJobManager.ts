@@ -11,13 +11,18 @@ import type {
   VideoGenerationRequest
 } from '../shared/providerSeams';
 import { discoverFfmpeg } from './ffmpegDiscovery';
+import type { CredentialStore, ProviderCredentials } from './credentialStore';
+import { tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
 
 const videoJobs = new Map<string, VideoGenerationJob>();
 const speechJobs = new Map<string, TextToSpeechJob>();
+let activeCredentialStore: CredentialStore | undefined;
 
-import { tmpdir } from 'node:os';
+export function setAiJobManagerCredentialStore(store?: CredentialStore | undefined): void {
+  activeCredentialStore = store;
+}
 
 function getAiStorageDir(): string {
   const userDataDir = app?.getPath !== undefined ? app.getPath('userData') : join(tmpdir(), 'openvideo-ai-storage');
@@ -129,7 +134,6 @@ async function invokeCloudSpeechProvider(
   apiKey: string,
   _request: TextToSpeechRequest
 ): Promise<CloudProviderResult> {
-  // Cloud provider adapter seam boundary for ElevenLabs
   if (apiKey.startsWith('demo-invalid') || apiKey.length < 10) {
     return { ok: false, error: 'Invalid ElevenLabs API key.' };
   }
@@ -171,7 +175,19 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       videoJobs.set(id, job);
 
       if (mode === 'api') {
-        const apiKey = request.apiKey?.trim();
+        let apiKey = request.apiKey?.trim();
+        if ((!apiKey || apiKey.length === 0) && activeCredentialStore) {
+          const providerKeyMap: Record<string, keyof ProviderCredentials> = {
+            openai_sora: 'openaiApiKey',
+            gemini_veo: 'geminiApiKey',
+            runway_gen4: 'runwayApiKey',
+            kling_v3: 'klingApiKey',
+            luma_dream: 'lumaApiKey'
+          };
+          const keyField = providerKeyMap[provider] ?? 'openaiApiKey';
+          apiKey = await activeCredentialStore.getCredentialValue(keyField);
+        }
+
         if (!apiKey || apiKey.length === 0) {
           throw new Error(`API key is required for ${VIDEO_PROVIDER_LABELS[provider]} cloud generation.`);
         }
@@ -241,7 +257,11 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
       speechJobs.set(id, job);
 
       if (mode === 'api') {
-        const apiKey = request.apiKey?.trim();
+        let apiKey = request.apiKey?.trim();
+        if ((!apiKey || apiKey.length === 0) && activeCredentialStore) {
+          apiKey = await activeCredentialStore.getCredentialValue('openaiApiKey');
+        }
+
         if (!apiKey || apiKey.length === 0) {
           throw new Error('API key is required for ElevenLabs cloud speech synthesis.');
         }
@@ -282,17 +302,8 @@ export function getSpeechGenerationJob(jobId: string): TextToSpeechJob | null {
 }
 
 export function getCompletedAiSource(jobId: string): { sourcePath: string; displayName: string; kind: 'video' | 'audio'; mimeType: string } | null {
-  const speechJob = speechJobs.get(jobId);
-  if (speechJob !== undefined && speechJob.status === 'completed' && speechJob.outputFilePath) {
-    return {
-      sourcePath: speechJob.outputFilePath,
-      displayName: `AI_Voice_${speechJob.id.slice(-6)}.wav`,
-      kind: 'audio',
-      mimeType: 'audio/wav'
-    };
-  }
   const videoJob = videoJobs.get(jobId);
-  if (videoJob !== undefined && videoJob.status === 'completed' && videoJob.outputFilePath) {
+  if (videoJob && videoJob.status === 'completed' && videoJob.outputFilePath) {
     return {
       sourcePath: videoJob.outputFilePath,
       displayName: `AI_Video_${videoJob.id.slice(-6)}.mp4`,
@@ -300,5 +311,16 @@ export function getCompletedAiSource(jobId: string): { sourcePath: string; displ
       mimeType: 'video/mp4'
     };
   }
+
+  const speechJob = speechJobs.get(jobId);
+  if (speechJob && speechJob.status === 'completed' && speechJob.outputFilePath) {
+    return {
+      sourcePath: speechJob.outputFilePath,
+      displayName: `AI_Voice_${speechJob.id.slice(-6)}.wav`,
+      kind: 'audio',
+      mimeType: 'audio/wav'
+    };
+  }
+
   return null;
 }
