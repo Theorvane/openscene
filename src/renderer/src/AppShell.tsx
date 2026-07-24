@@ -1,6 +1,8 @@
 import type { ReactElement, ReactNode } from 'react';
 import type { AppWorkspace } from './appWorkspaces';
 import { AgentChatPanel } from './AgentChatPanel';
+import { AgentChatProvider } from './AgentChatContext';
+import { AgentChatToggleButton } from './AgentChatToggleButton';
 import { LlmAssistantCopilot } from './LlmAssistantCopilot';
 import { LlmModelSelectorBar } from './LlmModelSelectorBar';
 import { ThemeSelector } from './ThemeSelector';
@@ -22,21 +24,26 @@ type AppShellProps = {
 
 export function AppShell({ activeWorkspace, children }: AppShellProps): ReactElement {
   return (
-    <main className="app-shell">
-      <AppShellBackground />
-      <header className="product-chrome" aria-label="Application chrome">
-        <div className="product-chrome__context" aria-label="Current workspace">
-          <span className="product-chrome__workspace">{activeWorkspace.label}</span>
-          <span className="local-pill">Local</span>
-        </div>
-        <div className="product-chrome__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <AgentChatProvider>
+      <main className="app-shell">
+        <AppShellBackground />
+        <header className="product-chrome" aria-label="Application chrome">
+          <div className="product-chrome__context" aria-label="Current workspace">
+            <span className="product-chrome__workspace">{activeWorkspace.label}</span>
+            <span className="local-pill">Local</span>
+          </div>
+          <div className="product-chrome__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AgentChatToggleButton />
+            <LlmAssistantCopilot />
+            <LlmModelSelectorBar />
+            <ThemeSelector />
+          </div>
+        </header>
+        <div style={{ display: 'flex', minHeight: 0, gap: 'var(--space-2)' }}>
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'grid' }}>{children}</div>
           <AgentChatPanel />
-          <LlmAssistantCopilot />
-          <LlmModelSelectorBar />
-          <ThemeSelector />
         </div>
-      </header>
-      {children}
-    </main>
+      </main>
+    </AgentChatProvider>
   );
 }
