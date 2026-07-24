@@ -46,6 +46,12 @@ import type {
 } from '../shared/timelineTypes';
 import { parseTimelineMenuCommandId } from '../shared/timelineMenuCommands';
 import type { TimelineMenuCommandId, TimelineMenuState } from '../shared/timelineMenuCommands';
+import type {
+  AgentChatApprovalInput,
+  AgentChatResetInput,
+  AgentChatSendInput,
+  AgentChatTurnState
+} from '../shared/agentChat';
 
 type ImportProjectAssetsResult = {
   readonly assets: readonly MediaAsset[];
@@ -110,6 +116,9 @@ export interface VideoToolApi {
   }): Promise<ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>>;
   mcpGetTools(): Promise<ApiResponse<unknown>>;
   mcpExecuteTool(toolName: string, params: unknown): Promise<ApiResponse<unknown>>;
+  agentChatSend(input: AgentChatSendInput): Promise<ApiResponse<AgentChatTurnState>>;
+  agentChatApprove(input: AgentChatApprovalInput): Promise<ApiResponse<AgentChatTurnState>>;
+  agentChatReset(input: AgentChatResetInput): Promise<ApiResponse<AgentChatTurnState>>;
 }
 
 const videoTool: VideoToolApi = {
@@ -192,7 +201,11 @@ const videoTool: VideoToolApi = {
     >,
   mcpGetTools: () => ipcRenderer.invoke(IPC_CHANNELS.mcpGetTools) as Promise<ApiResponse<unknown>>,
   mcpExecuteTool: (toolName: string, params: unknown) =>
-    ipcRenderer.invoke(IPC_CHANNELS.mcpExecuteTool, toolName, params) as Promise<ApiResponse<unknown>>
+    ipcRenderer.invoke(IPC_CHANNELS.mcpExecuteTool, toolName, params) as Promise<ApiResponse<unknown>>,
+  agentChatSend: (input) => ipcRenderer.invoke(IPC_CHANNELS.agentChatSend, input) as Promise<ApiResponse<AgentChatTurnState>>,
+  agentChatApprove: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.agentChatApprove, input) as Promise<ApiResponse<AgentChatTurnState>>,
+  agentChatReset: (input) => ipcRenderer.invoke(IPC_CHANNELS.agentChatReset, input) as Promise<ApiResponse<AgentChatTurnState>>
 };
 
 contextBridge.exposeInMainWorld('videoTool', videoTool);

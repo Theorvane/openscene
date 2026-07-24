@@ -1,0 +1,131 @@
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { tool } from '@langchain/core/tools';
+import { AIMessage } from '@langchain/core/messages';
+import { buildAgentChatGraph, type AgentChatModelFactory } from '../src/main/agentChatGraph';
+import { AgentChatSessionManager } from '../src/main/agentChatSession';
+
+const READ_ONLY_TOOL_NAME = 'getJobStatus';
+const MUTATING_TOOL_NAME = 'exportProjectVideo';
+
+const fakeTools = [
+  tool(async ({ jobId }: { jobId: string }) => JSON.stringify({ success: true, jobId, status: 'completed' }), {
+    name: READ_ONLY_TOOL_NAME,
+    description: 'Check job status',
+    schema: z.object({ jobId: z.string() })
+  }),
+  tool(async ({ projectId }: { projectId: string }) => JSON.stringify({ success: true, projectId, exportJobId: 'export-1' }), {
+    name: MUTATING_TOOL_NAME,
+    description: 'Export the project',
+    schema: z.object({ projectId: z.string() })
+  })
+];
+
+const MUTATING_TOOL_NAMES = new Set([MUTATING_TOOL_NAME]);
+
+function scriptedModel(responses: readonly AIMessage[]): AgentChatModelFactory {
+  let call = 0;
+  return () => ({
+    invoke: async () => {
+      const response = responses[Math.min(call, responses.length - 1)]!;
+      call += 1;
+      return response;
+    }
+  });
+}
+
+function buildSession(responses: readonly AIMessage[]): AgentChatSessionManager {
+  const bundle = buildAgentChatGraph({
+    tools: fakeTools,
+    mutatingToolNames: MUTATING_TOOL_NAMES,
+    createModel: scriptedModel(responses)
+  });
+  return new AgentChatSessionManager(bundle);
+}
+
+describe('agent chat graph', () => {
+  it('answers directly when the model makes no tool calls', async () => {
+    const session = buildSession([new AIMessage('Hello! How can I help?')]);
+
+    const result = await session.sendMessage({ conversationId: 'c1', text: 'hi', modelId: 'qwen2.5-coder' });
+
+    expect(result.status).toBe('idle');
+    expect(result.pendingApproval).toBeNull();
+    expect(result.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(result.messages[1]!.text).toBe('Hello! How can I help?');
+  });
+
+  it('executes a read-only tool call without requiring approval', async () => {
+    const session = buildSession([
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'call-1', name: READ_ONLY_TOOL_NAME, args: { jobId: 'job-1' } }]
+      }),
+      new AIMessage('Job job-1 is completed.')
+    ]);
+
+    const result = await session.sendMessage({ conversationId: 'c2', text: 'check job-1', modelId: 'qwen2.5-coder' });
+
+    expect(result.status).toBe('idle');
+    expect(result.pendingApproval).toBeNull();
+    const toolMessage = result.messages.find((m) => m.role === 'tool');
+    expect(toolMessage?.toolName).toBe(READ_ONLY_TOOL_NAME);
+    expect(toolMessage?.text).toContain('completed');
+    expect(result.messages.at(-1)?.text).toBe('Job job-1 is completed.');
+  });
+
+  it('pauses a mutating tool call for approval, then executes it once approved', async () => {
+    const session = buildSession([
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'call-2', name: MUTATING_TOOL_NAME, args: { projectId: 'proj-1' } }]
+      }),
+      new AIMessage('Export started.')
+    ]);
+
+    const paused = await session.sendMessage({ conversationId: 'c3', text: 'export it', modelId: 'qwen2.5-coder' });
+    expect(paused.status).toBe('awaiting-approval');
+    expect(paused.pendingApproval).toEqual({ toolCallId: 'call-2', toolName: MUTATING_TOOL_NAME, args: { projectId: 'proj-1' } });
+    // The tool must not have run yet.
+    expect(paused.messages.some((m) => m.role === 'tool')).toBe(false);
+
+    const resumed = await session.respondToApproval({ conversationId: 'c3', toolCallId: 'call-2', decision: 'approve' });
+    expect(resumed.status).toBe('idle');
+    expect(resumed.pendingApproval).toBeNull();
+    const toolMessage = resumed.messages.find((m) => m.role === 'tool');
+    expect(toolMessage?.toolName).toBe(MUTATING_TOOL_NAME);
+    expect(toolMessage?.text).toContain('export-1');
+    expect(resumed.messages.at(-1)?.text).toBe('Export started.');
+  });
+
+  it('records a denial instead of executing the mutating tool', async () => {
+    const session = buildSession([
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'call-3', name: MUTATING_TOOL_NAME, args: { projectId: 'proj-1' } }]
+      }),
+      new AIMessage('Okay, I will not export.')
+    ]);
+
+    await session.sendMessage({ conversationId: 'c4', text: 'export it', modelId: 'qwen2.5-coder' });
+    const resumed = await session.respondToApproval({ conversationId: 'c4', toolCallId: 'call-3', decision: 'deny' });
+
+    expect(resumed.status).toBe('idle');
+    const toolMessage = resumed.messages.find((m) => m.role === 'tool');
+    expect(toolMessage?.text).toContain('denied');
+    expect(resumed.messages.at(-1)?.text).toBe('Okay, I will not export.');
+  });
+
+  it('reset clears prior conversation history for that thread', async () => {
+    const session = buildSession([new AIMessage('First answer.'), new AIMessage('Second answer.')]);
+
+    await session.sendMessage({ conversationId: 'c5', text: 'first', modelId: 'qwen2.5-coder' });
+    const resetResult = await session.resetConversation({ conversationId: 'c5' });
+    expect(resetResult.messages).toEqual([]);
+
+    const afterReset = await session.sendMessage({ conversationId: 'c5', text: 'second', modelId: 'qwen2.5-coder' });
+    // Only the new turn's messages should be present, not the pre-reset history.
+    expect(afterReset.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(afterReset.messages[0]!.text).toBe('second');
+  });
+});

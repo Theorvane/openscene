@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 import type { AppWorkspace } from './appWorkspaces';
+import { AgentChatPanel } from './AgentChatPanel';
 import { LlmAssistantCopilot } from './LlmAssistantCopilot';
 import { LlmModelSelectorBar } from './LlmModelSelectorBar';
 import { ThemeSelector } from './ThemeSelector';
@@ -29,6 +30,7 @@ export function AppShell({ activeWorkspace, children }: AppShellProps): ReactEle
           <span className="local-pill">Local</span>
         </div>
         <div className="product-chrome__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AgentChatPanel />
           <LlmAssistantCopilot />
           <LlmModelSelectorBar />
           <ThemeSelector />

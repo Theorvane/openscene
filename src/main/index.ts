@@ -29,6 +29,10 @@ import { createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSour
 import { CredentialStore } from './credentialStore';
 import { LlmExecutionAdapter } from './llmAdapter';
 import { getOpenVideoMcpDefinition, OpenVideoMcpServer } from './openVideoMcpServer';
+import { AGENT_CHAT_MUTATING_TOOL_NAMES, createAgentChatTools } from './agentChatTools';
+import { buildAgentChatGraph } from './agentChatGraph';
+import { AgentChatSessionManager } from './agentChatSession';
+import { createOllamaAgentChatModel } from './agentChatModel';
 
 registerTimelineAssetScheme();
 
@@ -41,6 +45,7 @@ const ttsJobStore = new LocalTtsJobStore();
 const exportJobStore = new ExportJobStore();
 const credentialStore = new CredentialStore(app.getPath('userData'));
 const llmExecutionAdapter = new LlmExecutionAdapter(credentialStore);
+setAiJobManagerCredentialStore(credentialStore);
 const timelineIpcService = new TimelineIpcService({
   projects: projectStore,
   assets: assetLibraryStore,
@@ -198,7 +203,7 @@ function installDisplayMediaHandler(): void {
   });
 }
 
-function installIpcHandlers(): void {
+async function installIpcHandlers(): Promise<void> {
   registerCaptureIpcHandlers({
     ipcMain,
     shell,
@@ -321,33 +326,44 @@ function installIpcHandlers(): void {
     }
   });
 
-  const credentialStore = new CredentialStore(app.getPath('userData'));
-  setAiJobManagerCredentialStore(credentialStore);
+  const agentChatTools = await createAgentChatTools(mcpServerInstance);
+  const agentChatGraphBundle = buildAgentChatGraph({
+    tools: agentChatTools,
+    mutatingToolNames: AGENT_CHAT_MUTATING_TOOL_NAMES,
+    createModel: createOllamaAgentChatModel(agentChatTools)
+  });
+  const agentChatSessions = new AgentChatSessionManager(agentChatGraphBundle);
 
-  ipcMain.handle(IPC_CHANNELS.getProviderCredentials, async () => {
+  ipcMain.handle(IPC_CHANNELS.agentChatSend, async (_event, request) => {
     try {
-      const creds = await credentialStore.getCredentials();
-      return ok(creds);
+      return ok(await agentChatSessions.sendMessage(request));
     } catch (err) {
-      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to retrieve credentials');
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to send agent chat message');
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.setProviderCredential, async (_event, provider: any, apiKey: string) => {
+  ipcMain.handle(IPC_CHANNELS.agentChatApprove, async (_event, request) => {
     try {
-      await credentialStore.setCredential(provider, apiKey);
-      return ok({ updated: true });
+      return ok(await agentChatSessions.respondToApproval(request));
     } catch (err) {
-      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to save credential');
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to record agent chat approval');
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.agentChatReset, async (_event, request) => {
+    try {
+      return ok(agentChatSessions.resetConversation(request));
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to reset agent chat conversation');
     }
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   installApplicationMenu();
   installDisplayMediaHandler();
   registerTimelineAssetProtocol(timelineIpcService);
-  installIpcHandlers();
+  await installIpcHandlers();
   createWindow();
 
   app.on('activate', () => {

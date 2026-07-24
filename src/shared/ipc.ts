@@ -47,7 +47,10 @@ export const IPC_CHANNELS = {
   setProviderCredential: 'credentials:set',
   executeLlmPrompt: 'llm:execute-prompt',
   mcpGetTools: 'mcp:get-tools',
-  mcpExecuteTool: 'mcp:execute-tool'
+  mcpExecuteTool: 'mcp:execute-tool',
+  agentChatSend: 'agent-chat:send',
+  agentChatApprove: 'agent-chat:approve',
+  agentChatReset: 'agent-chat:reset'
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
