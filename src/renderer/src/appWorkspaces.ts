@@ -1,15 +1,17 @@
-export const APP_WORKSPACE_IDS = ['edit', 'video-generation', 'voice-generation'] as const;
+export const APP_WORKSPACE_IDS = ['edit', 'video-generation', 'voice-generation', 'settings'] as const;
 const APP_WORKSPACE_FIRST_ID: AppWorkspaceId = 'edit';
-const APP_WORKSPACE_LAST_ID: AppWorkspaceId = 'voice-generation';
+const APP_WORKSPACE_LAST_ID: AppWorkspaceId = 'settings';
 const APP_WORKSPACE_NEXT_IDS: Record<AppWorkspaceId, AppWorkspaceId> = {
   edit: 'video-generation',
   'video-generation': 'voice-generation',
-  'voice-generation': 'edit'
+  'voice-generation': 'settings',
+  settings: 'edit'
 };
 const APP_WORKSPACE_PREVIOUS_IDS: Record<AppWorkspaceId, AppWorkspaceId> = {
-  edit: 'voice-generation',
+  edit: 'settings',
   'video-generation': 'edit',
-  'voice-generation': 'video-generation'
+  'voice-generation': 'video-generation',
+  settings: 'voice-generation'
 };
 
 export type AppWorkspaceId = (typeof APP_WORKSPACE_IDS)[number];
@@ -45,6 +47,13 @@ export const APP_WORKSPACES = [
     navId: 'app-workspace-nav-voice-generation',
     panelId: 'app-workspace-panel-voice-generation',
     statusLabel: 'Local & API'
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    navId: 'app-workspace-nav-settings',
+    panelId: 'app-workspace-panel-settings',
+    statusLabel: 'Preferences'
   }
 ] as const satisfies readonly AppWorkspace[];
 

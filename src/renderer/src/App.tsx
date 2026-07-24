@@ -5,17 +5,19 @@ import { AppWorkspaceNavigation } from './AppWorkspaceNavigation';
 import { NarrationPanel } from './NarrationPanel';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
+import { SettingsWorkspace } from './SettingsWorkspace';
 import { APP_WORKSPACES, getDefaultAppWorkspaceId } from './appWorkspaces';
 import type { AppWorkspace, AppWorkspaceId } from './appWorkspaces';
 import { TimelineEditor } from './editor/TimelineEditor';
 import { useTimelineEditor } from './editor/useTimelineEditor';
 
-const [EDIT_WORKSPACE, VIDEO_GENERATION_WORKSPACE, VOICE_GENERATION_WORKSPACE] = APP_WORKSPACES;
+const [EDIT_WORKSPACE, VIDEO_GENERATION_WORKSPACE, VOICE_GENERATION_WORKSPACE, SETTINGS_WORKSPACE] = APP_WORKSPACES;
 
 const APP_WORKSPACE_BY_ID = {
   edit: EDIT_WORKSPACE,
   'video-generation': VIDEO_GENERATION_WORKSPACE,
-  'voice-generation': VOICE_GENERATION_WORKSPACE
+  'voice-generation': VOICE_GENERATION_WORKSPACE,
+  settings: SETTINGS_WORKSPACE
 } as const satisfies Readonly<Record<AppWorkspaceId, AppWorkspace>>;
 
 const APP_WORKSPACE_LAYOUT_STYLE = {
@@ -111,6 +113,17 @@ export function App(): ReactElement {
               tabIndex={-1}
             >
               <NarrationPanel />
+            </section>
+            <section
+              aria-labelledby={SETTINGS_WORKSPACE.navId}
+              hidden={activeWorkspaceId !== SETTINGS_WORKSPACE.id}
+              id={SETTINGS_WORKSPACE.panelId}
+              ref={setWorkspacePanelRef(SETTINGS_WORKSPACE.id)}
+              role="region"
+              style={APP_WORKSPACE_PANEL_STYLE}
+              tabIndex={-1}
+            >
+              <SettingsWorkspace />
             </section>
           </div>
         </div>
