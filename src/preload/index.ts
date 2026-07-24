@@ -110,8 +110,6 @@ export interface VideoToolApi {
   }): Promise<ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>>;
   mcpGetTools(): Promise<ApiResponse<unknown>>;
   mcpExecuteTool(toolName: string, params: unknown): Promise<ApiResponse<unknown>>;
-  getProviderCredentials(): Promise<ApiResponse<Record<string, string>>>;
-  setProviderCredential(provider: string, apiKey: string): Promise<ApiResponse<{ readonly updated: boolean }>>;
 }
 
 const videoTool: VideoToolApi = {
@@ -194,10 +192,7 @@ const videoTool: VideoToolApi = {
     >,
   mcpGetTools: () => ipcRenderer.invoke(IPC_CHANNELS.mcpGetTools) as Promise<ApiResponse<unknown>>,
   mcpExecuteTool: (toolName: string, params: unknown) =>
-    ipcRenderer.invoke(IPC_CHANNELS.mcpExecuteTool, toolName, params) as Promise<ApiResponse<unknown>>,
-  getProviderCredentials: () => ipcRenderer.invoke(IPC_CHANNELS.getProviderCredentials) as Promise<ApiResponse<Record<string, string>>>,
-  setProviderCredential: (provider, apiKey) =>
-    ipcRenderer.invoke(IPC_CHANNELS.setProviderCredential, provider, apiKey) as Promise<ApiResponse<{ readonly updated: boolean }>>
+    ipcRenderer.invoke(IPC_CHANNELS.mcpExecuteTool, toolName, params) as Promise<ApiResponse<unknown>>
 };
 
 contextBridge.exposeInMainWorld('videoTool', videoTool);

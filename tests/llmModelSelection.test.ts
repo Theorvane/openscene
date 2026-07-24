@@ -28,11 +28,38 @@ describe('LLM provider and model catalog configuration', () => {
     }
   });
 
-  it('parses stored model IDs with fallback to default qwen2.5-coder', () => {
-    expect(parseSelectedLlmModelId('gpt-5')).toBe('gpt-5');
-    expect(parseSelectedLlmModelId('claude-sonnet-5')).toBe('claude-sonnet-5');
-    expect(parseSelectedLlmModelId('deepseek-r1')).toBe('deepseek-r1');
+  it('marks only local_ollama models as available, all API-backed models as unavailable', () => {
+    const availableModels = DEFAULT_LLM_MODELS.filter((m) => m.available);
+    const unavailableModels = DEFAULT_LLM_MODELS.filter((m) => !m.available);
 
+    // Only local_ollama models should be selectable
+    expect(availableModels.length).toBeGreaterThan(0);
+    for (const model of availableModels) {
+      expect(model.providerId).toBe('local_ollama');
+      expect(model.defaultMode).toBe('local');
+    }
+
+    // All API-backed models must be unavailable with a reason
+    expect(unavailableModels.length).toBeGreaterThan(0);
+    for (const model of unavailableModels) {
+      expect(model.providerId).not.toBe('local_ollama');
+      expect(model.defaultMode).toBe('api');
+      expect(model.unavailabilityReason).toBeDefined();
+      expect(model.unavailabilityReason!.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('parseSelectedLlmModelId falls back to first available model for unavailable API model IDs', () => {
+    // Local available models resolve correctly
+    expect(parseSelectedLlmModelId('qwen2.5-coder')).toBe('qwen2.5-coder');
+    expect(parseSelectedLlmModelId('llama3.2-vision')).toBe('llama3.2-vision');
+
+    // API model IDs are now unavailable — must fall back to first available local model
+    expect(parseSelectedLlmModelId('gpt-5')).toBe('qwen2.5-coder');
+    expect(parseSelectedLlmModelId('claude-sonnet-5')).toBe('qwen2.5-coder');
+    expect(parseSelectedLlmModelId('deepseek-r1')).toBe('qwen2.5-coder');
+
+    // Null/undefined/unknown still fall back to first available
     expect(parseSelectedLlmModelId(null)).toBe('qwen2.5-coder');
     expect(parseSelectedLlmModelId(undefined)).toBe('qwen2.5-coder');
     expect(parseSelectedLlmModelId('invalid-model-id')).toBe('qwen2.5-coder');

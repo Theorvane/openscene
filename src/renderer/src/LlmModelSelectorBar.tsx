@@ -83,8 +83,12 @@ export function LlmModelSelectorBar(): ReactElement {
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '260px', overflowY: 'auto' }}>
-            {DEFAULT_LLM_MODELS.map((model: LlmModelConfig) => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '280px', overflowY: 'auto' }}>
+            {/* Available local models */}
+            <div style={{ fontSize: '8px', fontWeight: 700, color: 'var(--muted-foreground)', padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Available
+            </div>
+            {DEFAULT_LLM_MODELS.filter((m) => m.available).map((model: LlmModelConfig) => {
               const isSelected = model.id === selectedModel.id;
               return (
                 <button
@@ -118,8 +122,8 @@ export function LlmModelSelectorBar(): ReactElement {
                         fontWeight: 700,
                         padding: '1px 4px',
                         borderRadius: '2px',
-                        background: model.defaultMode === 'local' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                        color: model.defaultMode === 'local' ? 'var(--success)' : 'var(--primary)'
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        color: 'var(--success)'
                       }}
                     >
                       {model.badge}
@@ -131,6 +135,41 @@ export function LlmModelSelectorBar(): ReactElement {
                 </button>
               );
             })}
+
+            {/* Unavailable cloud models */}
+            <div style={{ fontSize: '8px', fontWeight: 700, color: 'var(--muted-foreground)', padding: '6px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.05em', borderTop: '1px solid var(--border)', marginTop: '2px' }}>
+              Coming Soon — Provider adapters not yet implemented
+            </div>
+            {DEFAULT_LLM_MODELS.filter((m) => !m.available).map((model: LlmModelConfig) => (
+              <button
+                key={model.id}
+                type="button"
+                disabled
+                title={model.unavailabilityReason}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  padding: '6px 8px',
+                  borderRadius: 'var(--radius-xs)',
+                  border: '1px solid transparent',
+                  background: 'transparent',
+                  color: 'var(--muted-foreground)',
+                  cursor: 'not-allowed',
+                  textAlign: 'left',
+                  opacity: 0.45
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
+                  <span style={{ fontSize: 'var(--text-micro)', fontWeight: 600, flex: 1 }}>{model.label}</span>
+                  <span style={{ fontSize: '8px', fontFamily: 'var(--font-mono)' }}>{model.providerLabel}</span>
+                  <span style={{ fontSize: '7px', fontWeight: 700, padding: '1px 4px', borderRadius: '2px', background: 'rgba(99,102,241,0.12)', color: 'var(--primary)' }}>
+                    {model.badge}
+                  </span>
+                </div>
+                <span style={{ fontSize: '9px', marginTop: '2px' }}>{model.description}</span>
+              </button>
+            ))}
           </div>
         </div>
       )}

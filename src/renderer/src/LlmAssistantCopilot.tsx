@@ -25,7 +25,9 @@ export function LlmAssistantCopilot(): ReactElement {
   const [prompt, setPrompt] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [steps, setSteps] = useState<readonly CopilotStep[]>([]);
-  const [statusMessage, setStatusMessage] = useState<string>('Ready for agentic video editing instructions.');
+  const [statusMessage, setStatusMessage] = useState<string>(
+    'Enter a command keyword: video, voice/speech, or export/render.'
+  );
 
   const pollJobCompletion = async (jobId: string, kind: 'video' | 'speech'): Promise<{ success: boolean; outputFilePath?: string | undefined; error?: string | undefined }> => {
     const maxRetries = 20;
@@ -52,7 +54,7 @@ export function LlmAssistantCopilot(): ReactElement {
     const text = inputPrompt.toLowerCase();
     const newSteps: CopilotStep[] = [];
 
-    setStatusMessage(`Analyzing instruction with ${selectedModel.label}...`);
+    setStatusMessage('Analyzing command...');
 
     try {
       if (text.includes('video') || text.includes('intro') || text.includes('scene') || text.includes('영상')) {
@@ -400,8 +402,8 @@ export function LlmAssistantCopilot(): ReactElement {
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '13px' }}>🤖</span>
-              <span style={{ fontSize: 'var(--text-small)', fontWeight: 700 }}>LLM Timeline Agent</span>
+              <span style={{ fontSize: '13px' }}>⚡</span>
+              <span style={{ fontSize: 'var(--text-small)', fontWeight: 700 }}>Timeline Command Panel</span>
             </div>
             <button
               type="button"
@@ -413,7 +415,9 @@ export function LlmAssistantCopilot(): ReactElement {
           </div>
 
           <div style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-            Active Model: <strong style={{ color: 'var(--foreground)' }}>{selectedModel.label}</strong> ({selectedModel.providerLabel})
+            Deterministic keyword router: <strong style={{ color: 'var(--foreground)' }}>video</strong>,{' '}
+            <strong style={{ color: 'var(--foreground)' }}>voice/speech</strong>, or{' '}
+            <strong style={{ color: 'var(--foreground)' }}>export/render</strong>.
             {activeProject && <div style={{ color: 'var(--primary)', marginTop: '2px' }}>Active Project: {activeProject.name}</div>}
           </div>
 
@@ -478,7 +482,7 @@ export function LlmAssistantCopilot(): ReactElement {
               type="text"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Ask AI agent to edit timeline or create media..."
+              placeholder="Enter keyword command (video / voice / export)..."
               disabled={isProcessing}
               style={{
                 flex: 1,
