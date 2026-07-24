@@ -7,24 +7,11 @@ export function AgentChatToggleButton(): ReactElement {
   return (
     <button
       type="button"
+      className={`agent-chat-toggle${isOpen ? ' agent-chat-toggle--active' : ''}`}
       onClick={toggleOpen}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '4px 10px',
-        background: isOpen ? 'var(--primary)' : 'var(--surface-control)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius-xs)',
-        color: isOpen ? '#fff' : 'var(--foreground)',
-        cursor: 'pointer',
-        fontSize: 'var(--text-micro)',
-        fontWeight: 600,
-        fontFamily: 'var(--font-mono)',
-        transition: 'all 120ms ease'
-      }}
+      aria-pressed={isOpen}
     >
-      <span>💬 Agent Chat</span>
+      Agent
     </button>
   );
 }
