@@ -12,9 +12,11 @@ describe('LLM provider and model catalog configuration', () => {
 
     const modelIds = DEFAULT_LLM_MODELS.map((m) => m.id);
     expect(modelIds).toContain('qwen2.5-coder');
+    expect(modelIds).toContain('openai-codex');
     expect(modelIds).toContain('gpt-4o');
-    expect(modelIds).toContain('claude-3-5-sonnet');
-    expect(modelIds).toContain('gemini-2.0-flash');
+    expect(modelIds).toContain('claude-3-7-sonnet');
+    expect(modelIds).toContain('gemini-3-6-flash');
+    expect(modelIds).toContain('deepseek-v4-pro');
     expect(modelIds).toContain('deepseek-r1');
 
     for (const model of DEFAULT_LLM_MODELS) {

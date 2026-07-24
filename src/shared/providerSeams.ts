@@ -1,4 +1,4 @@
-export type VideoGenerationProviderId = 'gemini_veo' | 'openai_sora' | 'local_video';
+export type VideoGenerationProviderId = 'gemini_veo' | 'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream' | 'local_video';
 export type TextToSpeechProviderId = 'elevenlabs' | 'local_qwen';
 export type ProviderJobStatus = 'queued' | 'running' | 'completed' | 'failed';
 export type ProviderExecutionMode = 'local' | 'api';
@@ -6,6 +6,9 @@ export type ProviderExecutionMode = 'local' | 'api';
 export interface ProviderApiConfig {
   geminiApiKey?: string;
   openaiApiKey?: string;
+  runwayApiKey?: string;
+  klingApiKey?: string;
+  lumaApiKey?: string;
   elevenlabsApiKey?: string;
 }
 

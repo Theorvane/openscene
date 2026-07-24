@@ -40,6 +40,16 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
 
   // Cloud Models - OpenAI
   {
+    id: 'openai-codex',
+    providerId: 'openai',
+    label: 'OpenAI Codex / GPT-5.6 Sol',
+    providerLabel: 'OpenAI',
+    description: 'Premier agentic model for automated timeline editing & video orchestration',
+    category: 'editor-assistant',
+    badge: 'REASONING',
+    defaultMode: 'api'
+  },
+  {
     id: 'gpt-4o',
     providerId: 'openai',
     label: 'GPT-4o',
@@ -62,6 +72,16 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
 
   // Cloud Models - Anthropic
   {
+    id: 'claude-3-7-sonnet',
+    providerId: 'anthropic',
+    label: 'Claude 3.7 Sonnet',
+    providerLabel: 'Anthropic',
+    description: 'Hybrid reasoning SOTA model for storyboarding, scripts, and editing logic',
+    category: 'voice-script',
+    badge: 'REASONING',
+    defaultMode: 'api'
+  },
+  {
     id: 'claude-3-5-sonnet',
     providerId: 'anthropic',
     label: 'Claude 3.5 Sonnet',
@@ -74,11 +94,21 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
 
   // Cloud Models - Google Gemini
   {
+    id: 'gemini-3-6-flash',
+    providerId: 'google_gemini',
+    label: 'Gemini 3.6 Flash',
+    providerLabel: 'Google Gemini',
+    description: 'Ultra-fast multimodal model integrated with Gemini Veo 3.1 video generation',
+    category: 'video-prompt',
+    badge: 'FAST',
+    defaultMode: 'api'
+  },
+  {
     id: 'gemini-2.0-flash',
     providerId: 'google_gemini',
     label: 'Gemini 2.0 Flash',
     providerLabel: 'Google Gemini',
-    description: 'Ultra-fast multimodal model integrated with Gemini Veo video generation',
+    description: 'Multimodal model integrated with Gemini Veo video generation',
     category: 'video-prompt',
     badge: 'FAST',
     defaultMode: 'api'
@@ -95,6 +125,16 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
   },
 
   // Cloud Models - DeepSeek
+  {
+    id: 'deepseek-v4-pro',
+    providerId: 'deepseek',
+    label: 'DeepSeek V4 Pro',
+    providerLabel: 'DeepSeek',
+    description: 'Advanced open-weights coding & reasoning model for AI video sequencing',
+    category: 'editor-assistant',
+    badge: 'REASONING',
+    defaultMode: 'api'
+  },
   {
     id: 'deepseek-r1',
     providerId: 'deepseek',
@@ -116,6 +156,9 @@ export interface LlmProviderApiConfig {
   anthropicApiKey?: string;
   geminiApiKey?: string;
   deepseekApiKey?: string;
+  runwayApiKey?: string;
+  klingApiKey?: string;
+  lumaApiKey?: string;
 }
 
 export function parseSelectedLlmModelId(storedId: string | null | undefined): string {

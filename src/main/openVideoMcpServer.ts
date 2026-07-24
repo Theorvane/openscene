@@ -17,7 +17,7 @@ export class OpenVideoMcpServer {
       durationSeconds: z.number().min(1).max(10).default(5),
       stylePreset: z.string().optional().default('Cinematic'),
       mode: z.enum(['local', 'api']).default('local'),
-      provider: z.enum(['local_video', 'gemini_veo', 'openai_sora']).optional(),
+      provider: z.enum(['local_video', 'gemini_veo', 'openai_sora', 'runway_gen4', 'kling_v3', 'luma_dream']).optional(),
       apiKey: z.string().optional()
     })
   })
@@ -27,7 +27,7 @@ export class OpenVideoMcpServer {
     durationSeconds?: number;
     stylePreset?: string;
     mode?: 'local' | 'api';
-    provider?: 'local_video' | 'gemini_veo' | 'openai_sora';
+    provider?: 'local_video' | 'gemini_veo' | 'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream';
     apiKey?: string;
   }) {
     const job = await createVideoGenerationJob({

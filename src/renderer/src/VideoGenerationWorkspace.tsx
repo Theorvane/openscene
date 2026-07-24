@@ -11,7 +11,7 @@ const DURATIONS = [3, 5, 10] as const;
 export function VideoGenerationWorkspace(): ReactElement {
   const { importTtsResult } = useProjectResultImport();
   const [mode, setMode] = useState<ProviderExecutionMode>('local');
-  const [apiProvider, setApiProvider] = useState<'gemini_veo' | 'openai_sora'>('gemini_veo');
+  const [apiProvider, setApiProvider] = useState<'gemini_veo' | 'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream'>('gemini_veo');
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [durationSeconds, setDurationSeconds] = useState<number>(5);
@@ -135,14 +135,14 @@ export function VideoGenerationWorkspace(): ReactElement {
         <div className="ai-workspace__form-panel">
           {mode === 'api' ? (
             <div className="ai-provider-select">
-              <span className="field-label-text">Select Cloud Provider</span>
-              <div className="provider-buttons">
+              <span className="field-label-text">Select Cloud AI Video Model</span>
+              <div className="provider-buttons" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 <button
                   type="button"
                   className={`provider-chip ${apiProvider === 'gemini_veo' ? 'provider-chip--selected' : ''}`}
                   onClick={() => setApiProvider('gemini_veo')}
                 >
-                  Google Gemini Veo
+                  Google Veo 3.1
                 </button>
                 <button
                   type="button"
@@ -151,15 +151,46 @@ export function VideoGenerationWorkspace(): ReactElement {
                 >
                   OpenAI Sora
                 </button>
+                <button
+                  type="button"
+                  className={`provider-chip ${apiProvider === 'runway_gen4' ? 'provider-chip--selected' : ''}`}
+                  onClick={() => setApiProvider('runway_gen4')}
+                >
+                  Runway Gen-4
+                </button>
+                <button
+                  type="button"
+                  className={`provider-chip ${apiProvider === 'kling_v3' ? 'provider-chip--selected' : ''}`}
+                  onClick={() => setApiProvider('kling_v3')}
+                >
+                  Kling 3.0
+                </button>
+                <button
+                  type="button"
+                  className={`provider-chip ${apiProvider === 'luma_dream' ? 'provider-chip--selected' : ''}`}
+                  onClick={() => setApiProvider('luma_dream')}
+                >
+                  Luma Dream
+                </button>
               </div>
 
               <label className="field-label" style={{ marginTop: 'var(--space-3)' }}>
-                API Key ({apiProvider === 'gemini_veo' ? 'Gemini' : 'OpenAI'})
+                API Key (
+                {apiProvider === 'gemini_veo'
+                  ? 'Google Gemini'
+                  : apiProvider === 'openai_sora'
+                    ? 'OpenAI'
+                    : apiProvider === 'runway_gen4'
+                      ? 'Runway ML'
+                      : apiProvider === 'kling_v3'
+                        ? 'Kling AI'
+                        : 'Luma AI'}
+                )
                 <input
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={`Enter your ${apiProvider === 'gemini_veo' ? 'Gemini' : 'OpenAI'} API key...`}
+                  placeholder={`Enter your API key...`}
                 />
               </label>
             </div>
