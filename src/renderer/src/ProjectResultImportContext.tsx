@@ -13,8 +13,6 @@ type ProjectResultImportContextValue = {
   readonly isImporting: boolean;
   readonly importRecordingResult: (sessionId: string) => Promise<StatusMessage>;
   readonly importTtsResult: (jobId: string) => Promise<StatusMessage>;
-  readonly importVideoResultAsset: (input: { sourcePath: string; displayName: string; kind: 'video'; mimeType: string }) => Promise<StatusMessage>;
-  readonly importTtsResultAsset: (input: { sourcePath: string; displayName: string; kind: 'audio'; mimeType: string }) => Promise<StatusMessage>;
 };
 
 type ProjectResultImportProviderProps = {
@@ -29,18 +27,6 @@ export function ProjectResultImportProvider({ children, editor }: ProjectResultI
     activeProject: editor.project === null ? null : { id: editor.project.id, name: editor.project.name },
     importRecordingResult: editor.importRecordingResult,
     importTtsResult: editor.importTtsResult,
-    importVideoResultAsset: async () => {
-      if (editor.project === null) {
-        return { tone: 'warning', text: 'Open a local project before importing media.' };
-      }
-      return { tone: 'success', text: `Imported generated AI asset into ${editor.project.name}.` };
-    },
-    importTtsResultAsset: async () => {
-      if (editor.project === null) {
-        return { tone: 'warning', text: 'Open a local project before importing voice audio.' };
-      }
-      return { tone: 'success', text: `Imported generated voice audio into ${editor.project.name}.` };
-    },
     isImporting: editor.isBusy
   };
 

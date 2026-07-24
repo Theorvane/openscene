@@ -69,7 +69,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
   const { videoDir } = await ensureAiDirectories();
   const id = `video-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const provider = request.mode === 'api' 
-    ? (request.prompt.toLowerCase().includes('sora') ? 'openai_sora' : 'gemini_veo')
+    ? (request.provider ?? 'gemini_veo')
     : 'local_video';
   
   const mode = request.mode ?? 'local';
@@ -168,4 +168,26 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
 
 export function getSpeechGenerationJob(jobId: string): TextToSpeechJob | null {
   return speechJobs.get(jobId) ?? null;
+}
+
+export function getCompletedAiSource(jobId: string): { sourcePath: string; displayName: string; kind: 'video' | 'audio'; mimeType: string } | null {
+  const speechJob = speechJobs.get(jobId);
+  if (speechJob !== undefined && speechJob.status === 'completed' && speechJob.outputFilePath) {
+    return {
+      sourcePath: speechJob.outputFilePath,
+      displayName: `AI_Voice_${speechJob.id.slice(-6)}.wav`,
+      kind: 'audio',
+      mimeType: 'audio/wav'
+    };
+  }
+  const videoJob = videoJobs.get(jobId);
+  if (videoJob !== undefined && videoJob.status === 'completed' && videoJob.outputFilePath) {
+    return {
+      sourcePath: videoJob.outputFilePath,
+      displayName: `AI_Video_${videoJob.id.slice(-6)}.mp4`,
+      kind: 'video',
+      mimeType: 'video/mp4'
+    };
+  }
+  return null;
 }

@@ -8,7 +8,7 @@ const ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const;
 const DURATIONS = [3, 5, 10] as const;
 
 export function VideoGenerationWorkspace(): ReactElement {
-  const { importVideoResultAsset } = useProjectResultImport();
+  const { importTtsResult } = useProjectResultImport();
   const [mode, setMode] = useState<ProviderExecutionMode>('local');
   const [apiProvider, setApiProvider] = useState<'gemini_veo' | 'openai_sora'>('gemini_veo');
   const [prompt, setPrompt] = useState('');
@@ -47,6 +47,7 @@ export function VideoGenerationWorkspace(): ReactElement {
         durationSeconds,
         stylePreset: selectedStyle,
         mode,
+        provider: apiProvider,
         apiKey
       });
 
@@ -86,12 +87,7 @@ export function VideoGenerationWorkspace(): ReactElement {
   const handleImportToProject = async (job: VideoGenerationJob): Promise<void> => {
     if (!job.outputFilePath) return;
     try {
-      const status = await importVideoResultAsset({
-        sourcePath: job.outputFilePath,
-        displayName: `AI_${job.provider}_${job.id.slice(-4)}.mp4`,
-        kind: 'video',
-        mimeType: 'video/mp4'
-      });
+      const status = await importTtsResult(job.id);
       setStatusMsg(status);
     } catch (err) {
       setStatusMsg({ text: `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`, tone: 'danger' });

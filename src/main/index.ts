@@ -24,6 +24,8 @@ import { resolvePreloadScriptPath } from './preloadPath';
 import { IPC_CHANNELS } from '../shared/ipc';
 import { installApplicationMenu } from './applicationMenu';
 
+import { createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getSpeechGenerationJob, getVideoGenerationJob } from './aiJobManager';
+
 registerTimelineAssetScheme();
 
 const sourceCatalog = new SourceCatalog();
@@ -56,7 +58,7 @@ const resultAssetImportService = new ResultAssetImportService({
       ? null
       : { sourcePath: result.outputPath, displayName: result.fileName, kind: 'video', mimeType: 'video/webm' };
   },
-  resolveTtsSource: (jobId) => voiceTtsService.getCompletedAudioSource(jobId)
+  resolveTtsSource: (jobId) => voiceTtsService.getCompletedAudioSource(jobId) ?? getCompletedAiSource(jobId)
 });
 const exportIpcService = new ExportIpcService({
   projects: projectStore,

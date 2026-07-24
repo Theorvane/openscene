@@ -91,15 +91,10 @@ export function NarrationPanel(): ReactElement {
   };
 
   const handleImportElevenToProject = async (): Promise<void> => {
-    if (!elevenJob?.filePath) return;
+    if (!elevenJob) return;
     try {
-      await projectImport.importTtsResultAsset({
-        sourcePath: elevenJob.filePath,
-        displayName: `ElevenLabs_${elevenJob.id.slice(-4)}.wav`,
-        kind: 'audio',
-        mimeType: 'audio/wav'
-      });
-      setElevenStatus({ tone: 'success', text: 'Successfully imported ElevenLabs audio into active project!' });
+      const status = await projectImport.importTtsResult(elevenJob.id);
+      setElevenStatus(status);
     } catch (err) {
       setElevenStatus({ tone: 'danger', text: err instanceof Error ? err.message : 'Import failed.' });
     }

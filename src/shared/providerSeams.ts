@@ -15,6 +15,7 @@ export interface VideoGenerationRequest {
   durationSeconds: number;
   stylePreset?: string;
   mode?: ProviderExecutionMode;
+  provider?: VideoGenerationProviderId;
   apiKey?: string;
 }
 
