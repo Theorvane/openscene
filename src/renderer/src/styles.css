@@ -153,6 +153,10 @@
   --shadow-inset-rule: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --shadow-control: none;
 }
+  --shadow-editorial: none;
+  --shadow-inset-rule: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-control: none;
+}
 
 * {
   box-sizing: border-box;

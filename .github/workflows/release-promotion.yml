@@ -1,0 +1,21 @@
+name: release-promotion
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-promotion:
+    runs-on: ubuntu-latest
+    env:
+      HEAD_REF: ${{ github.head_ref }}
+      HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+      BASE_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Require the repository-owned dev integration branch
+        run: |
+          test "$HEAD_REPOSITORY" = "$BASE_REPOSITORY"
+          test "$HEAD_REF" = "dev"

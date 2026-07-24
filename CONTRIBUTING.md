@@ -11,11 +11,11 @@ Thanks for improving OpenVideo. This is a local-first Electron desktop app: keep
 ## Development Workflow
 
 1. Create or find a GitHub issue that describes the change.
-2. Update your local `dev` branch, then create a focused feature branch from it:
+2. Update your local `dev` branch, then create a focused, issue-numbered branch from it. Use `<type>/<issue-number>-<short-description>`:
    ```bash
    git switch dev
    git pull --ff-only origin dev
-   git switch -c feat/short-description
+   git switch -c feat/123-short-description
    ```
 3. Make small, focused commits using [Conventional Commits](https://www.conventionalcommits.org/), for example `feat: add local export preset`, `fix: reject invalid media path`, or `docs: clarify FFmpeg setup`.
 4. Add or update tests for behavior changes. Run the relevant focused test first, then run the full checks:
