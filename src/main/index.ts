@@ -41,6 +41,7 @@ const ttsJobStore = new LocalTtsJobStore();
 const exportJobStore = new ExportJobStore();
 const credentialStore = new CredentialStore(app.getPath('userData'));
 const llmExecutionAdapter = new LlmExecutionAdapter(credentialStore);
+setAiJobManagerCredentialStore(credentialStore);
 const timelineIpcService = new TimelineIpcService({
   projects: projectStore,
   assets: assetLibraryStore,
@@ -318,27 +319,6 @@ function installIpcHandlers(): void {
       return fail('INVALID_INPUT', `MCP tool ${toolName} is not recognized.`);
     } catch (err) {
       return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : `Failed to execute MCP tool ${toolName}`);
-    }
-  });
-
-  const credentialStore = new CredentialStore(app.getPath('userData'));
-  setAiJobManagerCredentialStore(credentialStore);
-
-  ipcMain.handle(IPC_CHANNELS.getProviderCredentials, async () => {
-    try {
-      const creds = await credentialStore.getCredentials();
-      return ok(creds);
-    } catch (err) {
-      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to retrieve credentials');
-    }
-  });
-
-  ipcMain.handle(IPC_CHANNELS.setProviderCredential, async (_event, provider: any, apiKey: string) => {
-    try {
-      await credentialStore.setCredential(provider, apiKey);
-      return ok({ updated: true });
-    } catch (err) {
-      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to save credential');
     }
   });
 }
