@@ -94,7 +94,7 @@ describe('LlmExecutionAdapter (main process)', () => {
       const credentialStore = new CredentialStore(tempDir);
       const adapter = new LlmExecutionAdapter(credentialStore);
 
-      const result = await adapter.executeCompletion({ modelId: 'gpt-4o', prompt: 'Generate video script' });
+      const result = await adapter.executeCompletion({ modelId: 'gpt-5', prompt: 'Generate video script' });
 
       expect(result.ok).toBe(false);
       expect(result.providerId).toBe('openai');
@@ -111,7 +111,7 @@ describe('LlmExecutionAdapter (main process)', () => {
       await credentialStore.setCredential('openaiApiKey', 'sk-test-valid-openai-key-12345');
       const adapter = new LlmExecutionAdapter(credentialStore);
 
-      const result = await adapter.executeCompletion({ modelId: 'gpt-4o', prompt: 'Generate video script' });
+      const result = await adapter.executeCompletion({ modelId: 'gpt-5', prompt: 'Generate video script' });
 
       expect(result.ok).toBe(false);
       expect(result.providerId).toBe('openai');

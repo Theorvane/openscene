@@ -12,11 +12,11 @@ describe('LLM provider and model catalog configuration', () => {
 
     const modelIds = DEFAULT_LLM_MODELS.map((m) => m.id);
     expect(modelIds).toContain('qwen2.5-coder');
-    expect(modelIds).toContain('openai-codex');
-    expect(modelIds).toContain('gpt-4o');
-    expect(modelIds).toContain('claude-3-7-sonnet');
-    expect(modelIds).toContain('gemini-3-6-flash');
-    expect(modelIds).toContain('deepseek-v4-pro');
+    expect(modelIds).toContain('gpt-5');
+    expect(modelIds).toContain('claude-opus-4-8');
+    expect(modelIds).toContain('claude-sonnet-5');
+    expect(modelIds).toContain('gemini-3-pro');
+    expect(modelIds).toContain('deepseek-v3.1');
     expect(modelIds).toContain('deepseek-r1');
 
     for (const model of DEFAULT_LLM_MODELS) {
@@ -29,8 +29,8 @@ describe('LLM provider and model catalog configuration', () => {
   });
 
   it('parses stored model IDs with fallback to default qwen2.5-coder', () => {
-    expect(parseSelectedLlmModelId('gpt-4o')).toBe('gpt-4o');
-    expect(parseSelectedLlmModelId('claude-3-5-sonnet')).toBe('claude-3-5-sonnet');
+    expect(parseSelectedLlmModelId('gpt-5')).toBe('gpt-5');
+    expect(parseSelectedLlmModelId('claude-sonnet-5')).toBe('claude-sonnet-5');
     expect(parseSelectedLlmModelId('deepseek-r1')).toBe('deepseek-r1');
 
     expect(parseSelectedLlmModelId(null)).toBe('qwen2.5-coder');

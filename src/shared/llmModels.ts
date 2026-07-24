@@ -40,29 +40,19 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
 
   // Cloud Models - OpenAI
   {
-    id: 'openai-codex',
+    id: 'gpt-5',
     providerId: 'openai',
-    label: 'OpenAI Codex / GPT-5.6 Sol',
+    label: 'GPT-5',
     providerLabel: 'OpenAI',
-    description: 'Premier agentic model for automated timeline editing & video orchestration',
-    category: 'editor-assistant',
+    description: 'Flagship reasoning & multimodal model for cinematic scriptwriting and agentic timeline edits',
+    category: 'video-prompt',
     badge: 'REASONING',
     defaultMode: 'api'
   },
   {
-    id: 'gpt-4o',
+    id: 'gpt-5-mini',
     providerId: 'openai',
-    label: 'GPT-4o',
-    providerLabel: 'OpenAI',
-    description: 'Omni multimodal model for cinematic scriptwriting & video prompt creation',
-    category: 'video-prompt',
-    badge: 'SMART',
-    defaultMode: 'api'
-  },
-  {
-    id: 'gpt-4o-mini',
-    providerId: 'openai',
-    label: 'GPT-4o Mini',
+    label: 'GPT-5 Mini',
     providerLabel: 'OpenAI',
     description: 'Fast lightweight model for instant timeline edits',
     category: 'editor-assistant',
@@ -72,21 +62,21 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
 
   // Cloud Models - Anthropic
   {
-    id: 'claude-3-7-sonnet',
+    id: 'claude-opus-4-8',
     providerId: 'anthropic',
-    label: 'Claude 3.7 Sonnet',
+    label: 'Claude Opus 4.8',
     providerLabel: 'Anthropic',
-    description: 'Hybrid reasoning SOTA model for storyboarding, scripts, and editing logic',
+    description: 'Most capable Claude model for storyboarding, scripts, and complex editing logic',
     category: 'voice-script',
     badge: 'REASONING',
     defaultMode: 'api'
   },
   {
-    id: 'claude-3-5-sonnet',
+    id: 'claude-sonnet-5',
     providerId: 'anthropic',
-    label: 'Claude 3.5 Sonnet',
+    label: 'Claude Sonnet 5',
     providerLabel: 'Anthropic',
-    description: 'State-of-the-art reasoning model for narrative voiceovers & complex edits',
+    description: 'Balanced state-of-the-art model for narrative voiceovers & complex edits',
     category: 'voice-script',
     badge: 'SMART',
     defaultMode: 'api'
@@ -94,43 +84,33 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
 
   // Cloud Models - Google Gemini
   {
-    id: 'gemini-3-6-flash',
+    id: 'gemini-3-pro',
     providerId: 'google_gemini',
-    label: 'Gemini 3.6 Flash',
-    providerLabel: 'Google Gemini',
-    description: 'Ultra-fast multimodal model integrated with Gemini Veo 3.1 video generation',
-    category: 'video-prompt',
-    badge: 'FAST',
-    defaultMode: 'api'
-  },
-  {
-    id: 'gemini-2.0-flash',
-    providerId: 'google_gemini',
-    label: 'Gemini 2.0 Flash',
-    providerLabel: 'Google Gemini',
-    description: 'Multimodal model integrated with Gemini Veo video generation',
-    category: 'video-prompt',
-    badge: 'FAST',
-    defaultMode: 'api'
-  },
-  {
-    id: 'gemini-1.5-pro',
-    providerId: 'google_gemini',
-    label: 'Gemini 1.5 Pro',
+    label: 'Gemini 3 Pro',
     providerLabel: 'Google Gemini',
     description: 'Long-context multimodal model for full video timeline analysis',
     category: 'editor-assistant',
     badge: 'SMART',
     defaultMode: 'api'
   },
+  {
+    id: 'gemini-2.5-flash',
+    providerId: 'google_gemini',
+    label: 'Gemini 2.5 Flash',
+    providerLabel: 'Google Gemini',
+    description: 'Fast multimodal model integrated with Gemini Veo video generation',
+    category: 'video-prompt',
+    badge: 'FAST',
+    defaultMode: 'api'
+  },
 
   // Cloud Models - DeepSeek
   {
-    id: 'deepseek-v4-pro',
+    id: 'deepseek-v3.1',
     providerId: 'deepseek',
-    label: 'DeepSeek V4 Pro',
+    label: 'DeepSeek V3.1',
     providerLabel: 'DeepSeek',
-    description: 'Advanced open-weights coding & reasoning model for AI video sequencing',
+    description: 'Unified chat + reasoning open-weights model for scene sequencing & prompt optimization',
     category: 'editor-assistant',
     badge: 'REASONING',
     defaultMode: 'api'
@@ -140,7 +120,7 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     providerId: 'deepseek',
     label: 'DeepSeek R1',
     providerLabel: 'DeepSeek',
-    description: 'Open-weights reasoning model for scene sequencing & AI prompt optimization',
+    description: 'Open-weights reasoning specialist for scene sequencing & AI prompt optimization',
     category: 'editor-assistant',
     badge: 'REASONING',
     defaultMode: 'api'
