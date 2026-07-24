@@ -136,6 +136,7 @@ export interface LlmProviderApiConfig {
   anthropicApiKey?: string;
   geminiApiKey?: string;
   deepseekApiKey?: string;
+  elevenlabsApiKey?: string;
   runwayApiKey?: string;
   klingApiKey?: string;
   lumaApiKey?: string;

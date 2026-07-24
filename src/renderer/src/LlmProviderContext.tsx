@@ -113,6 +113,11 @@ export function LlmProvider({ children }: LlmProviderProps): ReactElement {
               })
               .catch(() => undefined);
           }
+          if (updates.elevenlabsApiKey !== undefined) {
+            window.videoTool.setProviderCredential('elevenlabsApiKey', updates.elevenlabsApiKey).then(() => {
+              setCredentialStatus((prev) => ({ ...prev, elevenlabsApiKey: updates.elevenlabsApiKey!.trim().length > 0 }));
+            }).catch(() => undefined);
+          }
         }
       }
       return next;

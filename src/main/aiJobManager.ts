@@ -259,7 +259,7 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
       if (mode === 'api') {
         let apiKey = request.apiKey?.trim();
         if ((!apiKey || apiKey.length === 0) && activeCredentialStore) {
-          apiKey = await activeCredentialStore.getCredentialValue('openaiApiKey');
+          apiKey = await activeCredentialStore.getCredentialValue('elevenlabsApiKey');
         }
 
         if (!apiKey || apiKey.length === 0) {

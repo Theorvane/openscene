@@ -27,15 +27,20 @@ describe('CredentialStore safeStorage and secret boundary tests', () => {
     const store = new CredentialStore(tempDir);
     await store.setCredential('openaiApiKey', 'sk-proj-test123456');
     await store.setCredential('anthropicApiKey', 'sk-ant-test654321');
+    await store.setCredential('elevenlabsApiKey', 'sk-eleven-test123999');
 
     const status = await store.getCredentialStatus();
     expect(status.openaiApiKey).toBe(true);
     expect(status.anthropicApiKey).toBe(true);
+    expect(status.elevenlabsApiKey).toBe(true);
     expect(status.geminiApiKey).toBe(false);
     expect(status.deepseekApiKey).toBe(false);
 
     const val = await store.getCredentialValue('openaiApiKey');
     expect(val).toBe('sk-proj-test123456');
+
+    const elevenVal = await store.getCredentialValue('elevenlabsApiKey');
+    expect(elevenVal).toBe('sk-eleven-test123999');
   });
 
   it('handles empty credential store initialization gracefully', async () => {
