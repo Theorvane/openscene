@@ -33,6 +33,7 @@ import { AGENT_CHAT_MUTATING_TOOL_NAMES, createAgentChatTools } from './agentCha
 import { buildAgentChatGraph } from './agentChatGraph';
 import { AgentChatSessionManager } from './agentChatSession';
 import { createOllamaAgentChatModel } from './agentChatModel';
+import { registerAgentChatIpcHandlers } from './agentChatIpcHandlers';
 
 registerTimelineAssetScheme();
 
@@ -333,30 +334,7 @@ async function installIpcHandlers(): Promise<void> {
     createModel: createOllamaAgentChatModel(agentChatTools)
   });
   const agentChatSessions = new AgentChatSessionManager(agentChatGraphBundle);
-
-  ipcMain.handle(IPC_CHANNELS.agentChatSend, async (_event, request) => {
-    try {
-      return ok(await agentChatSessions.sendMessage(request));
-    } catch (err) {
-      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to send agent chat message');
-    }
-  });
-
-  ipcMain.handle(IPC_CHANNELS.agentChatApprove, async (_event, request) => {
-    try {
-      return ok(await agentChatSessions.respondToApproval(request));
-    } catch (err) {
-      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to record agent chat approval');
-    }
-  });
-
-  ipcMain.handle(IPC_CHANNELS.agentChatReset, async (_event, request) => {
-    try {
-      return ok(agentChatSessions.resetConversation(request));
-    } catch (err) {
-      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to reset agent chat conversation');
-    }
-  });
+  registerAgentChatIpcHandlers(ipcMain, agentChatSessions);
 }
 
 app.whenReady().then(async () => {
