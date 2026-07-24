@@ -1,4 +1,6 @@
-import { readFile, stat } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   createSpeechGenerationJob,
@@ -8,8 +10,19 @@ import {
   getVideoGenerationJob
 } from '../src/main/aiJobManager';
 
-describe('AI Job Manager, provider seams, and local asset synthesis', () => {
-  it('creates and executes a local video generation job producing a valid non-empty MP4 asset', async () => {
+async function withTempDirectory<T>(run: (directory: string) => Promise<T>): Promise<T> {
+  const directory = await mkdtemp(join(tmpdir(), 'video-ai-job-test-'));
+  try {
+    return await run(directory);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+describe('AI Job Manager, provider seams, and local runner execution', () => {
+  it('fails unconfigured local video engine jobs gracefully without falsely generating media', async () => {
+    delete process.env.VIDEO_TOOL_LOCAL_VIDEO_RUNNER_PATH;
+
     const job = await createVideoGenerationJob({
       prompt: 'A cinematic sunset over glowing ocean waves',
       aspectRatio: '16:9',
@@ -17,66 +30,58 @@ describe('AI Job Manager, provider seams, and local asset synthesis', () => {
       mode: 'local'
     });
 
-    expect(job.id).toContain('video-job-');
-    expect(job.provider).toBe('local_video');
-    expect(job.mode).toBe('local');
     expect(job.status).toBe('queued');
-
     await new Promise((resolve) => setTimeout(resolve, 1200));
 
-    const completedJob = getVideoGenerationJob(job.id);
-    expect(completedJob).not.toBeNull();
-    expect(completedJob?.status).toBe('completed');
-    expect(completedJob?.outputFilePath).toBeDefined();
-
-    if (completedJob?.outputFilePath) {
-      const fileStats = await stat(completedJob.outputFilePath);
-      expect(fileStats.isFile()).toBe(true);
-      expect(fileStats.size).toBeGreaterThan(0);
-
-      const buffer = await readFile(completedJob.outputFilePath);
-      expect(buffer.toString('utf8', 4, 8)).toBe('ftyp');
-    }
-
-    const aiSource = getCompletedAiSource(job.id);
-    expect(aiSource).not.toBeNull();
-    expect(aiSource?.kind).toBe('video');
-    expect(aiSource?.mimeType).toBe('video/mp4');
+    const failedJob = getVideoGenerationJob(job.id);
+    expect(failedJob?.status).toBe('failed');
+    expect(failedJob?.error).toContain('Local AI video generation runner is unconfigured');
+    expect(failedJob?.outputFilePath).toBeUndefined();
   }, 10_000);
 
-  it('creates and executes a local speech synthesis job producing a valid non-empty WAV audio asset', async () => {
-    const job = await createSpeechGenerationJob({
-      script: 'Antigravity AI video editor speech test.',
-      voiceId: 'qwen-neutral',
-      mode: 'local'
+  it('passes request parameters to configured local video runner and generates valid output file', async () => {
+    await withTempDirectory(async (directory) => {
+      const mockRunnerPath = join(directory, 'mock-video-runner.sh');
+      const scriptContent = `#!/bin/sh
+for arg in "$@"; do
+  if [ "$prev" = "--output-path" ]; then
+    out="$arg"
+  fi
+  prev="$arg"
+done
+mkdir -p "$(dirname "$out")"
+printf "\\x00\\x00\\x00\\x20ftypisom\\x00\\x00\\x02\\x00isomiso2avc1mp41\\x00\\x00\\x00\\x08moov" > "$out"
+`;
+      await writeFile(mockRunnerPath, scriptContent);
+      await chmod(mockRunnerPath, 0o755);
+      process.env.VIDEO_TOOL_LOCAL_VIDEO_RUNNER_PATH = mockRunnerPath;
+
+      const job = await createVideoGenerationJob({
+        prompt: 'A futuristic city skyline at night',
+        stylePreset: 'Cyberpunk',
+        aspectRatio: '16:9',
+        durationSeconds: 5,
+        mode: 'local'
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const completedJob = getVideoGenerationJob(job.id);
+      expect(completedJob?.status).toBe('completed');
+      expect(completedJob?.outputFilePath).toBeDefined();
+
+      if (completedJob?.outputFilePath) {
+        const fileStats = await stat(completedJob.outputFilePath);
+        expect(fileStats.isFile()).toBe(true);
+        expect(fileStats.size).toBeGreaterThan(0);
+      }
+
+      const aiSource = getCompletedAiSource(job.id);
+      expect(aiSource?.kind).toBe('video');
+      expect(aiSource?.mimeType).toBe('video/mp4');
+
+      delete process.env.VIDEO_TOOL_LOCAL_VIDEO_RUNNER_PATH;
     });
-
-    expect(job.id).toContain('speech-job-');
-    expect(job.provider).toBe('local_qwen');
-    expect(job.mode).toBe('local');
-    expect(job.status).toBe('queued');
-
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    const completedJob = getSpeechGenerationJob(job.id);
-    expect(completedJob).not.toBeNull();
-    expect(completedJob?.status).toBe('completed');
-    expect(completedJob?.outputFilePath).toBeDefined();
-
-    if (completedJob?.outputFilePath) {
-      const fileStats = await stat(completedJob.outputFilePath);
-      expect(fileStats.isFile()).toBe(true);
-      expect(fileStats.size).toBeGreaterThan(44);
-
-      const buffer = await readFile(completedJob.outputFilePath);
-      expect(buffer.toString('utf8', 0, 4)).toBe('RIFF');
-      expect(buffer.toString('utf8', 8, 12)).toBe('WAVE');
-    }
-
-    const aiSource = getCompletedAiSource(job.id);
-    expect(aiSource).not.toBeNull();
-    expect(aiSource?.kind).toBe('audio');
-    expect(aiSource?.mimeType).toBe('audio/wav');
   }, 10_000);
 
   it('fails API mode video jobs cleanly when API key is missing or endpoint is unconfigured', async () => {

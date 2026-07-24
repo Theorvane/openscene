@@ -33,78 +33,66 @@ export async function ensureAiDirectories(): Promise<{ videoDir: string; speechD
   return { videoDir, speechDir };
 }
 
-// Generate valid MP4 file container buffer with ftyp, moov, and mdat boxes
-function generateValidMp4Buffer(): Buffer {
-  // ftyp box
-  const ftyp = Buffer.from([
-    0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, // size 32, 'ftyp'
-    0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00, // major_brand 'isom', minor_version 512
-    0x69, 0x73, 0x6f, 0x6d, 0x69, 0x73, 0x6f, 0x32, // compatible_brands 'isom', 'iso2'
-    0x61, 0x76, 0x63, 0x31, 0x6d, 0x70, 0x34, 0x31  // 'avc1', 'mp41'
-  ]);
+export type LocalVideoRunnerConfig = {
+  readonly runnerExecutablePath?: string;
+  readonly modelWeightsPath?: string;
+};
 
-  // mdat box with dummy NAL payload
-  const mdatData = Buffer.from([0x00, 0x00, 0x00, 0x02, 0x09, 0x10]);
-  const mdatHeader = Buffer.alloc(8);
-  mdatHeader.writeUInt32BE(8 + mdatData.length, 0);
-  mdatHeader.write('mdat', 4);
-  const mdat = Buffer.concat([mdatHeader, mdatData]);
-
-  // moov box header
-  const moovHeader = Buffer.alloc(8);
-  const moovData = Buffer.from([
-    // mvhd atom
-    0x00, 0x00, 0x00, 0x6c, 0x6d, 0x76, 0x68, 0x64,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xe8,
-    0x00, 0x00, 0x03, 0xe8, 0x00, 0x01, 0x00, 0x00,
-    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x02
-  ]);
-  moovHeader.writeUInt32BE(8 + moovData.length, 0);
-  moovHeader.write('moov', 4);
-  const moov = Buffer.concat([moovHeader, moovData]);
-
-  return Buffer.concat([ftyp, moov, mdat]);
+export function getLocalVideoRunnerConfig(): LocalVideoRunnerConfig {
+  const runnerExecutablePath = process.env.VIDEO_TOOL_LOCAL_VIDEO_RUNNER_PATH?.trim();
+  const modelWeightsPath = process.env.VIDEO_TOOL_LOCAL_VIDEO_MODEL_PATH?.trim();
+  return {
+    ...(runnerExecutablePath && runnerExecutablePath.length > 0 ? { runnerExecutablePath } : {}),
+    ...(modelWeightsPath && modelWeightsPath.length > 0 ? { modelWeightsPath } : {})
+  };
 }
 
-async function generatePlayableVideoFile(filePath: string, durationSeconds = 5, aspectRatio = '16:9'): Promise<void> {
-  const ffmpeg = await discoverFfmpeg();
-  if (ffmpeg.kind !== 'unavailable') {
-    const size = aspectRatio === '9:16' ? '360x640' : aspectRatio === '1:1' ? '480x480' : '640x360';
-    const duration = Math.min(Math.max(1, durationSeconds), 10);
-    try {
-      await execFileAsync(ffmpeg.executablePath, [
-        '-f', 'lavfi',
-        '-i', `testsrc=duration=${duration}:size=${size}:rate=30`,
-        '-f', 'lavfi',
-        '-i', 'anullsrc=r=44100:cl=mono',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac',
-        '-shortest',
-        '-y',
-        filePath
-      ]);
-    } catch {
-      await writeFile(filePath, generateValidMp4Buffer());
-    }
-  } else {
-    await writeFile(filePath, generateValidMp4Buffer());
+async function executeLocalVideoSynthesis(
+  filePath: string,
+  request: VideoGenerationRequest
+): Promise<void> {
+  const config = getLocalVideoRunnerConfig();
+  if (!config.runnerExecutablePath) {
+    throw new Error(
+      'Local AI video generation runner is unconfigured. Please configure VIDEO_TOOL_LOCAL_VIDEO_RUNNER_PATH or local model weights in settings.'
+    );
   }
+
+  await execFileAsync(config.runnerExecutablePath, [
+    '--prompt', request.prompt,
+    '--style-preset', request.stylePreset ?? 'Cinematic',
+    '--aspect-ratio', request.aspectRatio ?? '16:9',
+    '--duration', String(request.durationSeconds ?? 5),
+    '--output-path', filePath,
+    ...(config.modelWeightsPath ? ['--model-path', config.modelWeightsPath] : [])
+  ]);
 
   const fileStats = await stat(filePath);
   if (!fileStats.isFile() || fileStats.size === 0) {
-    throw new Error(`Generated video file at ${filePath} is invalid or empty.`);
+    throw new Error(`Local video synthesis runner produced an invalid or empty file at ${filePath}.`);
+  }
+}
+
+async function executeLocalSpeechSynthesis(
+  filePath: string,
+  request: TextToSpeechRequest
+): Promise<void> {
+  const runnerExecutablePath = process.env.VIDEO_TOOL_LOCAL_TTS_RUNNER_PATH?.trim();
+  if (!runnerExecutablePath) {
+    throw new Error(
+      'Local Qwen TTS runner is unconfigured. Please configure VIDEO_TOOL_LOCAL_TTS_RUNNER_PATH or Qwen model weights in settings.'
+    );
+  }
+
+  await execFileAsync(runnerExecutablePath, [
+    '--script', request.script,
+    '--voice-id', request.voiceId || 'qwen-neutral',
+    '--output-path', filePath
+  ]);
+
+  const fileStats = await stat(filePath);
+  if (!fileStats.isFile() || fileStats.size === 0) {
+    throw new Error(`Local speech synthesis runner produced an invalid or empty file at ${filePath}.`);
   }
 }
 
@@ -193,7 +181,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       } else {
         const fileName = `${id}.mp4`;
         const filePath = join(videoDir, fileName);
-        await generatePlayableVideoFile(filePath, request.durationSeconds ?? 5, request.aspectRatio ?? '16:9');
+        await executeLocalVideoSynthesis(filePath, request);
 
         job.status = 'completed';
         job.outputFilePath = filePath;
@@ -291,7 +279,7 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
       } else {
         const fileName = `${id}.wav`;
         const filePath = join(speechDir, fileName);
-        await writeFile(filePath, generateMinimalWavBuffer(3));
+        await executeLocalSpeechSynthesis(filePath, request);
 
         job.status = 'completed';
         job.outputFilePath = filePath;
