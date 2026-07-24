@@ -1,10 +1,13 @@
 import { type ReactElement } from 'react';
+import { DEFAULT_LLM_MODELS } from '../../shared/llmModels';
+import { useLlmModel } from './LlmProviderContext';
 import { useTheme } from './ThemeProvider';
 import { THEME_PRESETS, type ThemePresetId } from './theme';
 import { Button, Panel } from './ui';
 
 export function SettingsWorkspace(): ReactElement {
   const { mode, preference, preset, setPreset, setPreference } = useTheme();
+  const { selectedModelId, selectedModel, providerConfig, setSelectedModelId, updateProviderConfig } = useLlmModel();
 
   return (
     <div
@@ -12,7 +15,7 @@ export function SettingsWorkspace(): ReactElement {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
+        gap: '24px',
         padding: '20px 24px',
         height: '100%',
         overflowY: 'auto',
@@ -26,7 +29,7 @@ export function SettingsWorkspace(): ReactElement {
           Settings & Preferences
         </h1>
         <p style={{ fontSize: 'var(--text-small)', color: 'var(--muted-foreground)', margin: '4px 0 0 0' }}>
-          Manage your app theme, visual presets, and local AI engines
+          Manage your app theme, visual presets, LLM providers, and local AI engines
         </p>
       </header>
 
@@ -141,27 +144,178 @@ export function SettingsWorkspace(): ReactElement {
         </Panel>
       </section>
 
-      {/* Section 2: AI & Local Engine Configuration */}
+      {/* Section 2: Opencode LLM Providers & Models */}
       <section style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div>
-          <h2 style={{ fontSize: 'var(--text-title)', fontWeight: 600, margin: 0 }}>Local AI Engines & Provider Seams</h2>
+          <h2 style={{ fontSize: 'var(--text-title)', fontWeight: 600, margin: 0 }}>LLM Providers & AI Models</h2>
           <p style={{ fontSize: 'var(--text-caption)', color: 'var(--muted-foreground)', margin: '2px 0 0 0' }}>
-            Configure local model executable paths or external cloud API seams.
+            Opencode-style model configuration for local Ollama/Qwen, OpenAI, Anthropic, Gemini, and DeepSeek.
           </p>
         </div>
 
+        {/* Primary Model Selection Card */}
         <Panel style={{ padding: '16px', background: 'var(--card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <span style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block' }}>Local Video Generation Engine</span>
-            <span style={{ fontSize: 'var(--text-caption)', color: 'var(--muted-foreground)' }}>
-              Environment variable: <code>VIDEO_TOOL_LOCAL_VIDEO_RUNNER_PATH</code>
-            </span>
+            <label style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+              Active Primary Model
+            </label>
+            <select
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              style={{
+                width: '100%',
+                maxWidth: '420px',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-xs)',
+                border: '1px solid var(--border)',
+                background: 'var(--input)',
+                color: 'var(--foreground)',
+                fontSize: 'var(--text-body)',
+                fontFamily: 'var(--font-mono)'
+              }}
+            >
+              {DEFAULT_LLM_MODELS.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.label} ({model.providerLabel}) — [{model.badge}]
+                </option>
+              ))}
+            </select>
           </div>
-          <div>
-            <span style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block' }}>Local Speech Synthesis Engine</span>
-            <span style={{ fontSize: 'var(--text-caption)', color: 'var(--muted-foreground)' }}>
-              Environment variable: <code>VIDEO_TOOL_LOCAL_TTS_RUNNER_PATH</code> / Qwen TTS model weights
-            </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: 'var(--radius-xs)', background: 'var(--surface-inset)', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 'var(--text-subhead)' }}>🤖</span>
+            <div>
+              <span style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block' }}>
+                {selectedModel.label}
+              </span>
+              <span style={{ fontSize: 'var(--text-caption)', color: 'var(--muted-foreground)' }}>
+                {selectedModel.description}
+              </span>
+            </div>
+          </div>
+        </Panel>
+
+        {/* Provider Credentials & Base URLs Grid */}
+        <Panel style={{ padding: '16px', background: 'var(--card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <label style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block' }}>
+            Provider Credentials & Endpoints
+          </label>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+            {/* Local Engine / Ollama */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>Local Engine (Ollama / Qwen)</label>
+              <input
+                type="text"
+                placeholder="http://localhost:11434"
+                value={providerConfig.ollamaBaseUrl || ''}
+                onChange={(e) => updateProviderConfig({ ollamaBaseUrl: e.target.value })}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 'var(--radius-xs)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--input)',
+                  color: 'var(--foreground)',
+                  fontSize: 'var(--text-caption)',
+                  fontFamily: 'var(--font-mono)'
+                }}
+              />
+              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
+                Default: http://localhost:11434
+              </span>
+            </div>
+
+            {/* OpenAI */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>OpenAI API Key</label>
+              <input
+                type="password"
+                placeholder="sk-proj-..."
+                value={providerConfig.openaiApiKey || ''}
+                onChange={(e) => updateProviderConfig({ openaiApiKey: e.target.value })}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 'var(--radius-xs)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--input)',
+                  color: 'var(--foreground)',
+                  fontSize: 'var(--text-caption)',
+                  fontFamily: 'var(--font-mono)'
+                }}
+              />
+              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
+                Required for GPT-4o & GPT-4o Mini
+              </span>
+            </div>
+
+            {/* Anthropic */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>Anthropic API Key</label>
+              <input
+                type="password"
+                placeholder="sk-ant-..."
+                value={providerConfig.anthropicApiKey || ''}
+                onChange={(e) => updateProviderConfig({ anthropicApiKey: e.target.value })}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 'var(--radius-xs)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--input)',
+                  color: 'var(--foreground)',
+                  fontSize: 'var(--text-caption)',
+                  fontFamily: 'var(--font-mono)'
+                }}
+              />
+              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
+                Required for Claude 3.5 Sonnet
+              </span>
+            </div>
+
+            {/* Google Gemini */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>Google Gemini API Key</label>
+              <input
+                type="password"
+                placeholder="AIzaSy..."
+                value={providerConfig.geminiApiKey || ''}
+                onChange={(e) => updateProviderConfig({ geminiApiKey: e.target.value })}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 'var(--radius-xs)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--input)',
+                  color: 'var(--foreground)',
+                  fontSize: 'var(--text-caption)',
+                  fontFamily: 'var(--font-mono)'
+                }}
+              />
+              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
+                Required for Gemini 2.0 Flash & Veo Video
+              </span>
+            </div>
+
+            {/* DeepSeek */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>DeepSeek API Key</label>
+              <input
+                type="password"
+                placeholder="sk-..."
+                value={providerConfig.deepseekApiKey || ''}
+                onChange={(e) => updateProviderConfig({ deepseekApiKey: e.target.value })}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 'var(--radius-xs)',
+                  border: '1px solid var(--border)',
+                  background: 'var(--input)',
+                  color: 'var(--foreground)',
+                  fontSize: 'var(--text-caption)',
+                  fontFamily: 'var(--font-mono)'
+                }}
+              />
+              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
+                Required for DeepSeek R1 & V3
+              </span>
+            </div>
           </div>
         </Panel>
       </section>

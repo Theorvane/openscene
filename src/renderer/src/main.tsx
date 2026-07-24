@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
 import { bootstrapRendererTheme, ThemeProvider } from './ThemeProvider';
+import { LlmProvider } from './LlmProviderContext';
 import './styles.css';
 
 const rootElement = document.getElementById('root');
@@ -16,7 +17,9 @@ bootstrapRendererTheme();
 createRoot(rootElement).render(
   <React.StrictMode>
     <ThemeProvider>
-      <App />
+      <LlmProvider>
+        <App />
+      </LlmProvider>
     </ThemeProvider>
   </React.StrictMode>
 );

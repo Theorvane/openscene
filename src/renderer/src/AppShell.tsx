@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
 import type { AppWorkspace } from './appWorkspaces';
+import { LlmModelSelectorBar } from './LlmModelSelectorBar';
 import { ThemeSelector } from './ThemeSelector';
 
 function AppShellBackground(): ReactElement {
@@ -26,7 +27,8 @@ export function AppShell({ activeWorkspace, children }: AppShellProps): ReactEle
           <span className="product-chrome__workspace">{activeWorkspace.label}</span>
           <span className="local-pill">Local</span>
         </div>
-        <div className="product-chrome__actions">
+        <div className="product-chrome__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <LlmModelSelectorBar />
           <ThemeSelector />
         </div>
       </header>

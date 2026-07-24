@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import type { ProviderExecutionMode, VideoGenerationJob } from '../../shared/providerSeams';
+import { LlmModelSelectorBar } from './LlmModelSelectorBar';
 import { useProjectResultImport } from './ProjectResultImportContext';
 import { Button, StatusCard } from './ui';
 
@@ -102,27 +103,30 @@ export function VideoGenerationWorkspace(): ReactElement {
           <h2>AI Video Generation</h2>
           <span className="ai-workspace__subtitle">Synthesize videos using Local AI Models or External Cloud APIs</span>
         </div>
-        <div className="mode-toggle-group" role="radiogroup" aria-label="Execution mode selection">
-          <button
-            type="button"
-            role="radio"
-            aria-checked={mode === 'local'}
-            className={`mode-toggle-btn ${mode === 'local' ? 'mode-toggle-btn--active' : ''}`}
-            onClick={() => setMode('local')}
-          >
-            <span className="mode-badge mode-badge--local">Local</span>
-            <span>Local Engine</span>
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={mode === 'api'}
-            className={`mode-toggle-btn ${mode === 'api' ? 'mode-toggle-btn--active' : ''}`}
-            onClick={() => setMode('api')}
-          >
-            <span className="mode-badge mode-badge--api">Cloud API</span>
-            <span>External API</span>
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <LlmModelSelectorBar />
+          <div className="mode-toggle-group" role="radiogroup" aria-label="Execution mode selection">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={mode === 'local'}
+              className={`mode-toggle-btn ${mode === 'local' ? 'mode-toggle-btn--active' : ''}`}
+              onClick={() => setMode('local')}
+            >
+              <span className="mode-badge mode-badge--local">Local</span>
+              <span>Local Engine</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={mode === 'api'}
+              className={`mode-toggle-btn ${mode === 'api' ? 'mode-toggle-btn--active' : ''}`}
+              onClick={() => setMode('api')}
+            >
+              <span className="mode-badge mode-badge--api">Cloud API</span>
+              <span>External API</span>
+            </button>
+          </div>
         </div>
       </div>
 

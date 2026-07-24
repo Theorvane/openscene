@@ -3,6 +3,7 @@ import { useState, type ChangeEvent, type ReactElement } from 'react';
 import { ALLOWED_AUDIO_MIME_TYPES } from '../../shared/models';
 import type { StatusMessage } from './appTypes';
 import { formatDuration } from './format';
+import { LlmModelSelectorBar } from './LlmModelSelectorBar';
 import { NARRATION_SAMPLE_LIMITS } from './narrationLogic';
 import { parseAllowedAudioMimeType } from './narrationLogic';
 import { useProjectResultImport } from './ProjectResultImportContext';
@@ -107,27 +108,30 @@ export function NarrationPanel(): ReactElement {
           <p className="section-kicker">AI Voice Studio</p>
           <h2 id="narration-title">Voice Generation & Synthesis</h2>
         </div>
-        <div className="mode-toggle-group" role="radiogroup" aria-label="Voice execution mode selection">
-          <button
-            type="button"
-            role="radio"
-            aria-checked={mode === 'local'}
-            className={`mode-toggle-btn ${mode === 'local' ? 'mode-toggle-btn--active' : ''}`}
-            onClick={() => setMode('local')}
-          >
-            <span className="mode-badge mode-badge--local">Local</span>
-            <span>Local Qwen</span>
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={mode === 'api'}
-            className={`mode-toggle-btn ${mode === 'api' ? 'mode-toggle-btn--active' : ''}`}
-            onClick={() => setMode('api')}
-          >
-            <span className="mode-badge mode-badge--api">Cloud API</span>
-            <span>ElevenLabs API</span>
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <LlmModelSelectorBar />
+          <div className="mode-toggle-group" role="radiogroup" aria-label="Voice execution mode selection">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={mode === 'local'}
+              className={`mode-toggle-btn ${mode === 'local' ? 'mode-toggle-btn--active' : ''}`}
+              onClick={() => setMode('local')}
+            >
+              <span className="mode-badge mode-badge--local">Local</span>
+              <span>Local Qwen</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={mode === 'api'}
+              className={`mode-toggle-btn ${mode === 'api' ? 'mode-toggle-btn--active' : ''}`}
+              onClick={() => setMode('api')}
+            >
+              <span className="mode-badge mode-badge--api">Cloud API</span>
+              <span>ElevenLabs API</span>
+            </button>
+          </div>
         </div>
       </div>
 
