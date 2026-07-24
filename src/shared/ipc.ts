@@ -45,7 +45,9 @@ export const IPC_CHANNELS = {
   projectAiResultImport: 'project-assets:import-ai-result',
   getProviderCredentials: 'credentials:get',
   setProviderCredential: 'credentials:set',
-  executeLlmPrompt: 'llm:execute-prompt'
+  executeLlmPrompt: 'llm:execute-prompt',
+  mcpGetTools: 'mcp:get-tools',
+  mcpExecuteTool: 'mcp:execute-tool'
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

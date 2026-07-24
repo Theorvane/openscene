@@ -107,6 +107,8 @@ export interface VideoToolApi {
     systemPrompt?: string;
     ollamaBaseUrl?: string;
   }): Promise<ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>>;
+  mcpGetTools(): Promise<ApiResponse<unknown>>;
+  mcpExecuteTool(toolName: string, params: unknown): Promise<ApiResponse<unknown>>;
 }
 
 const videoTool: VideoToolApi = {
@@ -184,7 +186,10 @@ const videoTool: VideoToolApi = {
   executeLlmPrompt: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.executeLlmPrompt, request) as Promise<
       ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>
-    >
+    >,
+  mcpGetTools: () => ipcRenderer.invoke(IPC_CHANNELS.mcpGetTools) as Promise<ApiResponse<unknown>>,
+  mcpExecuteTool: (toolName: string, params: unknown) =>
+    ipcRenderer.invoke(IPC_CHANNELS.mcpExecuteTool, toolName, params) as Promise<ApiResponse<unknown>>
 };
 
 contextBridge.exposeInMainWorld('videoTool', videoTool);

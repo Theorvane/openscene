@@ -28,6 +28,7 @@ import { installApplicationMenu } from './applicationMenu';
 import { createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getSpeechGenerationJob, getVideoGenerationJob } from './aiJobManager';
 import { CredentialStore } from './credentialStore';
 import { LlmExecutionAdapter } from './llmAdapter';
+import { getOpenVideoMcpDefinition, OpenVideoMcpServer } from './openVideoMcpServer';
 
 registerTimelineAssetScheme();
 
@@ -279,6 +280,37 @@ function installIpcHandlers(): void {
       }
     }
   );
+
+  const mcpServerInstance = new OpenVideoMcpServer();
+
+  ipcMain.handle(IPC_CHANNELS.mcpGetTools, async () => {
+    try {
+      const definition = getOpenVideoMcpDefinition();
+      return ok(definition);
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to inspect MCP tools');
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.mcpExecuteTool, async (_event, toolName: string, params: unknown) => {
+    try {
+      if (toolName === 'createVideoJob') {
+        const result = await mcpServerInstance.createVideoJob(params as any);
+        return ok(result);
+      }
+      if (toolName === 'createSpeechJob') {
+        const result = await mcpServerInstance.createSpeechJob(params as any);
+        return ok(result);
+      }
+      if (toolName === 'getJobStatus') {
+        const result = await mcpServerInstance.getJobStatus(params as any);
+        return ok(result);
+      }
+      return fail('INVALID_INPUT', `MCP tool ${toolName} is not recognized.`);
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : `Failed to execute MCP tool ${toolName}`);
+    }
+  });
 }
 
 app.whenReady().then(() => {

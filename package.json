@@ -13,11 +13,13 @@
     "preview": "electron-vite preview"
   },
   "dependencies": {
+    "@theorvane/type-mcp": "^0.2.0",
     "@vitejs/plugin-react": "5.1.4",
     "electron": "latest",
     "electron-vite": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "latest",
