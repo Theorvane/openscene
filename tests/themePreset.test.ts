@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseThemePreset,
+  resolveThemePreset,
   THEME_PRESETS,
   THEME_PRESET_STORAGE_KEY,
   type ThemePresetId
@@ -28,6 +29,21 @@ describe('theme preset configuration and helper functions', () => {
     expect(parseThemePreset(null, 'dark')).toBe('dark-zinc');
     expect(parseThemePreset(undefined, 'light')).toBe('daylight-glass');
     expect(parseThemePreset('invalid-preset', 'dark')).toBe('dark-zinc');
+  });
+
+  it('resolves presets matching active mode and falls back when mode mismatches', () => {
+    // Dark mode matching presets stay intact
+    expect(resolveThemePreset('midnight-neon', 'dark')).toBe('midnight-neon');
+    expect(resolveThemePreset('obsidian-pro', 'dark')).toBe('obsidian-pro');
+    expect(resolveThemePreset('dark-zinc', 'dark')).toBe('dark-zinc');
+
+    // Light mode matching preset stays intact
+    expect(resolveThemePreset('daylight-glass', 'light')).toBe('daylight-glass');
+
+    // Mismatched mode presets fall back to mode-compatible default
+    expect(resolveThemePreset('midnight-neon', 'light')).toBe('daylight-glass');
+    expect(resolveThemePreset('obsidian-pro', 'light')).toBe('daylight-glass');
+    expect(resolveThemePreset('daylight-glass', 'dark')).toBe('dark-zinc');
   });
 
   it('uses the window-loom-theme-preset storage key identifier', () => {

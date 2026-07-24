@@ -4,6 +4,7 @@ import {
   parseThemePreference,
   parseThemePreset,
   resolveThemeMode,
+  resolveThemePreset,
   THEME_PRESET_STORAGE_KEY,
   THEME_PRESETS,
   THEME_STORAGE_KEY,
@@ -94,26 +95,30 @@ export function bootstrapRendererTheme(): void {
   const preference = getStoredThemePreference();
   const systemMode = getSystemThemeMode();
   const mode = resolveThemeMode(preference, systemMode);
-  const preset = getStoredThemePreset(mode);
-  applyDocumentTheme(mode, preset);
+  const storedPreset = getStoredThemePreset(mode);
+  const effectivePreset = resolveThemePreset(storedPreset, mode);
+  applyDocumentTheme(mode, effectivePreset);
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
   const [preference, setPreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
   const [systemMode, setSystemMode] = useState<ThemeMode>(() => getSystemThemeMode());
   const mode = resolveThemeMode(preference, systemMode);
-  const [preset, setPresetState] = useState<ThemePresetId>(() => getStoredThemePreset(mode));
+  const [presetState, setPresetState] = useState<ThemePresetId>(() => getStoredThemePreset(mode));
+
+  const effectivePreset = resolveThemePreset(presetState, mode);
 
   useLayoutEffect(() => {
-    applyDocumentTheme(mode, preset);
-  }, [mode, preset]);
+    applyDocumentTheme(mode, effectivePreset);
+  }, [mode, effectivePreset]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
 
     const mediaQueryList = window.matchMedia(DARK_THEME_QUERY);
     const handleSystemThemeChange = (event: MediaQueryListEvent): void => {
-      setSystemMode(event.matches ? 'dark' : 'light');
+      const nextSystemMode = event.matches ? 'dark' : 'light';
+      setSystemMode(nextSystemMode);
     };
 
     mediaQueryList.addEventListener('change', handleSystemThemeChange);
@@ -124,9 +129,11 @@ export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
     setPreferenceState((currentPreference) => {
       const nextMode = toggleThemeMode(resolveThemeMode(currentPreference, systemMode));
       persistThemePreference(nextMode);
-      const nextPreset = nextMode === 'light' ? 'daylight-glass' : 'dark-zinc';
-      setPresetState(nextPreset);
-      persistThemePreset(nextPreset);
+      setPresetState((currentPreset) => {
+        const nextPreset = resolveThemePreset(currentPreset, nextMode);
+        persistThemePreset(nextPreset);
+        return nextPreset;
+      });
       return nextMode;
     });
   }, [systemMode]);
@@ -141,21 +148,23 @@ export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
     persistThemePreset(nextPreset);
   }, []);
 
-  const setPreference = useCallback((nextPreference: ThemePreference): void => {
-    setPreferenceState(nextPreference);
-    persistThemePreference(nextPreference);
-    if (nextPreference === 'light') {
-      setPresetState('daylight-glass');
-      persistThemePreset('daylight-glass');
-    } else if (nextPreference === 'dark') {
-      setPresetState('dark-zinc');
-      persistThemePreset('dark-zinc');
-    }
-  }, []);
+  const setPreference = useCallback(
+    (nextPreference: ThemePreference): void => {
+      setPreferenceState(nextPreference);
+      persistThemePreference(nextPreference);
+      const nextMode = resolveThemeMode(nextPreference, systemMode);
+      setPresetState((currentPreset) => {
+        const validPreset = resolveThemePreset(currentPreset, nextMode);
+        persistThemePreset(validPreset);
+        return validPreset;
+      });
+    },
+    [systemMode]
+  );
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ mode, preference, preset, toggleTheme, setPreset, setPreference }),
-    [mode, preference, preset, toggleTheme, setPreset, setPreference]
+    () => ({ mode, preference, preset: effectivePreset, toggleTheme, setPreset, setPreference }),
+    [mode, preference, effectivePreset, toggleTheme, setPreset, setPreference]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

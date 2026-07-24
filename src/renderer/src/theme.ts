@@ -91,6 +91,14 @@ export function toggleThemeMode(mode: ThemeMode): ThemeMode {
   }
 }
 
+export function resolveThemePreset(presetId: ThemePresetId, mode: ThemeMode): ThemePresetId {
+  const presetConfig = THEME_PRESETS.find((p) => p.id === presetId);
+  if (presetConfig !== undefined && presetConfig.mode === mode) {
+    return presetId;
+  }
+  return mode === 'light' ? 'daylight-glass' : 'dark-zinc';
+}
+
 export function shouldToggleThemeOnSwitchKeyDown(key: string): boolean {
   return key === ' ' || key === 'Spacebar';
 }
