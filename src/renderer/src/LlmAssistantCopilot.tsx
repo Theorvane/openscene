@@ -405,7 +405,7 @@ export function LlmAssistantCopilot(): ReactElement {
           background: isOpen ? 'var(--primary)' : 'var(--surface-control)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-xs)',
-          color: isOpen ? '#fff' : 'var(--foreground)',
+          color: isOpen ? 'var(--primary-foreground)' : 'var(--foreground)',
           cursor: 'pointer',
           fontSize: 'var(--text-micro)',
           fontWeight: 600,
@@ -416,7 +416,7 @@ export function LlmAssistantCopilot(): ReactElement {
         <span>🤖 AI Copilot</span>
         <span
           style={{
-            fontSize: '8px',
+            fontSize: 'var(--text-micro)',
             padding: '1px 4px',
             borderRadius: '2px',
             background: 'rgba(255,255,255,0.2)',
@@ -449,13 +449,13 @@ export function LlmAssistantCopilot(): ReactElement {
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '13px' }}>⚡</span>
+              <span style={{ fontSize: 'var(--text-body)' }}>⚡</span>
               <span style={{ fontSize: 'var(--text-small)', fontWeight: 700 }}>Timeline Command Panel</span>
             </div>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: '12px' }}
+              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 'var(--text-small)' }}
             >
               ✕
             </button>
@@ -476,7 +476,7 @@ export function LlmAssistantCopilot(): ReactElement {
               type="button"
               onClick={() => runCopilotCommand('Create a 5s cinematic video intro of Seoul skyline')}
               style={{
-                fontSize: '9px',
+                fontSize: 'var(--text-caption)',
                 padding: '3px 7px',
                 borderRadius: 'var(--radius-xs)',
                 border: '1px solid var(--border)',
@@ -491,7 +491,7 @@ export function LlmAssistantCopilot(): ReactElement {
               type="button"
               onClick={() => runCopilotCommand('Synthesize voiceover saying "Welcome to OpenVideo editor"')}
               style={{
-                fontSize: '9px',
+                fontSize: 'var(--text-caption)',
                 padding: '3px 7px',
                 borderRadius: 'var(--radius-xs)',
                 border: '1px solid var(--border)',
@@ -506,7 +506,7 @@ export function LlmAssistantCopilot(): ReactElement {
               type="button"
               onClick={() => runCopilotCommand('Export project as 1080p MP4 video')}
               style={{
-                fontSize: '9px',
+                fontSize: 'var(--text-caption)',
                 padding: '3px 7px',
                 borderRadius: 'var(--radius-xs)',
                 border: '1px solid var(--border)',
@@ -551,7 +551,7 @@ export function LlmAssistantCopilot(): ReactElement {
                 borderRadius: 'var(--radius-xs)',
                 border: 'none',
                 background: 'var(--primary)',
-                color: '#fff',
+                color: 'var(--primary-foreground)',
                 cursor: 'pointer',
                 fontSize: 'var(--text-micro)',
                 fontWeight: 600
@@ -573,7 +573,7 @@ export function LlmAssistantCopilot(): ReactElement {
                     padding: '4px 6px',
                     borderRadius: 'var(--radius-xs)',
                     background: 'var(--surface-inset)',
-                    fontSize: '9px',
+                    fontSize: 'var(--text-caption)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '1px'

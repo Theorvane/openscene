@@ -56,7 +56,7 @@ export function ThemeSelector(): ReactElement {
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: '12px' }}
+              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 'var(--text-small)' }}
             >
               ✕
             </button>
@@ -158,7 +158,7 @@ export function ThemeSelector(): ReactElement {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: 'var(--text-small)', fontWeight: 600 }}>{item.label}</span>
-                    <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ fontSize: 'var(--text-micro)', opacity: 0.7, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
                       {item.mode}
                     </span>
                   </div>

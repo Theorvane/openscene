@@ -38,17 +38,20 @@ export function LlmModelSelectorBar(): ReactElement {
         <span style={{ fontWeight: 600 }}>{selectedModel.label}</span>
         <span
           style={{
-            fontSize: '8px',
+            fontSize: 'var(--text-micro)',
             fontWeight: 700,
             padding: '1px 5px',
             borderRadius: '3px',
-            background: selectedModel.defaultMode === 'local' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)',
+            background:
+              selectedModel.defaultMode === 'local'
+                ? 'color-mix(in srgb, var(--success) 20%, transparent)'
+                : 'color-mix(in srgb, var(--primary) 20%, transparent)',
             color: selectedModel.defaultMode === 'local' ? 'var(--success)' : 'var(--primary)'
           }}
         >
           {selectedModel.badge}
         </span>
-        <span style={{ fontSize: '9px', opacity: 0.6 }}>▼</span>
+        <span style={{ fontSize: 'var(--text-caption)', opacity: 0.6 }}>▼</span>
       </button>
 
       {isOpen && (
@@ -77,7 +80,7 @@ export function LlmModelSelectorBar(): ReactElement {
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: '11px' }}
+              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 'var(--text-small)' }}
             >
               ✕
             </button>
@@ -85,7 +88,7 @@ export function LlmModelSelectorBar(): ReactElement {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '280px', overflowY: 'auto' }}>
             {/* Available local models */}
-            <div style={{ fontSize: '8px', fontWeight: 700, color: 'var(--muted-foreground)', padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: 'var(--text-micro)', fontWeight: 700, color: 'var(--muted-foreground)', padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Available
             </div>
             {DEFAULT_LLM_MODELS.filter((m) => m.available).map((model: LlmModelConfig) => {
@@ -113,23 +116,23 @@ export function LlmModelSelectorBar(): ReactElement {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
                     <span style={{ fontSize: 'var(--text-micro)', fontWeight: 600, flex: 1 }}>{model.label}</span>
-                    <span style={{ fontSize: '8px', color: 'var(--muted-foreground)', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)', fontFamily: 'var(--font-mono)' }}>
                       {model.providerLabel}
                     </span>
                     <span
                       style={{
-                        fontSize: '7px',
+                        fontSize: 'var(--text-micro)',
                         fontWeight: 700,
                         padding: '1px 4px',
                         borderRadius: '2px',
-                        background: 'rgba(16, 185, 129, 0.15)',
+                        background: 'color-mix(in srgb, var(--success) 15%, transparent)',
                         color: 'var(--success)'
                       }}
                     >
                       {model.badge}
                     </span>
                   </div>
-                  <span style={{ fontSize: '9px', color: 'var(--muted-foreground)', marginTop: '2px' }}>
+                  <span style={{ fontSize: 'var(--text-caption)', color: 'var(--muted-foreground)', marginTop: '2px' }}>
                     {model.description}
                   </span>
                 </button>
@@ -137,7 +140,7 @@ export function LlmModelSelectorBar(): ReactElement {
             })}
 
             {/* Unavailable cloud models */}
-            <div style={{ fontSize: '8px', fontWeight: 700, color: 'var(--muted-foreground)', padding: '6px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.05em', borderTop: '1px solid var(--border)', marginTop: '2px' }}>
+            <div style={{ fontSize: 'var(--text-micro)', fontWeight: 700, color: 'var(--muted-foreground)', padding: '6px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.05em', borderTop: '1px solid var(--border)', marginTop: '2px' }}>
               Coming Soon — Provider adapters not yet implemented
             </div>
             {DEFAULT_LLM_MODELS.filter((m) => !m.available).map((model: LlmModelConfig) => (
@@ -162,12 +165,21 @@ export function LlmModelSelectorBar(): ReactElement {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
                   <span style={{ fontSize: 'var(--text-micro)', fontWeight: 600, flex: 1 }}>{model.label}</span>
-                  <span style={{ fontSize: '8px', fontFamily: 'var(--font-mono)' }}>{model.providerLabel}</span>
-                  <span style={{ fontSize: '7px', fontWeight: 700, padding: '1px 4px', borderRadius: '2px', background: 'rgba(99,102,241,0.12)', color: 'var(--primary)' }}>
+                  <span style={{ fontSize: 'var(--text-micro)', fontFamily: 'var(--font-mono)' }}>{model.providerLabel}</span>
+                  <span
+                    style={{
+                      fontSize: 'var(--text-micro)',
+                      fontWeight: 700,
+                      padding: '1px 4px',
+                      borderRadius: '2px',
+                      background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+                      color: 'var(--primary)'
+                    }}
+                  >
                     {model.badge}
                   </span>
                 </div>
-                <span style={{ fontSize: '9px', marginTop: '2px' }}>{model.description}</span>
+                <span style={{ fontSize: 'var(--text-caption)', marginTop: '2px' }}>{model.description}</span>
               </button>
             ))}
           </div>

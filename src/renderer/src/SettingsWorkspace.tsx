@@ -154,7 +154,7 @@ export function SettingsWorkspace(): ReactElement {
                     <span style={{ fontSize: 'var(--text-body)', fontWeight: 600, flex: 1 }}>{item.label}</span>
                     <span
                       style={{
-                        fontSize: '9px',
+                        fontSize: 'var(--text-micro)',
                         fontWeight: 600,
                         padding: '2px 6px',
                         borderRadius: '4px',
