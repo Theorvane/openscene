@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from 'react';
+import type { ImportProjectAssetsResult } from '../../shared/timelineTypes';
 import { useLlmModel } from './LlmProviderContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
 
@@ -12,14 +13,10 @@ type CopilotStep = {
 export function LlmAssistantCopilot(): ReactElement {
   const { selectedModel } = useLlmModel();
   let activeProject = null;
-  let importAiResult: ((jobId: string) => Promise<{ tone: string; text: string }>) | null = null;
-  let importTtsResult: ((jobId: string) => Promise<{ tone: string; text: string }>) | null = null;
 
   try {
     const importContext = useProjectResultImport();
     activeProject = importContext.activeProject;
-    importAiResult = importContext.importAiResult;
-    importTtsResult = importContext.importTtsResult;
   } catch {
     // Rendered outside ProjectResultImportProvider fallback
   }
@@ -33,7 +30,7 @@ export function LlmAssistantCopilot(): ReactElement {
   const pollJobCompletion = async (jobId: string, kind: 'video' | 'speech'): Promise<{ success: boolean; outputFilePath?: string | undefined; error?: string | undefined }> => {
     const maxRetries = 20;
     for (let i = 0; i < maxRetries; i++) {
-      await new Promise((res) => setTimeout(res, 1000));
+      await new Promise((res) => setTimeout(res, 500));
       const resp = await window.videoTool.mcpExecuteTool('getJobStatus', { jobId, kind });
       if (resp.ok) {
         const val = resp.value as { success?: boolean; status?: string; outputFilePath?: string; error?: string };
@@ -45,7 +42,7 @@ export function LlmAssistantCopilot(): ReactElement {
         }
       }
     }
-    return { success: true }; // Proceed for fast mock/test environments
+    return { success: false, error: 'AI generation job timed out.' };
   };
 
   const runCopilotCommand = async (inputPrompt: string): Promise<void> => {
@@ -123,15 +120,27 @@ export function LlmAssistantCopilot(): ReactElement {
               });
               setSteps([...newSteps]);
 
-              if (importAiResult) {
-                await importAiResult(jobId);
+              const importResp = await window.videoTool.importAiResultAsset({ projectId: activeProject.id, jobId });
+              if (!importResp.ok || !importResp.value.assets || importResp.value.assets.length === 0) {
+                const importErr = !importResp.ok ? importResp.error.message : 'No imported assets returned';
+                newSteps[2] = {
+                  id: importStepId,
+                  action: '3. Media Import Failed',
+                  status: 'failed',
+                  detail: importErr
+                };
+                setSteps([...newSteps]);
+                setStatusMessage(`Media import failed: ${importErr}`);
+                setIsProcessing(false);
+                return;
               }
 
+              const importedAsset = importResp.value.assets[0]!;
               newSteps[2] = {
                 id: importStepId,
                 action: '3. Media Imported into Project',
                 status: 'completed',
-                detail: 'Asset registered in project store'
+                detail: `Asset ID: ${importedAsset.id}`
               };
               setSteps([...newSteps]);
 
@@ -148,7 +157,7 @@ export function LlmAssistantCopilot(): ReactElement {
               const clipResp = await window.videoTool.mcpExecuteTool('addClipToTimeline', {
                 projectId: activeProject.id,
                 trackId: 'video-1',
-                assetId: jobId,
+                assetId: importedAsset.id,
                 startOffsetSeconds: 0,
                 durationSeconds: 5
               });
