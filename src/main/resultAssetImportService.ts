@@ -1,8 +1,8 @@
 import type { ApiResponse } from '../shared/models';
-import type { ImportRecordingResultAssetInput, ImportTtsResultAssetInput, MediaAsset, MediaKind } from '../shared/timelineTypes';
+import type { ImportProjectAssetsResult, ImportRecordingResultAssetInput, ImportTtsResultAssetInput, MediaKind } from '../shared/timelineTypes';
 import { parseImportRecordingResultAssetInput, parseImportTtsResultAssetInput } from '../shared/timelineValidators';
-import { AssetLibraryStore, type ImportAssetFromPathInput } from './assetLibraryStore';
 import { AssetImportValidationError } from './assetImportPolicy';
+import type { AssetLibraryStore } from './assetLibraryStore';
 import { fail, ok } from './ipcResponses';
 import { ProjectStoreError } from './projectStoreSupport';
 
@@ -13,17 +13,14 @@ export type CompletedResultAssetSource = {
   readonly mimeType: string;
 };
 
-type ImportProjectAssetsResult = {
-  readonly assets: readonly MediaAsset[];
-};
-
-type ResultAssetImportServiceDependencies = {
+export type ResultAssetImportDependencies = {
   readonly assets: AssetLibraryStore;
   readonly resolveRecordingSource: (sessionId: string) => CompletedResultAssetSource | null;
   readonly resolveTtsSource: (jobId: string) => CompletedResultAssetSource | null;
+  readonly resolveAiSource?: (jobId: string) => CompletedResultAssetSource | null;
 };
 
-function inputFromSource(projectId: string, source: CompletedResultAssetSource): ImportAssetFromPathInput {
+function inputFromSource(projectId: string, source: CompletedResultAssetSource) {
   return {
     projectId,
     sourcePath: source.sourcePath,
@@ -34,7 +31,7 @@ function inputFromSource(projectId: string, source: CompletedResultAssetSource):
 }
 
 export class ResultAssetImportService {
-  constructor(private readonly dependencies: ResultAssetImportServiceDependencies) {}
+  constructor(private readonly dependencies: ResultAssetImportDependencies) {}
 
   async importRecordingResult(payload: unknown): Promise<ApiResponse<ImportProjectAssetsResult>> {
     const input = parseImportRecordingResultAssetInput(payload);
@@ -58,6 +55,18 @@ export class ResultAssetImportService {
       return fail('TTS_RESULT_UNAVAILABLE', 'The completed TTS result is not available.');
     }
     return this.importResult(input, source, 'The completed TTS result could not be imported.');
+  }
+
+  async importAiResult(payload: unknown): Promise<ApiResponse<ImportProjectAssetsResult>> {
+    const input = parseImportTtsResultAssetInput(payload);
+    if (input === null) {
+      return fail('INVALID_INPUT', 'The AI result import payload was not valid.');
+    }
+    const source = (this.dependencies.resolveAiSource ? this.dependencies.resolveAiSource(input.jobId) : null) ?? this.dependencies.resolveTtsSource(input.jobId);
+    if (source === null) {
+      return fail('TTS_RESULT_UNAVAILABLE', 'The completed AI video result is not available.');
+    }
+    return this.importResult(input, source, 'The completed AI video result could not be imported.');
   }
 
   private async importResult(

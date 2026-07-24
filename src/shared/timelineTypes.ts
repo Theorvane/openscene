@@ -254,3 +254,7 @@ export type SaveTimelineInput = ProjectRequestInput & {
 export type GetAssetPlaybackUrlInput = ProjectRequestInput & {
   readonly assetId: string;
 };
+
+export type ImportProjectAssetsResult = {
+  readonly assets: readonly MediaAsset[];
+};
