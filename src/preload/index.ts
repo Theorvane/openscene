@@ -87,6 +87,7 @@ export interface VideoToolApi {
   importProjectAssets(input: ImportProjectAssetsInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
   importRecordingResultAsset(input: ImportRecordingResultAssetInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
   importTtsResultAsset(input: ImportTtsResultAssetInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
+  importAiResultAsset(input: { projectId: string; jobId: string }): Promise<ApiResponse<ImportProjectAssetsResult>>;
   updateAssetMetadata(input: UpdateAssetMetadataInput): Promise<ApiResponse<MediaAsset>>;
   getAssetPlaybackUrl(input: GetAssetPlaybackUrlInput): Promise<ApiResponse<AssetPlaybackUrl>>;
   saveTimeline(input: SaveTimelineInput): Promise<ApiResponse<LocalProjectSnapshot>>;
@@ -109,6 +110,8 @@ export interface VideoToolApi {
   }): Promise<ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>>;
   mcpGetTools(): Promise<ApiResponse<unknown>>;
   mcpExecuteTool(toolName: string, params: unknown): Promise<ApiResponse<unknown>>;
+  getProviderCredentials(): Promise<ApiResponse<Record<string, string>>>;
+  setProviderCredential(provider: string, apiKey: string): Promise<ApiResponse<{ readonly updated: boolean }>>;
 }
 
 const videoTool: VideoToolApi = {
@@ -162,6 +165,8 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.projectRecordingResultImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,
   importTtsResultAsset: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.projectTtsResultImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,
+  importAiResultAsset: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectAiResultImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,
   updateAssetMetadata: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.projectAssetMetadataUpdate, input) as Promise<ApiResponse<MediaAsset>>,
   getAssetPlaybackUrl: (input) =>
@@ -189,7 +194,10 @@ const videoTool: VideoToolApi = {
     >,
   mcpGetTools: () => ipcRenderer.invoke(IPC_CHANNELS.mcpGetTools) as Promise<ApiResponse<unknown>>,
   mcpExecuteTool: (toolName: string, params: unknown) =>
-    ipcRenderer.invoke(IPC_CHANNELS.mcpExecuteTool, toolName, params) as Promise<ApiResponse<unknown>>
+    ipcRenderer.invoke(IPC_CHANNELS.mcpExecuteTool, toolName, params) as Promise<ApiResponse<unknown>>,
+  getProviderCredentials: () => ipcRenderer.invoke(IPC_CHANNELS.getProviderCredentials) as Promise<ApiResponse<Record<string, string>>>,
+  setProviderCredential: (provider, apiKey) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setProviderCredential, provider, apiKey) as Promise<ApiResponse<{ readonly updated: boolean }>>
 };
 
 contextBridge.exposeInMainWorld('videoTool', videoTool);

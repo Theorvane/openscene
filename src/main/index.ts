@@ -282,6 +282,7 @@ function installIpcHandlers(): void {
   );
 
   const mcpServerInstance = new OpenVideoMcpServer();
+  mcpServerInstance.setServices(projectStore, exportIpcService);
 
   ipcMain.handle(IPC_CHANNELS.mcpGetTools, async () => {
     try {
@@ -306,9 +307,37 @@ function installIpcHandlers(): void {
         const result = await mcpServerInstance.getJobStatus(params as any);
         return ok(result);
       }
+      if (toolName === 'addClipToTimeline') {
+        const result = await mcpServerInstance.addClipToTimeline(params as any);
+        return ok(result);
+      }
+      if (toolName === 'exportProjectVideo') {
+        const result = await mcpServerInstance.exportProjectVideo(params as any);
+        return ok(result);
+      }
       return fail('INVALID_INPUT', `MCP tool ${toolName} is not recognized.`);
     } catch (err) {
       return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : `Failed to execute MCP tool ${toolName}`);
+    }
+  });
+
+  const credentialStore = new CredentialStore(app.getPath('userData'));
+
+  ipcMain.handle(IPC_CHANNELS.getProviderCredentials, async () => {
+    try {
+      const creds = await credentialStore.getCredentials();
+      return ok(creds);
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to retrieve credentials');
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.setProviderCredential, async (_event, provider: any, apiKey: string) => {
+    try {
+      await credentialStore.setCredential(provider, apiKey);
+      return ok({ updated: true });
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to save credential');
     }
   });
 }
