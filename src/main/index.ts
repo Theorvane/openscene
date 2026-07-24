@@ -26,6 +26,8 @@ import { IPC_CHANNELS } from '../shared/ipc';
 import { installApplicationMenu } from './applicationMenu';
 
 import { createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getSpeechGenerationJob, getVideoGenerationJob } from './aiJobManager';
+import { CredentialStore } from './credentialStore';
+import { LlmExecutionAdapter } from './llmAdapter';
 
 registerTimelineAssetScheme();
 
@@ -36,6 +38,8 @@ const assetLibraryStore = new AssetLibraryStore(join(app.getPath('userData'), 'p
 const voiceProfileStore = new VoiceProfileStore(join(app.getPath('userData'), 'voice-profiles'));
 const ttsJobStore = new LocalTtsJobStore();
 const exportJobStore = new ExportJobStore();
+const credentialStore = new CredentialStore(app.getPath('userData'));
+const llmExecutionAdapter = new LlmExecutionAdapter(credentialStore);
 const timelineIpcService = new TimelineIpcService({
   projects: projectStore,
   assets: assetLibraryStore,
@@ -245,6 +249,36 @@ function installIpcHandlers(): void {
     }
     return ok(job);
   });
+
+  ipcMain.handle(IPC_CHANNELS.getProviderCredentials, async () => {
+    try {
+      const status = await credentialStore.getCredentialStatus();
+      return ok(status);
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to retrieve credential status');
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.setProviderCredential, async (_event, provider: any, apiKey: string) => {
+    try {
+      await credentialStore.setCredential(provider, apiKey);
+      return ok({ updated: true });
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to save credential');
+    }
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.executeLlmPrompt,
+    async (_event, request: { modelId: string; prompt: string; systemPrompt?: string }) => {
+      try {
+        const result = await llmExecutionAdapter.executeCompletion(request);
+        return ok(result);
+      } catch (err) {
+        return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to execute LLM prompt');
+      }
+    }
+  );
 }
 
 app.whenReady().then(() => {

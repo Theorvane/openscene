@@ -42,7 +42,10 @@ export const IPC_CHANNELS = {
   aiGetVideoJob: 'ai:get-video-job',
   aiGenerateSpeech: 'ai:generate-speech',
   aiGetSpeechJob: 'ai:get-speech-job',
-  projectAiResultImport: 'project-assets:import-ai-result'
+  projectAiResultImport: 'project-assets:import-ai-result',
+  getProviderCredentials: 'credentials:get',
+  setProviderCredential: 'credentials:set',
+  executeLlmPrompt: 'llm:execute-prompt'
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

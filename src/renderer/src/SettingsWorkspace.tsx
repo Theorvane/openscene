@@ -1,13 +1,39 @@
-import { type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { DEFAULT_LLM_MODELS } from '../../shared/llmModels';
 import { useLlmModel } from './LlmProviderContext';
 import { useTheme } from './ThemeProvider';
 import { THEME_PRESETS, type ThemePresetId } from './theme';
 import { Button, Panel } from './ui';
 
+type ModelTestState =
+  | { status: 'idle' }
+  | { status: 'running' }
+  | { status: 'success'; completion: string }
+  | { status: 'error'; error: string };
+
 export function SettingsWorkspace(): ReactElement {
   const { mode, preference, preset, setPreset, setPreference } = useTheme();
   const { selectedModelId, selectedModel, providerConfig, setSelectedModelId, updateProviderConfig } = useLlmModel();
+  const [testState, setTestState] = useState<ModelTestState>({ status: 'idle' });
+
+  const runModelTest = async (): Promise<void> => {
+    setTestState({ status: 'running' });
+    try {
+      const response = await window.videoTool.executeLlmPrompt({
+        modelId: selectedModelId,
+        prompt: 'Reply with a short one-sentence greeting to confirm you are online.',
+        ...(providerConfig.ollamaBaseUrl ? { ollamaBaseUrl: providerConfig.ollamaBaseUrl } : {})
+      });
+      if (response.ok && response.value.ok && response.value.completion) {
+        setTestState({ status: 'success', completion: response.value.completion });
+      } else {
+        const error = response.ok ? response.value.error ?? 'Model test failed with no error detail.' : response.error.message;
+        setTestState({ status: 'error', error });
+      }
+    } catch (err) {
+      setTestState({ status: 'error', error: err instanceof Error ? err.message : 'Model test failed.' });
+    }
+  };
 
   return (
     <div
@@ -192,6 +218,22 @@ export function SettingsWorkspace(): ReactElement {
                 {selectedModel.description}
               </span>
             </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <Button variant="default" onClick={() => void runModelTest()} disabled={testState.status === 'running'} style={{ alignSelf: 'flex-start', padding: '8px 14px' }}>
+              {testState.status === 'running' ? 'Testing…' : 'Test Selected Model'}
+            </Button>
+            {testState.status === 'success' && (
+              <div style={{ padding: '10px', borderRadius: 'var(--radius-xs)', background: 'var(--surface-inset)', border: '1px solid var(--border)', fontSize: 'var(--text-caption)' }}>
+                <strong style={{ color: 'var(--success, #2e7d32)' }}>✓ Model responded:</strong> {testState.completion}
+              </div>
+            )}
+            {testState.status === 'error' && (
+              <div style={{ padding: '10px', borderRadius: 'var(--radius-xs)', background: 'var(--surface-inset)', border: '1px solid var(--border)', fontSize: 'var(--text-caption)', color: 'var(--destructive, #c62828)' }}>
+                ✗ {testState.error}
+              </div>
+            )}
           </div>
         </Panel>
 

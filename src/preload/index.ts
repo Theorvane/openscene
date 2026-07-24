@@ -99,6 +99,14 @@ export interface VideoToolApi {
   aiGetVideoJob(jobId: string): Promise<ApiResponse<unknown>>;
   aiGenerateSpeech(request: unknown): Promise<ApiResponse<unknown>>;
   aiGetSpeechJob(jobId: string): Promise<ApiResponse<unknown>>;
+  getProviderCredentialStatus(): Promise<ApiResponse<Record<string, boolean>>>;
+  setProviderCredential(provider: string, apiKey: string): Promise<ApiResponse<{ readonly updated: boolean }>>;
+  executeLlmPrompt(request: {
+    modelId: string;
+    prompt: string;
+    systemPrompt?: string;
+    ollamaBaseUrl?: string;
+  }): Promise<ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>>;
 }
 
 const videoTool: VideoToolApi = {
@@ -168,7 +176,15 @@ const videoTool: VideoToolApi = {
   aiGenerateVideo: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateVideo, request) as Promise<ApiResponse<unknown>>,
   aiGetVideoJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetVideoJob, jobId) as Promise<ApiResponse<unknown>>,
   aiGenerateSpeech: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateSpeech, request) as Promise<ApiResponse<unknown>>,
-  aiGetSpeechJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetSpeechJob, jobId) as Promise<ApiResponse<unknown>>
+  aiGetSpeechJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetSpeechJob, jobId) as Promise<ApiResponse<unknown>>,
+  getProviderCredentialStatus: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.getProviderCredentials) as Promise<ApiResponse<Record<string, boolean>>>,
+  setProviderCredential: (provider, apiKey) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setProviderCredential, provider, apiKey) as Promise<ApiResponse<{ readonly updated: boolean }>>,
+  executeLlmPrompt: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.executeLlmPrompt, request) as Promise<
+      ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>
+    >
 };
 
 contextBridge.exposeInMainWorld('videoTool', videoTool);
