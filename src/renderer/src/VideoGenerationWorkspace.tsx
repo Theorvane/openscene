@@ -9,7 +9,7 @@ const ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const;
 const DURATIONS = [3, 5, 10] as const;
 
 export function VideoGenerationWorkspace(): ReactElement {
-  const { importTtsResult } = useProjectResultImport();
+  const { importAiResult } = useProjectResultImport();
   const [mode, setMode] = useState<ProviderExecutionMode>('local');
   const [apiProvider, setApiProvider] = useState<'gemini_veo' | 'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream'>('gemini_veo');
   const [prompt, setPrompt] = useState('');
@@ -37,7 +37,7 @@ export function VideoGenerationWorkspace(): ReactElement {
 
     setIsGenerating(true);
     setStatusMsg({
-      text: `Submitting ${mode === 'local' ? 'Local AI Engine' : apiProvider === 'gemini_veo' ? 'Gemini Veo' : 'OpenAI Sora'} job...`,
+      text: `Submitting ${mode === 'local' ? 'Local AI Engine' : apiProvider === 'gemini_veo' ? 'Gemini Veo 3.1' : apiProvider === 'openai_sora' ? 'OpenAI Sora' : apiProvider === 'runway_gen4' ? 'Runway Gen-4' : apiProvider === 'kling_v3' ? 'Kling 3.0' : 'Luma Dream'} job...`,
       tone: 'neutral'
     });
 
@@ -88,7 +88,7 @@ export function VideoGenerationWorkspace(): ReactElement {
   const handleImportToProject = async (job: VideoGenerationJob): Promise<void> => {
     if (!job.outputFilePath) return;
     try {
-      const status = await importTtsResult(job.id);
+      const status = await importAiResult(job.id);
       setStatusMsg(status);
     } catch (err) {
       setStatusMsg({ text: `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`, tone: 'danger' });

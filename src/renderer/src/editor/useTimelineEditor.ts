@@ -136,7 +136,7 @@ export function useTimelineEditor() {
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
   }, [project, refreshProjects, setLoadedProject]);
 
-  const { importAssets, importRecordingResult, importTtsResult } = useProjectAssetImports({ project, setIsBusy, setProject, setSelectedAssetId, setStatusMessage });
+  const { importAssets, importRecordingResult, importTtsResult, importAiResult } = useProjectAssetImports({ project, setIsBusy, setProject, setSelectedAssetId, setStatusMessage });
 
   const replaceTimeline = useCallback((update: TimelineUpdate, successText: string): TimelineDocument | null => {
     if (project === null) return null;
@@ -279,7 +279,7 @@ export function useTimelineEditor() {
 
   return {
     addTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, hasUnsavedTimeline, importAssets,
-    importRecordingResult, importTtsResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
+    importRecordingResult, importTtsResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
     openProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
     selectedAsset, selectedAssetId, selectedClip, selectedClipId, setNewProjectName, setSelectedAssetId, setSelectedClipId,
     splitSelectedClip, statusMessage, trimSelectedClip, updateAssetMetadata, updateSelectedClipEffects,

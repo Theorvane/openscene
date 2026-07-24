@@ -13,6 +13,7 @@ type ProjectResultImportContextValue = {
   readonly isImporting: boolean;
   readonly importRecordingResult: (sessionId: string) => Promise<StatusMessage>;
   readonly importTtsResult: (jobId: string) => Promise<StatusMessage>;
+  readonly importAiResult: (jobId: string) => Promise<StatusMessage>;
 };
 
 type ProjectResultImportProviderProps = {
@@ -27,6 +28,7 @@ export function ProjectResultImportProvider({ children, editor }: ProjectResultI
     activeProject: editor.project === null ? null : { id: editor.project.id, name: editor.project.name },
     importRecordingResult: editor.importRecordingResult,
     importTtsResult: editor.importTtsResult,
+    importAiResult: editor.importAiResult,
     isImporting: editor.isBusy
   };
 

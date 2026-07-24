@@ -116,5 +116,31 @@ export function useProjectAssetImports({ project, setIsBusy, setProject, setSele
     return message;
   }, [mergeAssetsIntoProject, presentProjectImport, project, setIsBusy]);
 
-  return { importAssets, importRecordingResult, importTtsResult };
+  const importAiResult = useCallback(async (jobId: string): Promise<StatusMessage> => {
+    if (project === null) return { tone: 'warning', text: 'Open a local project before importing the AI media asset.' };
+    const projectId = project.id;
+    setIsBusy(true);
+    let response: Awaited<ReturnType<typeof window.videoTool.importAiResultAsset>>;
+    try {
+      response = await window.videoTool.importAiResultAsset({ projectId, jobId });
+    } catch (error: unknown) {
+      const message: StatusMessage = { tone: 'danger', text: error instanceof Error ? error.message : 'AI media import failed.' };
+      presentProjectImport({ projectId, selectedAssetId: null, statusMessage: message });
+      return message;
+    } finally {
+      setIsBusy(false);
+    }
+    if (response.ok) {
+      const importedAssetId = response.value.assets[0]?.id ?? null;
+      mergeAssetsIntoProject(projectId, response.value.assets);
+      const message: StatusMessage = { tone: 'success', text: `Imported AI media asset into ${project.name}.` };
+      presentProjectImport({ projectId, selectedAssetId: importedAssetId, statusMessage: message });
+      return message;
+    }
+    const message: StatusMessage = { tone: 'danger', text: errorMessage(response.error) };
+    presentProjectImport({ projectId, selectedAssetId: null, statusMessage: message });
+    return message;
+  }, [mergeAssetsIntoProject, presentProjectImport, project, setIsBusy]);
+
+  return { importAssets, importRecordingResult, importTtsResult, importAiResult };
 }
