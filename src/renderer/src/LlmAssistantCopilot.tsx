@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import type { ImportProjectAssetsResult } from '../../shared/timelineTypes';
+import { INTENT_SYSTEM_PROMPT, matchKeywordIntent, parseModelIntent, type CopilotTool } from './copilotIntent';
 import { useLlmModel } from './LlmProviderContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
 
@@ -26,7 +27,7 @@ export function LlmAssistantCopilot(): ReactElement {
   const [isProcessing, setIsProcessing] = useState(false);
   const [steps, setSteps] = useState<readonly CopilotStep[]>([]);
   const [statusMessage, setStatusMessage] = useState<string>(
-    'Enter a command keyword: video, voice/speech, or export/render.'
+    'Describe what you want (e.g. "generate a video intro", "add a voiceover", "export the project").'
   );
 
   const pollJobCompletion = async (jobId: string, kind: 'video' | 'speech'): Promise<{ success: boolean; outputFilePath?: string | undefined; error?: string | undefined }> => {
@@ -54,10 +55,56 @@ export function LlmAssistantCopilot(): ReactElement {
     const text = inputPrompt.toLowerCase();
     const newSteps: CopilotStep[] = [];
 
-    setStatusMessage('Analyzing command...');
+    setStatusMessage(`Consulting ${selectedModel.label}...`);
+
+    const intentStepId = `step-intent-${Date.now()}`;
+    newSteps.push({
+      id: intentStepId,
+      action: `Interpreting command via ${selectedModel.label}`,
+      status: 'running'
+    });
+    setSteps([...newSteps]);
+
+    let tool: CopilotTool | null = null;
+    const llmResponse = await window.videoTool.executeLlmPrompt({
+      modelId: selectedModel.id,
+      prompt: inputPrompt,
+      systemPrompt: INTENT_SYSTEM_PROMPT
+    });
+
+    if (llmResponse.ok && llmResponse.value.ok && llmResponse.value.completion) {
+      const parsed = parseModelIntent(llmResponse.value.completion);
+      if (parsed) {
+        tool = parsed.tool;
+        newSteps[0] = {
+          id: intentStepId,
+          action: `${selectedModel.label} interpreted command`,
+          status: 'completed',
+          detail: parsed.reason ?? llmResponse.value.completion
+        };
+      } else {
+        tool = matchKeywordIntent(text);
+        newSteps[0] = {
+          id: intentStepId,
+          action: `${selectedModel.label} response was not valid JSON, used keyword fallback`,
+          status: 'failed',
+          detail: llmResponse.value.completion
+        };
+      }
+    } else {
+      tool = matchKeywordIntent(text);
+      const errorDetail = llmResponse.ok ? llmResponse.value.error : llmResponse.error.message;
+      newSteps[0] = {
+        id: intentStepId,
+        action: `${selectedModel.label} unavailable, used keyword fallback`,
+        status: 'failed',
+        detail: errorDetail
+      };
+    }
+    setSteps([...newSteps]);
 
     try {
-      if (text.includes('video') || text.includes('intro') || text.includes('scene') || text.includes('영상')) {
+      if (tool === 'createVideoJob') {
         if (!activeProject) {
           setStatusMessage('Please open or create a local project before generating and inserting video.');
           setIsProcessing(false);
@@ -84,7 +131,7 @@ export function LlmAssistantCopilot(): ReactElement {
           const val = response.value as { success?: boolean; jobId?: string; error?: string };
           if (val.success && val.jobId) {
             const jobId = val.jobId;
-            newSteps[0] = {
+            newSteps[1] = {
               id: stepId,
               action: '1. MCP createVideoJob Started',
               status: 'completed',
@@ -104,7 +151,7 @@ export function LlmAssistantCopilot(): ReactElement {
 
             const pollResult = await pollJobCompletion(jobId, 'video');
             if (pollResult.success) {
-              newSteps[1] = {
+              newSteps[2] = {
                 id: pollStepId,
                 action: '2. AI Video Generation Completed',
                 status: 'completed',
@@ -125,7 +172,7 @@ export function LlmAssistantCopilot(): ReactElement {
               const importResp = await window.videoTool.importAiResultAsset({ projectId: activeProject.id, jobId });
               if (!importResp.ok || !importResp.value.assets || importResp.value.assets.length === 0) {
                 const importErr = !importResp.ok ? importResp.error.message : 'No imported assets returned';
-                newSteps[2] = {
+                newSteps[3] = {
                   id: importStepId,
                   action: '3. Media Import Failed',
                   status: 'failed',
@@ -138,7 +185,7 @@ export function LlmAssistantCopilot(): ReactElement {
               }
 
               const importedAsset = importResp.value.assets[0]!;
-              newSteps[2] = {
+              newSteps[3] = {
                 id: importStepId,
                 action: '3. Media Imported into Project',
                 status: 'completed',
@@ -167,7 +214,7 @@ export function LlmAssistantCopilot(): ReactElement {
               if (clipResp.ok) {
                 const clipVal = clipResp.value as { success?: boolean; clipId?: string; error?: string };
                 if (clipVal.success) {
-                  newSteps[3] = {
+                  newSteps[4] = {
                     id: clipStepId,
                     action: '4. MCP addClipToTimeline Completed',
                     status: 'completed',
@@ -176,7 +223,7 @@ export function LlmAssistantCopilot(): ReactElement {
                   setSteps([...newSteps]);
                   setStatusMessage(`Successfully generated, imported, and added video to ${activeProject.name}!`);
                 } else {
-                  newSteps[3] = {
+                  newSteps[4] = {
                     id: clipStepId,
                     action: '4. MCP addClipToTimeline Failed',
                     status: 'failed',
@@ -187,7 +234,7 @@ export function LlmAssistantCopilot(): ReactElement {
                 }
               }
             } else {
-              newSteps[1] = {
+              newSteps[2] = {
                 id: pollStepId,
                 action: '2. AI Video Generation Failed',
                 status: 'failed',
@@ -197,7 +244,7 @@ export function LlmAssistantCopilot(): ReactElement {
               setStatusMessage(`Video generation failed: ${pollResult.error ?? 'Unknown error'}`);
             }
           } else {
-            newSteps[0] = {
+            newSteps[1] = {
               id: stepId,
               action: '1. MCP createVideoJob Failed',
               status: 'failed',
@@ -207,7 +254,7 @@ export function LlmAssistantCopilot(): ReactElement {
             setStatusMessage(`Generation failed: ${val.error ?? 'Unknown error'}`);
           }
         } else {
-          newSteps[0] = {
+          newSteps[1] = {
             id: stepId,
             action: '1. MCP createVideoJob Failed',
             status: 'failed',
@@ -216,7 +263,7 @@ export function LlmAssistantCopilot(): ReactElement {
           setSteps([...newSteps]);
           setStatusMessage(`Execution failed: ${response.error.message}`);
         }
-      } else if (text.includes('voice') || text.includes('speech') || text.includes('narration') || text.includes('보이스')) {
+      } else if (tool === 'createSpeechJob') {
         if (!activeProject) {
           setStatusMessage('Please open or create a local project before generating speech.');
           setIsProcessing(false);
@@ -241,7 +288,7 @@ export function LlmAssistantCopilot(): ReactElement {
         if (response.ok) {
           const val = response.value as { success?: boolean; jobId?: string; error?: string };
           if (val.success && val.jobId) {
-            newSteps[0] = {
+            newSteps[1] = {
               id: stepId,
               action: '1. MCP createSpeechJob Completed',
               status: 'completed',
@@ -250,7 +297,7 @@ export function LlmAssistantCopilot(): ReactElement {
             setSteps([...newSteps]);
             setStatusMessage(`Speech synthesis initiated for ${activeProject.name}!`);
           } else {
-            newSteps[0] = {
+            newSteps[1] = {
               id: stepId,
               action: '1. MCP createSpeechJob Failed',
               status: 'failed',
@@ -260,7 +307,7 @@ export function LlmAssistantCopilot(): ReactElement {
             setStatusMessage(`Speech failed: ${val.error ?? 'Unknown error'}`);
           }
         } else {
-          newSteps[0] = {
+          newSteps[1] = {
             id: stepId,
             action: '1. MCP createSpeechJob Failed',
             status: 'failed',
@@ -269,7 +316,7 @@ export function LlmAssistantCopilot(): ReactElement {
           setSteps([...newSteps]);
           setStatusMessage(`Speech synthesis failed: ${response.error.message}`);
         }
-      } else if (text.includes('export') || text.includes('render') || text.includes('익스포트') || text.includes('저장')) {
+      } else if (tool === 'exportProjectVideo') {
         if (!activeProject) {
           setStatusMessage('Please open or create a local project before exporting.');
           setIsProcessing(false);
@@ -293,7 +340,7 @@ export function LlmAssistantCopilot(): ReactElement {
         if (response.ok) {
           const val = response.value as { success?: boolean; exportJobId?: string; error?: string };
           if (val.success) {
-            newSteps[0] = {
+            newSteps[1] = {
               id: stepId,
               action: 'MCP Tool exportProjectVideo Completed',
               status: 'completed',
@@ -302,7 +349,7 @@ export function LlmAssistantCopilot(): ReactElement {
             setSteps([...newSteps]);
             setStatusMessage(`FFmpeg MP4 export started for ${activeProject.name}!`);
           } else {
-            newSteps[0] = {
+            newSteps[1] = {
               id: stepId,
               action: 'MCP Tool exportProjectVideo Failed',
               status: 'failed',
@@ -312,7 +359,7 @@ export function LlmAssistantCopilot(): ReactElement {
             setStatusMessage(`Export failed: ${val.error ?? 'Unknown error'}`);
           }
         } else {
-          newSteps[0] = {
+          newSteps[1] = {
             id: stepId,
             action: 'MCP Tool exportProjectVideo Failed',
             status: 'failed',
@@ -333,7 +380,7 @@ export function LlmAssistantCopilot(): ReactElement {
         });
         setSteps([...newSteps]);
         setStatusMessage(
-          'Instruction not supported. Use keywords: video, scene, voice, speech, narration, export, or render.'
+          `${selectedModel.label} found no matching operation. Try mentioning video, voice/speech, or export/render.`
         );
       }
     } catch (err) {
@@ -415,7 +462,9 @@ export function LlmAssistantCopilot(): ReactElement {
           </div>
 
           <div style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-            Deterministic keyword router: <strong style={{ color: 'var(--foreground)' }}>video</strong>,{' '}
+            Routed by <strong style={{ color: 'var(--foreground)' }}>{selectedModel.label}</strong> (falls back to
+            keyword matching if the model is unavailable). Supports{' '}
+            <strong style={{ color: 'var(--foreground)' }}>video</strong>,{' '}
             <strong style={{ color: 'var(--foreground)' }}>voice/speech</strong>, or{' '}
             <strong style={{ color: 'var(--foreground)' }}>export/render</strong>.
             {activeProject && <div style={{ color: 'var(--primary)', marginTop: '2px' }}>Active Project: {activeProject.name}</div>}
@@ -482,7 +531,7 @@ export function LlmAssistantCopilot(): ReactElement {
               type="text"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Enter keyword command (video / voice / export)..."
+              placeholder="Describe the command (video / voice / export)..."
               disabled={isProcessing}
               style={{
                 flex: 1,

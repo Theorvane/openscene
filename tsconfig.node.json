@@ -33,6 +33,7 @@
     "src/renderer/src/editor/exportUiState.ts",
     "src/renderer/src/appWorkspaces.ts",
     "src/renderer/src/theme.ts",
+    "src/renderer/src/copilotIntent.ts",
     "src/shared/**/*.ts",
     "tests/**/*.ts"
   ]
