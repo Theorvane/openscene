@@ -56,6 +56,11 @@ Do not rename these persisted or public identifiers while rebranding docs or UI:
 - Preserve consent boundaries for voice samples. Samples must be user-owned or authorized, stored locally, and deletable from the app store.
 - When editing docs, use `OpenVideo` for the product name and keep compatibility identifiers exactly as written above.
 
+## Agent Skills & TypeMCP Integration
+
+- **Agent Skills Location**: `.agents/skills/api-to-typemcp/SKILL.md` (Integrates `api-to-typemcp` skill for converting OpenAPI/Swagger specifications or API docs into TypeMCP MCP projects).
+- **TypeMCP Server & Tools**: OpenVideo internal process capabilities (AI video generation, TTS speech synthesis, job status tracking) are declared as standard TypeMCP tools (`@theorvane/type-mcp`) in `src/main/openVideoMcpServer.ts` and exposed over IPC (`window.videoTool.mcpGetTools` / `mcpExecuteTool`).
+
 ## Required Issue, Branch, And PR Workflow
 
 Every change after the initial repository bootstrap follows this sequence. Never commit directly to protected `dev` or `main`.
