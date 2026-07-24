@@ -1,4 +1,4 @@
-import { Command, INTERRUPT, isInterrupted } from '@langchain/langgraph';
+import { Command, INTERRUPT, isInterrupted, type StateSnapshot } from '@langchain/langgraph';
 import type { MemorySaver } from '@langchain/langgraph-checkpoint';
 import type { BaseMessage } from '@langchain/core/messages';
 import type {
@@ -42,11 +42,24 @@ export class AgentChatSessionManager {
   }
 
   async respondToApproval(input: AgentChatApprovalInput): Promise<AgentChatTurnState> {
+    const config = this.runnableConfig(input.conversationId);
+
     try {
-      const result = await this.graph.invoke(
-        new Command({ resume: input.decision }),
-        this.runnableConfig(input.conversationId)
-      );
+      const snapshot = await this.graph.getState(config);
+      const actualPending = findPendingProposal(snapshot);
+
+      if (!actualPending || actualPending.toolCallId !== input.toolCallId) {
+        const messages = ((snapshot.values as { messages?: BaseMessage[] } | undefined)?.messages ?? []) as BaseMessage[];
+        return {
+          conversationId: input.conversationId,
+          messages: toDisplayMessages(messages),
+          pendingApproval: actualPending,
+          status: actualPending ? 'awaiting-approval' : 'idle',
+          error: 'This approval no longer matches the agent\'s current pending action. Ignored.'
+        };
+      }
+
+      const result = await this.graph.invoke(new Command({ resume: input.decision }), config);
       return await this.toTurnState(input.conversationId, result);
     } catch (err) {
       return this.errorState(input.conversationId, err);
@@ -101,6 +114,17 @@ export class AgentChatSessionManager {
       error: err instanceof Error ? err.message : 'Agent chat failed unexpectedly.'
     };
   }
+}
+
+function findPendingProposal(snapshot: StateSnapshot): AgentToolCallProposal | null {
+  for (const task of snapshot.tasks) {
+    for (const pendingInterrupt of task.interrupts) {
+      if (pendingInterrupt.value) {
+        return pendingInterrupt.value as AgentToolCallProposal;
+      }
+    }
+  }
+  return null;
 }
 
 function toDisplayMessages(messages: readonly BaseMessage[]): AgentChatDisplayMessage[] {

@@ -98,6 +98,33 @@ describe('agent chat graph', () => {
     expect(resumed.messages.at(-1)?.text).toBe('Export started.');
   });
 
+  it('ignores an approval response whose toolCallId does not match the pending proposal', async () => {
+    const session = buildSession([
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'call-stale', name: MUTATING_TOOL_NAME, args: { projectId: 'proj-1' } }]
+      }),
+      new AIMessage('Export started.')
+    ]);
+
+    const paused = await session.sendMessage({ conversationId: 'c6', text: 'export it', modelId: 'qwen2.5-coder' });
+    expect(paused.pendingApproval?.toolCallId).toBe('call-stale');
+
+    // Simulates a stale UI response — e.g. from a previous, already-resolved or unrelated proposal.
+    const mismatched = await session.respondToApproval({ conversationId: 'c6', toolCallId: 'call-from-a-different-turn', decision: 'approve' });
+
+    expect(mismatched.error).toBeDefined();
+    // The action must still be pending, and the tool must not have run.
+    expect(mismatched.status).toBe('awaiting-approval');
+    expect(mismatched.pendingApproval).toEqual({ toolCallId: 'call-stale', toolName: MUTATING_TOOL_NAME, args: { projectId: 'proj-1' } });
+    expect(mismatched.messages.some((m) => m.role === 'tool')).toBe(false);
+
+    // The real pending proposal can still be resolved afterward.
+    const resumed = await session.respondToApproval({ conversationId: 'c6', toolCallId: 'call-stale', decision: 'approve' });
+    expect(resumed.status).toBe('idle');
+    expect(resumed.messages.some((m) => m.role === 'tool')).toBe(true);
+  });
+
   it('records a denial instead of executing the mutating tool', async () => {
     const session = buildSession([
       new AIMessage({
