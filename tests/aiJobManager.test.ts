@@ -112,4 +112,29 @@ printf "\\x00\\x00\\x00\\x20ftypisom\\x00\\x00\\x02\\x00isomiso2avc1mp41\\x00\\x
     expect(unconfiguredJob?.status).toBe('failed');
     expect(unconfiguredJob?.error).toContain('Gemini Veo API service endpoint is currently unconfigured');
   }, 10_000);
+
+  it('reports the correct provider name for every cloud video provider, never a generic fallback', async () => {
+    const providers: Array<{ id: 'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream'; label: string }> = [
+      { id: 'openai_sora', label: 'OpenAI Sora' },
+      { id: 'runway_gen4', label: 'Runway Gen-4' },
+      { id: 'kling_v3', label: 'Kling 3.0' },
+      { id: 'luma_dream', label: 'Luma Dream' }
+    ];
+
+    for (const { id, label } of providers) {
+      const job = await createVideoGenerationJob({
+        prompt: `Test prompt for ${label}`,
+        aspectRatio: '16:9',
+        durationSeconds: 5,
+        mode: 'api',
+        provider: id,
+        apiKey: 'sk-test-key-12345'
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      const failedJob = getVideoGenerationJob(job.id);
+      expect(failedJob?.status).toBe('failed');
+      expect(failedJob?.error).toContain(`${label} API service endpoint is currently unconfigured`);
+    }
+  }, 20_000);
 });

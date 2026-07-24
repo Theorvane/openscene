@@ -100,18 +100,28 @@ type CloudProviderResult =
   | { readonly ok: true; readonly outputFilePath?: string; readonly providerJobId?: string }
   | { readonly ok: false; readonly error: string };
 
+const VIDEO_PROVIDER_LABELS: Record<VideoGenerationProviderId, string> = {
+  gemini_veo: 'Gemini Veo',
+  openai_sora: 'OpenAI Sora',
+  runway_gen4: 'Runway Gen-4',
+  kling_v3: 'Kling 3.0',
+  luma_dream: 'Luma Dream',
+  local_video: 'Local Engine'
+};
+
 async function invokeCloudVideoProvider(
   provider: VideoGenerationProviderId,
   apiKey: string,
   _request: VideoGenerationRequest
 ): Promise<CloudProviderResult> {
-  // Cloud provider adapter seam boundary for Gemini Veo / OpenAI Sora
+  // Cloud provider adapter seam boundary; no adapter is implemented for any provider yet.
+  const label = VIDEO_PROVIDER_LABELS[provider];
   if (apiKey.startsWith('demo-invalid') || apiKey.length < 10) {
-    return { ok: false, error: `Invalid ${provider === 'openai_sora' ? 'OpenAI Sora' : 'Gemini Veo'} API key.` };
+    return { ok: false, error: `Invalid ${label} API key.` };
   }
   return {
     ok: false,
-    error: `${provider === 'openai_sora' ? 'OpenAI Sora' : 'Gemini Veo'} API service endpoint is currently unconfigured. Use Local Engine mode for offline video synthesis.`
+    error: `${label} API service endpoint is currently unconfigured. Use Local Engine mode for offline video synthesis.`
   };
 }
 
@@ -163,7 +173,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       if (mode === 'api') {
         const apiKey = request.apiKey?.trim();
         if (!apiKey || apiKey.length === 0) {
-          throw new Error(`API key is required for ${provider === 'openai_sora' ? 'OpenAI Sora' : 'Gemini Veo'} cloud generation.`);
+          throw new Error(`API key is required for ${VIDEO_PROVIDER_LABELS[provider]} cloud generation.`);
         }
 
         const cloudResult = await invokeCloudVideoProvider(provider, apiKey, request);
@@ -202,37 +212,6 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
 
 export function getVideoGenerationJob(jobId: string): VideoGenerationJob | null {
   return videoJobs.get(jobId) ?? null;
-}
-
-// Generate minimal valid WAV file header buffer for audio synthesis preview
-function generateMinimalWavBuffer(durationSeconds = 3): Buffer {
-  const sampleRate = 44100;
-  const numChannels = 1;
-  const bitsPerSample = 16;
-  const numSamples = Math.floor(sampleRate * durationSeconds);
-  const dataSize = numSamples * numChannels * (bitsPerSample / 8);
-  const buffer = Buffer.alloc(44 + dataSize);
-
-  buffer.write('RIFF', 0);
-  buffer.writeUInt32LE(36 + dataSize, 4);
-  buffer.write('WAVE', 8);
-  buffer.write('fmt ', 12);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20);
-  buffer.writeUInt16LE(numChannels, 22);
-  buffer.writeUInt32LE(sampleRate, 24);
-  buffer.writeUInt32LE(sampleRate * numChannels * (bitsPerSample / 8), 28);
-  buffer.writeUInt16LE(numChannels * (bitsPerSample / 8), 32);
-  buffer.writeUInt16LE(bitsPerSample, 34);
-  buffer.write('data', 36);
-  buffer.writeUInt32LE(dataSize, 40);
-
-  for (let i = 0; i < numSamples; i++) {
-    const sample = Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 16384;
-    buffer.writeInt16LE(Math.floor(sample), 44 + i * 2);
-  }
-
-  return buffer;
 }
 
 export async function createSpeechGenerationJob(request: TextToSpeechRequest): Promise<TextToSpeechJob> {
