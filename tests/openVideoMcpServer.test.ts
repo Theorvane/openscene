@@ -44,9 +44,36 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.jobId.length).toBeGreaterThan(0);
-    expect(result.mode).toBe('local');
-    expect(result.provider).toBe('local_video');
+    const okResult = result as { success: true; jobId: string; mode: string; provider: string };
+    expect(okResult.jobId.length).toBeGreaterThan(0);
+    expect(okResult.mode).toBe('local');
+    expect(okResult.provider).toBe('local_video');
+  });
+
+  it('rejects createVideoJob with api mode and returns not-implemented error', async () => {
+    const server = new OpenVideoMcpServer();
+    const result = await server.createVideoJob({
+      prompt: 'Cinematic intro shot of Seoul skyline',
+      mode: 'api',
+      apiKey: 'sk-test-valid-key-12345'
+    });
+
+    expect(result.success).toBe(false);
+    const errResult = result as { success: false; error: string };
+    expect(errResult.error).toContain('not yet implemented');
+  });
+
+  it('rejects createSpeechJob with api mode and returns not-implemented error', async () => {
+    const server = new OpenVideoMcpServer();
+    const result = await server.createSpeechJob({
+      script: 'Hello from cloud speech',
+      mode: 'api',
+      apiKey: 'el-test-key-12345'
+    });
+
+    expect(result.success).toBe(false);
+    const errResult = result as { success: false; error: string };
+    expect(errResult.error).toContain('not yet implemented');
   });
 
   it('executes createSpeechJob MCP tool and returns speech job metadata', async () => {
@@ -58,8 +85,9 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.jobId.length).toBeGreaterThan(0);
-    expect(result.mode).toBe('local');
+    const okResult = result as { success: true; jobId: string; mode: string };
+    expect(okResult.jobId.length).toBeGreaterThan(0);
+    expect(okResult.mode).toBe('local');
   });
 
   it('fails addClipToTimeline when ProjectStore service is missing or project/track/asset is not found', async () => {
@@ -217,11 +245,12 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
       mode: 'local'
     });
     expect(jobResult.success).toBe(true);
-    expect(jobResult.jobId.length).toBeGreaterThan(0);
+    const okJobResult = jobResult as { success: true; jobId: string };
+    expect(okJobResult.jobId.length).toBeGreaterThan(0);
 
     // 2. Poll Status
     const statusResult = await server.getJobStatus({
-      jobId: jobResult.jobId,
+      jobId: okJobResult.jobId,
       kind: 'video'
     });
     expect(statusResult.success).toBe(true);
@@ -230,7 +259,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     // 3. Register asset & add to real project timeline
     const project = await projectStore.create({ name: 'Copilot Workflow Project' });
     const nowIso = new Date('2026-07-24T12:00:00.000Z').toISOString();
-    const assetId = `asset-${jobResult.jobId}`;
+    const assetId = `asset-${okJobResult.jobId}`;
     const dummyAsset: MediaAsset = {
       id: assetId,
       displayName: 'generated-video.mp4',

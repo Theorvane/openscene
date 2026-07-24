@@ -75,8 +75,7 @@ export function LlmAssistantCopilot(): ReactElement {
           prompt: inputPrompt,
           aspectRatio: '16:9',
           durationSeconds: 5,
-          mode: selectedModel.defaultMode,
-          provider: selectedModel.providerId === 'openai' ? 'openai_sora' : selectedModel.providerId === 'google_gemini' ? 'gemini_veo' : 'local_video'
+          mode: 'local'
         });
 
         if (response.ok) {
@@ -321,15 +320,19 @@ export function LlmAssistantCopilot(): ReactElement {
           setStatusMessage(`Export failed: ${response.error.message}`);
         }
       } else {
-        const stepId = `step-generic-${Date.now()}`;
+        const stepId = `step-unsupported-${Date.now()}`;
         newSteps.push({
           id: stepId,
-          action: `Executing ${selectedModel.label} Timeline Command`,
-          status: 'completed',
-          detail: `Processed instruction: "${inputPrompt}"`
+          action: 'Instruction Not Supported',
+          status: 'failed',
+          detail:
+            `"${inputPrompt}" did not match any supported copilot operation. ` +
+            'Supported commands: video/scene generation, voice/speech synthesis, export/render.'
         });
         setSteps([...newSteps]);
-        setStatusMessage(`Command processed by ${selectedModel.label}.`);
+        setStatusMessage(
+          'Instruction not supported. Use keywords: video, scene, voice, speech, narration, export, or render.'
+        );
       }
     } catch (err) {
       setStatusMessage(`Copilot error: ${err instanceof Error ? err.message : 'Unknown error'}`);
