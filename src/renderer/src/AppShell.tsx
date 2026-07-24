@@ -1,9 +1,6 @@
-import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
-
-import { useTheme } from './ThemeProvider';
+import type { ReactElement, ReactNode } from 'react';
 import type { AppWorkspace } from './appWorkspaces';
-import { shouldToggleThemeOnSwitchKeyDown } from './theme';
-import { Button } from './ui';
+import { ThemeSelector } from './ThemeSelector';
 
 function AppShellBackground(): ReactElement {
   return (
@@ -21,16 +18,6 @@ type AppShellProps = {
 };
 
 export function AppShell({ activeWorkspace, children }: AppShellProps): ReactElement {
-  const { mode, toggleTheme } = useTheme();
-  const nextMode = mode === 'dark' ? 'light' : 'dark';
-
-  const handleThemeSwitchKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
-    if (!shouldToggleThemeOnSwitchKeyDown(event.key)) return;
-
-    event.preventDefault();
-    toggleTheme();
-  };
-
   return (
     <main className="app-shell">
       <AppShellBackground />
@@ -40,18 +27,7 @@ export function AppShell({ activeWorkspace, children }: AppShellProps): ReactEle
           <span className="local-pill">Local</span>
         </div>
         <div className="product-chrome__actions">
-          <Button
-            className="theme-switch"
-            role="switch"
-            variant="ghost"
-            aria-checked={mode === 'dark'}
-            aria-label={`Theme is ${mode}. Switch to ${nextMode} theme.`}
-            onClick={toggleTheme}
-            onKeyDown={handleThemeSwitchKeyDown}
-          >
-            <span className="theme-switch__label">Theme</span>
-            <span className="theme-switch__value">{mode}</span>
-          </Button>
+          <ThemeSelector />
         </div>
       </header>
       {children}

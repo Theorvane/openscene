@@ -147,15 +147,48 @@
   --surface-raised: rgba(24, 24, 28, 0.85);
   --surface-raised-soft: rgba(20, 20, 24, 0.75);
   --surface-nav-idle: rgba(20, 20, 24, 0.6);
-  --shadow-color: transparent;
-  --shadow-panel: 0 12px 36px rgba(0, 0, 0, 0.4);
   --shadow-editorial: none;
   --shadow-inset-rule: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --shadow-control: none;
 }
-  --shadow-editorial: none;
-  --shadow-inset-rule: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --shadow-control: none;
+
+/* Preset Theme Overrides */
+:root[data-preset="midnight-neon"] {
+  --editor-canvas: #06070a;
+  --editor-glass: rgba(13, 14, 21, 0.88);
+  --background: #06070a;
+  --card: #0d0e15;
+  --popover: #0f101a;
+  --primary: #818cf8;
+  --accent: #f439a0;
+  --ring: #a855f7;
+  --border: #212438;
+}
+
+:root[data-preset="obsidian-pro"] {
+  --editor-canvas: #000000;
+  --editor-glass: rgba(18, 18, 18, 0.94);
+  --background: #000000;
+  --card: #121212;
+  --popover: #141414;
+  --primary: #3b82f6;
+  --accent: #0ea5e9;
+  --ring: #2563eb;
+  --border: #222222;
+}
+
+:root[data-preset="daylight-glass"] {
+  --editor-canvas: #f8faff;
+  --editor-glass: rgba(255, 255, 255, 0.76);
+  --background: #f8faff;
+  --card: #ffffff;
+}
+
+:root[data-preset="dark-zinc"] {
+  --editor-canvas: #09090b;
+  --editor-glass: rgba(18, 18, 22, 0.88);
+  --background: #09090b;
+  --card: #141417;
 }
 
 * {

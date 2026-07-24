@@ -1,13 +1,27 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 
-import { parseThemePreference, resolveThemeMode, THEME_STORAGE_KEY, toggleThemeMode, type ThemeMode, type ThemePreference } from './theme';
+import {
+  parseThemePreference,
+  parseThemePreset,
+  resolveThemeMode,
+  THEME_PRESET_STORAGE_KEY,
+  THEME_PRESETS,
+  THEME_STORAGE_KEY,
+  toggleThemeMode,
+  type ThemeMode,
+  type ThemePreference,
+  type ThemePresetId
+} from './theme';
 
 const DARK_THEME_QUERY = '(prefers-color-scheme: dark)';
 
 type ThemeContextValue = {
   readonly mode: ThemeMode;
   readonly preference: ThemePreference;
+  readonly preset: ThemePresetId;
   readonly toggleTheme: () => void;
+  readonly setPreset: (preset: ThemePresetId) => void;
+  readonly setPreference: (preference: ThemePreference) => void;
 };
 
 type ThemeProviderProps = {
@@ -36,7 +50,18 @@ function getStoredThemePreference(): ThemePreference {
   }
 }
 
-function persistThemePreference(preference: ThemeMode): void {
+function getStoredThemePreset(defaultMode: ThemeMode): ThemePresetId {
+  if (typeof window === 'undefined') return defaultMode === 'light' ? 'daylight-glass' : 'dark-zinc';
+
+  try {
+    return parseThemePreset(window.localStorage.getItem(THEME_PRESET_STORAGE_KEY), defaultMode);
+  } catch (error) {
+    if (isDomStorageError(error)) return defaultMode === 'light' ? 'daylight-glass' : 'dark-zinc';
+    throw error;
+  }
+}
+
+function persistThemePreference(preference: ThemePreference): void {
   if (typeof window === 'undefined') return;
 
   try {
@@ -46,28 +71,42 @@ function persistThemePreference(preference: ThemeMode): void {
   }
 }
 
-function applyDocumentTheme(mode: ThemeMode): void {
+function persistThemePreset(preset: ThemePresetId): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(THEME_PRESET_STORAGE_KEY, preset);
+  } catch (error) {
+    if (!isDomStorageError(error)) throw error;
+  }
+}
+
+function applyDocumentTheme(mode: ThemeMode, preset: ThemePresetId): void {
   if (typeof document === 'undefined') return;
 
   const root = document.documentElement;
   root.dataset.theme = mode;
+  root.dataset.preset = preset;
   root.style.colorScheme = mode;
 }
 
 export function bootstrapRendererTheme(): void {
   const preference = getStoredThemePreference();
   const systemMode = getSystemThemeMode();
-  applyDocumentTheme(resolveThemeMode(preference, systemMode));
+  const mode = resolveThemeMode(preference, systemMode);
+  const preset = getStoredThemePreset(mode);
+  applyDocumentTheme(mode, preset);
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
-  const [preference, setPreference] = useState<ThemePreference>(() => getStoredThemePreference());
+  const [preference, setPreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
   const [systemMode, setSystemMode] = useState<ThemeMode>(() => getSystemThemeMode());
   const mode = resolveThemeMode(preference, systemMode);
+  const [preset, setPresetState] = useState<ThemePresetId>(() => getStoredThemePreset(mode));
 
   useLayoutEffect(() => {
-    applyDocumentTheme(mode);
-  }, [mode]);
+    applyDocumentTheme(mode, preset);
+  }, [mode, preset]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
@@ -82,14 +121,42 @@ export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
   }, []);
 
   const toggleTheme = useCallback((): void => {
-    setPreference((currentPreference) => {
+    setPreferenceState((currentPreference) => {
       const nextMode = toggleThemeMode(resolveThemeMode(currentPreference, systemMode));
       persistThemePreference(nextMode);
+      const nextPreset = nextMode === 'light' ? 'daylight-glass' : 'dark-zinc';
+      setPresetState(nextPreset);
+      persistThemePreset(nextPreset);
       return nextMode;
     });
   }, [systemMode]);
 
-  const value = useMemo<ThemeContextValue>(() => ({ mode, preference, toggleTheme }), [mode, preference, toggleTheme]);
+  const setPreset = useCallback((nextPreset: ThemePresetId): void => {
+    const presetConfig = THEME_PRESETS.find((p) => p.id === nextPreset);
+    if (presetConfig !== undefined) {
+      setPreferenceState(presetConfig.mode);
+      persistThemePreference(presetConfig.mode);
+    }
+    setPresetState(nextPreset);
+    persistThemePreset(nextPreset);
+  }, []);
+
+  const setPreference = useCallback((nextPreference: ThemePreference): void => {
+    setPreferenceState(nextPreference);
+    persistThemePreference(nextPreference);
+    if (nextPreference === 'light') {
+      setPresetState('daylight-glass');
+      persistThemePreset('daylight-glass');
+    } else if (nextPreference === 'dark') {
+      setPresetState('dark-zinc');
+      persistThemePreset('dark-zinc');
+    }
+  }, []);
+
+  const value = useMemo<ThemeContextValue>(
+    () => ({ mode, preference, preset, toggleTheme, setPreset, setPreference }),
+    [mode, preference, preset, toggleTheme, setPreset, setPreference]
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
