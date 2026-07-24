@@ -4,7 +4,7 @@ import { THEME_PRESETS, shouldToggleThemeOnSwitchKeyDown, type ThemePresetId } f
 import { Button } from './ui';
 
 export function ThemeSelector(): ReactElement {
-  const { mode, preset, toggleTheme, setPreset } = useTheme();
+  const { mode, preference, preset, toggleTheme, setPreset, setPreference } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
 
   const activePreset = THEME_PRESETS.find((p) => p.id === preset) ?? THEME_PRESETS[0]!;
@@ -27,7 +27,7 @@ export function ThemeSelector(): ReactElement {
         onKeyDown={handleSwitchKeyDown}
       >
         <span className="theme-switch__label">Theme</span>
-        <span className="theme-switch__value">{activePreset.label}</span>
+        <span className="theme-switch__value">{mode === 'dark' ? '🌙 Dark' : '☀️ Light'}</span>
       </Button>
 
       {isOpen && (
@@ -51,14 +51,72 @@ export function ThemeSelector(): ReactElement {
             gap: '6px'
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <span style={{ fontSize: 'var(--text-caption)', fontWeight: 600, color: 'var(--muted-foreground)' }}>Visual Presets</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+            <span style={{ fontSize: 'var(--text-caption)', fontWeight: 600, color: 'var(--muted-foreground)' }}>Theme & Presets</span>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
               style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: '12px' }}
             >
               ✕
+            </button>
+          </div>
+
+          {/* Mode Switcher Segmented Control */}
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '4px', background: 'var(--surface-inset)', padding: '2px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
+            <button
+              type="button"
+              onClick={() => setPreference('light')}
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                fontSize: 'var(--text-micro)',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 600,
+                border: 'none',
+                borderRadius: '3px',
+                background: preference === 'light' ? 'var(--card)' : 'transparent',
+                color: preference === 'light' ? 'var(--foreground)' : 'var(--muted-foreground)',
+                cursor: 'pointer'
+              }}
+            >
+              ☀️ Light
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreference('dark')}
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                fontSize: 'var(--text-micro)',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 600,
+                border: 'none',
+                borderRadius: '3px',
+                background: preference === 'dark' ? 'var(--card)' : 'transparent',
+                color: preference === 'dark' ? 'var(--foreground)' : 'var(--muted-foreground)',
+                cursor: 'pointer'
+              }}
+            >
+              🌙 Dark
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreference('system')}
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                fontSize: 'var(--text-micro)',
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 600,
+                border: 'none',
+                borderRadius: '3px',
+                background: preference === 'system' ? 'var(--card)' : 'transparent',
+                color: preference === 'system' ? 'var(--foreground)' : 'var(--muted-foreground)',
+                cursor: 'pointer'
+              }}
+            >
+              💻 Auto
             </button>
           </div>
 
