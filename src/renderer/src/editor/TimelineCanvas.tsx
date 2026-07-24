@@ -148,13 +148,13 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
           {/* 1. Left Vertical Toolbox */}
           <div 
             style={{ 
-              background: 'var(--surface-raised-soft)', 
+              background: 'var(--surface-raised-soft)',
               borderRight: '1px solid var(--border)', 
               display: 'flex', 
               flexDirection: 'column', 
               alignItems: 'center', 
               paddingTop: 'var(--space-2)', 
-              gap: '4px' 
+              gap: '4px'
             }}
           >
             <button 

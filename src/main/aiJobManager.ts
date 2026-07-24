@@ -147,10 +147,10 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
   const { videoDir } = await ensureAiDirectories();
   const id = `video-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const mode = request.mode ?? 'local';
-  const provider: VideoGenerationProviderId = mode === 'api' 
+  const provider: VideoGenerationProviderId = mode === 'api'
     ? (request.provider ?? 'gemini_veo')
     : 'local_video';
-  
+
   const now = new Date().toISOString();
 
   const job: VideoGenerationJob = {
