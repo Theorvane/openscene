@@ -1,8 +1,6 @@
-import { useEffect, useRef, type ReactElement } from 'react';
-import { Button } from './ui';
+import { useEffect, useRef, type FormEvent, type ReactElement } from 'react';
 import { useAgentChat } from './AgentChatContext';
-
-const PANEL_WIDTH = '360px';
+import { Button } from './ui';
 
 export function AgentChatPanel(): ReactElement {
   const {
@@ -28,9 +26,14 @@ export function AgentChatPanel(): ReactElement {
     listEndRef.current?.scrollIntoView({ block: 'end' });
   }, [messages, pendingApproval]);
 
+  const submitMessage = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    void sendMessage(input);
+  };
+
   return (
-    <div style={{ width: isOpen ? PANEL_WIDTH : '0px', flexShrink: 0, overflow: 'hidden', transition: 'width 180ms ease' }}>
-      <div className="agent-chat-panel" style={{ width: PANEL_WIDTH }}>
+    <div className={`agent-chat-panel-shell${isOpen ? ' agent-chat-panel-shell--open' : ''}`}>
+      <div className="agent-chat-panel">
         <div className="agent-chat-panel__header">
           <div className="agent-chat-panel__title">
             <p className="agent-chat-panel__title-label">Agent</p>
@@ -40,10 +43,10 @@ export function AgentChatPanel(): ReactElement {
           </div>
           <div className="agent-chat-panel__actions">
             <Button variant="ghost" onClick={resetConversation} disabled={isBusy} title="Reset conversation" aria-label="Reset conversation">
-              ↺
+              Reset
             </Button>
             <Button variant="ghost" onClick={closeOpen} aria-label="Close agent chat">
-              ✕
+              Close
             </Button>
           </div>
         </div>
@@ -64,7 +67,9 @@ export function AgentChatPanel(): ReactElement {
 
           {messages.map((message) => (
             <div key={message.id} className={`agent-chat-message agent-chat-message--${message.role}`}>
-              <span className="agent-chat-message__role">{message.role === 'tool' ? `Tool · ${message.toolName}` : message.role}</span>
+              <span className="agent-chat-message__role">
+                {message.role === 'tool' ? `Tool · ${message.toolName}` : message.role}
+              </span>
               <p className="agent-chat-message__text">{message.text}</p>
             </div>
           ))}
@@ -86,7 +91,7 @@ export function AgentChatPanel(): ReactElement {
             </div>
           )}
 
-          {status === 'thinking' && <p className="agent-chat-status">Thinking…</p>}
+          {status === 'thinking' && <p className="agent-chat-status">Thinking...</p>}
           {error && (
             <div className="status-card status-card--danger" role="status">
               {error}
@@ -95,23 +100,17 @@ export function AgentChatPanel(): ReactElement {
           <div ref={listEndRef} />
         </div>
 
-        <form
-          className="agent-chat-panel__form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendMessage(input);
-          }}
-        >
+        <form className="agent-chat-panel__form" onSubmit={submitMessage}>
           <input
             type="text"
             className="agent-chat-panel__input"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={pendingApproval ? 'Respond to the approval above first…' : 'Message the agent…'}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder={pendingApproval ? 'Respond to the approval above first...' : 'Message the agent...'}
             disabled={isBusy || !isLocalModel || pendingApproval !== null}
           />
           <Button type="submit" variant="primary" disabled={isBusy || !isLocalModel || pendingApproval !== null || input.trim().length === 0}>
-            {isBusy ? '…' : 'Send'}
+            {isBusy ? '...' : 'Send'}
           </Button>
         </form>
       </div>
