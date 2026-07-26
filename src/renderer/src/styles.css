@@ -2653,6 +2653,16 @@ button {
   text-align: center;
 }
 
+.agent-workspace-lock__announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .agent-chat-panel-shell {
   display: flex;
   width: 360px;

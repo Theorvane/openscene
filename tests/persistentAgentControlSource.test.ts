@@ -36,9 +36,15 @@ describe('persistent agent control surface', () => {
     ]);
 
     expect(context).toContain('readonly isBusy: boolean;');
+    expect(context).toContain('try {');
+    expect(context).toContain('catch (cause) {');
+    expect(context).toContain('finally {');
+    expect(context).toContain('setIsBusy(false);');
     expect(appShell).toContain('aria-busy={isBusy}');
     expect(appShell).toContain('inert={isBusy}');
-    expect(appShell).toContain('Agent is working in this project');
+    expect(appShell).toContain('aria-live="polite"');
+    expect(appShell).toContain('className="agent-workspace-lock__message" aria-hidden="true"');
+    expect(appShell).toContain('className="agent-workspace-lock__announcement"');
     expect(styles).toContain('.agent-workspace-lock');
     expect(styles).toContain('.agent-workspace-lock__message');
   });

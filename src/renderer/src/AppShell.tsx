@@ -41,11 +41,16 @@ function AppShellContent({ activeWorkspace, children }: AppShellProps): ReactEle
           </header>
           <div className="agent-workspace-lock__content">{children}</div>
           {isBusy && (
-            <div className="agent-workspace-lock__message" role="status" aria-live="polite">
+            <div className="agent-workspace-lock__message" aria-hidden="true">
               Agent is working in this project. Workspace controls are temporarily locked.
             </div>
           )}
         </div>
+        {isBusy && (
+          <div className="agent-workspace-lock__announcement" role="status" aria-live="polite">
+            Agent is working in this project. Workspace controls are temporarily locked.
+          </div>
+        )}
         <AgentChatPanel />
       </div>
     </main>

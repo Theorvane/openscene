@@ -48,56 +48,80 @@ export function AgentChatProvider({ children }: { readonly children: ReactNode }
     setStatus('thinking');
     setInput('');
 
-    const response = await window.videoTool.agentChatSend({
-      conversationId: conversationIdRef.current,
-      text,
-      modelId: selectedModel.id,
-      ollamaBaseUrl: providerConfig.ollamaBaseUrl
-    });
+    try {
+      const response = await window.videoTool.agentChatSend({
+        conversationId: conversationIdRef.current,
+        text,
+        modelId: selectedModel.id,
+        ollamaBaseUrl: providerConfig.ollamaBaseUrl
+      });
 
-    if (response.ok) {
-      setMessages(response.value.messages);
-      setPendingApproval(response.value.pendingApproval);
-      setStatus(response.value.status);
-      setError(response.value.error);
-    } else {
+      if (response.ok) {
+        setMessages(response.value.messages);
+        setPendingApproval(response.value.pendingApproval);
+        setStatus(response.value.status);
+        setError(response.value.error);
+      } else {
+        setStatus('error');
+        setError(response.error.message);
+      }
+    } catch (cause) {
       setStatus('error');
-      setError(response.error.message);
+      setError(cause instanceof Error ? cause.message : 'Agent request failed.');
+    } finally {
+      setIsBusy(false);
     }
-    setIsBusy(false);
   };
 
   const respondToApproval = async (decision: 'approve' | 'deny'): Promise<void> => {
     if (!pendingApproval || isBusy) return;
 
     setIsBusy(true);
-    const response = await window.videoTool.agentChatApprove({
-      conversationId: conversationIdRef.current,
-      toolCallId: pendingApproval.toolCallId,
-      decision
-    });
+    try {
+      const response = await window.videoTool.agentChatApprove({
+        conversationId: conversationIdRef.current,
+        toolCallId: pendingApproval.toolCallId,
+        decision
+      });
 
-    if (response.ok) {
-      setMessages(response.value.messages);
-      setPendingApproval(response.value.pendingApproval);
-      setStatus(response.value.status);
-      setError(response.value.error);
-    } else {
+      if (response.ok) {
+        setMessages(response.value.messages);
+        setPendingApproval(response.value.pendingApproval);
+        setStatus(response.value.status);
+        setError(response.value.error);
+      } else {
+        setStatus('error');
+        setError(response.error.message);
+      }
+    } catch (cause) {
       setStatus('error');
-      setError(response.error.message);
+      setError(cause instanceof Error ? cause.message : 'Agent approval failed.');
+    } finally {
+      setIsBusy(false);
     }
-    setIsBusy(false);
   };
 
   const resetConversation = async (): Promise<void> => {
     if (isBusy) return;
     setIsBusy(true);
-    await window.videoTool.agentChatReset({ conversationId: conversationIdRef.current });
-    setMessages([]);
-    setPendingApproval(null);
-    setStatus('idle');
-    setError(undefined);
-    setIsBusy(false);
+    try {
+      const response = await window.videoTool.agentChatReset({ conversationId: conversationIdRef.current });
+      if (!response.ok) {
+        setStatus('error');
+        setError(response.error.message);
+        return;
+      }
+
+      setMessages([]);
+      setPendingApproval(null);
+      setStatus('idle');
+      setError(undefined);
+    } catch (cause) {
+      setStatus('error');
+      setError(cause instanceof Error ? cause.message : 'Could not reset the agent conversation.');
+    } finally {
+      setIsBusy(false);
+    }
   };
 
   const controller: AgentChatController = {
