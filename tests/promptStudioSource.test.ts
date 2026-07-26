@@ -22,6 +22,9 @@ describe('prompt-first studio source contract', () => {
     expect(source).toContain("useProjectResultImport");
     expect(source).toContain("importAiResult(job.id)");
     expect(source).toContain("mode: 'local'");
+    expect(source).toContain("aria-pressed={selectedStyle === preset}");
+    expect(source).toContain("aria-pressed={aspectRatio === ratio}");
+    expect(source).toContain("aria-pressed={durationSeconds === seconds}");
     expect(source).toContain("Prompt Studio");
   });
 

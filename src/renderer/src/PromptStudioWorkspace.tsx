@@ -146,6 +146,7 @@ export function PromptStudioWorkspace(): ReactElement {
                   key={preset}
                   type="button"
                   className={`preset-chip ${selectedStyle === preset ? 'preset-chip--selected' : ''}`}
+                  aria-pressed={selectedStyle === preset}
                   onClick={() => setSelectedStyle(preset)}
                 >
                   {preset}
@@ -159,7 +160,7 @@ export function PromptStudioWorkspace(): ReactElement {
               <span className="field-label-text">Frame</span>
               <div className="chip-list">
                 {ASPECT_RATIOS.map((ratio) => (
-                  <button key={ratio} type="button" className={`preset-chip ${aspectRatio === ratio ? 'preset-chip--selected' : ''}`} onClick={() => setAspectRatio(ratio)}>{ratio}</button>
+                  <button key={ratio} type="button" className={`preset-chip ${aspectRatio === ratio ? 'preset-chip--selected' : ''}`} aria-pressed={aspectRatio === ratio} onClick={() => setAspectRatio(ratio)}>{ratio}</button>
                 ))}
               </div>
             </div>
@@ -167,7 +168,7 @@ export function PromptStudioWorkspace(): ReactElement {
               <span className="field-label-text">Duration</span>
               <div className="chip-list">
                 {DURATIONS.map((seconds) => (
-                  <button key={seconds} type="button" className={`preset-chip ${durationSeconds === seconds ? 'preset-chip--selected' : ''}`} onClick={() => setDurationSeconds(seconds)}>{seconds}s</button>
+                  <button key={seconds} type="button" className={`preset-chip ${durationSeconds === seconds ? 'preset-chip--selected' : ''}`} aria-pressed={durationSeconds === seconds} onClick={() => setDurationSeconds(seconds)}>{seconds}s</button>
                 ))}
               </div>
             </div>
