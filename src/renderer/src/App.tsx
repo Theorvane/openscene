@@ -4,6 +4,7 @@ import { AppShell } from './AppShell';
 import { AppWorkspaceNavigation } from './AppWorkspaceNavigation';
 import { NarrationPanel } from './NarrationPanel';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
+import { PromptStudioWorkspace } from './PromptStudioWorkspace';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
 import { SettingsWorkspace } from './SettingsWorkspace';
 import { APP_WORKSPACES, getDefaultAppWorkspaceId } from './appWorkspaces';
@@ -11,9 +12,10 @@ import type { AppWorkspace, AppWorkspaceId } from './appWorkspaces';
 import { TimelineEditor } from './editor/TimelineEditor';
 import { useTimelineEditor } from './editor/useTimelineEditor';
 
-const [EDIT_WORKSPACE, VIDEO_GENERATION_WORKSPACE, VOICE_GENERATION_WORKSPACE, SETTINGS_WORKSPACE] = APP_WORKSPACES;
+const [PROMPT_STUDIO_WORKSPACE, EDIT_WORKSPACE, VIDEO_GENERATION_WORKSPACE, VOICE_GENERATION_WORKSPACE, SETTINGS_WORKSPACE] = APP_WORKSPACES;
 
 const APP_WORKSPACE_BY_ID = {
+  'prompt-studio': PROMPT_STUDIO_WORKSPACE,
   edit: EDIT_WORKSPACE,
   'video-generation': VIDEO_GENERATION_WORKSPACE,
   'voice-generation': VOICE_GENERATION_WORKSPACE,
@@ -81,6 +83,17 @@ export function App(): ReactElement {
         <div className="app-stack local-edit-bay" style={APP_WORKSPACE_LAYOUT_STYLE}>
           <AppWorkspaceNavigation activeWorkspaceId={activeWorkspaceId} onActiveWorkspaceChange={setActiveWorkspace} />
           <div style={APP_WORKSPACE_PANEL_STACK_STYLE}>
+            <section
+              aria-labelledby={PROMPT_STUDIO_WORKSPACE.navId}
+              hidden={activeWorkspaceId !== PROMPT_STUDIO_WORKSPACE.id}
+              id={PROMPT_STUDIO_WORKSPACE.panelId}
+              ref={setWorkspacePanelRef(PROMPT_STUDIO_WORKSPACE.id)}
+              role="region"
+              style={APP_WORKSPACE_PANEL_STYLE}
+              tabIndex={-1}
+            >
+              <PromptStudioWorkspace />
+            </section>
             <section
               aria-labelledby={EDIT_WORKSPACE.navId}
               hidden={activeWorkspaceId !== EDIT_WORKSPACE.id}

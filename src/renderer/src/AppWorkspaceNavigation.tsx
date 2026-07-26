@@ -25,6 +25,15 @@ function EditorTimelineIcon(): ReactElement {
   );
 }
 
+function PromptStudioIcon(): ReactElement {
+  return (
+    <svg className={WORKSPACE_ICON_CLASS_NAME} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 3.5l1.7 5.3 5.3 1.7-5.3 1.7-1.7 5.3-1.7-5.3-5.3-1.7 5.3-1.7L12 3.5z" />
+      <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
+    </svg>
+  );
+}
+
 function AiVideoIcon(): ReactElement {
   return (
     <svg className={WORKSPACE_ICON_CLASS_NAME} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -56,6 +65,7 @@ function SettingsGearIcon(): ReactElement {
 }
 
 const WORKSPACE_ICONS = {
+  'prompt-studio': PromptStudioIcon,
   edit: EditorTimelineIcon,
   'video-generation': AiVideoIcon,
   'voice-generation': VoiceWaveformIcon,

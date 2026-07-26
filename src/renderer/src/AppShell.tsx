@@ -3,7 +3,6 @@ import type { AppWorkspace } from './appWorkspaces';
 import { AgentChatPanel } from './AgentChatPanel';
 import { AgentChatProvider } from './AgentChatContext';
 import { AgentChatToggleButton } from './AgentChatToggleButton';
-import { LlmAssistantCopilot } from './LlmAssistantCopilot';
 import { LlmModelSelectorBar } from './LlmModelSelectorBar';
 import { ThemeSelector } from './ThemeSelector';
 
@@ -34,7 +33,6 @@ export function AppShell({ activeWorkspace, children }: AppShellProps): ReactEle
           </div>
           <div className="product-chrome__actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AgentChatToggleButton />
-            <LlmAssistantCopilot />
             <LlmModelSelectorBar />
             <ThemeSelector />
           </div>
