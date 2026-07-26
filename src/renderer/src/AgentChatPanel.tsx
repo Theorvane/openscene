@@ -1,11 +1,10 @@
 import { useEffect, useRef, type FormEvent, type ReactElement } from 'react';
+
 import { useAgentChat } from './AgentChatContext';
 import { Button } from './ui';
 
 export function AgentChatPanel(): ReactElement {
   const {
-    isOpen,
-    closeOpen,
     selectedModel,
     isLocalModel,
     input,
@@ -24,7 +23,7 @@ export function AgentChatPanel(): ReactElement {
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages, pendingApproval]);
+  }, [messages, pendingApproval, status]);
 
   const submitMessage = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -32,11 +31,11 @@ export function AgentChatPanel(): ReactElement {
   };
 
   return (
-    <div className={`agent-chat-panel-shell${isOpen ? ' agent-chat-panel-shell--open' : ''}`}>
+    <aside className="agent-chat-panel-shell" aria-label="OpenVideo agent chat">
       <div className="agent-chat-panel">
         <div className="agent-chat-panel__header">
           <div className="agent-chat-panel__title">
-            <p className="agent-chat-panel__title-label">Agent</p>
+            <p className="agent-chat-panel__title-label">OpenVideo Agent</p>
             <span className="agent-chat-panel__title-meta">
               {selectedModel.label} · {isLocalModel ? 'Local · Ollama' : 'Switch to a local model'}
             </span>
@@ -45,23 +44,19 @@ export function AgentChatPanel(): ReactElement {
             <Button variant="ghost" onClick={resetConversation} disabled={isBusy} title="Reset conversation" aria-label="Reset conversation">
               Reset
             </Button>
-            <Button variant="ghost" onClick={closeOpen} aria-label="Close agent chat">
-              Close
-            </Button>
           </div>
         </div>
 
-        <div className="agent-chat-log">
+        <div className="agent-chat-log" aria-live="polite">
           {!isLocalModel && (
             <p className="agent-chat-log__hint">
-              Agent chat only runs against a local Ollama model right now. Pick a Local Engine model above to use it.
+              Agent chat currently uses a local Ollama model. Pick a Local Engine model above to control OpenVideo with chat.
             </p>
           )}
 
           {messages.length === 0 && (
             <p className="agent-chat-log__hint">
-              Ask the agent to check a job, generate local AI video/speech, add a clip to the timeline, or export the
-              project. Actions that change your project ask for your approval first.
+              Ask the agent to generate video or speech, add a clip to the timeline, check a job, or export a project. Changes ask for approval before they run.
             </p>
           )}
 
@@ -81,17 +76,17 @@ export function AgentChatPanel(): ReactElement {
               </p>
               <pre className="agent-chat-approval__args">{JSON.stringify(pendingApproval.args, null, 2)}</pre>
               <div className="agent-chat-approval__actions">
-                <Button variant="primary" disabled={isBusy} onClick={() => respondToApproval('approve')}>
+                <Button variant="primary" disabled={isBusy} onClick={() => void respondToApproval('approve')}>
                   Run
                 </Button>
-                <Button variant="stop" disabled={isBusy} onClick={() => respondToApproval('deny')}>
+                <Button variant="stop" disabled={isBusy} onClick={() => void respondToApproval('deny')}>
                   Deny
                 </Button>
               </div>
             </div>
           )}
 
-          {status === 'thinking' && <p className="agent-chat-status">Thinking...</p>}
+          {status === 'thinking' && <p className="agent-chat-status">Working through OpenVideo…</p>}
           {error && (
             <div className="status-card status-card--danger" role="status">
               {error}
@@ -106,14 +101,14 @@ export function AgentChatPanel(): ReactElement {
             className="agent-chat-panel__input"
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder={pendingApproval ? 'Respond to the approval above first...' : 'Message the agent...'}
+            placeholder={pendingApproval ? 'Respond to the approval above first...' : 'Tell OpenVideo what to do…'}
             disabled={isBusy || !isLocalModel || pendingApproval !== null}
           />
           <Button type="submit" variant="primary" disabled={isBusy || !isLocalModel || pendingApproval !== null || input.trim().length === 0}>
-            {isBusy ? '...' : 'Send'}
+            {isBusy ? 'Working…' : 'Send'}
           </Button>
         </form>
       </div>
-    </div>
+    </aside>
   );
 }

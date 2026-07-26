@@ -28,12 +28,12 @@ describe('prompt-first studio source contract', () => {
     expect(source).toContain("Prompt Studio");
   });
 
-  it('removes the legacy LLM copilot drawer while retaining the independent agent chat surface', async () => {
+  it('removes the legacy LLM copilot drawer while retaining the persistent independent agent chat surface', async () => {
     const source = await readAppShellSource();
 
     expect(source).not.toContain("LlmAssistantCopilot");
     expect(source).not.toContain("<LlmAssistantCopilot />");
-    expect(source).toContain("<AgentChatToggleButton />");
+    expect(source).not.toContain("AgentChatToggleButton");
     expect(source).toContain("<AgentChatPanel />");
   });
 });

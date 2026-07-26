@@ -11,9 +11,6 @@ function createConversationId(): string {
 }
 
 interface AgentChatController {
-  readonly isOpen: boolean;
-  readonly toggleOpen: () => void;
-  readonly closeOpen: () => void;
   readonly selectedModel: LlmModelConfig;
   readonly isLocalModel: boolean;
   readonly input: string;
@@ -34,7 +31,6 @@ export function AgentChatProvider({ children }: { readonly children: ReactNode }
   const { selectedModel, providerConfig } = useLlmModel();
   const conversationIdRef = useRef<string>(createConversationId());
 
-  const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<readonly AgentChatDisplayMessage[]>([]);
   const [pendingApproval, setPendingApproval] = useState<AgentToolCallProposal | null>(null);
@@ -105,9 +101,6 @@ export function AgentChatProvider({ children }: { readonly children: ReactNode }
   };
 
   const controller: AgentChatController = {
-    isOpen,
-    toggleOpen: () => setIsOpen((prev) => !prev),
-    closeOpen: () => setIsOpen(false),
     selectedModel,
     isLocalModel,
     input,

@@ -285,7 +285,7 @@ button {
 .app-shell {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 2px;
   height: 100vh;
   min-height: 0;
@@ -297,6 +297,12 @@ button {
     linear-gradient(var(--editor-lilac-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--editor-lilac-grid) 1px, transparent 1px);
   background-size: auto, 32px 32px, 32px 32px;
+}
+
+.app-shell__body {
+  display: flex;
+  min-height: 0;
+  gap: var(--space-2);
 }
 
 .app-stack {
@@ -2618,16 +2624,41 @@ button {
   100% { transform: translateX(200%); }
 }
 
-/* Agent Chat Panel */
-.agent-chat-panel-shell {
-  width: 0;
-  flex-shrink: 0;
-  overflow: hidden;
-  transition: width 180ms ease;
+/* Persistent Agent Control Surface */
+.agent-workspace-lock {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
 }
 
-.agent-chat-panel-shell--open {
+.agent-workspace-lock__content {
+  min-width: 0;
+  min-height: 0;
+}
+
+.agent-workspace-lock__message {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--background) 76%, transparent);
+  backdrop-filter: blur(3px);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+
+.agent-chat-panel-shell {
+  display: flex;
   width: 360px;
+  min-width: 300px;
+  flex-shrink: 0;
+  min-height: 0;
 }
 
 .agent-chat-panel {
@@ -2824,35 +2855,4 @@ button {
 
 .agent-chat-panel__input:disabled {
   opacity: 0.5;
-}
-
-.agent-chat-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--control-compact-min-height);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  color: var(--color-text);
-  background: var(--surface-control);
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.agent-chat-toggle:hover {
-  border-color: var(--ring);
-  background: var(--surface-control-hover);
-}
-
-.agent-chat-toggle--active {
-  border-color: var(--line-selected);
-  color: var(--primary-foreground);
-  background: var(--primary);
 }
