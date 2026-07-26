@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react';
 import type { VideoGenerationJob } from '../../shared/providerSeams';
-import { LlmModelSelectorBar } from './LlmModelSelectorBar';
+import { AiDomainModelSelector } from './AiDomainModelSelector';
+import { useAiDomainModel } from './AiDomainModelContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
 import { Button, StatusCard } from './ui';
 
@@ -9,6 +10,8 @@ const ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const;
 const DURATIONS = [3, 5, 10] as const;
 
 export function VideoGenerationWorkspace(): ReactElement {
+  const { selectedModel } = useAiDomainModel();
+  const videoModel = selectedModel('video-generation');
   const { importAiResult } = useProjectResultImport();
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
@@ -36,7 +39,9 @@ export function VideoGenerationWorkspace(): ReactElement {
         aspectRatio,
         durationSeconds,
         stylePreset: selectedStyle,
-        mode: 'local'
+        mode: 'local',
+        provider: 'local_video',
+        modelId: videoModel.id
       });
 
       if (response.ok && response.value) {
@@ -90,8 +95,8 @@ export function VideoGenerationWorkspace(): ReactElement {
           <h2>AI Video Generation</h2>
           <span className="ai-workspace__subtitle">Synthesize videos using a locally configured AI runner</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <LlmModelSelectorBar />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '280px' }}>
+          <AiDomainModelSelector domain="video-generation" label="Video model" />
         </div>
       </div>
 

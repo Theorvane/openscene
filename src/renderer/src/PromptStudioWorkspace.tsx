@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 
 import type { VideoGenerationJob } from '../../shared/providerSeams';
+import { AiDomainModelSelector } from './AiDomainModelSelector';
+import { useAiDomainModel } from './AiDomainModelContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
 import { Button, StatusCard } from './ui';
 
@@ -20,6 +22,8 @@ function isTerminalJobStatus(status: VideoGenerationJob['status']): boolean {
 }
 
 export function PromptStudioWorkspace(): ReactElement {
+  const { selectedModel } = useAiDomainModel();
+  const videoModel = selectedModel('video-generation');
   const { importAiResult } = useProjectResultImport();
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
@@ -84,7 +88,9 @@ export function PromptStudioWorkspace(): ReactElement {
         aspectRatio,
         durationSeconds,
         stylePreset: selectedStyle,
-        mode: 'local'
+        mode: 'local',
+        provider: 'local_video',
+        modelId: videoModel.id
       });
       if (!response.ok || !response.value) {
         setIsGenerating(false);
@@ -118,6 +124,7 @@ export function PromptStudioWorkspace(): ReactElement {
           <h2>Prompt Studio</h2>
           <span className="ai-workspace__subtitle">Turn a clear idea into a local video asset, then refine it in the timeline.</span>
         </div>
+        <AiDomainModelSelector domain="video-generation" label="Video model" />
         <span className="local-pill">Local render</span>
       </div>
 

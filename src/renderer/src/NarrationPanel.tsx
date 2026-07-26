@@ -3,7 +3,7 @@ import { useState, type ChangeEvent, type ReactElement } from 'react';
 import { ALLOWED_AUDIO_MIME_TYPES } from '../../shared/models';
 import type { StatusMessage } from './appTypes';
 import { formatDuration } from './format';
-import { LlmModelSelectorBar } from './LlmModelSelectorBar';
+import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { NARRATION_SAMPLE_LIMITS } from './narrationLogic';
 import { parseAllowedAudioMimeType } from './narrationLogic';
 import { useProjectResultImport } from './ProjectResultImportContext';
@@ -109,7 +109,7 @@ export function NarrationPanel(): ReactElement {
           <h2 id="narration-title">Voice Generation & Synthesis</h2>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <LlmModelSelectorBar />
+          <AiDomainModelSelector domain="voice-generation" label="Voice model" />
           <div className="mode-toggle-group" role="radiogroup" aria-label="Voice execution mode selection">
             <button
               type="button"
