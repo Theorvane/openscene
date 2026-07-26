@@ -11,6 +11,7 @@ import {
 import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { Annotation, END, MemorySaver, START, StateGraph, interrupt } from '@langchain/langgraph';
 import type { AgentToolCallProposal, AgentToolApprovalDecision } from '../shared/agentChat';
+import type { EditAgentContextAsset } from '../shared/editAgentContext';
 
 const AGENT_CHAT_SYSTEM_PROMPT =
   'You are the OpenVideo in-app agent. You can call the provided tools to check AI job status, ' +
@@ -22,6 +23,27 @@ const AGENT_CHAT_SYSTEM_PROMPT =
 // chat model .invoke() calls actually return, so it doubles as our AI-message-of-either-kind check.
 function isAiLike(message: BaseMessage): message is AIMessage {
   return isAIMessage(message);
+}
+
+function getEditAssetContext(rawContext: string | undefined): readonly EditAgentContextAsset[] {
+  if (!rawContext) return [];
+  try {
+    const parsed: unknown = JSON.parse(rawContext);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is EditAgentContextAsset => {
+      if (typeof entry !== 'object' || entry === null) return false;
+      const asset = entry as Partial<EditAgentContextAsset>;
+      return typeof asset.projectId === 'string' && typeof asset.assetId === 'string' && typeof asset.label === 'string' && (asset.mediaKind === 'audio' || asset.mediaKind === 'video');
+    }).slice(0, 20);
+  } catch {
+    return [];
+  }
+}
+
+function buildAgentSystemPrompt(contextAssets: readonly EditAgentContextAsset[]): string {
+  if (contextAssets.length === 0) return AGENT_CHAT_SYSTEM_PROMPT;
+  const assetList = contextAssets.map((asset) => `${asset.mediaKind} assetId=${asset.assetId}, projectId=${asset.projectId}, label=${asset.label}`).join('; ');
+  return `${AGENT_CHAT_SYSTEM_PROMPT} The user explicitly attached these project assets for this turn: ${assetList}. Use only these asset IDs; never infer paths or credentials.`;
 }
 
 export interface AgentChatModelHandle {
@@ -52,14 +74,14 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
 
   const builder = new StateGraph(AgentChatState)
     .addNode('agent', async (state, config) => {
-      const configurable = (config?.configurable ?? {}) as { modelId?: string; ollamaBaseUrl?: string };
+      const configurable = (config?.configurable ?? {}) as { modelId?: string; ollamaBaseUrl?: string; editAssetContext?: string };
       if (!configurable.modelId) {
         throw new Error('agentChatGraph: a modelId must be provided via config.configurable.');
       }
 
       const model = options.createModel({ modelId: configurable.modelId, ollamaBaseUrl: configurable.ollamaBaseUrl });
       const hasSystemPrompt = state.messages.length > 0 && isSystemMessage(state.messages[0]!);
-      const messages = hasSystemPrompt ? state.messages : [new SystemMessage(AGENT_CHAT_SYSTEM_PROMPT), ...state.messages];
+      const messages = hasSystemPrompt ? state.messages : [new SystemMessage(buildAgentSystemPrompt(getEditAssetContext(configurable.editAssetContext))), ...state.messages];
 
       const response = await model.invoke(messages);
       return { messages: [response] };

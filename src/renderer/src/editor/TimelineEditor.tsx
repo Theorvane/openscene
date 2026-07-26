@@ -94,6 +94,7 @@ function getDefaultInspectorTabId({ selectedAssetId, selectedClipId }: Inspector
 
 export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   const { isBusy: isAgentBusy } = useAgentChat();
+  const { attachContextAsset } = useAgentChat();
   const [leftDockTabId, setLeftDockTabId] = useState<EditorLeftDockTabId>('project');
   const [inspectorTabId, setInspectorTabId] = useState<InspectorTabId>('project');
   const { layoutPreference, updateLayoutPreference } = useEditorLayoutPreference();
@@ -112,6 +113,16 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
     setLeftDockTabId(getDefaultEditorLeftDockTabId({ hasProject: projectIdentity.length > 0, selectedAssetId }));
   }, [projectIdentity, selectedAssetId]);
 
+  const addSelectedAssetToEditAgent = (): void => {
+    if (editor.project === null || editor.selectedAsset === null) return;
+    attachContextAsset({
+      projectId: editor.project.id,
+      assetId: editor.selectedAsset.id,
+      label: editor.selectedAsset.displayName,
+      mediaKind: editor.selectedAsset.kind,
+      ...(editor.selectedAsset.metadata?.durationMs === undefined ? {} : { durationMs: editor.selectedAsset.metadata.durationMs })
+    });
+  };
   const setProgramPercent = (programPercent: number): void => {
     updateLayoutPreference((currentPreference) => ({ ...currentPreference, programPercent: clampEditorProgramPercent(programPercent) }));
   };
@@ -224,7 +235,12 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
             <h1 id="timeline-editor-title">OpenVideo</h1>
             <span className="editor-program-region__subtitle">Timeline editor</span>
           </div>
-          <TimelineShortcutMap shortcutPreferences={shortcutPreferences} onShortcutPreferencesChange={updateShortcutPreferences} />
+          <div className="editor-program-region__actions">
+            <button type="button" className="button button--ghost" onClick={addSelectedAssetToEditAgent} disabled={editor.project === null || editor.selectedAsset === null || isAgentBusy}>
+              Add selected asset to Edit Agent
+            </button>
+            <TimelineShortcutMap shortcutPreferences={shortcutPreferences} onShortcutPreferencesChange={updateShortcutPreferences} />
+          </div>
         </div>
         {floatingProgramVisible ? <div className="empty-slate">Program Monitor is floating above the workspace.</div> : <ProgramMonitor editor={editor} />}
         {floatingExportVisible ? <div className="empty-slate">Export controls are floating above the workspace.</div> : <ExportPanel editor={editor} />}

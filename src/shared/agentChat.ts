@@ -1,3 +1,5 @@
+import type { EditAgentContextAsset } from './editAgentContext';
+
 export type AgentChatMessageRole = 'user' | 'assistant' | 'tool';
 
 export interface AgentChatDisplayMessage {
@@ -28,6 +30,7 @@ export interface AgentChatSendInput {
   readonly text: string;
   readonly modelId: string;
   readonly ollamaBaseUrl?: string | undefined;
+  readonly contextAssets?: readonly EditAgentContextAsset[] | undefined;
 }
 
 export type AgentToolApprovalDecision = 'approve' | 'deny';

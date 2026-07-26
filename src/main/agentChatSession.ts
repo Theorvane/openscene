@@ -9,11 +9,13 @@ import type {
   AgentChatTurnState,
   AgentToolCallProposal
 } from '../shared/agentChat';
+import type { EditAgentContextAsset } from '../shared/editAgentContext';
 import { isAiLike, isHumanMessage, isToolMessage, type AgentChatGraphBundle } from './agentChatGraph';
 
 interface ConversationConfig {
   readonly modelId: string;
   readonly ollamaBaseUrl: string | undefined;
+  readonly contextAssets: readonly EditAgentContextAsset[];
 }
 
 export class AgentChatSessionManager {
@@ -27,7 +29,11 @@ export class AgentChatSessionManager {
   }
 
   async sendMessage(input: AgentChatSendInput): Promise<AgentChatTurnState> {
-    this.conversationConfigs.set(input.conversationId, { modelId: input.modelId, ollamaBaseUrl: input.ollamaBaseUrl });
+    this.conversationConfigs.set(input.conversationId, {
+      modelId: input.modelId,
+      ollamaBaseUrl: input.ollamaBaseUrl,
+      contextAssets: input.contextAssets ?? []
+    });
     const { HumanMessage } = await import('@langchain/core/messages');
 
     try {
@@ -78,7 +84,8 @@ export class AgentChatSessionManager {
       configurable: {
         thread_id: conversationId,
         modelId: stored?.modelId,
-        ollamaBaseUrl: stored?.ollamaBaseUrl
+        ollamaBaseUrl: stored?.ollamaBaseUrl,
+        editAssetContext: JSON.stringify(stored?.contextAssets ?? [])
       }
     };
   }

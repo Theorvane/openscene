@@ -1,6 +1,7 @@
 import { useEffect, useRef, type FormEvent, type ReactElement } from 'react';
 
 import { useAgentChat } from './AgentChatContext';
+import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { Button } from './ui';
 
 export function AgentChatPanel(): ReactElement {
@@ -14,6 +15,8 @@ export function AgentChatPanel(): ReactElement {
     status,
     error,
     isBusy,
+    contextAssets,
+    removeContextAsset,
     sendMessage,
     respondToApproval,
     resetConversation
@@ -35,11 +38,12 @@ export function AgentChatPanel(): ReactElement {
       <div className="agent-chat-panel">
         <div className="agent-chat-panel__header">
           <div className="agent-chat-panel__title">
-            <p className="agent-chat-panel__title-label">OpenVideo Agent</p>
+            <p className="agent-chat-panel__title-label">OpenVideo Edit Agent</p>
             <span className="agent-chat-panel__title-meta">
-              {selectedModel.label} · {isLocalModel ? 'Local · Ollama' : 'Switch to a local model'}
+              {selectedModel.label} · {isLocalModel ? 'Local · Ollama' : 'Select an available editing model'}
             </span>
           </div>
+          <AiDomainModelSelector domain="edit-agent" label="Edit model" />
           <div className="agent-chat-panel__actions">
             <Button variant="ghost" onClick={resetConversation} disabled={isBusy} title="Reset conversation" aria-label="Reset conversation">
               Reset
@@ -48,6 +52,21 @@ export function AgentChatPanel(): ReactElement {
         </div>
 
         <div className="agent-chat-log" aria-live="polite">
+          <section className="agent-chat-context" aria-label="Edit Agent asset context">
+            <p className="agent-chat-context__title">Project context</p>
+            {contextAssets.length === 0 ? (
+              <p className="agent-chat-log__hint">Import an AI voice or video result, then add its project asset here before asking for an edit.</p>
+            ) : (
+              <ul className="agent-chat-context__assets">
+                {contextAssets.map((asset) => (
+                  <li key={`${asset.projectId}:${asset.assetId}`}>
+                    <span>{asset.label} · {asset.mediaKind}</span>
+                    <Button variant="ghost" onClick={() => removeContextAsset(asset.projectId, asset.assetId)} disabled={isBusy}>Remove</Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
           {!isLocalModel && (
             <p className="agent-chat-log__hint">
               Agent chat currently uses a local Ollama model. Pick a Local Engine model above to control OpenVideo with chat.
