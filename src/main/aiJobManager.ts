@@ -10,6 +10,7 @@ import type {
   VideoGenerationProviderId,
   VideoGenerationRequest
 } from '../shared/providerSeams';
+import { getDefaultDomainModelId, getDomainModel } from '../shared/aiDomainModels';
 import { discoverFfmpeg } from './ffmpegDiscovery';
 import type { CredentialStore, ProviderCredentials } from './credentialStore';
 import { tmpdir } from 'node:os';
@@ -143,7 +144,17 @@ async function invokeCloudSpeechProvider(
   };
 }
 
+function resolveGenerationModelId(domain: 'voice-generation' | 'video-generation', requestedModelId: string | undefined): string {
+  const modelId = requestedModelId ?? getDefaultDomainModelId(domain);
+  const model = getDomainModel(domain, modelId);
+  if (model === undefined || !model.available) {
+    throw new Error(`Model ${modelId} is not available for ${domain}.`);
+  }
+  return model.id;
+}
+
 export async function createVideoGenerationJob(request: VideoGenerationRequest): Promise<VideoGenerationJob> {
+  const modelId = resolveGenerationModelId('video-generation', request.modelId);
   const { videoDir } = await ensureAiDirectories();
   const id = `video-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const mode = request.mode ?? 'local';
@@ -162,6 +173,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
     aspectRatio: request.aspectRatio ?? '16:9',
     durationSeconds: request.durationSeconds ?? 5,
     stylePreset: request.stylePreset ?? 'Cinematic',
+    modelId,
     createdAt: now,
     updatedAt: now
   };
@@ -231,6 +243,7 @@ export function getVideoGenerationJob(jobId: string): VideoGenerationJob | null 
 }
 
 export async function createSpeechGenerationJob(request: TextToSpeechRequest): Promise<TextToSpeechJob> {
+  const modelId = resolveGenerationModelId('voice-generation', request.modelId);
   const { speechDir } = await ensureAiDirectories();
   const id = `speech-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const mode = request.mode ?? 'local';
@@ -244,6 +257,7 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
     status: 'queued',
     script: request.script,
     voiceId: request.voiceId || (mode === 'api' ? 'eleven-adam' : 'qwen-neutral'),
+    modelId,
     createdAt: now,
     updatedAt: now
   };

@@ -19,6 +19,7 @@ export interface VideoGenerationRequest {
   stylePreset?: string;
   mode?: ProviderExecutionMode;
   provider?: VideoGenerationProviderId;
+  modelId?: string;
   apiKey?: string;
 }
 
@@ -32,6 +33,7 @@ export interface VideoGenerationJob {
   durationSeconds: number;
   stylePreset?: string;
   providerJobId?: string;
+  modelId?: string;
   outputAssetId?: string;
   outputFilePath?: string;
   previewUrl?: string;
@@ -64,6 +66,7 @@ export interface TextToSpeechJob {
   status: ProviderJobStatus;
   script: string;
   voiceId: string;
+  modelId?: string;
   outputAssetId?: string;
   outputFilePath?: string;
   previewUrl?: string;

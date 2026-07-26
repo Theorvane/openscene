@@ -20,6 +20,18 @@ async function withTempDirectory<T>(run: (directory: string) => Promise<T>): Pro
 }
 
 describe('AI Job Manager, provider seams, and local runner execution', () => {
+  it('rejects a cross-domain model id before creating a video job', async () => {
+    await expect(
+      createVideoGenerationJob({
+        prompt: 'A local scene',
+        aspectRatio: '16:9',
+        durationSeconds: 3,
+        mode: 'local',
+        modelId: 'local-qwen-tts'
+      })
+    ).rejects.toThrow('is not available for video-generation');
+  });
+
   it('fails unconfigured local video engine jobs gracefully without falsely generating media', async () => {
     delete process.env.VIDEO_TOOL_LOCAL_VIDEO_RUNNER_PATH;
 
