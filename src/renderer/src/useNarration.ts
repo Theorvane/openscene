@@ -213,9 +213,9 @@ export function useNarration() {
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
   }, [selectedProfile]);
 
-  const startTtsJob = useCallback(async () => {
+  const startTtsJob = useCallback(async (modelId: string) => {
     if (selectedProfile === null || runtimeStatus?.kind !== 'ready') return;
-    const response = await window.videoTool.startTtsJob({ voiceProfileId: selectedProfile.id, script: ttsScript.trim(), language: selectedProfile.language, mimeType: ttsMimeType });
+    const response = await window.videoTool.startTtsJob({ voiceProfileId: selectedProfile.id, script: ttsScript.trim(), language: selectedProfile.language, mimeType: ttsMimeType, modelId });
     if (response.ok) {
       setTtsJob(response.value);
       setStatusMessage({ tone: 'neutral', text: 'Local Qwen narration job started.' });

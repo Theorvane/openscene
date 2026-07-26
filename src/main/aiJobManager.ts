@@ -144,23 +144,31 @@ async function invokeCloudSpeechProvider(
   };
 }
 
-function resolveGenerationModelId(domain: 'voice-generation' | 'video-generation', requestedModelId: string | undefined): string {
+function resolveGenerationModelId(
+  domain: 'voice-generation' | 'video-generation',
+  requestedModelId: string | undefined,
+  providerId: string,
+  executionPath: 'local' | 'api'
+): string {
   const modelId = requestedModelId ?? getDefaultDomainModelId(domain);
   const model = getDomainModel(domain, modelId);
   if (model === undefined || !model.available) {
     throw new Error(`Model ${modelId} is not available for ${domain}.`);
   }
+  if (model.providerId !== providerId || model.executionPath !== executionPath) {
+    throw new Error(`Model ${modelId} does not match ${domain} provider ${providerId} and ${executionPath} execution.`);
+  }
   return model.id;
 }
 
 export async function createVideoGenerationJob(request: VideoGenerationRequest): Promise<VideoGenerationJob> {
-  const modelId = resolveGenerationModelId('video-generation', request.modelId);
-  const { videoDir } = await ensureAiDirectories();
-  const id = `video-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const mode = request.mode ?? 'local';
   const provider: VideoGenerationProviderId = mode === 'api'
     ? (request.provider ?? 'gemini_veo')
     : 'local_video';
+  const modelId = resolveGenerationModelId('video-generation', request.modelId, provider, mode);
+  const { videoDir } = await ensureAiDirectories();
+  const id = `video-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
   const now = new Date().toISOString();
 
@@ -243,11 +251,11 @@ export function getVideoGenerationJob(jobId: string): VideoGenerationJob | null 
 }
 
 export async function createSpeechGenerationJob(request: TextToSpeechRequest): Promise<TextToSpeechJob> {
-  const modelId = resolveGenerationModelId('voice-generation', request.modelId);
-  const { speechDir } = await ensureAiDirectories();
-  const id = `speech-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const mode = request.mode ?? 'local';
   const provider = mode === 'api' ? 'elevenlabs' : 'local_qwen';
+  const modelId = resolveGenerationModelId('voice-generation', request.modelId, provider, mode);
+  const { speechDir } = await ensureAiDirectories();
+  const id = `speech-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const now = new Date().toISOString();
 
   const job: TextToSpeechJob = {

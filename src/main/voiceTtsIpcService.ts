@@ -1,6 +1,7 @@
 import { basename } from 'node:path';
 
 import type { LocalTtsRuntimeStatus, LocalTtsJob, StartTtsJobInput, VoiceProfile, VoiceProfileSampleSession } from '../shared/models';
+import { getDefaultDomainModelId, getDomainModel } from '../shared/aiDomainModels';
 import { isNarrationSampleDurationValid } from '../shared/narrationLogic';
 import { LocalQwenRunner, LocalTtsRunnerError, type LocalQwenRunInput, type LocalQwenRunResult } from './localQwenRunner';
 import { type LocalTtsConfigLoadResult, type LocalTtsRunnerConfig, loadLocalTtsConfig } from './localTtsConfig';
@@ -54,6 +55,15 @@ function safeRunnerFailure(error: unknown): string {
     }
   }
   return 'The local TTS job failed.';
+}
+
+function resolveLocalTtsModelId(requestedModelId: string | undefined): string {
+  const modelId = requestedModelId ?? getDefaultDomainModelId('voice-generation');
+  const model = getDomainModel('voice-generation', modelId);
+  if (model === undefined || !model.available || model.providerId !== 'local_qwen' || model.executionPath !== 'local') {
+    throw new Error(`Model ${modelId} is not available for local Qwen TTS.`);
+  }
+  return model.id;
 }
 
 export class VoiceTtsIpcService {
@@ -147,6 +157,13 @@ export class VoiceTtsIpcService {
     if (input === null) {
       return fail<LocalTtsJob>('INVALID_INPUT', 'The local TTS job payload was not valid.');
     }
+    let modelId: string;
+    try {
+      modelId = resolveLocalTtsModelId(input.modelId);
+    } catch (error: unknown) {
+      return fail<LocalTtsJob>('INVALID_INPUT', error instanceof Error ? error.message : 'The selected local TTS model was not valid.');
+    }
+    const resolvedInput: StartTtsJobInput = { ...input, modelId };
     if (this.ttsReserved) {
       return fail<LocalTtsJob>('TTS_UNAVAILABLE', 'Local TTS is already processing a job.');
     }
@@ -165,8 +182,8 @@ export class VoiceTtsIpcService {
       if (sample === null) {
         return fail<LocalTtsJob>('PROFILE_NOT_FOUND', 'The selected voice profile was not found.');
       }
-      const job = this.dependencies.ttsJobs.create(input, configuration.config.modelId);
-      this.runInBackground(() => this.runTtsJob(job.id, input, sample.samplePath, configuration.config));
+      const job = this.dependencies.ttsJobs.create(resolvedInput, configuration.config.modelId);
+      this.runInBackground(() => this.runTtsJob(job.id, resolvedInput, sample.samplePath, configuration.config));
       launched = true;
       return ok(job);
     } finally {

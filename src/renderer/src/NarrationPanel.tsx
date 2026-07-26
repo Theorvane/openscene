@@ -4,6 +4,7 @@ import { ALLOWED_AUDIO_MIME_TYPES } from '../../shared/models';
 import type { StatusMessage } from './appTypes';
 import { formatDuration } from './format';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
+import { useAiDomainModel } from './AiDomainModelContext';
 import { NARRATION_SAMPLE_LIMITS } from './narrationLogic';
 import { parseAllowedAudioMimeType } from './narrationLogic';
 import { useProjectResultImport } from './ProjectResultImportContext';
@@ -11,6 +12,8 @@ import { useNarration } from './useNarration';
 
 export function NarrationPanel(): ReactElement {
   const narration = useNarration();
+  const { selectedModel } = useAiDomainModel();
+  const voiceModel = selectedModel('voice-generation');
   const projectImport = useProjectResultImport();
   const [importStatus, setImportStatus] = useState<StatusMessage | null>(null);
   const [mode, setMode] = useState<'local' | 'api'>('local');
@@ -205,7 +208,7 @@ export function NarrationPanel(): ReactElement {
               <textarea value={narration.ttsScript} onChange={(event) => narration.setTtsScript(event.target.value)} rows={5} placeholder="Type the narration to synthesize with the selected voice profile." />
             </label>
             <div className="transport-strip__buttons">
-              <button className="button button--primary" type="button" onClick={() => void narration.startTtsJob()} disabled={!narration.canGenerateTts}>Generate TTS</button>
+              <button className="button button--primary" type="button" onClick={() => void narration.startTtsJob(voiceModel.id)} disabled={!narration.canGenerateTts}>Generate TTS</button>
               <button className="button button--ghost" type="button" onClick={() => void narration.deleteSelectedProfile()} disabled={narration.selectedProfile === null}>Delete profile</button>
             </div>
             <div className="runtime-card" role="status">{narration.ttsJobText}</div>

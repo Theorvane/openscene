@@ -66,6 +66,24 @@ describe('voice and local TTS IPC service', () => {
     expect(JSON.stringify(listed)).not.toContain(root);
   });
 
+  it('rejects a non-local domain model before reserving or creating a narration job', async () => {
+    const service = new VoiceTtsIpcService({
+      voiceProfiles: new VoiceProfileStore(join(tmpdir(), 'voice-tts-invalid-model')),
+      ttsJobs: new LocalTtsJobStore()
+    });
+
+    await expect(service.startTtsJob({
+      voiceProfileId: 'profile_01',
+      script: 'Hello',
+      language: 'en-US',
+      mimeType: 'audio/wav',
+      modelId: 'elevenlabs-multilingual-v2'
+    })).resolves.toEqual({
+      ok: false,
+      error: { code: 'INVALID_INPUT', message: 'Model elevenlabs-multilingual-v2 is not available for local Qwen TTS.' }
+    });
+  });
+
   it('loads local TTS config, derives the profile sample path in main, completes asynchronously, and opens only known results', async () => {
     const root = await mkdtemp(join(tmpdir(), 'voice-tts-ipc-'));
     const audioRoot = join(root, 'tts-audio');
@@ -134,9 +152,10 @@ describe('voice and local TTS IPC service', () => {
       voiceProfileId: profile.value.id,
       script: 'Hello from OpenVideo.',
       language: 'en-US',
-      mimeType: 'audio/wav'
+      mimeType: 'audio/wav',
+      modelId: 'local-qwen-tts'
     });
-    expect(startedJob).toMatchObject({ ok: true, value: { id: 'job_01', state: { kind: 'queued' } } });
+    expect(startedJob).toMatchObject({ ok: true, value: { id: 'job_01', modelId: 'local-qwen-tts', state: { kind: 'queued' } } });
     expect(JSON.stringify(startedJob)).not.toContain(root);
 
     await Promise.all(backgroundTasks);

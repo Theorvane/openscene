@@ -32,6 +32,27 @@ describe('AI Job Manager, provider seams, and local runner execution', () => {
     ).rejects.toThrow('is not available for video-generation');
   });
 
+  it('rejects model execution paths that do not match the requested provider and mode', async () => {
+    await expect(
+      createVideoGenerationJob({
+        prompt: 'A cloud scene',
+        aspectRatio: '16:9',
+        durationSeconds: 3,
+        mode: 'api',
+        provider: 'gemini_veo'
+      })
+    ).rejects.toThrow('does not match video-generation provider gemini_veo and api execution');
+
+    await expect(
+      createSpeechGenerationJob({
+        script: 'Cloud narration',
+        voiceId: 'voice_01',
+        mode: 'api',
+        modelId: 'local-qwen-tts'
+      })
+    ).rejects.toThrow('does not match voice-generation provider elevenlabs and api execution');
+  });
+
   it('fails unconfigured local video engine jobs gracefully without falsely generating media', async () => {
     delete process.env.VIDEO_TOOL_LOCAL_VIDEO_RUNNER_PATH;
 
@@ -96,57 +117,33 @@ printf "\\x00\\x00\\x00\\x20ftypisom\\x00\\x00\\x02\\x00isomiso2avc1mp41\\x00\\x
     });
   }, 10_000);
 
-  it('fails API mode video jobs cleanly when API key is missing or endpoint is unconfigured', async () => {
-    const jobWithoutKey = await createVideoGenerationJob({
+  it('rejects unavailable cloud video execution before queuing a misleading job', async () => {
+    await expect(createVideoGenerationJob({
       prompt: 'Test prompt for Sora',
       aspectRatio: '16:9',
       durationSeconds: 5,
       mode: 'api',
       provider: 'openai_sora'
-    });
+    })).rejects.toThrow('does not match video-generation provider openai_sora and api execution');
+  });
 
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    const failedJob = getVideoGenerationJob(jobWithoutKey.id);
-    expect(failedJob?.status).toBe('failed');
-    expect(failedJob?.error).toContain('API key is required');
-
-    const jobWithKey = await createVideoGenerationJob({
-      prompt: 'Test prompt for Gemini',
-      aspectRatio: '16:9',
-      durationSeconds: 5,
-      mode: 'api',
-      provider: 'gemini_veo',
-      apiKey: 'sk-test-key-12345'
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    const unconfiguredJob = getVideoGenerationJob(jobWithKey.id);
-    expect(unconfiguredJob?.status).toBe('failed');
-    expect(unconfiguredJob?.error).toContain('Gemini Veo API service endpoint is currently unconfigured');
-  }, 10_000);
-
-  it('reports the correct provider name for every cloud video provider, never a generic fallback', async () => {
-    const providers: Array<{ id: 'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream'; label: string }> = [
-      { id: 'openai_sora', label: 'OpenAI Sora' },
-      { id: 'runway_gen4', label: 'Runway Gen-4' },
-      { id: 'kling_v3', label: 'Kling 3.0' },
-      { id: 'luma_dream', label: 'Luma Dream' }
+  it('rejects every unimplemented cloud video provider instead of reporting a queued job', async () => {
+    const providers: Array<'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream'> = [
+      'openai_sora',
+      'runway_gen4',
+      'kling_v3',
+      'luma_dream'
     ];
 
-    for (const { id, label } of providers) {
-      const job = await createVideoGenerationJob({
-        prompt: `Test prompt for ${label}`,
+    for (const provider of providers) {
+      await expect(createVideoGenerationJob({
+        prompt: `Test prompt for ${provider}`,
         aspectRatio: '16:9',
         durationSeconds: 5,
         mode: 'api',
-        provider: id,
-        apiKey: 'sk-test-key-12345'
-      });
-
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      const failedJob = getVideoGenerationJob(job.id);
-      expect(failedJob?.status).toBe('failed');
-      expect(failedJob?.error).toContain(`${label} API service endpoint is currently unconfigured`);
+        provider,
+        apiKey: 'unused-because-adapter-is-unavailable'
+      })).rejects.toThrow(`does not match video-generation provider ${provider} and api execution`);
     }
-  }, 20_000);
+  });
 });

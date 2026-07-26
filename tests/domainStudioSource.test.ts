@@ -17,6 +17,9 @@ describe('domain generation studio wiring', () => {
     expect(video).toContain('domain="video-generation"');
     expect(prompt).toContain('domain="video-generation"');
     expect(voice).toContain('domain="voice-generation"');
+    expect(voice).toContain("useAiDomainModel()");
+    expect(voice).toContain("selectedModel('voice-generation')");
+    expect(voice).toContain('narration.startTtsJob(voiceModel.id)');
     expect(video).toContain('modelId: videoModel.id');
     expect(prompt).toContain('modelId: videoModel.id');
     expect(video).not.toContain('LlmModelSelectorBar');
