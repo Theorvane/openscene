@@ -136,6 +136,58 @@ export class OpenVideoMcpServer {
   }
 
   @McpTool({
+    description: 'Inspect an OpenVideo project timeline and safe asset metadata for edit planning. This is read-only and never returns filesystem paths or credentials.',
+    input: z.object({
+      projectId: z.string().min(1)
+    })
+  })
+  async getProjectTimeline(params: { projectId: string }) {
+    if (!this.projectStore) {
+      return { success: false, error: 'ProjectStore service is not available.' };
+    }
+
+    try {
+      const project = await this.projectStore.open(params.projectId);
+      if (!project) {
+        return { success: false, error: `Project ${params.projectId} not found.` };
+      }
+
+      return {
+        success: true,
+        project: {
+          id: project.id,
+          name: project.name,
+          assets: project.assets.map((asset) => ({
+            id: asset.id,
+            displayName: asset.displayName,
+            kind: asset.kind,
+            mimeType: asset.mimeType,
+            durationMs: asset.metadata?.durationMs
+          })),
+          timeline: {
+            tracks: project.timeline.tracks.map((track) => ({
+              id: track.id,
+              kind: track.kind,
+              clips: track.clips.map((clip) => ({
+                id: clip.id,
+                assetId: clip.assetId,
+                timelineStartMs: clip.timelineStartMs,
+                sourceStartMs: clip.sourceStartMs,
+                sourceEndMs: clip.sourceEndMs
+              }))
+            }))
+          }
+        }
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : `Failed to inspect project ${params.projectId}`
+      };
+    }
+  }
+
+  @McpTool({
     description: 'Add a video or audio clip to a specific project timeline track.',
     input: z.object({
       projectId: z.string().min(1),
@@ -262,7 +314,7 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'addClipToTimeline', 'exportProjectVideo']
+      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'getProjectTimeline', 'addClipToTimeline', 'exportProjectVideo']
     };
   }
 }

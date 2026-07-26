@@ -30,6 +30,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     expect(toolNames).toContain('createVideoJob');
     expect(toolNames).toContain('createSpeechJob');
     expect(toolNames).toContain('getJobStatus');
+    expect(toolNames).toContain('getProjectTimeline');
     expect(toolNames).toContain('addClipToTimeline');
     expect(toolNames).toContain('exportProjectVideo');
   });
@@ -88,6 +89,41 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     const okResult = result as { success: true; jobId: string; mode: string };
     expect(okResult.jobId.length).toBeGreaterThan(0);
     expect(okResult.mode).toBe('local');
+  });
+
+  it('returns a path-free read-only timeline summary only for an existing project', async () => {
+    const server = new OpenVideoMcpServer();
+
+    const withoutService = await server.getProjectTimeline({ projectId: 'project-missing' });
+    expect(withoutService).toMatchObject({ success: false, error: 'ProjectStore service is not available.' });
+
+    server.setServices(projectStore);
+    const project = await projectStore.create({ name: 'Planning-safe timeline' });
+    const nowIso = new Date('2026-07-26T12:00:00.000Z').toISOString();
+    const asset: MediaAsset = {
+      id: 'asset-safe-timeline',
+      displayName: 'safe-source.mp4',
+      projectRelativePath: 'assets/asset-safe-timeline/original.mp4',
+      kind: 'video',
+      mimeType: 'video/mp4',
+      byteLength: 1024,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      metadata: { durationMs: 8_000, width: 1920, height: 1080 }
+    };
+    await projectStore.registerAsset(project.id, asset);
+
+    const result = await server.getProjectTimeline({ projectId: project.id });
+    expect(result).toMatchObject({
+      success: true,
+      project: {
+        id: project.id,
+        name: 'Planning-safe timeline',
+        assets: [{ id: asset.id, displayName: asset.displayName, kind: 'video', durationMs: 8_000 }]
+      }
+    });
+    expect(JSON.stringify(result)).not.toContain('projectRelativePath');
+    expect(JSON.stringify(result)).not.toContain('original.mp4');
   });
 
   it('fails addClipToTimeline when ProjectStore service is missing or project/track/asset is not found', async () => {
