@@ -34,6 +34,7 @@ import { useEditorNativeMenuCommands } from './useEditorNativeMenuCommands';
 import { useEditorShortcutPreference } from './useEditorShortcutPreference';
 import type { TimelineEditorController } from './useTimelineEditor';
 import { useTimelineShortcuts } from './useTimelineShortcuts';
+import { useAgentChat } from '../AgentChatContext';
 import type { TabDefinition } from '../ui';
 
 export type InspectorTabId = (typeof EDITOR_INSPECTOR_DOCK_TAB_IDS)[number];
@@ -92,6 +93,7 @@ function getDefaultInspectorTabId({ selectedAssetId, selectedClipId }: Inspector
 }
 
 export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
+  const { isBusy: isAgentBusy } = useAgentChat();
   const [leftDockTabId, setLeftDockTabId] = useState<EditorLeftDockTabId>('project');
   const [inspectorTabId, setInspectorTabId] = useState<InspectorTabId>('project');
   const { layoutPreference, updateLayoutPreference } = useEditorLayoutPreference();
@@ -177,6 +179,7 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
 
   useTimelineShortcuts({
     canSplit: editor.selectedClip !== null,
+    isLocked: isAgentBusy,
     deleteSelectedClip: editor.deleteSelectedClip,
     redoTimeline: editor.redoTimeline,
     resetLayout,
@@ -190,6 +193,7 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
 
   useEditorNativeMenuCommands({
     editor,
+    isAgentBusy,
     layoutPreference,
     onApplyFloatingPreset: applyFloatingPreset,
     onResetLayout: resetLayout,

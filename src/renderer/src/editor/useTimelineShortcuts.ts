@@ -10,6 +10,7 @@ import { isTextEditingShortcutTarget } from './editorTimelineView';
 
 type TimelineShortcutInput = {
   readonly canSplit: boolean;
+  readonly isLocked: boolean;
   readonly deleteSelectedClip: () => void;
   readonly redoTimeline: () => void;
   readonly resetLayout: () => void;
@@ -37,6 +38,7 @@ const actionHandlers: Readonly<Record<EditorShortcutActionId, (input: TimelineSh
 export function useTimelineShortcuts(input: TimelineShortcutInput): void {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      if (input.isLocked) return;
       if (isTextEditingShortcutTarget(event.target as { tagName?: string; isContentEditable?: boolean } | null)) return;
       const matchedBinding = getEditorShortcutBindings(input.shortcutPreferences).find((binding) => binding.chord !== null && isEditorShortcutEventMatch(event, binding.chord));
       if (matchedBinding === undefined) return;

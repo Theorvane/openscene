@@ -14,6 +14,7 @@ export { getEditorNativeMenuState } from './editorNativeMenuState';
 
 type EditorNativeMenuCommandsInput = {
   readonly editor: TimelineEditorController;
+  readonly isAgentBusy: boolean;
   readonly layoutPreference: EditorLayoutPreference;
   readonly onApplyFloatingPreset: (presetId: EditorFloatingPresetId) => void;
   readonly onResetLayout: () => void;
@@ -32,7 +33,7 @@ export function useEditorNativeMenuCommands(input: EditorNativeMenuCommandsInput
     canUndoTimeline: editor.canUndoTimeline,
     hasProject: editor.project !== null,
     hasUnsavedTimeline: editor.hasUnsavedTimeline,
-    isBusy: editor.isBusy,
+    isBusy: editor.isBusy || input.isAgentBusy,
     isPlaying: editor.isPlaying,
     layoutPreference: layout
   }), [
@@ -40,6 +41,7 @@ export function useEditorNativeMenuCommands(input: EditorNativeMenuCommandsInput
     editor.canUndoTimeline,
     editor.hasUnsavedTimeline,
     editor.isBusy,
+    input.isAgentBusy,
     editor.isPlaying,
     editor.project,
     editor.selectedClip,
