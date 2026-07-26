@@ -36,4 +36,12 @@ describe('AI domain model catalog', () => {
   it('uses a versioned non-secret storage key', () => {
     expect(AI_DOMAIN_MODEL_STORAGE_KEY).toBe('openvideo-ai-domain-model-preferences-v1');
   });
+
+  it('uses independent default selections for every domain', () => {
+    expect(parseAiDomainModelPreferences(null)).toEqual({
+      'voice-generation': 'local-qwen-tts',
+      'video-generation': 'local-video-runner',
+      'edit-agent': 'qwen2.5-coder'
+    });
+  });
 });

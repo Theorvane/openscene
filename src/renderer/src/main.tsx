@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { bootstrapRendererTheme, ThemeProvider } from './ThemeProvider';
 import { LlmProvider } from './LlmProviderContext';
+import { AiDomainModelProvider } from './AiDomainModelContext';
 import './styles.css';
 
 const rootElement = document.getElementById('root');
@@ -18,7 +19,9 @@ createRoot(rootElement).render(
   <React.StrictMode>
     <ThemeProvider>
       <LlmProvider>
-        <App />
+        <AiDomainModelProvider>
+          <App />
+        </AiDomainModelProvider>
       </LlmProvider>
     </ThemeProvider>
   </React.StrictMode>
