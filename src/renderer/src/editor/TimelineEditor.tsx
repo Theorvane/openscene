@@ -93,8 +93,7 @@ function getDefaultInspectorTabId({ selectedAssetId, selectedClipId }: Inspector
 }
 
 export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
-  const { isBusy: isAgentBusy } = useAgentChat();
-  const { attachContextAsset } = useAgentChat();
+  const { isBusy: isAgentBusy, attachContextAsset } = useAgentChat();
   const [leftDockTabId, setLeftDockTabId] = useState<EditorLeftDockTabId>('project');
   const [inspectorTabId, setInspectorTabId] = useState<InspectorTabId>('project');
   const { layoutPreference, updateLayoutPreference } = useEditorLayoutPreference();

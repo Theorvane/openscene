@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 import { IPC_CHANNELS } from '../shared/ipc';
 import type { ExportJobActionInput, LocalExportJob, StartExportJobInput } from '../shared/exportTypes';
+import type { TextToSpeechJob, TextToSpeechRequest, VideoGenerationJob, VideoGenerationRequest } from '../shared/providerSeams';
 import type {
   AbortRecordingInput,
   ApiResponse,
@@ -102,10 +103,10 @@ export interface VideoToolApi {
   cancelExportJob(input: ExportJobActionInput): Promise<ApiResponse<{ readonly cancelled: boolean }>>;
   openExportResult(input: ExportJobActionInput): Promise<ApiResponse<{ readonly opened: boolean }>>;
   revealExportResult(input: ExportJobActionInput): Promise<ApiResponse<{ readonly revealed: boolean }>>;
-  aiGenerateVideo(request: unknown): Promise<ApiResponse<unknown>>;
-  aiGetVideoJob(jobId: string): Promise<ApiResponse<unknown>>;
-  aiGenerateSpeech(request: unknown): Promise<ApiResponse<unknown>>;
-  aiGetSpeechJob(jobId: string): Promise<ApiResponse<unknown>>;
+  aiGenerateVideo(request: VideoGenerationRequest): Promise<ApiResponse<VideoGenerationJob>>;
+  aiGetVideoJob(jobId: string): Promise<ApiResponse<VideoGenerationJob>>;
+  aiGenerateSpeech(request: TextToSpeechRequest): Promise<ApiResponse<TextToSpeechJob>>;
+  aiGetSpeechJob(jobId: string): Promise<ApiResponse<TextToSpeechJob>>;
   getProviderCredentialStatus(): Promise<ApiResponse<Record<string, boolean>>>;
   setProviderCredential(provider: string, apiKey: string): Promise<ApiResponse<{ readonly updated: boolean }>>;
   executeLlmPrompt(request: {
@@ -187,10 +188,10 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.openExportResult, input) as Promise<ApiResponse<{ readonly opened: boolean }>>,
   revealExportResult: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.revealExportResult, input) as Promise<ApiResponse<{ readonly revealed: boolean }>>,
-  aiGenerateVideo: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateVideo, request) as Promise<ApiResponse<unknown>>,
-  aiGetVideoJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetVideoJob, jobId) as Promise<ApiResponse<unknown>>,
-  aiGenerateSpeech: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateSpeech, request) as Promise<ApiResponse<unknown>>,
-  aiGetSpeechJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetSpeechJob, jobId) as Promise<ApiResponse<unknown>>,
+  aiGenerateVideo: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateVideo, request) as Promise<ApiResponse<VideoGenerationJob>>,
+  aiGetVideoJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetVideoJob, jobId) as Promise<ApiResponse<VideoGenerationJob>>,
+  aiGenerateSpeech: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateSpeech, request) as Promise<ApiResponse<TextToSpeechJob>>,
+  aiGetSpeechJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetSpeechJob, jobId) as Promise<ApiResponse<TextToSpeechJob>>,
   getProviderCredentialStatus: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getProviderCredentials) as Promise<ApiResponse<Record<string, boolean>>>,
   setProviderCredential: (provider, apiKey) =>

@@ -17,7 +17,7 @@ describe('agent workspace keyboard lock contract', () => {
     expect(shortcutHook).toContain('readonly isLocked: boolean;');
     expect(shortcutHook).toContain('if (input.isLocked) return;');
     expect(timelineEditor).toContain("import { useAgentChat } from '../AgentChatContext';");
-    expect(timelineEditor).toContain('const { isBusy: isAgentBusy } = useAgentChat();');
+    expect(timelineEditor).toContain('const { isBusy: isAgentBusy, attachContextAsset } = useAgentChat();');
     expect(timelineEditor).toContain('isLocked: isAgentBusy,');
     expect(timelineEditor).toContain('isAgentBusy,');
     expect(nativeMenu).toContain('readonly isAgentBusy: boolean;');
