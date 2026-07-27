@@ -1,26 +1,127 @@
-import { useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
+
+import type { LocalFfmpegRuntimeStatus } from '../../shared/exportTypes';
 import { DEFAULT_LLM_MODELS, type LlmProviderId } from '../../shared/llmModels';
-import { useLlmModel } from './LlmProviderContext';
+import { AiDomainModelSelector } from './AiDomainModelSelector';
+import { useLlmModel, type LlmCredentialKey } from './LlmProviderContext';
 import { useTheme } from './ThemeProvider';
 import { THEME_PRESETS, type ThemePresetId } from './theme';
-import { Button, Panel } from './ui';
+import { Button, MetadataList, Panel, PanelHeading, StatusCard } from './ui';
+
+const SETTINGS_SECTIONS = [
+  { id: 'appearance', title: 'Appearance', description: 'Theme mode and Daylight Glass presets.' },
+  { id: 'local-tools', title: 'Local Tools', description: 'Local runtime readiness for desktop capture, narration, and final export.' },
+  { id: 'voice', title: 'Voice', description: 'Voice model preference and consent-based local narration boundaries.' },
+  { id: 'video', title: 'Video', description: 'Video model preference and local result import boundaries.' },
+  { id: 'edit-agent', title: 'Edit Agent', description: 'Primary model, provider credentials, and the persistent right-side agent.' },
+  { id: 'data-privacy', title: 'Data & Privacy', description: 'Local storage, provider authorization, and deletion expectations.' }
+] as const;
+
+type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
+type SettingsSectionId = SettingsSection['id'];
+
+type ModelTestState =
+  | { readonly status: 'idle' }
+  | { readonly status: 'running' }
+  | { readonly status: 'success'; readonly completion: string }
+  | { readonly status: 'error'; readonly error: string };
+
+type FfmpegStatusState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'ready'; readonly value: LocalFfmpegRuntimeStatus }
+  | { readonly status: 'error'; readonly error: string };
+
+type CredentialField = {
+  readonly providerId: LlmProviderId;
+  readonly keyName: LlmCredentialKey;
+  readonly label: string;
+  readonly placeholder: string;
+};
+
+type CredentialDrafts = Record<LlmCredentialKey, string>;
+type CredentialSaveState = Record<LlmCredentialKey, 'idle' | 'saving' | 'saved' | 'error'>;
+
+type SettingsWorkspaceProps = {
+  readonly onReplayFirstRunOnboarding: () => void;
+};
+
+const CREDENTIAL_FIELDS: readonly CredentialField[] = [
+  { providerId: 'openai', keyName: 'openaiApiKey', label: 'OpenAI API key', placeholder: 'sk-proj-...' },
+  { providerId: 'anthropic', keyName: 'anthropicApiKey', label: 'Anthropic API key', placeholder: 'sk-ant-...' },
+  { providerId: 'google_gemini', keyName: 'geminiApiKey', label: 'Google Gemini API key', placeholder: 'AIzaSy...' },
+  { providerId: 'deepseek', keyName: 'deepseekApiKey', label: 'DeepSeek API key', placeholder: 'sk-...' }
+] as const;
+
+const EMPTY_CREDENTIAL_DRAFTS: CredentialDrafts = {
+  openaiApiKey: '',
+  anthropicApiKey: '',
+  geminiApiKey: '',
+  deepseekApiKey: '',
+  elevenlabsApiKey: ''
+};
+
+const IDLE_CREDENTIAL_SAVE_STATE: CredentialSaveState = {
+  openaiApiKey: 'idle',
+  anthropicApiKey: 'idle',
+  geminiApiKey: 'idle',
+  deepseekApiKey: 'idle',
+  elevenlabsApiKey: 'idle'
+};
+
+function getSettingsSection(sectionId: SettingsSectionId): SettingsSection {
+  return SETTINGS_SECTIONS.find((section) => section.id === sectionId) ?? SETTINGS_SECTIONS[0];
+}
 
 function modelLabelsForProvider(providerId: LlmProviderId): string {
-  return DEFAULT_LLM_MODELS.filter((m) => m.providerId === providerId)
-    .map((m) => m.label)
+  return DEFAULT_LLM_MODELS.filter((model) => model.providerId === providerId)
+    .map((model) => model.label)
     .join(' & ');
 }
 
-type ModelTestState =
-  | { status: 'idle' }
-  | { status: 'running' }
-  | { status: 'success'; completion: string }
-  | { status: 'error'; error: string };
+function ffmpegStatusText(state: FfmpegStatusState): { readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string } {
+  switch (state.status) {
+    case 'loading':
+      return { tone: 'warning', text: 'Checking local FFmpeg readiness.' };
+    case 'error':
+      return { tone: 'danger', text: state.error };
+    case 'ready':
+      switch (state.value.kind) {
+        case 'configured':
+          return { tone: 'success', text: 'Configured FFmpeg runtime is available for local MP4 export.' };
+        case 'system':
+          return { tone: 'success', text: 'System FFmpeg runtime is available for local MP4 export.' };
+        case 'unavailable':
+          return { tone: 'danger', text: state.value.reason };
+      }
+  }
+}
 
-export function SettingsWorkspace(): ReactElement {
+export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorkspaceProps): ReactElement {
   const { mode, preference, preset, setPreset, setPreference } = useTheme();
-  const { selectedModelId, selectedModel, providerConfig, setSelectedModelId, updateProviderConfig } = useLlmModel();
+  const { credentialStatus, providerConfig, saveProviderCredential, selectedModel, selectedModelId, setSelectedModelId, updateProviderConfig } = useLlmModel();
+  const [activeSectionId, setActiveSectionId] = useState<SettingsSectionId>('appearance');
+  const [credentialDrafts, setCredentialDrafts] = useState<CredentialDrafts>(EMPTY_CREDENTIAL_DRAFTS);
+  const [credentialSaveState, setCredentialSaveState] = useState<CredentialSaveState>(IDLE_CREDENTIAL_SAVE_STATE);
   const [testState, setTestState] = useState<ModelTestState>({ status: 'idle' });
+  const [ffmpegState, setFfmpegState] = useState<FfmpegStatusState>({ status: 'loading' });
+  const activeSection = getSettingsSection(activeSectionId);
+  const ffmpegView = ffmpegStatusText(ffmpegState);
+
+  useEffect(() => {
+    let mounted = true;
+    window.videoTool.getFfmpegRuntimeStatus()
+      .then((response) => {
+        if (!mounted) return;
+        setFfmpegState(response.ok ? { status: 'ready', value: response.value } : { status: 'error', error: response.error.message });
+      })
+      .catch((error: unknown) => {
+        if (!mounted) return;
+        setFfmpegState({ status: 'error', error: error instanceof Error ? error.message : 'FFmpeg readiness could not be checked.' });
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const runModelTest = async (): Promise<void> => {
     setTestState({ status: 'running' });
@@ -32,341 +133,128 @@ export function SettingsWorkspace(): ReactElement {
       });
       if (response.ok && response.value.ok && response.value.completion) {
         setTestState({ status: 'success', completion: response.value.completion });
-      } else {
-        const error = response.ok ? response.value.error ?? 'Model test failed with no error detail.' : response.error.message;
-        setTestState({ status: 'error', error });
+        return;
       }
-    } catch (err) {
-      setTestState({ status: 'error', error: err instanceof Error ? err.message : 'Model test failed.' });
+      setTestState({ status: 'error', error: response.ok ? response.value.error ?? 'Model test failed with no error detail.' : response.error.message });
+    } catch (error: unknown) {
+      setTestState({ status: 'error', error: error instanceof Error ? error.message : 'Model test failed.' });
+    }
+  };
+
+  const saveCredentialDraft = async (field: CredentialField): Promise<void> => {
+    setCredentialSaveState((current) => ({ ...current, [field.keyName]: 'saving' }));
+    const saved = await saveProviderCredential(field.keyName, credentialDrafts[field.keyName]);
+    setCredentialSaveState((current) => ({ ...current, [field.keyName]: saved ? 'saved' : 'error' }));
+    if (saved) {
+      setCredentialDrafts((current) => ({ ...current, [field.keyName]: '' }));
+    }
+  };
+
+  const renderActiveSection = (): ReactNode => {
+    switch (activeSectionId) {
+      case 'appearance':
+        return (
+          <>
+            <div className="settings-control-row" role="group" aria-label="Theme mode">
+              <Button variant={preference === 'light' ? 'primary' : 'default'} onClick={() => setPreference('light')}>Light</Button>
+              <Button variant={preference === 'dark' ? 'primary' : 'default'} onClick={() => setPreference('dark')}>Dark</Button>
+              <Button variant={preference === 'system' ? 'primary' : 'default'} onClick={() => setPreference('system')}>System</Button>
+            </div>
+            <MetadataList items={[{ term: 'Active mode', description: mode }, { term: 'Preference', description: preference }]} />
+            <div className="settings-preset-grid">
+              {THEME_PRESETS.map((item) => (
+                <button key={item.id} className="settings-preset-card" type="button" aria-pressed={item.id === preset} onClick={() => setPreset(item.id as ThemePresetId)}>
+                  <span className="settings-preset-card__swatch" style={{ background: item.accentColor }} />
+                  <strong>{item.label}</strong>
+                  <small>{item.description}</small>
+                </button>
+              ))}
+            </div>
+          </>
+        );
+      case 'local-tools':
+        return (
+          <>
+            <StatusCard tone={ffmpegView.tone}>{ffmpegView.text}</StatusCard>
+            <MetadataList items={[{ term: 'Screen permission', description: 'Checked by the recorder when capture starts.' }, { term: 'Local Qwen', description: 'User-configured runtime only; no model download is bundled.' }]} />
+          </>
+        );
+      case 'voice':
+        return (
+          <>
+            <AiDomainModelSelector domain="voice-generation" label="Voice generation model" description="Choose the configured model used by the Voice Generation workspace." />
+            <StatusCard tone="neutral">Voice samples must be user-owned or authorized, stored locally, and deletable from local app storage.</StatusCard>
+          </>
+        );
+      case 'video':
+        return (
+          <>
+            <AiDomainModelSelector domain="video-generation" label="Video generation model" description="Choose the configured model used by the Video Generation workspace." />
+            <StatusCard tone="warning">Provider seams are selectable preferences only; unsupported cloud adapters are not silently called.</StatusCard>
+          </>
+        );
+      case 'edit-agent':
+        return (
+          <>
+            <AiDomainModelSelector domain="edit-agent" label="Edit Agent model" description="Choose the model preference for the persistent right-side Edit Agent panel." />
+            <label className="field-label" htmlFor="primary-model">Primary LLM model</label>
+            <select id="primary-model" value={selectedModelId} onChange={(event) => setSelectedModelId(event.target.value)}>
+              {DEFAULT_LLM_MODELS.map((model) => <option key={model.id} value={model.id}>{model.label} ({model.providerLabel}) - [{model.badge}]</option>)}
+            </select>
+            <StatusCard tone="neutral"><strong>{selectedModel.label}</strong>: {selectedModel.description}</StatusCard>
+            <label className="field-label" htmlFor="ollama-base-url">Local Ollama endpoint</label>
+            <input id="ollama-base-url" type="text" value={providerConfig.ollamaBaseUrl ?? ''} placeholder="http://localhost:11434" onChange={(event) => updateProviderConfig({ ollamaBaseUrl: event.target.value })} />
+            <div className="settings-credential-grid">
+              {CREDENTIAL_FIELDS.map((field) => (
+                <div key={field.keyName} className="settings-credential-card">
+                  <label className="field-label" htmlFor={`credential-${field.keyName}`}>
+                    {field.label}
+                    <input id={`credential-${field.keyName}`} type="password" placeholder={field.placeholder} value={credentialDrafts[field.keyName]} onChange={(event) => setCredentialDrafts((current) => ({ ...current, [field.keyName]: event.target.value }))} />
+                  </label>
+                  <span>{credentialStatus[field.keyName] ? 'Stored in main-process safe storage.' : `Required for ${modelLabelsForProvider(field.providerId)}.`}</span>
+                  {credentialSaveState[field.keyName] === 'saved' && <span role="status">Credential saved.</span>}
+                  {credentialSaveState[field.keyName] === 'error' && <span role="status">Credential could not be saved.</span>}
+                  <Button variant="default" onClick={() => void saveCredentialDraft(field)} disabled={credentialSaveState[field.keyName] === 'saving'}>{credentialSaveState[field.keyName] === 'saving' ? 'Saving...' : 'Save credential'}</Button>
+                </div>
+              ))}
+            </div>
+            <Button variant="default" onClick={() => void runModelTest()} disabled={testState.status === 'running'}>{testState.status === 'running' ? 'Testing...' : 'Test selected model'}</Button>
+            {testState.status === 'success' && <StatusCard tone="success">Model responded: {testState.completion}</StatusCard>}
+            {testState.status === 'error' && <StatusCard tone="danger">{testState.error}</StatusCard>}
+          </>
+        );
+      case 'data-privacy':
+        return (
+          <>
+            <MetadataList items={[{ term: 'Projects', description: 'Stored under local Electron user data.' }, { term: 'Exports', description: 'Opened and revealed through main-process actions only.' }, { term: 'Provider secrets', description: 'Sent to main-process safe storage instead of plain localStorage.' }]} />
+            <StatusCard tone="success">No account system, analytics, crash reporting, cloud upload, or hidden provider network work is implemented.</StatusCard>
+            <Button variant="default" onClick={onReplayFirstRunOnboarding}>Replay setup</Button>
+          </>
+        );
     }
   };
 
   return (
-    <div
-      className="settings-workspace"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '24px',
-        padding: '20px 24px',
-        height: '100%',
-        overflowY: 'auto',
-        background: 'var(--background)',
-        color: 'var(--foreground)'
-      }}
-    >
-      {/* Settings Header */}
-      <header style={{ borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-        <h1 id="settings-page-title" style={{ fontSize: 'var(--text-hero)', fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>
-          Settings & Preferences
-        </h1>
-        <p style={{ fontSize: 'var(--text-small)', color: 'var(--muted-foreground)', margin: '4px 0 0 0' }}>
-          Manage your app theme, visual presets, LLM providers, and local AI engines
-        </p>
+    <div className="settings-workspace">
+      <header className="settings-workspace__header">
+        <p className="section-kicker">Settings</p>
+        <h1 id="settings-page-title">Local workspace preferences.</h1>
+        <p>Configure appearance, local runtime readiness, model preferences, and privacy boundaries without exposing paths or secrets to the renderer.</p>
       </header>
 
-      {/* Section 1: Appearance & Theme Settings */}
-      <section style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        <div>
-          <h2 style={{ fontSize: 'var(--text-title)', fontWeight: 600, margin: 0 }}>Appearance & Theme</h2>
-          <p style={{ fontSize: 'var(--text-caption)', color: 'var(--muted-foreground)', margin: '2px 0 0 0' }}>
-            Choose between Light mode, Dark mode, or select a curated visual theme preset.
-          </p>
-        </div>
+      <div className="settings-workspace__grid">
+        {SETTINGS_SECTIONS.map((section) => (
+          <button key={section.id} type="button" aria-controls="settings-active-section" aria-pressed={section.id === activeSectionId} onClick={() => setActiveSectionId(section.id)}>
+            <strong>{section.title}</strong>
+            <span>{section.description}</span>
+          </button>
+        ))}
+      </div>
 
-        {/* Theme Mode Segmented Selector */}
-        <Panel style={{ padding: '16px', background: 'var(--card)', border: '1px solid var(--border)' }}>
-          <label style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
-            Theme Mode
-          </label>
-          <div style={{ display: 'flex', gap: '8px', maxWidth: '420px' }}>
-            <Button
-              variant={preference === 'light' ? 'primary' : 'default'}
-              onClick={() => setPreference('light')}
-              style={{ flex: 1, padding: '8px 12px' }}
-            >
-              ☀️ Light
-            </Button>
-            <Button
-              variant={preference === 'dark' ? 'primary' : 'default'}
-              onClick={() => setPreference('dark')}
-              style={{ flex: 1, padding: '8px 12px' }}
-            >
-              🌙 Dark
-            </Button>
-            <Button
-              variant={preference === 'system' ? 'primary' : 'default'}
-              onClick={() => setPreference('system')}
-              style={{ flex: 1, padding: '8px 12px' }}
-            >
-              💻 System Auto
-            </Button>
-          </div>
-          <span style={{ fontSize: 'var(--text-caption)', color: 'var(--muted-foreground)', display: 'block', marginTop: '8px' }}>
-            Active mode: <strong style={{ color: 'var(--foreground)' }}>{mode.toUpperCase()}</strong> (Preference: {preference})
-          </span>
-        </Panel>
-
-        {/* Visual Theme Presets Grid */}
-        <Panel style={{ padding: '16px', background: 'var(--card)', border: '1px solid var(--border)' }}>
-          <label style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block', marginBottom: '12px' }}>
-            Visual Theme Presets
-          </label>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-              gap: '12px'
-            }}
-          >
-            {THEME_PRESETS.map((item) => {
-              const isSelected = item.id === preset;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setPreset(item.id as ThemePresetId)}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    padding: '14px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
-                    background: isSelected ? 'var(--surface-control-selected)' : 'var(--surface-inset)',
-                    color: 'var(--foreground)',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 120ms ease'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', marginBottom: '6px' }}>
-                    <span
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '50%',
-                        background: item.accentColor,
-                        border: '1px solid rgba(255,255,255,0.3)',
-                        flexShrink: 0
-                      }}
-                    />
-                    <span style={{ fontSize: 'var(--text-body)', fontWeight: 600, flex: 1 }}>{item.label}</span>
-                    <span
-                      style={{
-                        fontSize: 'var(--text-micro)',
-                        fontWeight: 600,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        background: 'var(--surface-control)',
-                        textTransform: 'uppercase',
-                        fontFamily: 'var(--font-mono)'
-                      }}
-                    >
-                      {item.mode}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                    {item.description}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </Panel>
-      </section>
-
-      {/* Section 2: Opencode LLM Providers & Models */}
-      <section style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        <div>
-          <h2 style={{ fontSize: 'var(--text-title)', fontWeight: 600, margin: 0 }}>LLM Providers & AI Models</h2>
-          <p style={{ fontSize: 'var(--text-caption)', color: 'var(--muted-foreground)', margin: '2px 0 0 0' }}>
-            Opencode-style model configuration for local Ollama/Qwen, OpenAI, Anthropic, Gemini, and DeepSeek.
-          </p>
-        </div>
-
-        {/* Primary Model Selection Card */}
-        <Panel style={{ padding: '16px', background: 'var(--card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div>
-            <label style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
-              Active Primary Model
-            </label>
-            <select
-              value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
-              style={{
-                width: '100%',
-                maxWidth: '420px',
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-xs)',
-                border: '1px solid var(--border)',
-                background: 'var(--input)',
-                color: 'var(--foreground)',
-                fontSize: 'var(--text-body)',
-                fontFamily: 'var(--font-mono)'
-              }}
-            >
-              {DEFAULT_LLM_MODELS.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.label} ({model.providerLabel}) — [{model.badge}]
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: 'var(--radius-xs)', background: 'var(--surface-inset)', border: '1px solid var(--border)' }}>
-            <span style={{ fontSize: 'var(--text-subhead)' }}>🤖</span>
-            <div>
-              <span style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block' }}>
-                {selectedModel.label}
-              </span>
-              <span style={{ fontSize: 'var(--text-caption)', color: 'var(--muted-foreground)' }}>
-                {selectedModel.description}
-              </span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <Button variant="default" onClick={() => void runModelTest()} disabled={testState.status === 'running'} style={{ alignSelf: 'flex-start', padding: '8px 14px' }}>
-              {testState.status === 'running' ? 'Testing…' : 'Test Selected Model'}
-            </Button>
-            {testState.status === 'success' && (
-              <div style={{ padding: '10px', borderRadius: 'var(--radius-xs)', background: 'var(--surface-inset)', border: '1px solid var(--border)', fontSize: 'var(--text-caption)' }}>
-                <strong style={{ color: 'var(--success, #2e7d32)' }}>✓ Model responded:</strong> {testState.completion}
-              </div>
-            )}
-            {testState.status === 'error' && (
-              <div style={{ padding: '10px', borderRadius: 'var(--radius-xs)', background: 'var(--surface-inset)', border: '1px solid var(--border)', fontSize: 'var(--text-caption)', color: 'var(--destructive, #c62828)' }}>
-                ✗ {testState.error}
-              </div>
-            )}
-          </div>
-        </Panel>
-
-        {/* Provider Credentials & Base URLs Grid */}
-        <Panel style={{ padding: '16px', background: 'var(--card)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <label style={{ fontSize: 'var(--text-small)', fontWeight: 600, display: 'block' }}>
-            Provider Credentials & Endpoints
-          </label>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-            {/* Local Engine / Ollama */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>Local Engine (Ollama / Qwen)</label>
-              <input
-                type="text"
-                placeholder="http://localhost:11434"
-                value={providerConfig.ollamaBaseUrl || ''}
-                onChange={(e) => updateProviderConfig({ ollamaBaseUrl: e.target.value })}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius-xs)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--input)',
-                  color: 'var(--foreground)',
-                  fontSize: 'var(--text-caption)',
-                  fontFamily: 'var(--font-mono)'
-                }}
-              />
-              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                Default: http://localhost:11434
-              </span>
-            </div>
-
-            {/* OpenAI */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>OpenAI API Key</label>
-              <input
-                type="password"
-                placeholder="sk-proj-..."
-                value={providerConfig.openaiApiKey || ''}
-                onChange={(e) => updateProviderConfig({ openaiApiKey: e.target.value })}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius-xs)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--input)',
-                  color: 'var(--foreground)',
-                  fontSize: 'var(--text-caption)',
-                  fontFamily: 'var(--font-mono)'
-                }}
-              />
-              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                Required for {modelLabelsForProvider('openai')}
-              </span>
-            </div>
-
-            {/* Anthropic */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>Anthropic API Key</label>
-              <input
-                type="password"
-                placeholder="sk-ant-..."
-                value={providerConfig.anthropicApiKey || ''}
-                onChange={(e) => updateProviderConfig({ anthropicApiKey: e.target.value })}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius-xs)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--input)',
-                  color: 'var(--foreground)',
-                  fontSize: 'var(--text-caption)',
-                  fontFamily: 'var(--font-mono)'
-                }}
-              />
-              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                Required for {modelLabelsForProvider('anthropic')}
-              </span>
-            </div>
-
-            {/* Google Gemini */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>Google Gemini API Key</label>
-              <input
-                type="password"
-                placeholder="AIzaSy..."
-                value={providerConfig.geminiApiKey || ''}
-                onChange={(e) => updateProviderConfig({ geminiApiKey: e.target.value })}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius-xs)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--input)',
-                  color: 'var(--foreground)',
-                  fontSize: 'var(--text-caption)',
-                  fontFamily: 'var(--font-mono)'
-                }}
-              />
-              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                Required for {modelLabelsForProvider('google_gemini')} & Veo Video
-              </span>
-            </div>
-
-            {/* DeepSeek */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: 'var(--text-caption)', fontWeight: 600 }}>DeepSeek API Key</label>
-              <input
-                type="password"
-                placeholder="sk-..."
-                value={providerConfig.deepseekApiKey || ''}
-                onChange={(e) => updateProviderConfig({ deepseekApiKey: e.target.value })}
-                style={{
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius-xs)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--input)',
-                  color: 'var(--foreground)',
-                  fontSize: 'var(--text-caption)',
-                  fontFamily: 'var(--font-mono)'
-                }}
-              />
-              <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)' }}>
-                Required for {modelLabelsForProvider('deepseek')}
-              </span>
-            </div>
-          </div>
-        </Panel>
-      </section>
+      <Panel id="settings-active-section" className="settings-section" role="region" aria-labelledby={`settings-section-${activeSection.id}`}>
+        <PanelHeading><div><h2 id={`settings-section-${activeSection.id}`}>{activeSection.title}</h2><p>{activeSection.description}</p></div></PanelHeading>
+        {renderActiveSection()}
+      </Panel>
     </div>
   );
 }

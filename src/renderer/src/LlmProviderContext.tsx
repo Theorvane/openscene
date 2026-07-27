@@ -8,6 +8,8 @@ import {
   type LlmProviderApiConfig
 } from '../../shared/llmModels';
 
+export type LlmCredentialKey = 'openaiApiKey' | 'anthropicApiKey' | 'geminiApiKey' | 'deepseekApiKey' | 'elevenlabsApiKey';
+
 type LlmContextValue = {
   readonly selectedModelId: string;
   readonly selectedModel: LlmModelConfig;
@@ -15,6 +17,7 @@ type LlmContextValue = {
   readonly credentialStatus: Record<string, boolean>;
   readonly setSelectedModelId: (id: string) => void;
   readonly updateProviderConfig: (updates: Partial<LlmProviderApiConfig>) => void;
+  readonly saveProviderCredential: (key: LlmCredentialKey, value: string) => Promise<boolean>;
 };
 
 type LlmProviderProps = {
@@ -85,48 +88,32 @@ export function LlmProvider({ children }: LlmProviderProps): ReactElement {
     }
   }, []);
 
+  const saveProviderCredential = useCallback(async (key: LlmCredentialKey, value: string): Promise<boolean> => {
+    if (typeof window === 'undefined') return false;
+    const response = await window.videoTool.setProviderCredential(key, value);
+    if (!response.ok) return false;
+
+    setCredentialStatus((current) => ({ ...current, [key]: value.trim().length > 0 }));
+    return response.value.updated;
+  }, []);
+
   const updateProviderConfig = useCallback((updates: Partial<LlmProviderApiConfig>): void => {
     setProviderConfigState((prev) => {
       const next = { ...prev, ...updates };
       if (typeof window !== 'undefined') {
         try {
-          // Never store API keys in plain localStorage; persist only the (non-secret) endpoint setting.
           window.localStorage.setItem(LLM_STORAGE_CONFIG_KEY, JSON.stringify({ ollamaBaseUrl: next.ollamaBaseUrl }));
         } catch {
           // storage fallback
         }
-
-        // Persist API key updates securely via main-process safeStorage IPC instead.
-        const secretFields: Array<keyof LlmProviderApiConfig> = [
-          'openaiApiKey',
-          'anthropicApiKey',
-          'geminiApiKey',
-          'deepseekApiKey'
-        ];
-        for (const field of secretFields) {
-          const value = updates[field];
-          if (value !== undefined && window.videoTool?.setProviderCredential) {
-            window.videoTool
-              .setProviderCredential(field, value)
-              .then(() => {
-                setCredentialStatus((prevStatus) => ({ ...prevStatus, [field]: value.trim().length > 0 }));
-              })
-              .catch(() => undefined);
-          }
-          if (updates.elevenlabsApiKey !== undefined) {
-            window.videoTool.setProviderCredential('elevenlabsApiKey', updates.elevenlabsApiKey).then(() => {
-              setCredentialStatus((prev) => ({ ...prev, elevenlabsApiKey: updates.elevenlabsApiKey!.trim().length > 0 }));
-            }).catch(() => undefined);
-          }
-        }
       }
-      return next;
+      return next.ollamaBaseUrl === undefined ? {} : { ollamaBaseUrl: next.ollamaBaseUrl };
     });
   }, []);
 
   const value = useMemo<LlmContextValue>(
-    () => ({ selectedModelId, selectedModel, providerConfig, credentialStatus, setSelectedModelId, updateProviderConfig }),
-    [selectedModelId, selectedModel, providerConfig, credentialStatus, setSelectedModelId, updateProviderConfig]
+    () => ({ selectedModelId, selectedModel, providerConfig, credentialStatus, setSelectedModelId, updateProviderConfig, saveProviderCredential }),
+    [selectedModelId, selectedModel, providerConfig, credentialStatus, setSelectedModelId, updateProviderConfig, saveProviderCredential]
   );
 
   return <LlmContext.Provider value={value}>{children}</LlmContext.Provider>;

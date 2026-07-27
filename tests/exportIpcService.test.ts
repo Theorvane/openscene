@@ -58,6 +58,23 @@ async function openSource(sourcePath: string) {
 }
 
 describe('export IPC service', () => {
+  it('reports FFmpeg readiness without exposing executable paths or arguments', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'export-service-'));
+    const service = new ExportIpcService({
+      projects: { open: async () => SNAPSHOT },
+      assets: { openPlaybackSource: async () => null },
+      jobs: new ExportJobStore({ createId: () => 'export_01' }),
+      exportsRoot: join(root, 'exports'),
+      discoverFfmpeg: async () => ({ kind: 'configured', executablePath: join(root, 'bin', 'ffmpeg') })
+    });
+
+    const readiness = await service.getFfmpegRuntimeStatus();
+
+    expect(readiness).toEqual({ ok: true, value: { kind: 'configured' } });
+    expect(JSON.stringify(readiness)).not.toContain(root);
+    expect(JSON.stringify(readiness)).not.toMatch(/executablePath|argv|args/);
+  });
+
   it('runs a background export, polls path-free state, and opens only the completed known result', async () => {
     const root = await mkdtemp(join(tmpdir(), 'export-service-'));
     const sourcePath = join(root, 'source.webm');

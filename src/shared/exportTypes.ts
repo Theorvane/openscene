@@ -15,6 +15,11 @@ export type ExportJobActionInput = {
   readonly jobId: string;
 };
 
+export type LocalFfmpegRuntimeStatus =
+  | { readonly kind: 'configured' }
+  | { readonly kind: 'system' }
+  | { readonly kind: 'unavailable'; readonly reason: string };
+
 export type ExportProgress = {
   readonly processedMs: number;
   readonly durationMs: number;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 
 import type { EditAgentContextAsset } from '../../shared/editAgentContext';
 import { AppShell } from './AppShell';
+import { FirstRunOnboarding } from './FirstRunOnboarding';
 import { HomePage } from './HomePage';
 import { NarrationPanel } from './NarrationPanel';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
@@ -12,6 +13,7 @@ import type { AppPageId } from './appPages';
 import { APP_WORKSPACES, getDefaultAppWorkspaceId } from './appWorkspaces';
 import type { AppWorkspaceId } from './appWorkspaces';
 import { TimelineEditor } from './editor/TimelineEditor';
+import { readFirstRunOnboardingCompletion, resetFirstRunOnboardingCompletion, writeFirstRunOnboardingCompletion } from './firstRunOnboardingPreference';
 import { useTimelineEditor } from './editor/useTimelineEditor';
 
 const [EDIT_WORKSPACE, VOICE_GENERATION_WORKSPACE, VIDEO_GENERATION_WORKSPACE] = APP_WORKSPACES;
@@ -26,6 +28,10 @@ export function App(): ReactElement {
   const editor = useTimelineEditor();
   const [activePageId, setActivePageId] = useState<AppPageId>(() => getDefaultAppPageId());
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<AppWorkspaceId>(() => getDefaultAppWorkspaceId());
+  const [showFirstRunOnboarding, setShowFirstRunOnboarding] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return !readFirstRunOnboardingCompletion(window.localStorage).completed;
+  });
   const pagePanelRefs = useRef<Partial<Record<AppPageId, HTMLElement>>>({});
   const pendingFocusPageRef = useRef<AppPageId | null>(null);
   const activePage = APP_PAGE_BY_ID[activePageId];
@@ -80,6 +86,16 @@ export function App(): ReactElement {
     setActiveWorkspaceId(workspaceId);
     setActivePageId(workspaceId);
   }, [activePageId, activeWorkspaceId, focusPagePanel, requestPageFocus]);
+
+  const completeFirstRunOnboarding = useCallback((): void => {
+    writeFirstRunOnboardingCompletion(window.localStorage);
+    setShowFirstRunOnboarding(false);
+  }, []);
+
+  const replayFirstRunOnboarding = useCallback((): void => {
+    resetFirstRunOnboardingCompletion(window.localStorage);
+    setShowFirstRunOnboarding(true);
+  }, []);
 
   useEffect(() => {
     const pendingFocusPageId = pendingFocusPageRef.current;
@@ -155,8 +171,9 @@ export function App(): ReactElement {
             role="region"
             tabIndex={-1}
           >
-            <SettingsWorkspace />
+            <SettingsWorkspace onReplayFirstRunOnboarding={replayFirstRunOnboarding} />
           </div>
+          {showFirstRunOnboarding && <FirstRunOnboarding onComplete={completeFirstRunOnboarding} />}
         </div>
       </ProjectResultImportProvider>
     </AppShell>

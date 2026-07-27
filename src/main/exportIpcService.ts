@@ -1,5 +1,5 @@
 import type { ApiResponse } from '../shared/models';
-import { EXPORT_DEFAULTS, type LocalExportJob, type StartExportJobInput } from '../shared/exportTypes';
+import { EXPORT_DEFAULTS, type LocalExportJob, type LocalFfmpegRuntimeStatus, type StartExportJobInput } from '../shared/exportTypes';
 import { parseExportJobActionInput, parseStartExportJobInput } from '../shared/exportValidators';
 import type { LocalProjectSnapshot } from '../shared/timelineTypes';
 import type { OpenedAssetPlaybackSource } from './assetLibraryStore';
@@ -110,6 +110,11 @@ export class ExportIpcService {
     }
   }
 
+  async getFfmpegRuntimeStatus(): Promise<ApiResponse<LocalFfmpegRuntimeStatus>> {
+    const ffmpeg = await this.discover();
+    return ok(ffmpeg.kind === 'unavailable' ? { kind: 'unavailable', reason: ffmpeg.reason } : { kind: ffmpeg.kind });
+  }
+
   async getExportJob(payload: unknown): Promise<ApiResponse<LocalExportJob>> {
     const input = parseExportJobActionInput(payload);
     if (input === null) {
@@ -169,13 +174,11 @@ export class ExportIpcService {
         exportsRoot: this.dependencies.exportsRoot,
         jobId: input.jobId
       });
-      const dimensions = this.outputDimensions(input.request, input.project);
       const compiled = compileFfmpegTimeline({
         timeline: input.project.timeline,
         assetPaths: staged.assetPaths,
         outputPath,
-        width: dimensions.width,
-        height: dimensions.height,
+        ...this.outputDimensions(input.request, input.project),
         frameRate: input.request.frameRate ?? EXPORT_DEFAULTS.frameRate
       });
       return { executablePath: input.executablePath, outputPath, stagingDirectory: staged.directory, ...compiled };
@@ -200,9 +203,7 @@ export class ExportIpcService {
   }
 
   private normalizedDimension(value: number | undefined, fallback: number, maximum: number): number {
-    if (value === undefined || !Number.isInteger(value) || value < 16) {
-      return fallback;
-    }
+    if (value === undefined || !Number.isInteger(value) || value < 16) return fallback;
     const bounded = Math.min(value, maximum);
     return bounded - bounded % 2;
   }
