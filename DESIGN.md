@@ -1,18 +1,18 @@
 # OpenVideo Design System
 
-OpenVideo is a compact local editing bay with a bright technical editor theme called Daylight Glass. The renderer should feel like a precise desktop NLE console for arranging local recordings, imported media, and narration, not like a cloud video generator or generic web dashboard.
+OpenVideo is a compact local studio command desk for arranging recordings, imported media, generated local assets, and narration in one persistent desktop shell. The renderer should feel like a real post-production desk: warm work surface, graphite rails, copper command accents, cyan review signals, and dense tactile controls. It must not read as a cloud video generator, generic SaaS dashboard, provider console, or marketing page.
 
 ## Core Principles
 
 - Treat Home as the initial page. Editing, Voice Generation, and Video Generation are persistent local workspaces opened from Home.
-- Keep every renderer claim local. Projects, recordings, imports, voice samples, and timeline edits stay on the user's machine.
+- Keep every renderer claim local. Projects, recordings, imports, voice samples, generated results, and timeline edits stay on the user's machine unless a future reviewed provider operation explicitly says otherwise.
 - Never expose raw local filesystem paths in renderer UI for imported timeline assets. Show names, durations, media kind, status, and secure playback URLs only when playback needs them.
-- Use dense but readable panels with mono section kickers, serif titles, clear control labels, and compact metadata.
-- Do not present cloud generation, provider integrations, unsupported formats, or frame-perfect mastering guarantees as implemented until the code supports them.
+- Use dense but readable panels with mono section kickers, strong desk labels, clear control copy, and compact metadata.
+- Do not present cloud generation, provider integrations, unsupported formats, bundled model setup, or frame-perfect mastering guarantees as implemented until the code supports them.
 
 ## Layout Contract
 
-- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Home and Settings buttons, and the theme switch. Do not duplicate the OpenVideo identity here; the active Edit program header owns product branding.
+- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Home and Settings buttons, and the theme switch. It reads as the desk toolbar, not the product billboard; the active Edit program header owns product branding.
 - The persistent right `AgentChatPanel` is the only user-facing Edit Agent UI. It is always the rightmost flex child beside the mounted workspace stack and owns Edit Agent model/connection status, selected and attached project context, conversation and tool stream, approval queue, reset/status, and prompt controls.
 - Do not render a global agent model selector in `product-chrome`, add a separate `EditAgentWorkspace`, or move Edit Agent controls into the left workspace navigation. Direct AI Video and AI Voice studios keep their own domain-specific controls, and Settings keeps provider credentials and primary model configuration separate from the Edit Agent chat surface.
 - `app-page-stack` owns top-level page visibility for Home, mounted workspaces, and Settings. Active page state is separate from active workspace state.
@@ -75,7 +75,7 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 ## Bottom Timeline
 
 - The timeline is the bottom anchor of the editor. It spans the full workspace width on desktop.
-- Track lanes use a time grid, sticky ruler, visible slate or parchment playhead, and clip blocks that encode media kind with text, border treatment, and pattern.
+- Track lanes use a time grid, sticky ruler, visible cyan or copper playhead, and clip blocks that encode media kind with text, border treatment, and pattern.
 - Clip blocks show asset name and duration. Trim handles stay visible enough to discover, but should not dominate the clip label.
 - Timeline interactions must read as local edits. Do not suggest non-existent cloud sync, unsupported render formats, or frame-perfect mastering guarantees.
 - The timeline remains visible while users switch side dock tabs. It is not part of the left dock or inspector tab systems.
@@ -92,18 +92,19 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 ## Theme System
 
 - The renderer uses semantic theme tokens: `--background`, `--foreground`, `--card`, `--primary`, `--secondary`, `--muted`, `--accent`, `--destructive`, `--success`, `--warning`, `--info`, `--border`, `--input`, and `--ring`.
-- Light mode is the Issue #5 visual contract: a white or off-white canvas, subtle lilac technical grid, navy typography, blue-purple-pink gradient accents, translucent glass panels, thin lavender borders, and restrained soft shadows.
-- Dark mode uses a cool slate and green tinted canvas, deep teal primary actions, cool cyan interaction and focus accents, pale editorial foreground, and layered cards that remain visibly non monochrome without reducing NLE contrast.
-- Legacy `--color-*` names are aliases over semantic tokens. Keep new styling on semantic tokens and only use aliases to match existing renderer classes.
+- Light mode is the Issue #59 command-desk visual contract: warm ivory canvas, graphite foreground, parchment and aluminum panels, copper primary actions, cyan review accents, station-grid guide lines, beveled control shadows, and restrained dark text contrast.
+- Dark mode mirrors the same command desk in low light: graphite canvas, blue-black panels, copper command accents, cyan focus/review signals, pale foreground, and non-monochrome layered cards that preserve NLE contrast.
+- The persisted preset id `daylight-glass` remains a compatibility identifier only. Do not rename it. User-facing copy may describe that light preset as Command Desk, but compatibility identifiers listed in `AGENTS.md` must remain stable.
+- Legacy `--editor-*` and `--color-*` names are aliases over semantic command-desk tokens. Keep new styling on semantic tokens and only use aliases to match existing renderer classes.
 - Atmosphere, panels, timeline grids, controls, tabs, and selected states use color for semantic hierarchy and interaction, not decoration. Pair hue with contrast, opacity, borders, shadows, labels, and subtle patterns so media kind is never signaled by color alone.
 
-## Enterprise Editorial Refinement Contract
+## Command Desk Refinement Contract
 
 - Keep the product direction original, restrained, and local first. The refinement may borrow from generic public design principles such as hierarchy, rhythm, contrast, and editorial spacing, but it must not borrow third party brand expression.
-- Preserve OpenVideo as an expressive light and dark desktop NLE with restrained enterprise editorial color. Do not change the product into a cloud editor, provider console, marketing dashboard, or generative media suite.
-- Strengthen hierarchy through scale, weight, placement, and concise labels. Program monitor, timeline, dock tabs, inspector tabs, and Home workspace entry cards should each have one clear job and a visible reading order.
-- Use measured whitespace, not empty decoration. Give the monitor and timeline enough breathing room to feel primary, keep command clusters tight, and separate dock, inspector, and status content with consistent gaps.
-- Build surface depth with semantic theme tokens only. Bright light surfaces may carry white glass, lilac grid texture, lavender hairline borders, soft shadows, opacity changes, and subtle hatch patterns, while dark surfaces remain cool and readable without reducing NLE contrast.
+- Preserve OpenVideo as an expressive light and dark desktop NLE with a command-desk material system. Do not change the product into a cloud editor, provider console, marketing dashboard, or generative media suite.
+- Strengthen hierarchy through scale, weight, placement, and concise labels. Program monitor, timeline, dock tabs, inspector tabs, Agent Chat, and Home workspace entry cards should each have one clear job and a visible reading order.
+- Use measured whitespace, not empty decoration. Give the monitor and timeline enough breathing room to feel primary, keep command clusters tight, and separate dock, inspector, chat, and status content with consistent gaps.
+- Build surface depth with semantic theme tokens only. Light surfaces may carry ivory enamel, brushed parchment insets, graphite rails, copper hairline emphasis, cyan review lights, soft shadows, opacity changes, and subtle hatch patterns. Dark surfaces remain cool and readable without reducing NLE contrast.
 - Keep navigation clarity accessible. Home workspace entry cards need visible labels, static local status, `aria-controls`, and focus movement to the active mounted region.
 - Preserve mounted workspace state retention. Visual refinements must keep inactive Editing, Voice Generation, and Video Generation regions hidden rather than unmounted.
 - Keep compact controls and focus treatment intact. Shortcut map controls stay dense, tabs stay compact, and the 2px focus outline with 2px offset and 4px halo remains visible in both themes.
@@ -120,12 +121,12 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 
 ## Type, Status, And Motion
 
-- Titles use the serif display stack. Controls use the body stack. Metadata, section kickers, timers, command labels, media badges, tab labels, and theme switch text use monospace.
-- Status semantics stay restrained: default is muted slate, success is green, warning or busy is amber, and danger or destructive states are red. Use these only for state, not decoration.
+- Titles use the display stack. Controls use the body stack. Metadata, section kickers, timers, command labels, media badges, tab labels, and theme switch text use monospace.
+- Status semantics stay restrained: default is muted graphite, success is green, warning or busy is amber, and danger or destructive states are red. Use these only for state, not decoration.
 - Home workspace entry icons are decorative inline SVGs with `aria-hidden="true"`; accessible names come from visible labels and existing button semantics, not from icon-only controls.
 - Video clips and media badges use solid semantic borders with angled hatch labels. Audio uses dashed borders and a different stripe direction. Both must keep visible `Video` or `Audio` text, and media kind must not depend on hue alone.
-- Controls should feel tactile with small hover lift and border changes. Respect `prefers-reduced-motion` and keep transitions short.
-- Compact controls use the 36px minimum. Default controls use the 42px minimum where space allows. Tabs are compact dashed pills until selected, then solid semantic selected pills with an `Active` marker.
+- Controls should feel tactile with small hover lift, bevel, and border changes. Respect `prefers-reduced-motion` and keep transitions short.
+- Compact controls use the 36px minimum. Default controls use the 42px minimum where space allows. Tabs are compact desk pills until selected, then solid semantic selected pills with an `Active` marker.
 
 ## Accessibility Rules
 

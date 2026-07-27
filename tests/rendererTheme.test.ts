@@ -8,16 +8,16 @@ const rendererStyles = readFileSync(new URL('../src/renderer/src/styles.css', im
 const minimumNormalTextContrast = 4.5;
 const minimumExpressiveColorChroma = 24;
 const minimumDistinctSemanticColorDistance = 64;
-const brightEditorContractTokens = [
-  '--editor-canvas: #f8faff;',
-  '--editor-navy: #172554;',
-  '--editor-lilac-grid: rgba(168, 162, 255, 0.18);',
-  '--editor-glass: rgba(255, 255, 255, 0.76);',
-  '--editor-glass-border: rgba(168, 162, 255, 0.34);',
-  '--editor-gradient-accent: linear-gradient(135deg, #2563eb 0%, #7c3aed 48%, #ec4899 100%);'
+const commandDeskContractTokens = [
+  '--command-desk-canvas: #f4efe5;',
+  '--command-desk-graphite: #1f2933;',
+  '--command-desk-grid: rgba(94, 83, 69, 0.14);',
+  '--command-desk-panel: rgba(255, 251, 242, 0.86);',
+  '--command-desk-panel-border: rgba(91, 75, 55, 0.24);',
+  '--command-desk-accent: linear-gradient(135deg, #9a4f1f 0%, #256e72 48%, #0ea5a8 100%);'
 ] as const;
 
-const brightEditorSurfaceSelectors = [
+const commandDeskSurfaceSelectors = [
   '.app-shell',
   '.app-workspace-panel-stack',
   '.editor-program-region',
@@ -62,7 +62,15 @@ const guardedDesignSurfaceFiles = [
   '../DESIGN.md',
   '../src/renderer/src/styles.css',
   '../src/renderer/src/AppShell.tsx',
-  '../src/renderer/src/App.tsx'
+  '../src/renderer/src/App.tsx',
+  '../src/renderer/src/AgentChatPanel.tsx',
+  '../src/renderer/src/SettingsWorkspace.tsx',
+  '../src/renderer/src/theme.ts'
+] as const;
+
+const forbiddenThirdPartyBrandPatterns = [
+  /cohere/i,
+  /hermes/i
 ] as const;
 
 const mutedForegroundContrastCases = themeModes.flatMap((mode) => [
@@ -228,6 +236,14 @@ describe('renderer theme contract', () => {
     expect(contrastRatio).toBeGreaterThanOrEqual(minimumNormalTextContrast);
   });
 
+  it('Given light theme accent foreground tokens, When contrast is computed, Then normal accent text meets WCAG AA contrast', () => {
+    const accent = getThemeHexCustomProperty('light', '--accent');
+    const accentForeground = getThemeHexCustomProperty('light', '--accent-foreground');
+    const contrastRatio = getContrastRatio(accentForeground, accent);
+
+    expect(contrastRatio).toBeGreaterThanOrEqual(minimumNormalTextContrast);
+  });
+
   it.each(mutedForegroundContrastCases)(
     'Given %s theme muted foreground on %s, When contrast is computed against %s, Then it meets WCAG AA normal text contrast',
     (mode, foregroundToken, backgroundToken) => {
@@ -254,27 +270,44 @@ describe('renderer theme contract', () => {
     expect(rendererStyles).toMatch(new RegExp(`${token}:\\s*[^;]+;`));
   });
 
-  it('Given Issue #5 bright editor reference, When renderer CSS tokens are checked, Then light mode owns the bright OpenVideo visual contract', () => {
+  it('Given Issue #59 command desk reference, When renderer CSS tokens are checked, Then light mode owns the local studio command desk visual contract', () => {
     const lightTheme = getThemeTokenBlock('light');
 
-    expect(lightTheme).toContain('--background: var(--editor-canvas);');
-    expect(lightTheme).toContain('--foreground: var(--editor-navy);');
-    for (const token of brightEditorContractTokens) {
+    expect(lightTheme).toContain('--background: var(--command-desk-canvas);');
+    expect(lightTheme).toContain('--foreground: var(--command-desk-graphite);');
+    for (const token of commandDeskContractTokens) {
       expect(lightTheme).toContain(token);
     }
   });
 
-  it('Given Issue #5 bright editor reference, When renderer CSS surfaces are checked, Then existing editor classes use glass, lilac grid, and gradient accents', () => {
-    for (const selector of brightEditorSurfaceSelectors) {
+  it('Given Issue #59 command desk reference, When renderer CSS surfaces are checked, Then existing editor classes use command desk panels, grids, and accents', () => {
+    for (const selector of commandDeskSurfaceSelectors) {
       expect(rendererStyles).toContain(selector);
     }
 
-    expect(rendererStyles).toContain('var(--editor-glass)');
-    expect(rendererStyles).toContain('var(--editor-glass-border)');
-    expect(rendererStyles).toContain('var(--editor-lilac-grid)');
-    expect(rendererStyles).toContain('var(--editor-gradient-accent)');
+    expect(rendererStyles).toContain('var(--command-desk-panel)');
+    expect(rendererStyles).toContain('var(--command-desk-panel-border)');
+    expect(rendererStyles).toContain('var(--command-desk-grid)');
+    expect(rendererStyles).toContain('var(--command-desk-accent)');
     expect(rendererStyles).not.toContain('linear-gradient(to bottom, #2b2e4a 0%, #171822 100%)');
     expect(rendererStyles).not.toContain('linear-gradient(to bottom, #103126 0%, #091c16 100%)');
+    expect(rendererStyles).not.toMatch(/linear-gradient\(135deg,\s*rgba\(255, 255, 255, 0\.9\),\s*rgba\((238, 242, 255|236, 253, 245)/);
+    expect(rendererStyles).toMatch(/\.timeline-clip\s*\{[\s\S]*?color-mix\(in srgb, var\(--card\) 94%, var\(--primary\)\)/);
+    expect(rendererStyles).toMatch(/\.timeline-clip--audio\s*\{[\s\S]*?color-mix\(in srgb, var\(--card\) 92%, var\(--success\)\)/);
+  });
+
+  it('Given the agent chat input, When focus-visible CSS is checked, Then it uses the documented ring, offset, and halo', () => {
+    expect(rendererStyles).toMatch(
+      /\.agent-chat-panel__input:focus-visible\s*\{[\s\S]*?outline:\s*2px solid var\(--focus-ring\);[\s\S]*?outline-offset:\s*2px;[\s\S]*?box-shadow:\s*0 0 0 4px var\(--focus-shadow\)/
+    );
+  });
+
+  it('Given the persistent agent chat rail, When renderer CSS is checked, Then only the activity log scrolls inside a viewport-bounded panel', () => {
+    expect(rendererStyles).toMatch(/@media \(max-width:\s*1120px\)\s*\{[\s\S]*?body\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?\.app-shell\s*\{[\s\S]*?height:\s*100vh;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;[\s\S]*?#root\s*\{[\s\S]*?height:\s*100vh;/);
+    expect(rendererStyles).toMatch(/\.app-shell__body\s*\{[\s\S]*?height:\s*100%;[\s\S]*?max-height:\s*100%;[\s\S]*?overflow:\s*hidden;/);
+    expect(rendererStyles).toMatch(/\.agent-chat-panel-shell\s*\{[\s\S]*?align-self:\s*stretch;[\s\S]*?height:\s*100%;[\s\S]*?max-height:\s*100%;[\s\S]*?overflow:\s*hidden;/);
+    expect(rendererStyles).toMatch(/\.agent-chat-panel\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[\s\S]*?max-height:\s*100%;[\s\S]*?overflow:\s*hidden;/);
+    expect(rendererStyles).toMatch(/\.agent-chat-log\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/);
   });
 
   it('Given sidebar-free workspace panels, When renderer CSS is checked, Then obsolete workspace nav styles are absent', () => {
@@ -287,6 +320,8 @@ describe('renderer theme contract', () => {
   it.each(guardedDesignSurfaceFiles)('Given %s, When brand source text is checked, Then third-party brand copy is absent', (filePath) => {
     const sourceText = readFileSync(new URL(filePath, import.meta.url), 'utf8');
 
-    expect(sourceText).not.toMatch(/cohere/i);
+    for (const pattern of forbiddenThirdPartyBrandPatterns) {
+      expect(sourceText).not.toMatch(pattern);
+    }
   });
 });

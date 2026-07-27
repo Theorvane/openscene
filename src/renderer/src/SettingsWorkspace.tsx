@@ -9,7 +9,7 @@ import { THEME_PRESETS, type ThemePresetId } from './theme';
 import { Button, MetadataList, Panel, PanelHeading, StatusCard } from './ui';
 
 const SETTINGS_SECTIONS = [
-  { id: 'appearance', title: 'Appearance', description: 'Theme mode and Daylight Glass presets.' },
+  { id: 'appearance', title: 'Appearance', description: 'Theme mode and command desk presets.' },
   { id: 'local-tools', title: 'Local Tools', description: 'Local runtime readiness for desktop capture, narration, and final export.' },
   { id: 'voice', title: 'Voice', description: 'Voice model preference and consent-based local narration boundaries.' },
   { id: 'video', title: 'Video', description: 'Video model preference and local result import boundaries.' },

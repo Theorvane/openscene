@@ -26,11 +26,11 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
   },
   {
     id: 'daylight-glass',
-    label: 'Daylight Glass',
+    label: 'Command Desk',
     mode: 'light',
-    description: 'Vibrant glassmorphic daylight studio',
-    accentColor: '#2563eb',
-    bgPreview: '#f8faff'
+    description: 'Warm local studio command desk',
+    accentColor: '#9a4f1f',
+    bgPreview: '#f4efe5'
   },
   {
     id: 'midnight-neon',
