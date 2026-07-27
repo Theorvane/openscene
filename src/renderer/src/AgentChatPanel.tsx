@@ -1,4 +1,4 @@
-import { useEffect, useRef, type FormEvent, type ReactElement } from 'react';
+import { useEffect, useRef, type CSSProperties, type FormEvent, type ReactElement } from 'react';
 
 import type { EditAgentContextAsset } from '../../shared/editAgentContext';
 import { useAgentChat } from './AgentChatContext';
@@ -7,9 +7,14 @@ import { Button } from './ui';
 
 type AgentChatPanelProps = {
   readonly selectedContextAsset: EditAgentContextAsset | null;
+  readonly width: number;
 };
 
-export function AgentChatPanel({ selectedContextAsset }: AgentChatPanelProps): ReactElement {
+type AgentChatPanelStyle = CSSProperties & {
+  readonly '--agent-chat-panel-width': string;
+};
+
+export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelProps): ReactElement {
   const {
     selectedModel,
     isLocalModel,
@@ -46,9 +51,10 @@ export function AgentChatPanel({ selectedContextAsset }: AgentChatPanelProps): R
 
   const selectedContextIsAttached = selectedContextAsset !== null
     && contextAssets.some((asset) => asset.projectId === selectedContextAsset.projectId && asset.assetId === selectedContextAsset.assetId);
+  const panelStyle: AgentChatPanelStyle = { '--agent-chat-panel-width': `${width}px` };
 
   return (
-    <aside className="agent-chat-panel-shell" aria-label="OpenVideo agent chat">
+    <aside id="app-shell-agent-chat" className="agent-chat-panel-shell" aria-label="OpenVideo agent chat" style={panelStyle}>
       <div className="agent-chat-panel">
         <div className="agent-chat-panel__header">
           <div className="agent-chat-panel__title">

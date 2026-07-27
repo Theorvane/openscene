@@ -19,7 +19,7 @@ const brightEditorContractTokens = [
 
 const brightEditorSurfaceSelectors = [
   '.app-shell',
-  '.workspace-nav',
+  '.app-workspace-panel-stack',
   '.editor-program-region',
   '.project-rail',
   '.asset-bin',
@@ -62,7 +62,7 @@ const guardedDesignSurfaceFiles = [
   '../DESIGN.md',
   '../src/renderer/src/styles.css',
   '../src/renderer/src/AppShell.tsx',
-  '../src/renderer/src/AppWorkspaceNavigation.tsx'
+  '../src/renderer/src/App.tsx'
 ] as const;
 
 const mutedForegroundContrastCases = themeModes.flatMap((mode) => [
@@ -275,6 +275,13 @@ describe('renderer theme contract', () => {
     expect(rendererStyles).toContain('var(--editor-gradient-accent)');
     expect(rendererStyles).not.toContain('linear-gradient(to bottom, #2b2e4a 0%, #171822 100%)');
     expect(rendererStyles).not.toContain('linear-gradient(to bottom, #103126 0%, #091c16 100%)');
+  });
+
+  it('Given sidebar-free workspace panels, When renderer CSS is checked, Then obsolete workspace nav styles are absent', () => {
+    expect(rendererStyles).toContain('.app-workspace-panel-stack');
+    expect(rendererStyles).toContain('.visually-hidden');
+    expect(rendererStyles).not.toContain('.workspace-nav');
+    expect(rendererStyles).not.toContain('nav[aria-label="Application workspaces"]');
   });
 
   it.each(guardedDesignSurfaceFiles)('Given %s, When brand source text is checked, Then third-party brand copy is absent', (filePath) => {

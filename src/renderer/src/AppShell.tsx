@@ -1,11 +1,24 @@
-import type { ReactElement, ReactNode } from 'react';
+import { useRef, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
 
 import type { EditAgentContextAsset } from '../../shared/editAgentContext';
+import {
+  AGENT_CHAT_LAYOUT_DEFAULT_WIDTH,
+  AGENT_CHAT_LAYOUT_MAX_WIDTH,
+  AGENT_CHAT_LAYOUT_MIN_WIDTH,
+  clampAgentChatPanelWidth,
+  getNextAgentChatPanelWidthFromKey
+} from './agentChatLayoutPreferences';
 import type { AppPage, AppPageId } from './appPages';
 import { AgentChatPanel } from './AgentChatPanel';
 import { AgentChatProvider, useAgentChat } from './AgentChatContext';
 import { ThemeSelector } from './ThemeSelector';
 import { Button } from './ui';
+import { useAgentChatLayoutPreference } from './useAgentChatLayoutPreference';
+
+type ChatPanelDragOrigin = {
+  readonly clientX: number;
+  readonly width: number;
+};
 
 function AppShellBackground(): ReactElement {
   return (
@@ -45,14 +58,56 @@ function HomeIcon(): ReactElement {
 
 function AppShellContent({ activePage, children, onPageChange, selectedContextAsset }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
+  const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
+  const shellBodyRef = useRef<HTMLDivElement | null>(null);
+  const dragOriginRef = useRef<ChatPanelDragOrigin | null>(null);
+  const chatPanelWidth = layoutPreference.chatPanelWidth;
   const homeIsActive = activePage.id === 'home';
   const settingsIsActive = activePage.id === 'settings';
+
+  const setChatPanelWidth = (width: number): void => {
+    const containerWidth = shellBodyRef.current?.getBoundingClientRect().width;
+    updateLayoutPreference((currentPreference) => ({
+      ...currentPreference,
+      chatPanelWidth: clampAgentChatPanelWidth(width, containerWidth)
+    }));
+  };
+
+  const releasePointer = (event: PointerEvent<HTMLDivElement>): void => {
+    dragOriginRef.current = null;
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  const onChatSplitterKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key === 'Escape' && dragOriginRef.current !== null) {
+      event.preventDefault();
+      setChatPanelWidth(dragOriginRef.current.width);
+      dragOriginRef.current = null;
+      return;
+    }
+
+    const nextWidth = getNextAgentChatPanelWidthFromKey({ currentWidth: chatPanelWidth, key: event.key, shiftKey: event.shiftKey });
+    if (nextWidth === null) return;
+    event.preventDefault();
+    setChatPanelWidth(nextWidth);
+  };
+
+  const onChatSplitterPointerMove = (event: PointerEvent<HTMLDivElement>): void => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId) || dragOriginRef.current === null) return;
+    setChatPanelWidth(dragOriginRef.current.width + dragOriginRef.current.clientX - event.clientX);
+  };
+
+  const onChatSplitterPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragOriginRef.current = { clientX: event.clientX, width: chatPanelWidth };
+  };
 
   return (
     <main className="app-shell">
       <AppShellBackground />
-      <div className="app-shell__body">
-        <div className="agent-workspace-lock" aria-busy={isBusy} inert={isBusy}>
+      <div ref={shellBodyRef} className="app-shell__body">
+        <div id="app-shell-workspace" className="agent-workspace-lock" aria-busy={isBusy} inert={isBusy}>
           <header className="product-chrome" aria-label="Application chrome">
             <div className="product-chrome__context" aria-label="Current page">
               <span className="product-chrome__workspace">{activePage.chromeLabel}</span>
@@ -94,7 +149,25 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
             Agent is working in this project. Workspace controls are temporarily locked.
           </div>
         )}
-        <AgentChatPanel selectedContextAsset={selectedContextAsset} />
+        <div
+          className="agent-chat-resize-splitter"
+          role="separator"
+          tabIndex={0}
+          aria-label="Resize Edit Agent chat"
+          aria-orientation="vertical"
+          aria-valuemin={AGENT_CHAT_LAYOUT_MIN_WIDTH}
+          aria-valuemax={AGENT_CHAT_LAYOUT_MAX_WIDTH}
+          aria-valuenow={chatPanelWidth}
+          aria-valuetext={`Edit Agent chat ${chatPanelWidth} pixels`}
+          aria-controls="app-shell-workspace app-shell-agent-chat"
+          onKeyDown={onChatSplitterKeyDown}
+          onPointerDown={onChatSplitterPointerDown}
+          onPointerMove={onChatSplitterPointerMove}
+          onPointerUp={releasePointer}
+          onPointerCancel={releasePointer}
+          onDoubleClick={() => setChatPanelWidth(AGENT_CHAT_LAYOUT_DEFAULT_WIDTH)}
+        />
+        <AgentChatPanel selectedContextAsset={selectedContextAsset} width={chatPanelWidth} />
       </div>
     </main>
   );

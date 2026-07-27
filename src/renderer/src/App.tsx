@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 
 import type { EditAgentContextAsset } from '../../shared/editAgentContext';
 import { AppShell } from './AppShell';
-import { AppWorkspaceNavigation } from './AppWorkspaceNavigation';
 import { HomePage } from './HomePage';
 import { NarrationPanel } from './NarrationPanel';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
@@ -16,16 +15,6 @@ import { TimelineEditor } from './editor/TimelineEditor';
 import { useTimelineEditor } from './editor/useTimelineEditor';
 
 const [EDIT_WORKSPACE, VOICE_GENERATION_WORKSPACE, VIDEO_GENERATION_WORKSPACE] = APP_WORKSPACES;
-
-const APP_WORKSPACE_LAYOUT_STYLE = {
-  gridTemplateColumns: 'minmax(184px, 220px) minmax(0, 1fr)',
-  gridTemplateRows: 'minmax(0, 1fr)'
-} as const satisfies CSSProperties;
-
-const APP_WORKSPACE_PANEL_STACK_STYLE = {
-  minHeight: 0,
-  overflow: 'hidden'
-} as const satisfies CSSProperties;
 
 const APP_WORKSPACE_PANEL_STYLE = {
   height: '100%',
@@ -117,9 +106,8 @@ export function App(): ReactElement {
           >
             <HomePage onWorkspaceOpen={setActiveWorkspace} workspaces={APP_WORKSPACES} />
           </section>
-          <div className="app-stack local-edit-bay" hidden={!workspaceIsVisible} style={APP_WORKSPACE_LAYOUT_STYLE}>
-            <AppWorkspaceNavigation activeWorkspaceId={activeWorkspaceId} onActiveWorkspaceChange={setActiveWorkspace} />
-            <div style={APP_WORKSPACE_PANEL_STACK_STYLE}>
+          <div className="app-stack local-edit-bay" hidden={!workspaceIsVisible}>
+            <div className="app-workspace-panel-stack">
               <section
                 aria-labelledby={EDIT_WORKSPACE.navId}
                 hidden={activeWorkspaceId !== EDIT_WORKSPACE.id || !workspaceIsVisible}
@@ -129,6 +117,7 @@ export function App(): ReactElement {
                 style={APP_WORKSPACE_PANEL_STYLE}
                 tabIndex={-1}
               >
+                <h2 className="visually-hidden" id={EDIT_WORKSPACE.navId}>{EDIT_WORKSPACE.label}</h2>
                 <TimelineEditor editor={editor} />
               </section>
               <section
@@ -140,6 +129,7 @@ export function App(): ReactElement {
                 style={APP_WORKSPACE_PANEL_STYLE}
                 tabIndex={-1}
               >
+                <h2 className="visually-hidden" id={VOICE_GENERATION_WORKSPACE.navId}>{VOICE_GENERATION_WORKSPACE.label}</h2>
                 <NarrationPanel />
               </section>
               <section
@@ -151,6 +141,7 @@ export function App(): ReactElement {
                 style={APP_WORKSPACE_PANEL_STYLE}
                 tabIndex={-1}
               >
+                <h2 className="visually-hidden" id={VIDEO_GENERATION_WORKSPACE.navId}>{VIDEO_GENERATION_WORKSPACE.label}</h2>
                 <VideoGenerationWorkspace />
               </section>
             </div>

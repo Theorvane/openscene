@@ -282,6 +282,16 @@ button {
   display: none !important;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .app-shell {
   position: relative;
   display: grid;
@@ -301,6 +311,7 @@ button {
 
 .app-shell__body {
   display: flex;
+  align-items: stretch;
   min-height: 0;
   gap: var(--space-2);
 }
@@ -417,6 +428,13 @@ button {
   min-height: 0;
 }
 
+.app-workspace-panel-stack {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 .app-page-stack {
   display: grid;
   min-width: 0;
@@ -437,7 +455,7 @@ button {
 }
 
 .app-page:focus-visible,
-.local-edit-bay > :last-child > [role="region"]:focus-visible {
+.app-workspace-panel-stack > [role="region"]:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
   box-shadow: inset 0 0 0 4px var(--focus-shadow);
@@ -584,161 +602,7 @@ button {
   min-height: 0;
 }
 
-.local-edit-bay > nav[aria-label="Application workspaces"] {
-  position: sticky;
-  top: var(--space-4);
-  height: 100%;
-  overflow: auto;
-  align-self: stretch;
-}
-
-.workspace-nav {
-  display: grid;
-  align-content: start;
-  gap: var(--space-2);
-  min-height: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--editor-glass-border);
-  border-radius: var(--radius-lg);
-  background:
-    linear-gradient(160deg, color-mix(in srgb, var(--card) 72%, transparent), var(--editor-glass)),
-    var(--editor-glass);
-  box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(18px) saturate(1.2);
-}
-
-.workspace-nav__header {
-  display: grid;
-  gap: var(--space-1);
-  padding: 0 var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--line-subtle);
-}
-
-.workspace-nav__meta,
-.workspace-nav-item__status {
-  color: var(--color-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-caption);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.workspace-nav-item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  justify-items: stretch;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--control-min-height);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--color-muted);
-  background: transparent;
-  box-shadow: none;
-  text-align: left;
-}
-
-.workspace-nav-item::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: transparent;
-}
-
-.workspace-nav-item:hover:not(:disabled),
-.workspace-nav-item:focus-visible {
-  border-color: var(--border);
-  color: var(--color-text);
-  background: var(--secondary);
-}
-
-.workspace-nav-item--active,
-.workspace-nav-item--active:hover:not(:disabled),
-.workspace-nav-item--active:focus-visible {
-  border-color: var(--ring);
-  color: var(--primary-foreground);
-  background: var(--editor-gradient-accent);
-  box-shadow: var(--shadow-control);
-}
-
-.workspace-nav-item--active::before {
-  background: var(--accent);
-}
-
-.workspace-nav-item--active .workspace-nav-item__status {
-  color: color-mix(in srgb, var(--primary-foreground) 80%, transparent);
-}
-
-.workspace-nav-item__icon {
-  display: grid;
-  place-items: center;
-  width: var(--space-6);
-  height: var(--space-6);
-  border: 1px solid currentColor;
-  border-radius: var(--radius-xs);
-  color: inherit;
-  background: color-mix(in srgb, var(--foreground) 5%, transparent);
-  opacity: 0.76;
-}
-
-.workspace-nav-item--active .workspace-nav-item__icon {
-  background: color-mix(in srgb, var(--primary-foreground) 12%, transparent);
-  opacity: 1;
-}
-
-.workspace-nav-item__svg {
-  width: var(--space-5);
-  height: var(--space-5);
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.7;
-}
-
-.workspace-nav-item__text {
-  display: grid;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.workspace-nav-item__label {
-  overflow: hidden;
-  color: color-mix(in srgb, var(--foreground) 78%, var(--muted-foreground));
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workspace-nav-item--active .workspace-nav-item__label {
-  color: var(--primary-foreground);
-}
-
-.workspace-nav-item__marker {
-  align-self: center;
-  padding: calc(var(--space-1) * 0.5) var(--space-2);
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  letter-spacing: 0.08em;
-  line-height: 1;
-  background: color-mix(in srgb, var(--primary-foreground) 10%, transparent);
-  text-transform: uppercase;
-}
-
-.local-edit-bay > :last-child {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-.local-edit-bay > :last-child > [role="region"] {
+.app-workspace-panel-stack > [role="region"] {
   min-width: 0;
   min-height: 0;
   outline: none;
@@ -2814,6 +2678,7 @@ button {
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
 }
@@ -2848,10 +2713,29 @@ button {
   white-space: nowrap;
 }
 
+.agent-chat-resize-splitter {
+  align-self: stretch;
+  min-width: var(--space-2);
+  border: 1px solid var(--line-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ring) 16%, transparent);
+  cursor: col-resize;
+}
+
+.agent-chat-resize-splitter:hover,
+.agent-chat-resize-splitter:focus-visible {
+  border-color: var(--ring);
+  background: color-mix(in srgb, var(--ring) 26%, transparent);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--focus-shadow);
+}
+
 .agent-chat-panel-shell {
   display: flex;
-  width: 360px;
+  width: var(--agent-chat-panel-width);
   min-width: 300px;
+  max-width: 520px;
   flex-shrink: 0;
   min-height: 0;
 }
@@ -2859,8 +2743,9 @@ button {
 .agent-chat-panel {
   display: flex;
   flex-direction: column;
-  width: 360px;
+  width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   border: 1px solid var(--editor-glass-border);
   border-radius: var(--radius-md);

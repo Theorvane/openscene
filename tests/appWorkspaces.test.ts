@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { APP_PAGE_BY_ID, APP_PAGE_IDS, APP_PAGES, getDefaultAppPageId, isWorkspacePageId } from '../src/renderer/src/appPages';
-import {
-  APP_WORKSPACE_IDS,
-  APP_WORKSPACES,
-  getDefaultAppWorkspaceId,
-  getNextAppWorkspaceId
-} from '../src/renderer/src/appWorkspaces';
+import { APP_WORKSPACE_IDS, APP_WORKSPACES, getDefaultAppWorkspaceId } from '../src/renderer/src/appWorkspaces';
 
 describe('app workspaces', () => {
   it('returns a stable three-workspace model without Settings or Prompt Studio', () => {
@@ -27,17 +22,6 @@ describe('app workspaces', () => {
       'app-workspace-panel-video-generation'
     ]);
     expect(workspaces.map((workspace) => workspace.statusLabel)).toEqual(['Local timeline', 'Local narration', 'Result studio']);
-  });
-
-  it('moves focus across the three workspaces with ArrowUp, ArrowDown, Home, and End wrap', () => {
-    expect(getNextAppWorkspaceId({ currentWorkspaceId: 'edit', key: 'ArrowDown' })).toBe('voice-generation');
-    expect(getNextAppWorkspaceId({ currentWorkspaceId: 'voice-generation', key: 'ArrowDown' })).toBe('video-generation');
-    expect(getNextAppWorkspaceId({ currentWorkspaceId: 'video-generation', key: 'ArrowDown' })).toBe('edit');
-    expect(getNextAppWorkspaceId({ currentWorkspaceId: 'edit', key: 'ArrowUp' })).toBe('video-generation');
-    expect(getNextAppWorkspaceId({ currentWorkspaceId: 'video-generation', key: 'ArrowUp' })).toBe('voice-generation');
-    expect(getNextAppWorkspaceId({ currentWorkspaceId: 'voice-generation', key: 'ArrowUp' })).toBe('edit');
-    expect(getNextAppWorkspaceId({ currentWorkspaceId: 'video-generation', key: 'Home' })).toBe('edit');
-    expect(getNextAppWorkspaceId({ currentWorkspaceId: 'edit', key: 'End' })).toBe('video-generation');
   });
 
   it('returns a stable page model with Home as the initial page and Settings outside workspaces', () => {

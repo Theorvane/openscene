@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 const APP_SOURCE_URL = new URL('../src/renderer/src/App.tsx', import.meta.url);
 const APP_SHELL_SOURCE_URL = new URL('../src/renderer/src/AppShell.tsx', import.meta.url);
 const HOME_PAGE_SOURCE_URL = new URL('../src/renderer/src/HomePage.tsx', import.meta.url);
-const NAV_SOURCE_URL = new URL('../src/renderer/src/AppWorkspaceNavigation.tsx', import.meta.url);
 
 async function readSource(url: URL): Promise<string> {
   return readFile(url, 'utf8');
@@ -24,15 +23,28 @@ describe('app page shell source contract', () => {
   });
 
   it('opens Home and Settings from product chrome instead of workspace navigation', async () => {
-    const [appShell, navigation] = await Promise.all([readSource(APP_SHELL_SOURCE_URL), readSource(NAV_SOURCE_URL)]);
+    const [app, appShell] = await Promise.all([readSource(APP_SOURCE_URL), readSource(APP_SHELL_SOURCE_URL)]);
 
     expect(appShell).toContain('onPageChange: (pageId: AppPageId) => void;');
     expect(appShell).toContain('aria-controls="app-page-panel-home"');
     expect(appShell).toContain("onClick={() => onPageChange('home')}");
     expect(appShell).toContain('aria-controls="app-page-panel-settings"');
     expect(appShell).toContain("onClick={() => onPageChange('settings')}");
-    expect(navigation).not.toContain('settings');
-    expect(navigation).not.toContain('SettingsGearIcon');
+    expect(app).not.toContain('AppWorkspaceNavigation');
+    expect(app).not.toContain('aria-label="Application workspaces"');
+  });
+
+  it('keeps mounted workspace panels directly labeled after removing the sidebar', async () => {
+    const app = await readSource(APP_SOURCE_URL);
+
+    expect(app).toContain('className="app-workspace-panel-stack"');
+    expect(app).toContain('className="visually-hidden"');
+    expect(app).toContain('id={EDIT_WORKSPACE.navId}');
+    expect(app).toContain('id={VOICE_GENERATION_WORKSPACE.navId}');
+    expect(app).toContain('id={VIDEO_GENERATION_WORKSPACE.navId}');
+    expect(app).toContain('{EDIT_WORKSPACE.label}');
+    expect(app).toContain('{VOICE_GENERATION_WORKSPACE.label}');
+    expect(app).toContain('{VIDEO_GENERATION_WORKSPACE.label}');
   });
 
   it('renders Home entry cards in the requested workspace order with accessible controls', async () => {
