@@ -188,6 +188,73 @@ export class OpenVideoMcpServer {
   }
 
   @McpTool({
+    description: 'Trim an existing timeline clip to a validated source range. This changes a saved project and requires explicit user approval.',
+    input: z.object({
+      projectId: z.string().min(1),
+      clipId: z.string().min(1),
+      sourceStartMs: z.number().finite().min(0),
+      sourceEndMs: z.number().finite().min(0)
+    })
+  })
+  async trimTimelineClip(params: {
+    projectId: string;
+    clipId: string;
+    sourceStartMs: number;
+    sourceEndMs: number;
+  }) {
+    if (!this.projectStore) {
+      return { success: false, error: 'ProjectStore service is not available.' };
+    }
+    if (params.sourceEndMs <= params.sourceStartMs) {
+      return { success: false, error: 'sourceEndMs must be greater than sourceStartMs.' };
+    }
+
+    try {
+      const project = await this.projectStore.open(params.projectId);
+      if (!project) {
+        return { success: false, error: `Project ${params.projectId} not found.` };
+      }
+
+      let found = false;
+      let rangeError: string | undefined;
+      const tracks: TimelineTrack[] = project.timeline.tracks.map((track) => ({
+        ...track,
+        clips: track.clips.map((clip) => {
+          if (clip.id !== params.clipId) return clip;
+          found = true;
+          if (params.sourceEndMs > clip.sourceDurationMs) {
+            rangeError = `Trim range exceeds source duration for clip ${params.clipId}.`;
+            return clip;
+          }
+          return { ...clip, sourceStartMs: params.sourceStartMs, sourceEndMs: params.sourceEndMs };
+        })
+      }));
+
+      if (!found) {
+        return { success: false, error: `Clip ${params.clipId} not found in project ${params.projectId}.` };
+      }
+      if (rangeError !== undefined) {
+        return { success: false, error: rangeError };
+      }
+
+      await this.projectStore.saveTimeline(params.projectId, { ...project.timeline, tracks });
+      return {
+        success: true,
+        projectId: params.projectId,
+        clipId: params.clipId,
+        sourceStartMs: params.sourceStartMs,
+        sourceEndMs: params.sourceEndMs,
+        message: `Trimmed clip ${params.clipId} in project ${params.projectId}`
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : `Failed to trim clip ${params.clipId}`
+      };
+    }
+  }
+
+  @McpTool({
     description: 'Add a video or audio clip to a specific project timeline track.',
     input: z.object({
       projectId: z.string().min(1),
@@ -314,7 +381,7 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'getProjectTimeline', 'addClipToTimeline', 'exportProjectVideo']
+      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'getProjectTimeline', 'trimTimelineClip', 'addClipToTimeline', 'exportProjectVideo']
     };
   }
 }
