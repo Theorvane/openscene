@@ -1,16 +1,14 @@
-export const APP_WORKSPACE_IDS = ['prompt-studio', 'edit', 'video-generation', 'voice-generation', 'settings'] as const;
-const APP_WORKSPACE_FIRST_ID: AppWorkspaceId = 'prompt-studio';
+export const APP_WORKSPACE_IDS = ['edit', 'video-generation', 'voice-generation', 'settings'] as const;
+const APP_WORKSPACE_FIRST_ID: AppWorkspaceId = 'edit';
 const APP_WORKSPACE_LAST_ID: AppWorkspaceId = 'settings';
 const APP_WORKSPACE_NEXT_IDS: Record<AppWorkspaceId, AppWorkspaceId> = {
-  'prompt-studio': 'edit',
   edit: 'video-generation',
   'video-generation': 'voice-generation',
   'voice-generation': 'settings',
-  settings: 'prompt-studio'
+  settings: 'edit'
 };
 const APP_WORKSPACE_PREVIOUS_IDS: Record<AppWorkspaceId, AppWorkspaceId> = {
-  'prompt-studio': 'settings',
-  edit: 'prompt-studio',
+  edit: 'settings',
   'video-generation': 'edit',
   'voice-generation': 'video-generation',
   settings: 'voice-generation'
@@ -29,13 +27,6 @@ export type AppWorkspace = {
 };
 
 export const APP_WORKSPACES = [
-  {
-    id: 'prompt-studio',
-    label: 'Prompt Studio',
-    navId: 'app-workspace-nav-prompt-studio',
-    panelId: 'app-workspace-panel-prompt-studio',
-    statusLabel: 'Prompt to video'
-  },
   {
     id: 'edit',
     label: 'Edit Timeline',

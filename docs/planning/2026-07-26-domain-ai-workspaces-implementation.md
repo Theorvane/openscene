@@ -202,12 +202,11 @@ git commit -m "feat(ai): validate model selections for generation jobs"
 **Files:**
 - Modify: `src/renderer/src/NarrationPanel.tsx`
 - Modify: `src/renderer/src/VideoGenerationWorkspace.tsx`
-- Modify: `src/renderer/src/PromptStudioWorkspace.tsx`
 - Test: `tests/domainStudioSource.test.ts`
 
 **Step 1: Write failing source contracts**
 
-Assert Voice Studio uses `AiDomainModelSelector domain="voice-generation"`, Video/Prompt Studio use `domain="video-generation"`, generation calls include selected safe `modelId/provider`, and no longer render `LlmModelSelectorBar`.
+Assert Voice Studio uses `AiDomainModelSelector domain="voice-generation"`, Video Studio uses `domain="video-generation"`, generation calls include selected safe `modelId/provider`, and no longer render `LlmModelSelectorBar`.
 
 **Step 2: Run RED**
 
@@ -217,18 +216,18 @@ Expected: FAIL because studios still use the global selector or omit model IDs.
 
 **Step 3: Implement minimal wiring**
 
-Use `useAiDomainModel` and `AiDomainModelSelector` in both studios. Preserve all existing profile consent, import, polling, status, and cleanup behavior. Do not expose API keys in component state for unavailable providers.
+Use `useAiDomainModel` and `AiDomainModelSelector` in Voice Studio and Video Studio. Preserve all existing profile consent, import, polling, status, and cleanup behavior. Do not expose API keys in component state for unavailable providers.
 
 **Step 4: Run GREEN**
 
-Run: `npm test -- --run tests/domainStudioSource.test.ts tests/promptStudioSource.test.ts && npm run typecheck`
+Run: `npm test -- --run tests/domainStudioSource.test.ts && npm run typecheck`
 
 Expected: PASS.
 
 **Step 5: Commit**
 
 ```bash
-git add src/renderer/src/NarrationPanel.tsx src/renderer/src/VideoGenerationWorkspace.tsx src/renderer/src/PromptStudioWorkspace.tsx tests/domainStudioSource.test.ts
+git add src/renderer/src/NarrationPanel.tsx src/renderer/src/VideoGenerationWorkspace.tsx tests/domainStudioSource.test.ts
 git commit -m "feat(ai): use domain models in generation studios"
 ```
 
