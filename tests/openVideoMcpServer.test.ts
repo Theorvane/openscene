@@ -32,6 +32,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     expect(toolNames).toContain('getJobStatus');
     expect(toolNames).toContain('getProjectTimeline');
     expect(toolNames).toContain('trimTimelineClip');
+    expect(toolNames).toContain('updateClipEffects');
     expect(toolNames).toContain('addClipToTimeline');
     expect(toolNames).toContain('exportProjectVideo');
   });
@@ -174,6 +175,30 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     const reloaded = await projectStore.open(project.id);
     const clip = reloaded?.timeline.tracks.find((track) => track.id === trackId)?.clips[0];
     expect(clip).toMatchObject({ id: clipId, sourceStartMs: 1_000, sourceEndMs: 5_000 });
+  });
+
+  it('updates only requested bounded effects on an existing clip', async () => {
+    const server = new OpenVideoMcpServer();
+    server.setServices(projectStore);
+    const project = await projectStore.create({ name: 'Effect-safe project' });
+    const nowIso = new Date('2026-07-27T01:00:00.000Z').toISOString();
+    const asset: MediaAsset = {
+      id: 'asset-effects-source', displayName: 'effects.mp4', projectRelativePath: 'assets/asset-effects-source/original.mp4',
+      kind: 'video', mimeType: 'video/mp4', byteLength: 1024, createdAt: nowIso, updatedAt: nowIso,
+      metadata: { durationMs: 10_000, width: 1920, height: 1080 }
+    };
+    await projectStore.registerAsset(project.id, asset);
+    const trackId = project.timeline.tracks[0]!.id;
+    const added = await server.addClipToTimeline({ projectId: project.id, trackId, assetId: asset.id, startOffsetSeconds: 0, durationSeconds: 5 });
+    const clipId = (added as { clipId: string }).clipId;
+
+    const rejected = await server.updateClipEffects({ projectId: project.id, clipId, effects: { opacity: 2 } });
+    expect(rejected).toMatchObject({ success: false, error: expect.stringContaining('opacity') });
+
+    const updated = await server.updateClipEffects({ projectId: project.id, clipId, effects: { opacity: 0.5, scale: 1.25 } });
+    expect(updated).toMatchObject({ success: true, clipId, effects: { opacity: 0.5, scale: 1.25 } });
+    const clip = (await projectStore.open(project.id))?.timeline.tracks.find((track) => track.id === trackId)?.clips[0];
+    expect(clip?.effects).toMatchObject({ opacity: 0.5, scale: 1.25, volume: 1 });
   });
 
   it('fails addClipToTimeline when ProjectStore service is missing or project/track/asset is not found', async () => {

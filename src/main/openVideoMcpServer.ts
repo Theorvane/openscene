@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getMcpServerDefinition, McpResource, McpServer, McpTool } from '@theorvane/type-mcp';
 import { z } from 'zod';
-import { DEFAULT_CLIP_EFFECTS, type TimelineTrack } from '../shared/timelineTypes';
+import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, type ClipEffects, type TimelineTrack } from '../shared/timelineTypes';
 import type { ExportIpcService } from './exportIpcService';
 import type { ProjectStore } from './projectStore';
 import {
@@ -255,6 +255,51 @@ export class OpenVideoMcpServer {
   }
 
   @McpTool({
+    description: 'Update validated basic effects on one timeline clip. This changes a saved project and requires explicit user approval.',
+    input: z.object({
+      projectId: z.string().min(1),
+      clipId: z.string().min(1),
+      effects: z.object({
+        opacity: z.number().finite().min(CLIP_EFFECT_RANGES.opacity.min).max(CLIP_EFFECT_RANGES.opacity.max).optional(),
+        scale: z.number().finite().min(CLIP_EFFECT_RANGES.scale.min).max(CLIP_EFFECT_RANGES.scale.max).optional(),
+        positionX: z.number().finite().min(CLIP_EFFECT_RANGES.positionX.min).max(CLIP_EFFECT_RANGES.positionX.max).optional(),
+        positionY: z.number().finite().min(CLIP_EFFECT_RANGES.positionY.min).max(CLIP_EFFECT_RANGES.positionY.max).optional(),
+        rotation: z.number().finite().min(CLIP_EFFECT_RANGES.rotation.min).max(CLIP_EFFECT_RANGES.rotation.max).optional(),
+        volume: z.number().finite().min(CLIP_EFFECT_RANGES.volume.min).max(CLIP_EFFECT_RANGES.volume.max).optional()
+      }).refine((effects) => Object.keys(effects).length > 0, 'At least one effect must be provided.')
+    })
+  })
+  async updateClipEffects(params: { projectId: string; clipId: string; effects: Partial<ClipEffects> }) {
+    if (!this.projectStore) return { success: false, error: 'ProjectStore service is not available.' };
+    const entries = Object.entries(params.effects) as readonly [keyof ClipEffects, number][];
+    if (entries.length === 0) return { success: false, error: 'At least one effect must be provided.' };
+    for (const [property, value] of entries) {
+      const range = CLIP_EFFECT_RANGES[property];
+      if (!Number.isFinite(value) || value < range.min || value > range.max) {
+        return { success: false, error: `${property} must be between ${range.min} and ${range.max}.` };
+      }
+    }
+    try {
+      const project = await this.projectStore.open(params.projectId);
+      if (!project) return { success: false, error: `Project ${params.projectId} not found.` };
+      let found = false;
+      const tracks: TimelineTrack[] = project.timeline.tracks.map((track) => ({
+        ...track,
+        clips: track.clips.map((clip) => {
+          if (clip.id !== params.clipId) return clip;
+          found = true;
+          return { ...clip, effects: { ...(clip.effects ?? DEFAULT_CLIP_EFFECTS), ...params.effects } };
+        })
+      }));
+      if (!found) return { success: false, error: `Clip ${params.clipId} not found in project ${params.projectId}.` };
+      await this.projectStore.saveTimeline(params.projectId, { ...project.timeline, tracks });
+      return { success: true, projectId: params.projectId, clipId: params.clipId, effects: params.effects };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : `Failed to update effects for clip ${params.clipId}` };
+    }
+  }
+
+  @McpTool({
     description: 'Add a video or audio clip to a specific project timeline track.',
     input: z.object({
       projectId: z.string().min(1),
@@ -381,7 +426,7 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'getProjectTimeline', 'trimTimelineClip', 'addClipToTimeline', 'exportProjectVideo']
+      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'getProjectTimeline', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'exportProjectVideo']
     };
   }
 }

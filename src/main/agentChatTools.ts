@@ -12,6 +12,7 @@ export const AGENT_CHAT_MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
   'createVideoJob',
   'createSpeechJob',
   'trimTimelineClip',
+  'updateClipEffects',
   'addClipToTimeline',
   'exportProjectVideo'
 ]);
