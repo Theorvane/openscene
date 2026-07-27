@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const APP_SOURCE_URL = new URL('../src/renderer/src/App.tsx', import.meta.url);
 const APP_SHELL_SOURCE_URL = new URL('../src/renderer/src/AppShell.tsx', import.meta.url);
 const HOME_PAGE_SOURCE_URL = new URL('../src/renderer/src/HomePage.tsx', import.meta.url);
+const DESIGN_SOURCE_URL = new URL('../DESIGN.md', import.meta.url);
 
 async function readSource(url: URL): Promise<string> {
   return readFile(url, 'utf8');
@@ -55,5 +56,14 @@ describe('app page shell source contract', () => {
     expect(homePage).toContain('className="home-card"');
     expect(homePage).toContain('aria-controls={workspace.panelId}');
     expect(homePage).toContain('onClick={() => onWorkspaceOpen(workspace.id)}');
+  });
+
+  it('documents Home cards as the only workspace entry surface after sidebar removal', async () => {
+    const design = await readSource(DESIGN_SOURCE_URL);
+
+    expect(design).toContain('do not reintroduce a left workspace sidebar');
+    expect(design).toContain('Home entry cards are the workspace navigation');
+    expect(design).not.toContain('a left sidebar for workspace navigation');
+    expect(design).not.toContain('Application workspace switching belongs to `AppWorkspaceNavigation`');
   });
 });

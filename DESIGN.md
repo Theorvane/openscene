@@ -4,7 +4,7 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 
 ## Core Principles
 
-- Treat Home as the initial page. Editing, Voice Generation, and Video Generation are persistent local workspaces opened from Home or the left workspace navigation.
+- Treat Home as the initial page. Editing, Voice Generation, and Video Generation are persistent local workspaces opened from Home.
 - Keep every renderer claim local. Projects, recordings, imports, voice samples, and timeline edits stay on the user's machine.
 - Never expose raw local filesystem paths in renderer UI for imported timeline assets. Show names, durations, media kind, status, and secure playback URLs only when playback needs them.
 - Use dense but readable panels with mono section kickers, serif titles, clear control labels, and compact metadata.
@@ -16,21 +16,19 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 - The persistent right `AgentChatPanel` is the only user-facing Edit Agent UI. It is always the rightmost flex child beside the mounted workspace stack and owns Edit Agent model/connection status, selected and attached project context, conversation and tool stream, approval queue, reset/status, and prompt controls.
 - Do not render a global agent model selector in `product-chrome`, add a separate `EditAgentWorkspace`, or move Edit Agent controls into the left workspace navigation. Direct AI Video and AI Voice studios keep their own domain-specific controls, and Settings keeps provider credentials and primary model configuration separate from the Edit Agent chat surface.
 - `app-page-stack` owns top-level page visibility for Home, mounted workspaces, and Settings. Active page state is separate from active workspace state.
-- `local-edit-bay` owns the application workspace grid while a workspace page is active: a left sidebar for workspace navigation and a single active workspace panel on the right.
+- `local-edit-bay` owns the active workspace panel while a workspace page is active. The panel fills the space between product chrome and the persistent right AgentChatPanel; do not reintroduce a left workspace sidebar.
 - Workspace panels for Editing, Voice Generation, and Video Generation stay mounted while inactive. Hide inactive panels with the platform `hidden` state rather than unmounting them, so video generation jobs, sample capture, local TTS job state, and timeline editor state survive navigation.
 - Settings is a top-level page opened from product chrome, not a workspace navigation item. Home is a top-level page with entry cards for Editing, Voice Generation, and Video Generation in that order.
-- The left sidebar navigation is labeled `Application workspaces` and lists exactly `Editing`, `Voice Generation`, and `Video Generation`. It is navigation, not dock tabs and not a collapsed disclosure group. MP4 export lives inside the Editing workspace because it acts on the saved local timeline.
+- Home is the direct workspace chooser and lists `Editing`, `Voice Generation`, and `Video Generation` as entry cards. MP4 export lives inside the Editing workspace because it acts on the saved local timeline.
 - `editor-workspace--nle` uses a desktop NLE grid: tabbed project/media dock on the left, persistent program monitor in the center, tabbed inspector on the right, and persistent timeline across the bottom. Timeline commands are routed through the native application menu, not an in-workspace command bar.
 - Project/media dock tabs and inspector tabs exist only inside the Edit workspace. Never use those tabs for switching to Screen Recording or Voice Generation, and never tab the monitor or timeline.
 - On narrow screens, preserve the same order in a single column: program monitor, timeline, project/media dock tabs, inspector tabs.
 
-## Workspace Navigation
+## Workspace Entry
 
-- The left workspace navigation uses button items because each item switches mounted local application regions in place. Keep every item full width, left aligned, and labeled with a small original inline SVG icon, workspace name, and short static `Local` status label.
-- Status labels are fixed product labels, not live progress text: `Local` is sufficient in the navigation and product chrome. Live recording, sample, TTS, save, or error status stays inside the active workspace panel.
-- The active workspace item uses the primary button tone, `aria-current="page"`, `aria-controls` for its panel, and visible compact `Current` text. Do not rely on color or fill alone to show the active workspace.
-- Keyboard support wraps vertically through enabled workspace items with Arrow Up and Arrow Down. Home moves to Editing, End moves to Video Generation.
-- When users activate a different workspace, focus moves to the newly active region. When they activate the already current workspace, focus returns to that region.
+- Home entry cards are the workspace navigation. Each card uses a full native `Button`, original inline SVG icon, visible workspace label, static local status label, and `aria-controls` for its mounted panel.
+- Status labels are fixed product labels, not live progress text. Live recording, sample, TTS, save, or error status stays inside the active workspace panel.
+- When users activate a workspace card, focus moves to the newly active region. Product chrome Home returns focus to the Home page region when it is already active.
 
 ## Home And Settings Pages
 
@@ -89,7 +87,7 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 - `Button` variants are limited to default, primary, record, stop, and ghost. Add new variants only when a repeated local workflow needs a distinct semantic tone.
 - `MetadataList` is for compact term and value facts. Use it for project, asset, clip, runtime, and result metadata rather than ad hoc grids.
 - `StatusCard` is for user visible status with success, warning, danger, or default tone. Do not hide busy, warning, or error states in copy outside the visible card.
-- `Tabs` and `TabPanel` are the only tab primitives. Use them for Edit workspace dock scoped navigation, not for major workspace regions. Application workspace switching belongs to `AppWorkspaceNavigation`.
+- `Tabs` and `TabPanel` are the only tab primitives. Use them for Edit workspace dock scoped navigation, not for major workspace regions. Application workspace switching belongs to Home entry cards.
 
 ## Theme System
 
@@ -103,10 +101,10 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 
 - Keep the product direction original, restrained, and local first. The refinement may borrow from generic public design principles such as hierarchy, rhythm, contrast, and editorial spacing, but it must not borrow third party brand expression.
 - Preserve OpenVideo as an expressive light and dark desktop NLE with restrained enterprise editorial color. Do not change the product into a cloud editor, provider console, marketing dashboard, or generative media suite.
-- Strengthen hierarchy through scale, weight, placement, and concise labels. Program monitor, timeline, dock tabs, inspector tabs, and workspace navigation should each have one clear job and a visible reading order.
+- Strengthen hierarchy through scale, weight, placement, and concise labels. Program monitor, timeline, dock tabs, inspector tabs, and Home workspace entry cards should each have one clear job and a visible reading order.
 - Use measured whitespace, not empty decoration. Give the monitor and timeline enough breathing room to feel primary, keep command clusters tight, and separate dock, inspector, and status content with consistent gaps.
 - Build surface depth with semantic theme tokens only. Bright light surfaces may carry white glass, lilac grid texture, lavender hairline borders, soft shadows, opacity changes, and subtle hatch patterns, while dark surfaces remain cool and readable without reducing NLE contrast.
-- Keep navigation clarity accessible. Workspace buttons need visible labels, static `Local` status, `Current` text, `aria-current`, `aria-controls`, keyboard wrapping, and focus movement to the active mounted region.
+- Keep navigation clarity accessible. Home workspace entry cards need visible labels, static local status, `aria-controls`, and focus movement to the active mounted region.
 - Preserve mounted workspace state retention. Visual refinements must keep inactive Editing, Voice Generation, and Video Generation regions hidden rather than unmounted.
 - Keep compact controls and focus treatment intact. Shortcut map controls stay dense, tabs stay compact, and the 2px focus outline with 2px offset and 4px halo remains visible in both themes.
 - Respect reduced motion. Any hover lift, reveal, or panel transition must stay short and must not override `prefers-reduced-motion`.
@@ -124,15 +122,15 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 
 - Titles use the serif display stack. Controls use the body stack. Metadata, section kickers, timers, command labels, media badges, tab labels, and theme switch text use monospace.
 - Status semantics stay restrained: default is muted slate, success is green, warning or busy is amber, and danger or destructive states are red. Use these only for state, not decoration.
-- Application workspace navigation icons are decorative inline SVGs with `aria-hidden="true"`; accessible names come from visible labels and existing button semantics, not from icon-only controls.
+- Home workspace entry icons are decorative inline SVGs with `aria-hidden="true"`; accessible names come from visible labels and existing button semantics, not from icon-only controls.
 - Video clips and media badges use solid semantic borders with angled hatch labels. Audio uses dashed borders and a different stripe direction. Both must keep visible `Video` or `Audio` text, and media kind must not depend on hue alone.
 - Controls should feel tactile with small hover lift and border changes. Respect `prefers-reduced-motion` and keep transitions short.
 - Compact controls use the 36px minimum. Default controls use the 42px minimum where space allows. Tabs are compact dashed pills until selected, then solid semantic selected pills with an `Active` marker.
 
 ## Accessibility Rules
 
-- Preserve semantic regions and labels: `product-chrome`, `Home`, `Settings`, `Application workspaces`, `Project and media`, `Timeline editor`, inspector, Voice Generation, and Video Generation. Timeline commands are available through the native menu bridge rather than as a renderer toolbar landmark.
-- Keep keyboard focus visible with the semantic focus ring on workspace navigation buttons, workspace regions, buttons, cards, timeline lanes, clips, inputs, and dock tabs. The implemented rule is a 2px `--focus-ring` outline, 2px offset, and 4px `--focus-shadow` halo.
+- Preserve semantic regions and labels: `product-chrome`, `Home`, `Settings`, `OpenVideo workspaces`, `Project and media`, `Timeline editor`, inspector, Voice Generation, and Video Generation. Timeline commands are available through the native menu bridge rather than as a renderer toolbar landmark.
+- Keep keyboard focus visible with the semantic focus ring on Home workspace cards, workspace regions, buttons, timeline lanes, clips, inputs, and dock tabs. The implemented rule is a 2px `--focus-ring` outline, 2px offset, and 4px `--focus-shadow` halo.
 - Maintain 42px default control height where space allows. Compact shortcut map buttons may be 36px because the customization grid is dense.
 - Do not rely on color alone. Pair tones with labels such as video, audio, selected, saved, and metadata status, plus border or pattern changes where media kind differs.
 - Dock and inspector tabs inside the Edit workspace must use the ARIA tab contract: `role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`, `aria-controls`, and `aria-labelledby`.
