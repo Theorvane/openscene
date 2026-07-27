@@ -1,10 +1,15 @@
 import { useEffect, useRef, type FormEvent, type ReactElement } from 'react';
 
+import type { EditAgentContextAsset } from '../../shared/editAgentContext';
 import { useAgentChat } from './AgentChatContext';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { Button } from './ui';
 
-export function AgentChatPanel(): ReactElement {
+type AgentChatPanelProps = {
+  readonly selectedContextAsset: EditAgentContextAsset | null;
+};
+
+export function AgentChatPanel({ selectedContextAsset }: AgentChatPanelProps): ReactElement {
   const {
     selectedModel,
     isLocalModel,
@@ -16,6 +21,7 @@ export function AgentChatPanel(): ReactElement {
     error,
     isBusy,
     contextAssets,
+    attachContextAsset,
     removeContextAsset,
     sendMessage,
     respondToApproval,
@@ -33,6 +39,14 @@ export function AgentChatPanel(): ReactElement {
     void sendMessage(input);
   };
 
+  const attachSelectedContextAsset = (): void => {
+    if (selectedContextAsset === null) return;
+    attachContextAsset(selectedContextAsset);
+  };
+
+  const selectedContextIsAttached = selectedContextAsset !== null
+    && contextAssets.some((asset) => asset.projectId === selectedContextAsset.projectId && asset.assetId === selectedContextAsset.assetId);
+
   return (
     <aside className="agent-chat-panel-shell" aria-label="OpenVideo agent chat">
       <div className="agent-chat-panel">
@@ -43,7 +57,7 @@ export function AgentChatPanel(): ReactElement {
               {selectedModel.label} · {isLocalModel ? 'Local · Ollama' : 'Select an available editing model'}
             </span>
           </div>
-          <AiDomainModelSelector domain="edit-agent" label="Edit model" />
+          <AiDomainModelSelector domain="edit-agent" label="Edit model" description="Local connection for chat-controlled edits." />
           <div className="agent-chat-panel__actions">
             <Button variant="ghost" onClick={resetConversation} disabled={isBusy} title="Reset conversation" aria-label="Reset conversation">
               Reset
@@ -54,14 +68,39 @@ export function AgentChatPanel(): ReactElement {
         <div className="agent-chat-log" aria-live="polite">
           <section className="agent-chat-context" aria-label="Edit Agent asset context">
             <p className="agent-chat-context__title">Project context</p>
+            {selectedContextAsset !== null && (
+              <div className="agent-chat-context__candidate">
+                <span className="agent-chat-context__eyebrow">Selected asset</span>
+                <span className="agent-chat-context__name">{selectedContextAsset.label}</span>
+                <span className="agent-chat-context__meta">{selectedContextAsset.mediaKind}</span>
+                <Button
+                  variant="ghost"
+                  onClick={attachSelectedContextAsset}
+                  disabled={isBusy || selectedContextIsAttached}
+                  aria-label={`Attach ${selectedContextAsset.label} to Edit Agent context`}
+                >
+                  {selectedContextIsAttached ? 'Attached' : 'Attach'}
+                </Button>
+              </div>
+            )}
             {contextAssets.length === 0 ? (
               <p className="agent-chat-log__hint">Import an AI voice or video result, then add its project asset here before asking for an edit.</p>
             ) : (
               <ul className="agent-chat-context__assets">
                 {contextAssets.map((asset) => (
                   <li key={`${asset.projectId}:${asset.assetId}`}>
-                    <span>{asset.label} · {asset.mediaKind}</span>
-                    <Button variant="ghost" onClick={() => removeContextAsset(asset.projectId, asset.assetId)} disabled={isBusy}>Remove</Button>
+                    <span>
+                      <span className="agent-chat-context__name">{asset.label}</span>
+                      <span className="agent-chat-context__meta">{asset.mediaKind}</span>
+                    </span>
+                    <Button
+                      variant="ghost"
+                      onClick={() => removeContextAsset(asset.projectId, asset.assetId)}
+                      disabled={isBusy}
+                      aria-label={`Remove ${asset.label} from Edit Agent context`}
+                    >
+                      Remove
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -121,9 +160,15 @@ export function AgentChatPanel(): ReactElement {
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder={pendingApproval ? 'Respond to the approval above first...' : 'Tell OpenVideo what to do…'}
+            aria-label="Edit Agent prompt"
             disabled={isBusy || !isLocalModel || pendingApproval !== null}
           />
-          <Button type="submit" variant="primary" disabled={isBusy || !isLocalModel || pendingApproval !== null || input.trim().length === 0}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={isBusy || !isLocalModel || pendingApproval !== null || input.trim().length === 0}
+            aria-label="Send Edit Agent prompt"
+          >
             {isBusy ? 'Working…' : 'Send'}
           </Button>
         </form>

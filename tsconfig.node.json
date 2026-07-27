@@ -31,6 +31,7 @@
     "src/renderer/src/editor/programMonitorPreview.ts",
     "src/renderer/src/editor/projectAssetImportFeedback.ts",
     "src/renderer/src/editor/exportUiState.ts",
+    "src/renderer/src/appPages.ts",
     "src/renderer/src/appWorkspaces.ts",
     "src/renderer/src/theme.ts",
     "src/shared/**/*.ts",

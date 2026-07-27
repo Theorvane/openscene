@@ -57,7 +57,7 @@ export function SettingsWorkspace(): ReactElement {
     >
       {/* Settings Header */}
       <header style={{ borderBottom: '1px solid var(--border)', paddingBottom: '16px' }}>
-        <h1 style={{ fontSize: 'var(--text-hero)', fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>
+        <h1 id="settings-page-title" style={{ fontSize: 'var(--text-hero)', fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>
           Settings & Preferences
         </h1>
         <p style={{ fontSize: 'var(--text-small)', color: 'var(--muted-foreground)', margin: '4px 0 0 0' }}>

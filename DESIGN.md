@@ -4,7 +4,7 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 
 ## Core Principles
 
-- Treat the timeline editor as the default workspace. Edit, Screen Recording, and Voice Generation are persistent top level local workspaces reached through the left sidebar navigation.
+- Treat Home as the initial page. Editing, Voice Generation, and Video Generation are persistent local workspaces opened from Home or the left workspace navigation.
 - Keep every renderer claim local. Projects, recordings, imports, voice samples, and timeline edits stay on the user's machine.
 - Never expose raw local filesystem paths in renderer UI for imported timeline assets. Show names, durations, media kind, status, and secure playback URLs only when playback needs them.
 - Use dense but readable panels with mono section kickers, serif titles, clear control labels, and compact metadata.
@@ -12,10 +12,14 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 
 ## Layout Contract
 
-- `product-chrome` is a compact top bar with the current workspace, a concise `Local` indicator, and the theme switch. Do not duplicate the OpenVideo identity here; the active Edit program header owns product branding.
-- `local-edit-bay` owns the application workspace grid: a left sidebar for workspace navigation and a single active workspace panel on the right.
-- Workspace panels for Edit, Screen Recording, and Voice Generation stay mounted while inactive. Hide inactive panels with the platform `hidden` state rather than unmounting them, so recording sessions, sample capture, local TTS job state, and timeline editor state survive navigation.
-- The left sidebar navigation is labeled `Application workspaces` and lists exactly `Edit`, `Screen Recording`, and `Voice Generation`. It is navigation, not dock tabs and not a collapsed disclosure group. MP4 export lives inside the Edit workspace because it acts on the saved local timeline.
+- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Home and Settings buttons, and the theme switch. Do not duplicate the OpenVideo identity here; the active Edit program header owns product branding.
+- The persistent right `AgentChatPanel` is the only user-facing Edit Agent UI. It is always the rightmost flex child beside the mounted workspace stack and owns Edit Agent model/connection status, selected and attached project context, conversation and tool stream, approval queue, reset/status, and prompt controls.
+- Do not render a global agent model selector in `product-chrome`, add a separate `EditAgentWorkspace`, or move Edit Agent controls into the left workspace navigation. Direct AI Video and AI Voice studios keep their own domain-specific controls, and Settings keeps provider credentials and primary model configuration separate from the Edit Agent chat surface.
+- `app-page-stack` owns top-level page visibility for Home, mounted workspaces, and Settings. Active page state is separate from active workspace state.
+- `local-edit-bay` owns the application workspace grid while a workspace page is active: a left sidebar for workspace navigation and a single active workspace panel on the right.
+- Workspace panels for Editing, Voice Generation, and Video Generation stay mounted while inactive. Hide inactive panels with the platform `hidden` state rather than unmounting them, so video generation jobs, sample capture, local TTS job state, and timeline editor state survive navigation.
+- Settings is a top-level page opened from product chrome, not a workspace navigation item. Home is a top-level page with entry cards for Editing, Voice Generation, and Video Generation in that order.
+- The left sidebar navigation is labeled `Application workspaces` and lists exactly `Editing`, `Voice Generation`, and `Video Generation`. It is navigation, not dock tabs and not a collapsed disclosure group. MP4 export lives inside the Editing workspace because it acts on the saved local timeline.
 - `editor-workspace--nle` uses a desktop NLE grid: tabbed project/media dock on the left, persistent program monitor in the center, tabbed inspector on the right, and persistent timeline across the bottom. Timeline commands are routed through the native application menu, not an in-workspace command bar.
 - Project/media dock tabs and inspector tabs exist only inside the Edit workspace. Never use those tabs for switching to Screen Recording or Voice Generation, and never tab the monitor or timeline.
 - On narrow screens, preserve the same order in a single column: program monitor, timeline, project/media dock tabs, inspector tabs.
@@ -25,8 +29,16 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 - The left workspace navigation uses button items because each item switches mounted local application regions in place. Keep every item full width, left aligned, and labeled with a small original inline SVG icon, workspace name, and short static `Local` status label.
 - Status labels are fixed product labels, not live progress text: `Local` is sufficient in the navigation and product chrome. Live recording, sample, TTS, save, or error status stays inside the active workspace panel.
 - The active workspace item uses the primary button tone, `aria-current="page"`, `aria-controls` for its panel, and visible compact `Current` text. Do not rely on color or fill alone to show the active workspace.
-- Keyboard support wraps vertically through enabled workspace items with Arrow Up and Arrow Down. Home moves to Edit, End moves to Voice Generation.
+- Keyboard support wraps vertically through enabled workspace items with Arrow Up and Arrow Down. Home moves to Editing, End moves to Video Generation.
 - When users activate a different workspace, focus moves to the newly active region. When they activate the already current workspace, focus returns to that region.
+
+## Home And Settings Pages
+
+- Home is the first page after launch and uses semantic page structure with `home-page-title` labeling its region.
+- Home entry cards are native `Button` controls with `aria-controls` pointing to the mounted workspace region they open. Card order is Editing, Voice Generation, Video Generation.
+- Home copy must stay truthful to the local-first product boundary: it can describe local editing, consent-based local narration, configured provider seams, and local result import, but must not imply account, analytics, cloud upload, or bundled model/runtime setup.
+- Product chrome opens Home and Settings with native `Button` controls, visible labels, inline SVG icons, `aria-current="page"` when active, and `aria-controls` for each page region.
+- Settings owns theme preferences, provider credentials, endpoints, primary model configuration, and local AI engine preferences. It is not part of `APP_WORKSPACES` and must not appear in `AppWorkspaceNavigation`.
 
 ## Program Header And Command Surface
 
@@ -95,7 +107,7 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 - Use measured whitespace, not empty decoration. Give the monitor and timeline enough breathing room to feel primary, keep command clusters tight, and separate dock, inspector, and status content with consistent gaps.
 - Build surface depth with semantic theme tokens only. Bright light surfaces may carry white glass, lilac grid texture, lavender hairline borders, soft shadows, opacity changes, and subtle hatch patterns, while dark surfaces remain cool and readable without reducing NLE contrast.
 - Keep navigation clarity accessible. Workspace buttons need visible labels, static `Local` status, `Current` text, `aria-current`, `aria-controls`, keyboard wrapping, and focus movement to the active mounted region.
-- Preserve mounted workspace state retention. Visual refinements must keep inactive Edit, Screen Recording, and Voice Generation regions hidden rather than unmounted.
+- Preserve mounted workspace state retention. Visual refinements must keep inactive Editing, Voice Generation, and Video Generation regions hidden rather than unmounted.
 - Keep compact controls and focus treatment intact. Shortcut map controls stay dense, tabs stay compact, and the 2px focus outline with 2px offset and 4px halo remains visible in both themes.
 - Respect reduced motion. Any hover lift, reveal, or panel transition must stay short and must not override `prefers-reduced-motion`.
 - Third party brand elements are excluded: no borrowed names, color values, logos, typography, copy, layouts, gradients, or token names.
@@ -119,7 +131,7 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 
 ## Accessibility Rules
 
-- Preserve semantic regions and labels: `product-chrome`, `Application workspaces`, `Project and media`, `Timeline editor`, inspector, Screen Recording, and Voice Generation. Timeline commands are available through the native menu bridge rather than as a renderer toolbar landmark.
+- Preserve semantic regions and labels: `product-chrome`, `Home`, `Settings`, `Application workspaces`, `Project and media`, `Timeline editor`, inspector, Voice Generation, and Video Generation. Timeline commands are available through the native menu bridge rather than as a renderer toolbar landmark.
 - Keep keyboard focus visible with the semantic focus ring on workspace navigation buttons, workspace regions, buttons, cards, timeline lanes, clips, inputs, and dock tabs. The implemented rule is a 2px `--focus-ring` outline, 2px offset, and 4px `--focus-shadow` halo.
 - Maintain 42px default control height where space allows. Compact shortcut map buttons may be 36px because the customization grid is dense.
 - Do not rely on color alone. Pair tones with labels such as video, audio, selected, saved, and metadata status, plus border or pattern changes where media kind differs.
@@ -130,7 +142,7 @@ OpenVideo is a compact local editing bay with a bright technical editor theme ca
 ## Local First Constraints
 
 - No cloud upload, analytics, accounts, crash reporting, provider calls, or hidden network work may be implied by renderer copy.
-- Screen Recording and Voice Generation can import local results into the active project, but they remain local workspace regions with no cloud, account, analytics, or provider implication.
+- Voice Generation and Video Generation can import configured local results into the active project, but they remain local workspace regions with no cloud upload, account, analytics, or hidden provider implication.
 - Local Qwen narration depends on user provided local runtime configuration. The renderer must not claim bundled models or automatic model setup.
 - Local MP4 export depends on user provided FFmpeg availability through `VIDEO_TOOL_FFMPEG_PATH` or absolute `PATH` discovery. The renderer must not claim bundled FFmpeg, cloud export, multiple formats, or access to filesystem paths.
 - Provider seams for future Gemini Veo, OpenAI Sora, and ElevenLabs support are interfaces only unless implementation changes prove otherwise.

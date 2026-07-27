@@ -4,7 +4,7 @@
 
 **Goal:** Give Voice Studio, Video Studio, and the LangGraph Edit Agent independent, capability-safe model settings; allow explicitly imported generated assets to become reviewable Edit Agent context.
 
-**Architecture:** Add a shared AI domain catalog/preference module and renderer context with independent persisted non-secret choices. Thread typed voice/video selections into existing IPC job requests and preserve existing result-import behavior. Extend the existing LangGraph Agent Chat context with user-attached project asset references and render an OpenCode-style Edit Agent panel alongside the timeline; all MCP writes remain LangGraph approval-gated.
+**Architecture:** Add a shared AI domain catalog/preference module and renderer context with independent persisted non-secret choices. Thread typed voice/video selections into existing IPC job requests and preserve existing result-import behavior. Extend the existing right-side `AgentChatPanel` with user-attached project asset references, edit-agent model connection, conversation/tool stream, approval queue, and prompt; all MCP writes remain LangGraph approval-gated.
 
 **Tech Stack:** Electron, React, TypeScript, Vitest, LangGraph, LangChain, TypeMCP, safeStorage-backed credentials.
 
@@ -19,7 +19,7 @@
 | A3 | Typed generation requests include only safe `providerId` / `modelId` fields; main process rejects invalid domain/model pairs before a job starts. |
 | A4 | A completed generated result is imported into the active project before it can be attached to the edit agent. |
 | A5 | An attached asset includes safe project metadata only; never an output path, API key, or arbitrary file path. |
-| A6 | The Edit Agent presents model settings, project/asset context, transcript/tool history, and the existing approval queue without replacing direct timeline editing. |
+| A6 | The persistent right-side `AgentChatPanel` presents edit-agent model settings, safe project/asset context, transcript/tool history, the approval queue, and the prompt without replacing direct timeline editing. |
 | A7 | Project writes remain in `AGENT_CHAT_MUTATING_TOOL_NAMES`; deny/error/rejected IPC preserve project state and release the UI lock. |
 
 ## Task 1: Shared domain catalog and preference parsing
@@ -271,43 +271,41 @@ git add src/shared/editAgentContext.ts src/renderer/src/AgentChatContext.tsx src
 git commit -m "feat(agent): attach imported assets as edit context"
 ```
 
-## Task 7: OpenCode-style Edit Agent workspace
+## Task 7: Persistent right-side Edit Agent panel
 
-**Objective:** Give the editor a dedicated agent workspace while retaining the persistent agent panel and direct timeline.
+**Objective:** Consolidate edit-agent UI into the existing persistent right-side `AgentChatPanel` while retaining direct timeline editing.
 
 **Files:**
-- Create: `src/renderer/src/EditAgentWorkspace.tsx`
-- Modify: `src/renderer/src/editor/TimelineEditor.tsx`
 - Modify: `src/renderer/src/AgentChatContext.tsx`
 - Modify: `src/renderer/src/AgentChatPanel.tsx`
 - Modify: `src/renderer/src/styles.css`
-- Test: `tests/editAgentWorkspaceSource.test.ts`
+- Test: `tests/persistentAgentControlSource.test.ts`
 
 **Step 1: Write failing source/accessibility tests**
 
-Assert the editor renders `EditAgentWorkspace`, it selects `edit-agent` models only, renders attached project asset references with remove controls, reuses transcript/pending approval state, includes semantic region labels, and does not contain shell/filesystem execution affordances.
+Assert `AgentChatPanel` is the persistent right-side edit-agent surface, it selects `edit-agent` models only, renders safe attached project asset references with remove controls, reuses transcript/pending approval state, includes semantic region labels for model connection, context attachments, conversation/tool stream, approval queue, and prompt, and does not contain shell/filesystem execution affordances or arbitrary path fields.
 
 **Step 2: Run RED**
 
-Run: `npm test -- --run tests/editAgentWorkspaceSource.test.ts`
+Run: `npm test -- --run tests/persistentAgentControlSource.test.ts`
 
-Expected: FAIL because workspace is missing.
+Expected: FAIL because the right-side panel does not yet expose the consolidated edit-agent regions and safe attachment controls.
 
-**Step 3: Implement minimal workspace**
+**Step 3: Implement minimal panel consolidation**
 
-Render four regions from the spec: model/connection, context attachments, conversation/tool stream, and approval queue. Reuse existing `AgentChatContext` methods so execution semantics, busy locking, and error recovery are unchanged. Persistent side panel stays as compact universal chat; the new workspace is detailed when the editor is active.
+Render the edit-agent experience inside `AgentChatPanel`: model connection, safe context attachments, conversation/tool stream, approval queue, and prompt. Reuse existing `AgentChatContext` methods so execution semantics, busy locking, approval gating, and error recovery are unchanged. Do not add a separate `EditAgentWorkspace`, edit-timeline entry point, arbitrary shell/filesystem tools, output paths, API keys, or arbitrary file paths.
 
 **Step 4: Run GREEN**
 
-Run: `npm test -- --run tests/editAgentWorkspaceSource.test.ts tests/persistentAgentControlSource.test.ts && npm run typecheck`
+Run: `npm test -- --run tests/persistentAgentControlSource.test.ts && npm run typecheck`
 
 Expected: PASS.
 
 **Step 5: Commit**
 
 ```bash
-git add src/renderer/src/EditAgentWorkspace.tsx src/renderer/src/editor/TimelineEditor.tsx src/renderer/src/AgentChatContext.tsx src/renderer/src/AgentChatPanel.tsx src/renderer/src/styles.css tests/editAgentWorkspaceSource.test.ts
-git commit -m "feat(agent): add OpenCode-style edit workspace"
+git add src/renderer/src/AgentChatContext.tsx src/renderer/src/AgentChatPanel.tsx src/renderer/src/styles.css tests/persistentAgentControlSource.test.ts
+git commit -m "feat(agent): consolidate edit agent panel"
 ```
 
 ## Task 8: Context-aware LangGraph planning and safe tools
