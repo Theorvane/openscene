@@ -63,7 +63,6 @@ export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelPr
               {selectedModel.label} · {isLocalModel ? 'Local · Ollama' : 'Select an available editing model'}
             </span>
           </div>
-          <AiDomainModelSelector domain="edit-agent" label="Edit model" description="Local connection for chat-controlled edits." />
           <div className="agent-chat-panel__actions">
             <Button variant="ghost" onClick={resetConversation} disabled={isBusy} title="Reset conversation" aria-label="Reset conversation">
               Reset
@@ -114,7 +113,7 @@ export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelPr
           </section>
           {!isLocalModel && (
             <p className="agent-chat-log__hint">
-              Agent chat currently uses a local Ollama model. Pick a Local Engine model above to control OpenVideo with chat.
+              Agent chat currently uses a local Ollama model. Pick a Local Engine model below to control OpenVideo with chat.
             </p>
           )}
 
@@ -180,9 +179,7 @@ export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelPr
             />
             <div className="agent-chat-prompt-card__toolbar">
               <div className="agent-chat-prompt-card__meta">
-                <span className="agent-chat-prompt-card__model-tag">
-                  {isLocalModel ? '★ Qwen 2.5 Coder · Local' : 'Select Local Model'}
-                </span>
+                <AiDomainModelSelector domain="edit-agent" label="Edit model" description="Local connection for chat-controlled edits." />
               </div>
               <Button
                 type="submit"
