@@ -433,12 +433,12 @@ button {
 .app-shell {
   position: relative;
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  gap: 2px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
   height: 100vh;
   min-height: 0;
   overflow: hidden;
-  padding: var(--space-3);
+  padding: 0;
   isolation: isolate;
   background: var(--background);
 }
@@ -451,6 +451,7 @@ button {
   min-height: 0;
   gap: var(--space-2);
   overflow: hidden;
+  padding: var(--space-2);
 }
 
 .app-stack {
@@ -459,6 +460,8 @@ button {
   gap: 2px;
 }
 
+/* Window titlebar: the native frame is hidden on macOS, so this bar owns
+   window dragging. Interactive controls opt out via no-drag below. */
 .product-chrome {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, auto);
@@ -466,10 +469,28 @@ button {
   align-items: center;
   min-height: 44px;
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
   background: var(--card);
-  box-shadow: var(--shadow-control);
+  box-shadow: none;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+/* Reserve room for the macOS traffic lights inside the titlebar. */
+:root[data-platform="darwin"] .product-chrome {
+  padding-left: 84px;
+}
+
+/* Interactive clusters opt out of window dragging; the empty stretch of the
+   bar (including the flexible gap) stays draggable. */
+.product-chrome__actions {
+  -webkit-app-region: no-drag;
+}
+
+.product-chrome__context > * {
+  -webkit-app-region: no-drag;
 }
 
 .local-pill {
@@ -3396,8 +3417,8 @@ button {
   }
 
   .app-shell {
-    gap: var(--space-3);
-    padding: var(--space-3);
+    gap: 0;
+    padding: 0;
   }
 
   .product-chrome {

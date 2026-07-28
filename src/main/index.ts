@@ -117,6 +117,11 @@ function createWindow(): void {
     title: 'OpenVideo',
     backgroundColor: '#10100f',
     show: false,
+    // macOS: hide the native titlebar so the renderer's product chrome acts as
+    // the draggable top bar; traffic lights are repositioned to center in it.
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 14, y: 15 } }
+      : {}),
     webPreferences: {
       preload: resolvePreloadScriptPath(__dirname),
       contextIsolation: true,

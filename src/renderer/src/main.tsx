@@ -15,6 +15,10 @@ if (rootElement === null) {
 
 bootstrapRendererTheme();
 
+// Platform flag for titlebar layout: macOS reserves room for the traffic lights
+// inside the product chrome when the native titlebar is hidden.
+document.documentElement.dataset.platform = navigator.platform.toLowerCase().includes('mac') ? 'darwin' : 'other';
+
 createRoot(rootElement).render(
   <React.StrictMode>
     <ThemeProvider>

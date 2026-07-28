@@ -142,9 +142,9 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
   return (
     <main className="app-shell">
       <AppShellBackground />
-      <div ref={shellBodyRef} className="app-shell__body">
-        <div id="app-shell-workspace" className="agent-workspace-lock" aria-busy={isBusy} inert={isBusy}>
-          <header className="product-chrome" aria-label="Application chrome">
+      {/* Draggable window titlebar: the native frame is hidden on macOS, so this
+          bar owns window dragging; interactive controls opt out via no-drag. */}
+      <header className="product-chrome" aria-label="Application chrome" inert={isBusy}>
             <div className="product-chrome__context" aria-label="Current page">
               <span className="product-chrome__stage-pill">{getStageBadge(activePage.id)}</span>
               <span className="product-chrome__workspace">{activePage.chromeLabel}</span>
@@ -187,8 +187,10 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
                 Settings
               </Button>
               <ThemeSelector />
-            </div>
-          </header>
+        </div>
+      </header>
+      <div ref={shellBodyRef} className="app-shell__body">
+        <div id="app-shell-workspace" className="agent-workspace-lock" aria-busy={isBusy} inert={isBusy}>
           <div className="agent-workspace-lock__content">{children}</div>
           {isBusy && (
             <div aria-live="polite">
