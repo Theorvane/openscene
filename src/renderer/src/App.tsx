@@ -136,6 +136,7 @@ export function App(): ReactElement {
                 await editor.openProject(projectId);
                 setActivePage('home');
               }}
+              onGoToProjects={() => setActivePage('projects')}
               isBusy={editor.isBusy}
             />
           </section>
