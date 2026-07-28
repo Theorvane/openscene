@@ -4038,7 +4038,8 @@ button {
 
 .agent-chat-prompt-card__toolbar .ai-domain-model-selector .field-label,
 .agent-chat-prompt-card__toolbar .ai-domain-model-selector__description,
-.agent-chat-prompt-card__toolbar .ai-domain-model-selector__status {
+.agent-chat-prompt-card__toolbar .ai-domain-model-selector__status,
+.agent-chat-prompt-card__toolbar .ai-domain-model-selector__badges {
   display: none;
 }
 
