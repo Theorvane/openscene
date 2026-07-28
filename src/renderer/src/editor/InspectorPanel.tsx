@@ -271,7 +271,9 @@ export function InspectorPanel({ activeTabId, editor, onActiveTabChange, tabs }:
         </TabPanel>
       </div>
 
-      <StatusCard tone={editor.statusMessage.tone}>{editor.statusMessage.text}</StatusCard>
+      {editor.statusMessage.text.length > 0 && (
+        <StatusCard tone={editor.statusMessage.tone}>{editor.statusMessage.text}</StatusCard>
+      )}
     </aside>
   );
 }

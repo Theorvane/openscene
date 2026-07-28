@@ -97,7 +97,7 @@ export function useTimelineEditor() {
       setSelectedAssetId(response.value.assets[0]?.id ?? '');
       setSelectedClipId('');
       setHasUnsavedTimeline(false);
-      setStatusMessage({ tone: 'success', text: `Opened ${response.value.name}.` });
+      setStatusMessage({ tone: 'neutral', text: '' });
       return true;
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });

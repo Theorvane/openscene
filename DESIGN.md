@@ -73,7 +73,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 - Inspector content uses collapsible property groups separated by hairline borders: an xs medium group title with a −/+ toggle, and label/value property rows (caption muted label on the left, mono value or quiet compact input on the right). Selected-clip trim/nudge actions render as a compact two-column button grid above the groups.
 - Clip controls belong here when they affect the selected clip. Timeline wide commands belong in the native Timeline menu bridge.
 - Keep destructive actions visually distinct with the danger color and clear labels.
-- Keep the inspector status card visible below the tab panels. Status messages use `role="status"` and must stay readable after any tab switch.
+- The inspector status card renders below the tab panels only while a status message exists; routine project opening emits no status. Status messages use `role="status"` and must stay readable after any tab switch.
 
 ## Bottom Timeline
 
