@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 
-import { getDomainModels, type AiDomain } from '../../shared/aiDomainModels';
+import { formatAiModelOptionLabel, getDomainModels, type AiDomain } from '../../shared/aiDomainModels';
 import { useAiDomainModel } from './AiDomainModelContext';
 
 type AiDomainModelSelectorProps = {
@@ -17,6 +17,8 @@ export function AiDomainModelSelector({ domain, label, description }: AiDomainMo
   const isLocal = activeModel.executionPath === 'local';
   const isZenModel = activeModel.id === 'qwen2.5-coder' || activeModel.id === 'local-video-runner' || activeModel.id === 'local-qwen-tts';
 
+  const specLabel = isLocal ? activeModel.precisionBit : activeModel.contextWindow;
+
   return (
     <div className="ai-domain-model-selector">
       <div className="ai-domain-model-selector__header">
@@ -27,7 +29,7 @@ export function AiDomainModelSelector({ domain, label, description }: AiDomainMo
           {isZenModel && <span className="ai-domain-model-selector__zen-badge">★ Zen</span>}
           <span className={`ai-domain-model-selector__badge ai-domain-model-selector__badge--${activeModel.executionPath}`}>
             <span className="ai-domain-model-selector__badge-dot" />
-            {isLocal ? 'Local Engine' : 'API Adapter'}
+            {isLocal ? 'Local' : 'Cloud'}
           </span>
         </div>
       </div>
@@ -41,19 +43,17 @@ export function AiDomainModelSelector({ domain, label, description }: AiDomainMo
           onChange={(event) => setSelectedModelId(domain, event.target.value)}
           aria-describedby={description ? descriptionId : undefined}
         >
-          {models.map((model) => {
-            const isZen = model.id === 'qwen2.5-coder' || model.id === 'local-video-runner' || model.id === 'local-qwen-tts';
-            return (
-              <option key={model.id} value={model.id} disabled={!model.available}>
-                {isZen ? '★ ' : ''}{model.label} — {model.providerLabel}{model.available ? '' : ' (Unavailable)'}
-              </option>
-            );
-          })}
+          {models.map((model) => (
+            <option key={model.id} value={model.id} disabled={!model.available}>
+              {formatAiModelOptionLabel(model)}
+            </option>
+          ))}
         </select>
       </div>
 
       <div className="ai-domain-model-selector__status" role="status">
         <span className="ai-domain-model-selector__status-tag">{activeModel.providerLabel}</span>
+        {specLabel && <span className="ai-domain-model-selector__status-spec">{specLabel}</span>}
         <div className="ai-domain-model-selector__status-info">
           <strong>{activeModel.label}</strong>: {activeModel.description}
         </div>

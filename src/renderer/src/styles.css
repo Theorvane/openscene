@@ -3395,6 +3395,18 @@ button {
   text-transform: uppercase;
 }
 
+.ai-domain-model-selector__status-spec {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
 .ai-domain-model-selector__status-info {
   flex: 1;
   min-width: 0;
