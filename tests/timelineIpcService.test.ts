@@ -110,9 +110,9 @@ describe('timeline IPC service', () => {
     });
   });
 
-  it('given a picked folder without a project file, when opened, then a safe invalid-input error is returned', async () => {
+  it('given a picked empty folder, when opened, then a project named after the folder is initialized there', async () => {
     await withTempDirectory(async (directory) => {
-      const emptyFolder = join(directory, 'empty');
+      const emptyFolder = join(directory, 'Fresh Cut');
       await mkdir(emptyFolder);
       const projects = new ProjectStore(
         join(directory, 'projects'),
@@ -126,7 +126,35 @@ describe('timeline IPC service', () => {
 
       const opened = await service.openProjectFolder(undefined);
 
-      expect(opened).toEqual({ ok: false, error: { code: 'INVALID_INPUT', message: 'The selected folder does not contain an OpenVideo project.' } });
+      if (!opened.ok || opened.value.cancelled) {
+        throw new Error('Expected the empty folder to become a project.');
+      }
+      expect(opened.value.created).toBe(true);
+      expect(opened.value.project.name).toBe('Fresh Cut');
+      await expect(readFile(join(emptyFolder, 'project.json'), 'utf8')).resolves.toContain(opened.value.project.id);
+      expect(JSON.stringify(opened)).not.toContain(directory);
+    });
+  });
+
+  it('given a picked folder with unrelated files, when opened, then a safe invalid-input error is returned and nothing is written', async () => {
+    await withTempDirectory(async (directory) => {
+      const cluttered = join(directory, 'cluttered');
+      await mkdir(cluttered);
+      await writeFile(join(cluttered, 'notes.txt'), 'not a project');
+      const projects = new ProjectStore(
+        join(directory, 'projects'),
+        new ProjectLocationRegistry(join(directory, 'project-locations.json'))
+      );
+      const service = new TimelineIpcService({
+        projects,
+        assets: new AssetLibraryStore(join(directory, 'projects'), projects),
+        selectProjectDirectory: async () => ({ canceled: false, filePaths: [cluttered] })
+      });
+
+      const opened = await service.openProjectFolder(undefined);
+
+      expect(opened).toEqual({ ok: false, error: { code: 'INVALID_INPUT', message: 'The selected folder already contains files that are not an OpenVideo project.' } });
+      expect(await projects.list()).toEqual([]);
     });
   });
 

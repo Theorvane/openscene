@@ -402,4 +402,49 @@ describe('folder-backed project store', () => {
       expect(await store.list()).toEqual([]);
     });
   });
+
+  it('given an empty folder, when opened-or-initialized, then a project named after the folder is created there', async () => {
+    await withTempDirectory(async (directory) => {
+      const picked = join(directory, 'Summer Reel');
+      await mkdir(picked);
+      await writeFile(join(picked, '.DS_Store'), 'hidden files do not count');
+      const store = folderStore(directory);
+
+      const result = await store.openOrInitializeFolder(picked);
+
+      expect(result?.created).toBe(true);
+      expect(result?.project.name).toBe('Summer Reel');
+      await expect(readFile(join(picked, 'project.json'), 'utf8')).resolves.toContain(result?.project.id);
+      expect((await store.list()).map((summary) => summary.folderName)).toEqual(['Summer Reel']);
+    });
+  });
+
+  it('given a folder that already holds a project, when opened-or-initialized, then the existing project opens without being recreated', async () => {
+    await withTempDirectory(async (directory) => {
+      const workspace = join(directory, 'workspace');
+      await mkdir(workspace);
+      const store = folderStore(directory);
+      const created = await store.createInFolder({ name: 'Reuse', parentDirectory: workspace });
+      await store.delete(created.id);
+
+      const result = await store.openOrInitializeFolder(join(workspace, 'Reuse'));
+
+      expect(result?.created).toBe(false);
+      expect(result?.project.id).toBe(created.id);
+    });
+  });
+
+  it('given a folder with unrelated visible files, when opened-or-initialized, then null is returned and the folder stays untouched', async () => {
+    await withTempDirectory(async (directory) => {
+      const cluttered = join(directory, 'cluttered');
+      await mkdir(cluttered);
+      await writeFile(join(cluttered, 'notes.txt'), 'keep me');
+      const store = folderStore(directory);
+
+      await expect(store.openOrInitializeFolder(cluttered)).resolves.toBeNull();
+
+      expect((await readdir(cluttered)).sort()).toEqual(['notes.txt']);
+      expect(await store.list()).toEqual([]);
+    });
+  });
 });

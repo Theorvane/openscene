@@ -754,14 +754,26 @@ button {
 
 .home-project-hub__form {
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-3);
+  align-items: center;
+  gap: var(--space-4);
   max-width: 540px;
 }
 
-.home-project-hub__form .field-label {
-  flex: 1;
-  min-width: 0;
+.home-project-hub__folder-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--radius-md);
+}
+
+.home-project-hub__hint {
+  margin: var(--space-1) 0 0;
+  color: var(--text-weak);
+  font-size: var(--text-small);
 }
 
 .home-project-hub__list-section {

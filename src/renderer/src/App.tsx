@@ -150,19 +150,7 @@ export function App(): ReactElement {
               onWorkspaceOpen={setActiveWorkspace}
               workspaces={APP_WORKSPACES}
               project={editor.project}
-              projects={editor.projects}
-              newProjectName={editor.newProjectName}
-              onNewProjectNameChange={editor.setNewProjectName}
-              onCreateProject={async () => {
-                const created = await editor.createProject();
-                if (created) navigateToPage('home');
-              }}
-              onOpenProject={async (projectId) => {
-                const opened = await editor.openProject(projectId);
-                if (opened) navigateToPage('home');
-              }}
               onGoToProjects={() => setActivePage('projects')}
-              isBusy={editor.isBusy}
             />
           </section>
           <section
@@ -177,12 +165,6 @@ export function App(): ReactElement {
             <ProjectsPage
               project={editor.project}
               projects={editor.projects}
-              newProjectName={editor.newProjectName}
-              onNewProjectNameChange={editor.setNewProjectName}
-              onCreateProject={async () => {
-                const created = await editor.createProject();
-                if (created) navigateToPage('home');
-              }}
               onOpenProject={async (projectId) => {
                 const opened = await editor.openProject(projectId);
                 if (opened) navigateToPage('home');

@@ -15,6 +15,7 @@ import type {
 import { parseCreateProjectInput, parseTimelineDocument, parseUpdateAssetMetadataInput } from '../shared/timelineValidators';
 import { assertAssetImportQuota, DEFAULT_ASSET_IMPORT_LIMITS, type AssetImportLimits } from './assetImportPolicy';
 import {
+  PROJECT_FILE_NAME,
   ProjectStoreError,
   isOpaqueId,
   projectDirectory,
@@ -55,6 +56,11 @@ function sanitizeFolderName(name: string): string {
 export type CreateProjectInFolderInput = {
   readonly name: string;
   readonly parentDirectory: string;
+};
+
+export type OpenOrInitializeFolderResult = {
+  readonly project: LocalProjectSnapshot;
+  readonly created: boolean;
 };
 
 export class ProjectStore {
@@ -139,6 +145,48 @@ export class ProjectStore {
     }
     await this.locations.register(snapshot.id, resolved);
     return snapshot;
+  }
+
+  /**
+   * Single-picker flow: a folder with a project opens it, an empty folder
+   * (hidden files like .DS_Store don't count) becomes a new project named
+   * after the folder itself, and any other folder is rejected untouched.
+   */
+  async openOrInitializeFolder(directory: string, now = new Date()): Promise<OpenOrInitializeFolderResult | null> {
+    if (this.locations === null) {
+      throw new ProjectStoreError('Folder-backed projects are not configured.');
+    }
+    const resolved = resolve(directory);
+    const existing = await readProjectSnapshotAtDirectory(resolved, null);
+    if (existing !== null) {
+      await this.locations.register(existing.id, resolved);
+      return { project: existing, created: false };
+    }
+    const entries = await readdir(resolved);
+    if (entries.some((entry) => !entry.startsWith('.'))) {
+      return null;
+    }
+    const id = randomUUID();
+    const timestamp = now.toISOString();
+    const snapshot: LocalProjectSnapshot = {
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      id,
+      name: sanitizeFolderName(basename(resolved)),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      assets: [],
+      timeline: createInitialTimeline()
+    };
+    try {
+      await writeProjectSnapshotAtDirectory(resolved, snapshot);
+      await this.locations.register(id, resolved);
+      return { project: snapshot, created: true };
+    } catch (error) {
+      // The folder belongs to the user: roll back only the file we wrote.
+      await rm(join(resolved, PROJECT_FILE_NAME), { force: true }).catch(() => undefined);
+      await this.locations.unregister(id).catch(() => undefined);
+      throw error;
+    }
   }
 
   async create(input: CreateProjectInput, now = new Date()): Promise<LocalProjectSnapshot> {

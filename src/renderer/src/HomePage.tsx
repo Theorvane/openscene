@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 
-import type { LocalProjectSnapshot, LocalProjectSummary } from '../../shared/timelineTypes';
+import type { LocalProjectSnapshot } from '../../shared/timelineTypes';
 import type { AppWorkspace, AppWorkspaceId } from './appWorkspaces';
 import { Button } from './ui';
 
@@ -8,13 +8,7 @@ type HomePageProps = {
   readonly onWorkspaceOpen: (workspaceId: AppWorkspaceId) => void;
   readonly workspaces: readonly AppWorkspace[];
   readonly project?: LocalProjectSnapshot | null;
-  readonly projects?: readonly LocalProjectSummary[];
-  readonly newProjectName?: string;
-  readonly onNewProjectNameChange?: (name: string) => void;
-  readonly onCreateProject?: () => Promise<void>;
-  readonly onOpenProject?: (projectId: string) => Promise<void>;
   readonly onGoToProjects?: () => void;
-  readonly isBusy?: boolean;
 };
 
 const WORKSPACE_COPY = {
@@ -129,7 +123,7 @@ export function HomePage({
                 <CardIcon workspaceId={workspace.id} />
               </span>
               <span className="home-card__body">
-                <span className="home-card__kicker">STAGE 3 · {workspace.statusLabel}</span>
+                <span className="home-card__kicker">{workspace.statusLabel}</span>
                 <span className="home-card__title">{card.heading}</span>
                 <span className="home-card__description">{card.description}</span>
                 <span className="home-card__action">{card.action}</span>

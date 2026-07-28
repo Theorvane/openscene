@@ -144,7 +144,7 @@ export type CreateProjectResult =
 
 export type OpenProjectFolderResult =
   | { readonly cancelled: true }
-  | { readonly cancelled: false; readonly project: LocalProjectSnapshot };
+  | { readonly cancelled: false; readonly created: boolean; readonly project: LocalProjectSnapshot };
 
 export type LocalProjectSummary = {
   readonly id: string;

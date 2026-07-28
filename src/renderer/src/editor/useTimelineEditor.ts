@@ -140,6 +140,9 @@ export function useTimelineEditor() {
       setSelectedClipId('');
       setHasUnsavedTimeline(false);
       await refreshProjects();
+      setStatusMessage(response.value.created
+        ? { tone: 'success', text: `Created ${project.name} in the selected folder.` }
+        : { tone: 'neutral', text: '' });
       return true;
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });

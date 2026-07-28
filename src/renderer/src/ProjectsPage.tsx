@@ -7,20 +7,24 @@ import { Button } from './ui';
 type ProjectsPageProps = {
   readonly project?: LocalProjectSnapshot | null;
   readonly projects?: readonly LocalProjectSummary[];
-  readonly newProjectName?: string;
-  readonly onNewProjectNameChange?: (name: string) => void;
-  readonly onCreateProject?: () => Promise<void>;
   readonly onOpenProject?: (projectId: string) => Promise<void>;
   readonly onOpenProjectFolder?: () => Promise<void>;
   readonly isBusy?: boolean;
 };
 
+function FolderPlusIcon(): ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d="M3.5 6.25c0-.97.78-1.75 1.75-1.75h3.9c.47 0 .92.19 1.25.52l1.06 1.06c.33.33.78.52 1.25.52h6.04c.97 0 1.75.78 1.75 1.75v9.4c0 .97-.78 1.75-1.75 1.75H5.25c-.97 0-1.75-.78-1.75-1.75z" />
+      <path d="M12 10.75v4.5" />
+      <path d="M9.75 13h4.5" />
+    </svg>
+  );
+}
+
 export function ProjectsPage({
   project = null,
   projects = [],
-  newProjectName = '',
-  onNewProjectNameChange,
-  onCreateProject,
   onOpenProject,
   onOpenProjectFolder,
   isBusy = false
@@ -31,7 +35,7 @@ export function ProjectsPage({
         <p className="section-kicker">Projects</p>
         <h1 id="projects-page-title">Local Project Folders</h1>
         <p>
-          OpenVideo stores every project in a dedicated local folder. Create a new project folder or select an existing folder below to unlock the studio menu and workspaces.
+          OpenVideo stores every project in a dedicated local folder. Pick a folder below to unlock the studio menu and workspaces.
         </p>
       </header>
 
@@ -51,36 +55,24 @@ export function ProjectsPage({
       {/* Folder-Based Project Creation & Selection Hub */}
       <section className="home-project-hub" aria-label="Project folder management hub">
         <div className="home-project-hub__creator">
-          <div className="home-project-hub__header">
-            <span className="home-project-hub__kicker">📁 Folder-Based Setup</span>
-            <h2 className="home-project-hub__title">Create New Project Folder</h2>
-          </div>
           <div className="home-project-hub__form">
-            <label className="field-label" htmlFor="projects-name-input">
-              Project Folder Name
-              <input
-                id="projects-name-input"
-                type="text"
-                value={newProjectName}
-                onChange={(e) => onNewProjectNameChange?.(e.target.value)}
-                placeholder="My New Video Project"
-                disabled={isBusy}
-              />
-            </label>
             <Button
               variant="primary"
-              onClick={() => void onCreateProject?.()}
-              disabled={isBusy || newProjectName.trim().length === 0}
+              className="home-project-hub__folder-picker"
+              aria-label="Choose or create a project folder"
+              title="Choose or create a project folder"
+              onClick={() => void onOpenProjectFolder?.()}
+              disabled={isBusy}
             >
-              Create Project Folder ➔
+              <FolderPlusIcon />
             </Button>
-            <Button onClick={() => void onOpenProjectFolder?.()} disabled={isBusy}>
-              Open Existing Folder…
-            </Button>
+            <div className="home-project-hub__header">
+              <h2 className="home-project-hub__title">Project Folder</h2>
+              <p className="home-project-hub__hint">
+                Pick a folder: an OpenVideo project inside opens, and an empty folder becomes a new project named after it. Use “New Folder” in the picker to start fresh.
+              </p>
+            </div>
           </div>
-          <p className="home-project-hub__hint">
-            Creating a project asks for a location and makes a real folder there; opening picks a folder that already contains an OpenVideo project.
-          </p>
         </div>
 
         {projects.length > 0 && (
