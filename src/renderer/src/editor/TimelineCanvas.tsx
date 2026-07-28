@@ -326,6 +326,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
               style={{
                 display: 'grid',
                 gridTemplateColumns: '104px minmax(0, 1fr)',
+                gap: 0,
                 height: '20px',
                 position: 'relative',
                 overflow: 'visible',
