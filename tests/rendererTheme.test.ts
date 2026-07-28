@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { parseThemePreference, resolveThemeMode, toggleThemeMode } from '../src/renderer/src/theme';
 
 const rendererStyles = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8');
-const themeSelectorSource = readFileSync(new URL('../src/renderer/src/ThemeSelector.tsx', import.meta.url), 'utf8');
+const appShellSource = readFileSync(new URL('../src/renderer/src/AppShell.tsx', import.meta.url), 'utf8');
 const settingsWorkspaceSource = readFileSync(new URL('../src/renderer/src/SettingsWorkspace.tsx', import.meta.url), 'utf8');
 const minimumNormalTextContrast = 4.5;
 const minimumExpressiveColorChroma = 24;
@@ -322,29 +322,16 @@ describe('renderer theme contract', () => {
     expect(getThemeCustomPropertyValue('light', '--surface-control')).not.toBe(getThemeCustomPropertyValue('dark', '--surface-control'));
   });
 
-  it('Given Issue #61 ThemeSelector presentation, When source and CSS are checked, Then styling lives in renderer CSS classes', () => {
-    expect(themeSelectorSource).not.toContain('style={{');
-    expect(themeSelectorSource).not.toMatch(/[🌙☀️💻✕]/u);
+  it('Given Issue #84 slim titlebar, When theme controls are checked, Then they live only in Settings Appearance', () => {
+    expect(appShellSource).not.toContain('ThemeSelector');
+    expect(appShellSource).not.toContain('stage-pill');
+    expect(settingsWorkspaceSource).toContain('aria-label="Theme mode"');
+    expect(settingsWorkspaceSource).toContain('aria-pressed={item.id === preset}');
     expect(settingsWorkspaceSource).not.toContain('style={{ background: item.accentColor }}');
-    expect(rendererStyles).toContain('.theme-preset-popover');
-    expect(rendererStyles).toContain('.theme-mode-segment__button[aria-pressed="true"]');
-    expect(rendererStyles).toContain('.preset-card[aria-pressed="true"]');
+    expect(rendererStyles).not.toContain('.theme-preset-popover');
+    expect(rendererStyles).toContain('.settings-preset-card[aria-pressed="true"]');
     expect(rendererStyles).toContain('.preset-swatch--daylight-glass');
     expect(rendererStyles).toContain('.preset-swatch--dark-zinc');
-  });
-
-  it('Given Issue #61 ThemeSelector accessibility, When source is checked, Then the trigger owns a disclosure dialog contract', () => {
-    expect(themeSelectorSource).not.toContain('role="switch"');
-    expect(themeSelectorSource).not.toContain('aria-checked');
-    expect(themeSelectorSource).not.toContain('shouldToggleThemeOnSwitchKeyDown');
-    expect(themeSelectorSource).toContain('aria-haspopup="dialog"');
-    expect(themeSelectorSource).toContain('aria-expanded={isOpen}');
-    expect(themeSelectorSource).toContain('aria-controls={themePresetDialogId}');
-    expect(themeSelectorSource).toContain('id={themePresetDialogId}');
-    expect(themeSelectorSource).toContain('ref={triggerRef}');
-    expect(themeSelectorSource).toContain('ref={dialogRef}');
-    expect(themeSelectorSource).toContain('tabIndex={-1}');
-    expect(themeSelectorSource).toContain('onKeyDown={handleDialogKeyDown}');
   });
 
   it('Given the agent chat input, When focus-visible CSS is checked, Then it uses the documented ring, offset, and halo', () => {

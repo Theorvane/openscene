@@ -12,7 +12,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Layout Contract
 
-- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Projects, Home (Menu), and Settings buttons, and the theme switch. It reads as the desk toolbar, not the product billboard; the Edit workspace keeps its own branding visually hidden for accessibility only. The Menu button stays disabled with a short hint until a project is open; Projects and Settings stay reachable at all times.
+- `product-chrome` is a compact top bar with the current page label, the project pill, a concise `Local` indicator, and icon-only Projects, Home (Menu), and Settings buttons. It reads as the desk toolbar, not the product billboard; the Edit workspace keeps its own branding visually hidden for accessibility only. The Menu button stays disabled with a short hint until a project is open; Projects and Settings stay reachable at all times.
 - `product-chrome` is also the window titlebar: the native macOS titlebar is hidden (`hiddenInset`, repositioned traffic lights) and the bar is a full-width `-webkit-app-region: drag` surface at the very top of the shell, above the workspace/chat body. Interactive clusters opt out with no-drag, macOS reserves left padding for the traffic lights via the root `data-platform` flag, and the bar sits outside the agent workspace lock but goes `inert` while an agent turn runs so navigation stays locked. Other platforms keep their native frame.
 - The right `AgentChatPanel` is the only user-facing Edit Agent UI. It is the rightmost flex child beside the mounted workspace stack and owns Edit Agent model/connection status, the project scope chip, conversation and tool stream, approval queue, reset/status, and prompt controls. The sidebar is collapsible: a header control collapses it to a slim labeled rail with an expand button, the collapsed state persists with the chat layout preference, and conversation state lives in `AgentChatProvider` so collapsing never loses the chat.
 - The Edit Agent operates at project scope. The renderer passes a safe active-project context (projectId, name, asset and track counts — never filesystem paths) with every send; the agent system prompt instructs the model to operate on that project by default. There is no per-asset attach flow in the panel.
@@ -37,7 +37,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 - Projects is the first page after launch. Home is reachable only with an active project — creating or opening a project routes to Home on success — and uses semantic page structure with `home-page-title` labeling its region. Navigation to a project-required page without a project (including losing the active project mid-session) falls back to Projects.
 - Home entry cards are native `Button` controls with `aria-controls` pointing to the mounted workspace region they open. Card order is Editing, Voice Generation, Video Generation.
 - Home copy must stay truthful to the local-first product boundary: it can describe local editing, consent-based local narration, configured provider seams, and local result import, but must not imply account, analytics, cloud upload, or bundled model/runtime setup.
-- Product chrome opens Home and Settings with native `Button` controls, visible labels, inline SVG icons, `aria-current="page"` when active, and `aria-controls` for each page region.
+- Product chrome opens Home and Settings with native icon-only `Button` controls: inline SVG icons with `aria-label` and `title` tooltips, `aria-current="page"` when active, and `aria-controls` for each page region.
 - Settings owns theme preferences, provider credentials, endpoints, primary model configuration, and local AI engine preferences. It is not part of `APP_WORKSPACES` and must not appear in `AppWorkspaceNavigation`.
 
 ## Program Header And Command Surface
@@ -129,7 +129,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 - The persisted key is `window-loom-theme`. Only explicit `light` or `dark` values are stored. Toggling from a system-resolved mode stores the opposite explicit mode.
 - The persisted preset key is `window-loom-theme-preset`. Keep `dark-zinc`, `daylight-glass`, `midnight-neon`, and `obsidian-pro` as the complete stable preset id set until a separate migration is designed.
 - `ThemeProvider` listens for system preference changes while the current preference is `system`, then reapplies the resolved mode through the same root `data-theme` path.
-- The product chrome theme control is a compact ghost `Button` with `role="switch"`, `aria-checked={mode === 'dark'}`, visible `Theme` and current mode text, and an aria label that names the current mode and active preset. Clicking opens the preset dialog; pressing Space on the focused switch toggles the explicit light/dark mode.
+- Product chrome carries no theme control. Theme mode (light/dark/system) and preset selection live only in Settings → Appearance, using CSS-classed controls with `aria-pressed` state.
 
 ## Type, Status, And Motion
 

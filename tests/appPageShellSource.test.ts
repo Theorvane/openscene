@@ -51,7 +51,7 @@ describe('app page shell source contract', () => {
     expect(app).toContain('hasActiveProject={hasActiveProject}');
     expect(appShell).toContain('readonly hasActiveProject: boolean;');
     expect(appShell).toContain('disabled={!hasActiveProject}');
-    expect(appShell).toContain("title={hasActiveProject ? undefined : 'Open or create a project first'}");
+    expect(appShell).toContain("title={hasActiveProject ? 'Menu' : 'Open or create a project first'}");
   });
 
   it('keeps mounted workspace panels directly labeled after removing the sidebar', async () => {

@@ -11,7 +11,6 @@ import {
 import { isWorkspacePageId, type AppPage, type AppPageId } from './appPages';
 import { AgentChatPanel } from './AgentChatPanel';
 import { AgentChatProvider, useAgentChat } from './AgentChatContext';
-import { ThemeSelector } from './ThemeSelector';
 import { Button } from './ui';
 import { useAgentChatLayoutPreference } from './useAgentChatLayoutPreference';
 
@@ -63,23 +62,6 @@ function FolderIcon(): ReactElement {
       <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
     </svg>
   );
-}
-
-function getStageBadge(pageId: AppPageId): string {
-  switch (pageId) {
-    case 'projects':
-      return 'Stage 1 · Projects';
-    case 'home':
-      return 'Stage 2 · Main Menu';
-    case 'edit':
-    case 'voice-generation':
-    case 'video-generation':
-      return 'Stage 3 · Workspace';
-    case 'settings':
-      return 'Settings';
-    default:
-      return 'Local';
-  }
 }
 
 function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext }: AppShellProps): ReactElement {
@@ -146,7 +128,6 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
           bar owns window dragging; interactive controls opt out via no-drag. */}
       <header className="product-chrome" aria-label="Application chrome" inert={isBusy}>
             <div className="product-chrome__context" aria-label="Current page">
-              <span className="product-chrome__stage-pill">{getStageBadge(activePage.id)}</span>
               <span className="product-chrome__workspace">{activePage.chromeLabel}</span>
               {activeProjectContext && (
                 <span className="product-chrome__project-pill">📁 Project: {activeProjectContext.name}</span>
@@ -157,36 +138,37 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
               <Button
                 aria-controls="app-page-panel-projects"
                 aria-current={projectsIsActive ? 'page' : undefined}
+                aria-label="Projects"
                 className="product-chrome__nav-button"
                 onClick={() => onPageChange('projects')}
+                title="Projects"
                 variant={projectsIsActive ? 'primary' : 'ghost'}
               >
                 <FolderIcon />
-                Projects
               </Button>
               <Button
                 aria-controls="app-page-panel-home"
                 aria-current={homeIsActive ? 'page' : undefined}
+                aria-label="Menu"
                 className="product-chrome__nav-button"
                 disabled={!hasActiveProject}
                 onClick={() => onPageChange('home')}
-                title={hasActiveProject ? undefined : 'Open or create a project first'}
+                title={hasActiveProject ? 'Menu' : 'Open or create a project first'}
                 variant={homeIsActive ? 'primary' : 'ghost'}
               >
                 <HomeIcon />
-                Menu
               </Button>
               <Button
                 aria-controls="app-page-panel-settings"
                 aria-current={settingsIsActive ? 'page' : undefined}
+                aria-label="Settings"
                 className="product-chrome__nav-button"
                 onClick={() => onPageChange('settings')}
+                title="Settings"
                 variant={settingsIsActive ? 'primary' : 'ghost'}
               >
                 <SettingsIcon />
-                Settings
               </Button>
-              <ThemeSelector />
         </div>
       </header>
       <div ref={shellBodyRef} className="app-shell__body">
