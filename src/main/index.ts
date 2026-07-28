@@ -33,7 +33,7 @@ import { getOpenVideoMcpDefinition, OpenVideoMcpServer } from './openVideoMcpSer
 import { AGENT_CHAT_MUTATING_TOOL_NAMES, createAgentChatTools } from './agentChatTools';
 import { buildAgentChatGraph } from './agentChatGraph';
 import { AgentChatSessionManager } from './agentChatSession';
-import { createOllamaAgentChatModel } from './agentChatModel';
+import { createAgentChatModel } from './agentChatModel';
 import { registerAgentChatIpcHandlers } from './agentChatIpcHandlers';
 import { AgentChatHistoryStore } from './agentChatHistoryStore';
 
@@ -343,7 +343,7 @@ async function installIpcHandlers(): Promise<void> {
   const agentChatGraphBundle = buildAgentChatGraph({
     tools: agentChatTools,
     mutatingToolNames: AGENT_CHAT_MUTATING_TOOL_NAMES,
-    createModel: createOllamaAgentChatModel(agentChatTools)
+    createModel: createAgentChatModel(agentChatTools, credentialStore)
   });
   const agentChatSessions = new AgentChatSessionManager(agentChatGraphBundle);
   registerAgentChatIpcHandlers(ipcMain, agentChatSessions, new AgentChatHistoryStore(projectStore));

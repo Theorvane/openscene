@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 
 import type { LocalFfmpegRuntimeStatus } from '../../shared/exportTypes';
 import { DEFAULT_LLM_MODELS, type LlmProviderId } from '../../shared/llmModels';
+import { LLM_PROVIDERS } from '../../shared/llmProviders';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { TimelineShortcutMap } from './editor/TimelineEditorLayoutControls';
 import { useEditorShortcutPreference } from './editor/useEditorShortcutPreference';
@@ -16,7 +17,8 @@ const SETTINGS_SECTIONS = [
   { id: 'local-tools', title: 'Local Tools', description: 'Local runtime readiness for desktop capture, narration, and final export.' },
   { id: 'voice', title: 'Voice', description: 'Voice model preference and consent-based local narration boundaries.' },
   { id: 'video', title: 'Video', description: 'Video model preference and local result import boundaries.' },
-  { id: 'edit-agent', title: 'Edit Agent', description: 'Primary model, provider credentials, and the persistent right-side agent.' },
+  { id: 'providers', title: 'Providers', description: 'Connect model providers: the local engine plus cloud APIs with safe-storage keys.' },
+  { id: 'edit-agent', title: 'Edit Agent', description: 'Model preference for the persistent right-side agent.' },
   { id: 'shortcuts', title: 'Shortcuts', description: 'Timeline editor keyboard shortcut remapping.' },
   { id: 'data-privacy', title: 'Data & Privacy', description: 'Local storage, provider authorization, and deletion expectations.' }
 ] as const;
@@ -49,12 +51,15 @@ type SettingsWorkspaceProps = {
   readonly onReplayFirstRunOnboarding: () => void;
 };
 
-const CREDENTIAL_FIELDS: readonly CredentialField[] = [
-  { providerId: 'openai', keyName: 'openaiApiKey', label: 'OpenAI API key', placeholder: 'sk-proj-...' },
-  { providerId: 'anthropic', keyName: 'anthropicApiKey', label: 'Anthropic API key', placeholder: 'sk-ant-...' },
-  { providerId: 'google_gemini', keyName: 'geminiApiKey', label: 'Google Gemini API key', placeholder: 'AIzaSy...' },
-  { providerId: 'deepseek', keyName: 'deepseekApiKey', label: 'DeepSeek API key', placeholder: 'sk-...' }
-] as const;
+// Cloud provider rows derive from the shared opencode-style provider registry.
+const CREDENTIAL_FIELDS: readonly CredentialField[] = LLM_PROVIDERS
+  .filter((provider) => provider.auth === 'api-key' && provider.credentialKey !== undefined)
+  .map((provider) => ({
+    providerId: provider.id,
+    keyName: provider.credentialKey as LlmCredentialKey,
+    label: provider.label,
+    placeholder: provider.keyPlaceholder ?? ''
+  }));
 
 const EMPTY_CREDENTIAL_DRAFTS: CredentialDrafts = {
   openaiApiKey: '',
@@ -155,6 +160,12 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
     }
   };
 
+  const disconnectProvider = async (field: CredentialField): Promise<void> => {
+    setCredentialSaveState((current) => ({ ...current, [field.keyName]: 'saving' }));
+    const cleared = await saveProviderCredential(field.keyName, '');
+    setCredentialSaveState((current) => ({ ...current, [field.keyName]: cleared ? 'idle' : 'error' }));
+  };
+
   const renderActiveSection = (): ReactNode => {
     switch (activeSectionId) {
       case 'appearance':
@@ -198,6 +209,53 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
             <StatusCard tone="warning">Provider seams are selectable preferences only; unsupported cloud adapters are not silently called.</StatusCard>
           </>
         );
+      case 'providers':
+        return (
+          <>
+            <div className="settings-provider-list">
+              <div className="settings-provider-row">
+                <div className="settings-provider-row__head">
+                  <strong className="settings-provider-row__name">Ollama</strong>
+                  <span className="settings-provider-row__status settings-provider-row__status--on">● Local</span>
+                </div>
+                <p className="settings-provider-row__description">Local engine over HTTP. No account or key; models run on this machine.</p>
+                <label className="field-label" htmlFor="ollama-base-url">
+                  Endpoint
+                  <input id="ollama-base-url" type="text" value={providerConfig.ollamaBaseUrl ?? ''} placeholder="http://localhost:11434" onChange={(event) => updateProviderConfig({ ollamaBaseUrl: event.target.value })} />
+                </label>
+              </div>
+              {CREDENTIAL_FIELDS.map((field) => {
+                const connected = credentialStatus[field.keyName] === true;
+                return (
+                  <div key={field.keyName} className="settings-provider-row">
+                    <div className="settings-provider-row__head">
+                      <strong className="settings-provider-row__name">{field.label}</strong>
+                      <span className={`settings-provider-row__status${connected ? ' settings-provider-row__status--on' : ''}`}>
+                        {connected ? '● Connected' : '○ Not connected'}
+                      </span>
+                    </div>
+                    <p className="settings-provider-row__description">Unlocks {modelLabelsForProvider(field.providerId)}.</p>
+                    <div className="settings-provider-row__controls">
+                      <label className="field-label" htmlFor={`credential-${field.keyName}`}>
+                        API key
+                        <input id={`credential-${field.keyName}`} type="password" placeholder={field.placeholder} value={credentialDrafts[field.keyName]} onChange={(event) => setCredentialDrafts((current) => ({ ...current, [field.keyName]: event.target.value }))} />
+                      </label>
+                      <Button variant="primary" onClick={() => void saveCredentialDraft(field)} disabled={credentialSaveState[field.keyName] === 'saving' || credentialDrafts[field.keyName].trim().length === 0}>
+                        {credentialSaveState[field.keyName] === 'saving' ? 'Working...' : connected ? 'Replace key' : 'Connect'}
+                      </Button>
+                      {connected && (
+                        <Button variant="default" onClick={() => void disconnectProvider(field)} disabled={credentialSaveState[field.keyName] === 'saving'}>Disconnect</Button>
+                      )}
+                    </div>
+                    {credentialSaveState[field.keyName] === 'saved' && <span role="status">Credential saved to main-process safe storage.</span>}
+                    {credentialSaveState[field.keyName] === 'error' && <span role="status">Credential could not be saved.</span>}
+                  </div>
+                );
+              })}
+            </div>
+            <StatusCard tone="neutral">API keys live in main-process safe storage, are write-only from this screen, and are never rendered back.</StatusCard>
+          </>
+        );
       case 'edit-agent':
         return (
           <>
@@ -207,22 +265,6 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
               {DEFAULT_LLM_MODELS.map((model) => <option key={model.id} value={model.id}>{model.label} ({model.providerLabel}) - [{model.badge}]</option>)}
             </select>
             <StatusCard tone="neutral"><strong>{selectedModel.label}</strong>: {selectedModel.description}</StatusCard>
-            <label className="field-label" htmlFor="ollama-base-url">Local Ollama endpoint</label>
-            <input id="ollama-base-url" type="text" value={providerConfig.ollamaBaseUrl ?? ''} placeholder="http://localhost:11434" onChange={(event) => updateProviderConfig({ ollamaBaseUrl: event.target.value })} />
-            <div className="settings-credential-grid">
-              {CREDENTIAL_FIELDS.map((field) => (
-                <div key={field.keyName} className="settings-credential-card">
-                  <label className="field-label" htmlFor={`credential-${field.keyName}`}>
-                    {field.label}
-                    <input id={`credential-${field.keyName}`} type="password" placeholder={field.placeholder} value={credentialDrafts[field.keyName]} onChange={(event) => setCredentialDrafts((current) => ({ ...current, [field.keyName]: event.target.value }))} />
-                  </label>
-                  <span>{credentialStatus[field.keyName] ? 'Stored in main-process safe storage.' : `Required for ${modelLabelsForProvider(field.providerId)}.`}</span>
-                  {credentialSaveState[field.keyName] === 'saved' && <span role="status">Credential saved.</span>}
-                  {credentialSaveState[field.keyName] === 'error' && <span role="status">Credential could not be saved.</span>}
-                  <Button variant="default" onClick={() => void saveCredentialDraft(field)} disabled={credentialSaveState[field.keyName] === 'saving'}>{credentialSaveState[field.keyName] === 'saving' ? 'Saving...' : 'Save credential'}</Button>
-                </div>
-              ))}
-            </div>
             <Button variant="default" onClick={() => void runModelTest()} disabled={testState.status === 'running'}>{testState.status === 'running' ? 'Testing...' : 'Test selected model'}</Button>
             {testState.status === 'success' && <StatusCard tone="success">Model responded: {testState.completion}</StatusCard>}
             {testState.status === 'error' && <StatusCard tone="danger">{testState.error}</StatusCard>}

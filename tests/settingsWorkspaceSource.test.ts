@@ -8,7 +8,7 @@ describe('Settings workspace source contract', () => {
   it('organizes settings into the requested local-first sections and reads only safe FFmpeg readiness', async () => {
     const source = await readFile(SETTINGS_SOURCE_URL, 'utf8');
 
-    for (const heading of ['Appearance', 'Local Tools', 'Voice', 'Video', 'Edit Agent', 'Data & Privacy']) {
+    for (const heading of ['Appearance', 'Local Tools', 'Voice', 'Video', 'Providers', 'Edit Agent', 'Data & Privacy']) {
       expect(source).toContain(`title: '${heading}'`);
     }
     expect(source).toContain('window.videoTool.getFfmpegRuntimeStatus');
@@ -27,6 +27,18 @@ describe('Settings workspace source contract', () => {
     expect(source).toContain('setCredentialDrafts((current) => ({ ...current, [field.keyName]: \'\' }))');
     expect(source).not.toContain('value={providerConfig[field.keyName]');
     expect(source).not.toContain('updateProviderConfig({ [field.keyName]');
+  });
+
+  it('renders opencode-style provider rows with connect, disconnect, and connection status', async () => {
+    const source = await readFile(SETTINGS_SOURCE_URL, 'utf8');
+
+    expect(source).toContain("from '../../shared/llmProviders'");
+    expect(source).toContain('settings-provider-row');
+    expect(source).toContain("'● Connected' : '○ Not connected'");
+    expect(source).toContain('disconnectProvider');
+    expect(source).toContain("saveProviderCredential(field.keyName, '')");
+    expect(source).toContain('● Local');
+    expect(source).toContain('id="ollama-base-url"');
   });
 
   it('uses stateful section buttons with an active labeled content region', async () => {

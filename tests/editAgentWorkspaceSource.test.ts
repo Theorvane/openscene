@@ -19,7 +19,7 @@ describe('Edit Agent workspace wiring', () => {
     expect(context).toContain('activeProject');
     expect(context).toContain('sendMessage');
     expect(panel).toContain('selectedModel.label');
-    expect(panel).toContain('AiDomainModelSelector domain="edit-agent"');
+    expect(panel).toContain('<AgentModelPicker />');
     expect(panel).toContain('agent-chat-log');
     expect(panel).toContain('messages.map((message) => (');
     expect(panel).toContain("message.role === 'tool' ? `Tool · ${message.toolName}` : message.role");

@@ -13,13 +13,16 @@ export interface LlmModelConfig {
   readonly category: LlmModelCategory;
   readonly badge: LlmModelBadge;
   readonly defaultMode: 'local' | 'api';
-  /** Whether this model can be selected and used in the current build. */
+  /** Whether this model's provider adapter is implemented in the current build. */
   readonly available: boolean;
   /**
    * Human-readable reason shown when available is false.
    * Cloud provider adapter must be implemented before this model can be used.
    */
   readonly unavailabilityReason?: string;
+  /** Whether the model supports structured tool calling (Edit Agent requirement). */
+  readonly toolCall?: boolean;
+  readonly contextWindow?: string;
 }
 
 export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
@@ -28,23 +31,26 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     id: 'qwen2.5-coder',
     providerId: 'local_ollama',
     label: 'Qwen 2.5 Coder 14B',
-    providerLabel: 'Local Engine (Ollama)',
+    providerLabel: 'Ollama',
     description: 'High-performance offline local model for timeline scripts & prompts',
     category: 'editor-assistant',
     badge: 'LOCAL',
     defaultMode: 'local',
-    available: true
+    available: true,
+    toolCall: true,
+    contextWindow: '32k'
   },
   {
     id: 'llama3.2-vision',
     providerId: 'local_ollama',
     label: 'Llama 3.2 Vision 11B',
-    providerLabel: 'Local Engine (Ollama)',
+    providerLabel: 'Ollama',
     description: 'Local multimodal vision model for video scene analysis',
     category: 'video-prompt',
     badge: 'LOCAL',
     defaultMode: 'local',
-    available: true
+    available: true,
+    contextWindow: '128k'
   },
 
   // Cloud Models - OpenAI
@@ -57,8 +63,9 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     category: 'video-prompt',
     badge: 'REASONING',
     defaultMode: 'api',
-    available: false,
-    unavailabilityReason: 'OpenAI provider adapter not yet implemented'
+    available: true,
+    toolCall: true,
+    contextWindow: '256k'
   },
   {
     id: 'gpt-5-mini',
@@ -69,8 +76,9 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     category: 'editor-assistant',
     badge: 'FAST',
     defaultMode: 'api',
-    available: false,
-    unavailabilityReason: 'OpenAI provider adapter not yet implemented'
+    available: true,
+    toolCall: true,
+    contextWindow: '256k'
   },
 
   // Cloud Models - Anthropic
@@ -83,8 +91,9 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     category: 'voice-script',
     badge: 'REASONING',
     defaultMode: 'api',
-    available: false,
-    unavailabilityReason: 'Anthropic provider adapter not yet implemented'
+    available: true,
+    toolCall: true,
+    contextWindow: '200k'
   },
   {
     id: 'claude-sonnet-5',
@@ -95,8 +104,9 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     category: 'voice-script',
     badge: 'SMART',
     defaultMode: 'api',
-    available: false,
-    unavailabilityReason: 'Anthropic provider adapter not yet implemented'
+    available: true,
+    toolCall: true,
+    contextWindow: '200k'
   },
 
   // Cloud Models - Google Gemini
@@ -109,8 +119,9 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     category: 'editor-assistant',
     badge: 'SMART',
     defaultMode: 'api',
-    available: false,
-    unavailabilityReason: 'Google Gemini provider adapter not yet implemented'
+    available: true,
+    toolCall: true,
+    contextWindow: '1M'
   },
   {
     id: 'gemini-2.5-flash',
@@ -121,8 +132,9 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     category: 'video-prompt',
     badge: 'FAST',
     defaultMode: 'api',
-    available: false,
-    unavailabilityReason: 'Google Gemini provider adapter not yet implemented'
+    available: true,
+    toolCall: true,
+    contextWindow: '1M'
   },
 
   // Cloud Models - DeepSeek
@@ -135,8 +147,9 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     category: 'editor-assistant',
     badge: 'REASONING',
     defaultMode: 'api',
-    available: false,
-    unavailabilityReason: 'DeepSeek provider adapter not yet implemented'
+    available: true,
+    toolCall: true,
+    contextWindow: '128k'
   },
   {
     id: 'deepseek-r1',
@@ -147,8 +160,8 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     category: 'editor-assistant',
     badge: 'REASONING',
     defaultMode: 'api',
-    available: false,
-    unavailabilityReason: 'DeepSeek provider adapter not yet implemented'
+    available: true,
+    contextWindow: '128k'
   }
 ] as const;
 
@@ -165,6 +178,10 @@ export interface LlmProviderApiConfig {
   runwayApiKey?: string;
   klingApiKey?: string;
   lumaApiKey?: string;
+}
+
+export function getLlmModel(modelId: string): LlmModelConfig | undefined {
+  return DEFAULT_LLM_MODELS.find((model) => model.id === modelId);
 }
 
 export function parseSelectedLlmModelId(storedId: string | null | undefined): string {

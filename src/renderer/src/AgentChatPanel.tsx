@@ -1,7 +1,7 @@
 import { useEffect, useRef, type CSSProperties, type FormEvent, type ReactElement } from 'react';
 
 import { useAgentChat } from './AgentChatContext';
-import { AiDomainModelSelector } from './AiDomainModelSelector';
+import { AgentModelPicker } from './AgentModelPicker';
 import { Button } from './ui';
 
 type AgentChatPanelProps = {
@@ -17,6 +17,7 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
   const {
     selectedModel,
     isLocalModel,
+    modelReady,
     input,
     setInput,
     messages,
@@ -50,7 +51,7 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
           <div className="agent-chat-panel__title">
             <p className="agent-chat-panel__title-label">OpenVideo Edit Agent</p>
             <span className="agent-chat-panel__title-meta">
-              {selectedModel.label} · {isLocalModel ? 'Local · Ollama' : 'Select an available editing model'}
+              {selectedModel.label} · {selectedModel.providerLabel} · {isLocalModel ? 'Local' : modelReady ? 'Connected' : 'Not connected'}
             </span>
           </div>
           <div className="agent-chat-panel__actions">
@@ -87,11 +88,11 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
 
         <div className="agent-chat-log" aria-live="polite">
 
-          {!isLocalModel && (
+          {!modelReady && (
             <div className="agent-chat-hint-card agent-chat-hint-card--warning">
               <span className="agent-chat-hint-card__icon">⚠️</span>
               <p className="agent-chat-hint-card__text">
-                Agent chat currently uses a local Ollama model. Pick a Local Engine model below to control OpenVideo with chat.
+                {selectedModel.providerLabel} is not connected. Connect it in Settings → Providers, or pick a local model below.
               </p>
             </div>
           )}
@@ -149,24 +150,24 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault();
-                  if (!isBusy && isLocalModel && pendingApproval === null && input.trim().length > 0) {
+                  if (!isBusy && modelReady && pendingApproval === null && input.trim().length > 0) {
                     void sendMessage(input);
                   }
                 }
               }}
               placeholder={pendingApproval ? 'Respond to the approval above first...' : 'Tell OpenVideo what to do…'}
               aria-label="Edit Agent prompt"
-              disabled={isBusy || !isLocalModel || pendingApproval !== null}
+              disabled={isBusy || !modelReady || pendingApproval !== null}
               rows={2}
             />
             <div className="agent-chat-prompt-card__toolbar">
               <div className="agent-chat-prompt-card__meta">
-                <AiDomainModelSelector domain="edit-agent" label="Edit model" description="Local connection for chat-controlled edits." />
+                <AgentModelPicker />
               </div>
               <Button
                 type="submit"
                 variant="primary"
-                disabled={isBusy || !isLocalModel || pendingApproval !== null || input.trim().length === 0}
+                disabled={isBusy || !modelReady || pendingApproval !== null || input.trim().length === 0}
                 aria-label="Send Edit Agent prompt"
               >
                 {isBusy ? 'Working…' : 'Send'}

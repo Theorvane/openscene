@@ -4350,6 +4350,73 @@ button {
   text-transform: uppercase;
 }
 
+/* opencode-style provider rows: name + connection status, then controls. */
+.settings-provider-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.settings-provider-row {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.settings-provider-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.settings-provider-row__name {
+  color: var(--text-strong);
+  font-size: var(--text-subhead);
+  font-weight: 600;
+}
+
+.settings-provider-row__status {
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-provider-row__status--on {
+  color: var(--color-success);
+}
+
+.settings-provider-row__description {
+  margin: 0;
+  color: var(--text-weak);
+  font-size: var(--text-small);
+}
+
+.settings-provider-row__controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.settings-provider-row__controls .field-label {
+  flex: 1;
+  min-width: 220px;
+}
+
+.settings-provider-row [role="status"] {
+  color: var(--color-success);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 1040px) {
   .settings-workspace__grid,
   .settings-preset-grid,
@@ -4798,6 +4865,146 @@ button {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* opencode-style model picker in the prompt toolbar. */
+.agent-model-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.agent-model-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 240px;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-micro);
+  cursor: pointer;
+}
+
+.agent-model-picker__trigger:hover {
+  background: var(--surface-inset);
+}
+
+.agent-model-picker__trigger-label {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-model-picker__trigger-provider {
+  color: var(--text-weak);
+  white-space: nowrap;
+}
+
+.agent-model-picker__trigger-caret {
+  color: var(--text-weak);
+}
+
+.agent-model-picker__popover {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: var(--space-3);
+  width: 300px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow-panel);
+}
+
+.agent-model-picker__group {
+  display: grid;
+  gap: 2px;
+}
+
+.agent-model-picker__group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) var(--space-1);
+}
+
+.agent-model-picker__group-label {
+  color: var(--text-weak);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.agent-model-picker__group-status {
+  color: var(--text-weaker);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-model-picker__group-status--connected {
+  color: var(--color-success);
+}
+
+.agent-model-picker__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 6px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-model-picker__option:hover:not(:disabled) {
+  background: var(--surface-inset);
+}
+
+.agent-model-picker__option--active {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.agent-model-picker__option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agent-model-picker__option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-model-picker__option-meta {
+  flex: none;
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+.agent-model-picker__hint {
+  margin: 0;
+  padding: 0 var(--space-2);
+  color: var(--text-weaker);
+  font-size: var(--text-micro);
 }
 
 .agent-chat-prompt-card__toolbar .ai-domain-model-selector .field-label,

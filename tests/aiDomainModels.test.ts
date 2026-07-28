@@ -11,7 +11,19 @@ describe('AI domain model catalog', () => {
   it('exposes an independent available local model for each AI domain', () => {
     expect(getAvailableDomainModels('voice-generation').map((model) => model.id)).toEqual(['local-qwen-tts']);
     expect(getAvailableDomainModels('video-generation').map((model) => model.id)).toEqual(['local-video-runner']);
-    expect(getAvailableDomainModels('edit-agent').map((model) => model.id)).toEqual(['qwen2.5-coder']);
+    expect(getAvailableDomainModels('edit-agent').map((model) => model.id)).toEqual([
+      'qwen2.5-coder',
+      'gpt-5-mini',
+      'gpt-5',
+      'claude-sonnet-5',
+      'claude-opus-4-8',
+      'gemini-3-pro',
+      'deepseek-v3.1'
+    ]);
+  });
+
+  it('keeps the local model as the edit-agent default ahead of cloud providers', () => {
+    expect(getAvailableDomainModels('edit-agent')[0]?.executionPath).toBe('local');
   });
 
   it('never resolves a model from another domain', () => {

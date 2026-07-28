@@ -23,8 +23,9 @@ type FetchLike = typeof fetch;
 
 /**
  * Executes LLM completions for the model selected in Settings. Local models are sent to a
- * real Ollama server over HTTP; cloud models fail with an explicit, honest error until a
- * real provider HTTP client is implemented for that provider.
+ * real Ollama server over HTTP; cloud models call their provider's HTTP API with the key
+ * from main-process safe storage (OpenAI, Anthropic, Google Gemini, DeepSeek). Providers
+ * without an implemented adapter fail with an explicit, honest error — never fake success.
  */
 export class LlmExecutionAdapter {
   private credentialStore: CredentialStore | undefined;
@@ -132,9 +133,9 @@ export class LlmExecutionAdapter {
   private async executeCloudCompletion(
     modelId: string,
     providerId: string,
-    modelLabel: string,
+    _modelLabel: string,
     providerLabel: string,
-    _request: LlmCompletionRequest
+    request: LlmCompletionRequest
   ): Promise<LlmCompletionResponse> {
     let credKey: keyof ProviderCredentials | null = null;
     if (providerId === 'openai') credKey = 'openaiApiKey';
@@ -161,11 +162,147 @@ export class LlmExecutionAdapter {
       };
     }
 
-    return {
-      ok: false,
-      modelId,
-      providerId,
-      error: `${providerLabel} (${modelLabel}) cloud adapter is not yet implemented in the main process. Use a Local Engine model, or configure Ollama, for now.`
-    };
+    const cloudRequest = buildCloudCompletionRequest(providerId, modelId, apiKey.trim(), request);
+    if (cloudRequest === null) {
+      return {
+        ok: false,
+        modelId,
+        providerId,
+        error: `Cloud provider ${providerLabel} is not available in the current build.`
+      };
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CLOUD_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await this.fetchImpl(cloudRequest.url, {
+        method: 'POST',
+        headers: cloudRequest.headers,
+        signal: controller.signal,
+        body: JSON.stringify(cloudRequest.body)
+      });
+
+      if (!response.ok) {
+        const detail = await safeErrorDetail(response);
+        const unauthorized = response.status === 401 || response.status === 403;
+        return {
+          ok: false,
+          modelId,
+          providerId,
+          error: unauthorized
+            ? `${providerLabel} rejected the stored API key (status ${response.status}). Reconnect the provider in Settings.`
+            : `${providerLabel} request failed with status ${response.status}${detail ? `: ${detail}` : ''}.`
+        };
+      }
+
+      const completion = cloudRequest.extractCompletion(await response.json());
+      if (typeof completion !== 'string' || completion.trim().length === 0) {
+        return { ok: false, modelId, providerId, error: `${providerLabel} returned an empty response for model "${modelId}".` };
+      }
+      return { ok: true, modelId, providerId, completion };
+    } catch (err) {
+      const aborted = err instanceof Error && err.name === 'AbortError';
+      return {
+        ok: false,
+        modelId,
+        providerId,
+        error: aborted
+          ? `${providerLabel} did not respond within ${CLOUD_REQUEST_TIMEOUT_MS / 1000}s.`
+          : `Could not reach ${providerLabel}. (${err instanceof Error ? err.message : String(err)})`
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+const CLOUD_REQUEST_TIMEOUT_MS = 120_000;
+const ANTHROPIC_VERSION = '2023-06-01';
+const MAX_COMPLETION_TOKENS = 4_096;
+
+type CloudCompletionRequest = {
+  readonly url: string;
+  readonly headers: Record<string, string>;
+  readonly body: unknown;
+  readonly extractCompletion: (payload: unknown) => string | undefined;
+};
+
+/** Error bodies can be attacker- or provider-controlled: keep a short text detail, never echo credentials. */
+async function safeErrorDetail(response: Response): Promise<string> {
+  const bodyText = await response.text().catch(() => '');
+  try {
+    const parsed = JSON.parse(bodyText) as { error?: { message?: string } | string };
+    if (typeof parsed.error === 'string') return parsed.error.slice(0, 300);
+    if (parsed.error && typeof parsed.error.message === 'string') return parsed.error.message.slice(0, 300);
+  } catch {
+    // keep raw text
+  }
+  return bodyText.slice(0, 300);
+}
+
+function openAiStyleRequest(baseUrl: string, modelId: string, apiKey: string, request: LlmCompletionRequest): CloudCompletionRequest {
+  return {
+    url: `${baseUrl}/chat/completions`,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: {
+      model: modelId,
+      messages: [
+        ...(request.systemPrompt ? [{ role: 'system', content: request.systemPrompt }] : []),
+        { role: 'user', content: request.prompt }
+      ]
+    },
+    extractCompletion: (payload) =>
+      (payload as { choices?: readonly { message?: { content?: string } }[] }).choices?.[0]?.message?.content
+  };
+}
+
+function buildCloudCompletionRequest(
+  providerId: string,
+  modelId: string,
+  apiKey: string,
+  request: LlmCompletionRequest
+): CloudCompletionRequest | null {
+  switch (providerId) {
+    case 'openai':
+      return openAiStyleRequest('https://api.openai.com/v1', modelId, apiKey, request);
+    case 'deepseek':
+      return openAiStyleRequest('https://api.deepseek.com', modelId, apiKey, request);
+    case 'anthropic':
+      return {
+        url: 'https://api.anthropic.com/v1/messages',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': ANTHROPIC_VERSION
+        },
+        body: {
+          model: modelId,
+          max_tokens: MAX_COMPLETION_TOKENS,
+          ...(request.systemPrompt ? { system: request.systemPrompt } : {}),
+          messages: [{ role: 'user', content: request.prompt }]
+        },
+        extractCompletion: (payload) =>
+          (payload as { content?: readonly { type?: string; text?: string }[] }).content
+            ?.filter((part) => part.type === 'text' && typeof part.text === 'string')
+            .map((part) => part.text)
+            .join('')
+      };
+    case 'google_gemini':
+      return {
+        // The key travels in a header, not the query string, so it can never
+        // land in request logs.
+        url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`,
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: {
+          contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
+          ...(request.systemPrompt ? { systemInstruction: { parts: [{ text: request.systemPrompt }] } } : {})
+        },
+        extractCompletion: (payload) =>
+          (payload as { candidates?: readonly { content?: { parts?: readonly { text?: string }[] } }[] }).candidates?.[0]?.content?.parts
+            ?.map((part) => part.text ?? '')
+            .join('')
+      };
+    default:
+      return null;
   }
 }

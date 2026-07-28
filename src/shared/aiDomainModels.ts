@@ -7,10 +7,13 @@ export type AiDomainProvider = {
 };
 
 export const AI_DOMAIN_PROVIDERS: readonly AiDomainProvider[] = [
-  { id: 'local_ollama', label: 'Ollama Local', executionPath: 'local' },
+  { id: 'local_ollama', label: 'Ollama', executionPath: 'local' },
   { id: 'local_qwen', label: 'Local Engine', executionPath: 'local' },
   { id: 'local_video', label: 'Local Engine', executionPath: 'local' },
   { id: 'openai', label: 'OpenAI', executionPath: 'api' },
+  { id: 'anthropic', label: 'Anthropic', executionPath: 'api' },
+  { id: 'google_gemini', label: 'Google Gemini', executionPath: 'api' },
+  { id: 'deepseek', label: 'DeepSeek', executionPath: 'api' },
   { id: 'gemini', label: 'Google Gemini', executionPath: 'api' },
   { id: 'elevenlabs', label: 'ElevenLabs', executionPath: 'api' }
 ] as const;
@@ -103,7 +106,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     id: 'qwen2.5-coder',
     providerId: 'local_ollama',
     label: 'Qwen 2.5 Coder 14B',
-    providerLabel: 'Ollama Local',
+    providerLabel: 'Ollama',
     description: 'Local tool-calling model for LangGraph edit operations.',
     executionPath: 'local',
     precisionBit: '4-bit (Q4_K_M)',
@@ -116,13 +119,72 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     providerId: 'openai',
     label: 'GPT-5 Mini',
     providerLabel: 'OpenAI',
-    description: 'Cloud tool-calling model for agentic timeline editing.',
+    description: 'Fast cloud tool-calling model for agentic timeline editing.',
     executionPath: 'api',
-    contextWindow: '128k',
+    contextWindow: '256k',
     availableContexts: ['32k', '64k', '128k', '256k'],
     domains: ['edit-agent'],
-    available: false,
-    unavailableReason: 'OpenAI tool-calling adapter is not implemented in this build.'
+    available: true
+  },
+  {
+    id: 'gpt-5',
+    providerId: 'openai',
+    label: 'GPT-5',
+    providerLabel: 'OpenAI',
+    description: 'Flagship cloud reasoning model for complex agentic edits.',
+    executionPath: 'api',
+    contextWindow: '256k',
+    availableContexts: ['64k', '128k', '256k'],
+    domains: ['edit-agent'],
+    available: true
+  },
+  {
+    id: 'claude-sonnet-5',
+    providerId: 'anthropic',
+    label: 'Claude Sonnet 5',
+    providerLabel: 'Anthropic',
+    description: 'Balanced cloud tool-calling model for timeline edits.',
+    executionPath: 'api',
+    contextWindow: '200k',
+    availableContexts: ['64k', '128k', '200k'],
+    domains: ['edit-agent'],
+    available: true
+  },
+  {
+    id: 'claude-opus-4-8',
+    providerId: 'anthropic',
+    label: 'Claude Opus 4.8',
+    providerLabel: 'Anthropic',
+    description: 'Most capable Claude model for complex editing logic.',
+    executionPath: 'api',
+    contextWindow: '200k',
+    availableContexts: ['64k', '128k', '200k'],
+    domains: ['edit-agent'],
+    available: true
+  },
+  {
+    id: 'gemini-3-pro',
+    providerId: 'google_gemini',
+    label: 'Gemini 3 Pro',
+    providerLabel: 'Google Gemini',
+    description: 'Long-context cloud model for full-timeline agentic edits.',
+    executionPath: 'api',
+    contextWindow: '1M',
+    availableContexts: ['128k', '512k', '1M'],
+    domains: ['edit-agent'],
+    available: true
+  },
+  {
+    id: 'deepseek-v3.1',
+    providerId: 'deepseek',
+    label: 'DeepSeek V3.1',
+    providerLabel: 'DeepSeek',
+    description: 'Open-weights cloud tool-calling model for scene sequencing.',
+    executionPath: 'api',
+    contextWindow: '128k',
+    availableContexts: ['32k', '64k', '128k'],
+    domains: ['edit-agent'],
+    available: true
   }
 ] as const;
 

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactEleme
 import type { AgentChatDisplayMessage, AgentChatStatus, AgentToolCallProposal } from '../../shared/agentChat';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import type { AiDomainModelConfig } from '../../shared/aiDomainModels';
+import { isProviderConnected } from '../../shared/llmProviders';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useLlmModel } from './LlmProviderContext';
 
@@ -15,6 +16,8 @@ function createConversationId(): string {
 interface AgentChatController {
   readonly selectedModel: AiDomainModelConfig;
   readonly isLocalModel: boolean;
+  /** True when the selected model's provider is usable: local, or cloud with a stored key. */
+  readonly modelReady: boolean;
   readonly input: string;
   readonly setInput: (value: string) => void;
   readonly messages: readonly AgentChatDisplayMessage[];
@@ -44,7 +47,7 @@ type AgentChatProviderProps = {
 };
 
 export function AgentChatProvider({ activeProject, restoreRequest = null, onRestoreHandled, children }: AgentChatProviderProps): ReactElement {
-  const { providerConfig } = useLlmModel();
+  const { providerConfig, credentialStatus } = useLlmModel();
   const { selectedModel: getSelectedDomainModel } = useAiDomainModel();
   const selectedModel = getSelectedDomainModel('edit-agent');
   const conversationIdRef = useRef<string>(createConversationId());
@@ -59,7 +62,8 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   // main process can re-seed an empty (e.g. post-relaunch) conversation thread.
   const restoredSeedRef = useRef<readonly AgentChatDisplayMessage[] | null>(null);
 
-  const isLocalModel = selectedModel.providerId === 'local_ollama';
+  const isLocalModel = selectedModel.executionPath === 'local';
+  const modelReady = isLocalModel || isProviderConnected(selectedModel.providerId, credentialStatus);
 
   useEffect(() => {
     if (restoreRequest === null) return;
@@ -74,7 +78,7 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   }, [restoreRequest, onRestoreHandled]);
 
   const sendMessage = async (text: string): Promise<void> => {
-    if (text.trim().length === 0 || isBusy || !isLocalModel) return;
+    if (text.trim().length === 0 || isBusy || !modelReady) return;
 
     setIsBusy(true);
     setError(undefined);
@@ -164,6 +168,7 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   const controller: AgentChatController = {
     selectedModel,
     isLocalModel,
+    modelReady,
     input,
     setInput,
     messages,
