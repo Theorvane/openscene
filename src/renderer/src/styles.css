@@ -803,6 +803,14 @@ button {
   white-space: nowrap;
 }
 
+.projects-home__error {
+  margin: 0;
+  padding-left: var(--space-2);
+  color: var(--color-danger);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
 .projects-home__empty {
   margin: 0;
   padding-left: var(--space-2);

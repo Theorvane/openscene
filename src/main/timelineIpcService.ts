@@ -115,7 +115,7 @@ export class TimelineIpcService {
       }
       const result = await this.dependencies.projects.openOrInitializeFolder(directory);
       if (result === null) {
-        return fail('INVALID_INPUT', 'The selected folder already contains files that are not an OpenVideo project.');
+        return fail('INVALID_INPUT', 'The selected folder has a project file that could not be read, so it was left untouched.');
       }
       return ok({ cancelled: false, created: result.created, project: result.project });
     } catch (error: unknown) {

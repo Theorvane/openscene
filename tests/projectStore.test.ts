@@ -434,16 +434,32 @@ describe('folder-backed project store', () => {
     });
   });
 
-  it('given a folder with unrelated visible files, when opened-or-initialized, then null is returned and the folder stays untouched', async () => {
+  it('given a folder with unrelated files, when opened-or-initialized, then a project is created there and the files are untouched', async () => {
     await withTempDirectory(async (directory) => {
-      const cluttered = join(directory, 'cluttered');
+      const cluttered = join(directory, 'Clips Folder');
       await mkdir(cluttered);
-      await writeFile(join(cluttered, 'notes.txt'), 'keep me');
+      await writeFile(join(cluttered, 'take-1.mp4'), 'keep me');
       const store = folderStore(directory);
 
-      await expect(store.openOrInitializeFolder(cluttered)).resolves.toBeNull();
+      const result = await store.openOrInitializeFolder(cluttered);
 
-      expect((await readdir(cluttered)).sort()).toEqual(['notes.txt']);
+      expect(result?.created).toBe(true);
+      expect(result?.project.name).toBe('Clips Folder');
+      expect((await readdir(cluttered)).sort()).toEqual(['project.json', 'take-1.mp4']);
+      await expect(readFile(join(cluttered, 'take-1.mp4'), 'utf8')).resolves.toBe('keep me');
+    });
+  });
+
+  it('given a folder whose project file cannot be read, when opened-or-initialized, then null is returned and the file is never overwritten', async () => {
+    await withTempDirectory(async (directory) => {
+      const corrupt = join(directory, 'corrupt');
+      await mkdir(corrupt);
+      await writeFile(join(corrupt, 'project.json'), '{not valid json', 'utf8');
+      const store = folderStore(directory);
+
+      await expect(store.openOrInitializeFolder(corrupt)).resolves.toBeNull();
+
+      await expect(readFile(join(corrupt, 'project.json'), 'utf8')).resolves.toBe('{not valid json');
       expect(await store.list()).toEqual([]);
     });
   });

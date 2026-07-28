@@ -13,6 +13,7 @@ type ProjectsPageProps = {
   readonly onOpenProject?: (projectId: string) => Promise<void>;
   readonly onOpenProjectFolder?: () => Promise<void>;
   readonly onOpenChat?: (entry: AgentChatHistoryEntry) => Promise<void>;
+  readonly errorText?: string | undefined;
   readonly isBusy?: boolean;
 };
 
@@ -41,6 +42,7 @@ export function ProjectsPage({
   onOpenProject,
   onOpenProjectFolder,
   onOpenChat,
+  errorText,
   isBusy = false
 }: ProjectsPageProps): ReactElement {
   const chatGroups = groupAgentChatHistory(chats, new Date());
@@ -61,6 +63,9 @@ export function ProjectsPage({
             <FolderPlusIcon />
           </Button>
         </div>
+        {errorText !== undefined && errorText.length > 0 && (
+          <p role="alert" className="projects-home__error">{errorText}</p>
+        )}
         {projects.length > 0 ? (
           <ul className="projects-home__list">
             {projects.map((item) => {
@@ -90,7 +95,7 @@ export function ProjectsPage({
           </ul>
         ) : (
           <p className="projects-home__empty">
-            No project folders yet. Pick a folder with the add button: an OpenVideo project inside opens, and an empty folder becomes a new project named after it.
+            No project folders yet. Pick any folder with the add button: an OpenVideo project inside opens, and any other folder becomes a new project named after it.
           </p>
         )}
       </aside>

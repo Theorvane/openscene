@@ -1,4 +1,4 @@
-import { chmod, mkdir, readdir, rm } from 'node:fs/promises';
+import { chmod, mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -148,9 +148,12 @@ export class ProjectStore {
   }
 
   /**
-   * Single-picker flow: a folder with a project opens it, an empty folder
-   * (hidden files like .DS_Store don't count) becomes a new project named
-   * after the folder itself, and any other folder is rejected untouched.
+   * Single-picker flow: a folder with a readable project opens it, and any
+   * folder without a project.json becomes a new project named after the
+   * folder itself — its existing files are left untouched; only project.json
+   * is written. A folder whose project.json exists but cannot be read is
+   * rejected so a real (possibly newer or corrupt) project is never
+   * overwritten.
    */
   async openOrInitializeFolder(directory: string, now = new Date()): Promise<OpenOrInitializeFolderResult | null> {
     if (this.locations === null) {
@@ -162,8 +165,8 @@ export class ProjectStore {
       await this.locations.register(existing.id, resolved);
       return { project: existing, created: false };
     }
-    const entries = await readdir(resolved);
-    if (entries.some((entry) => !entry.startsWith('.'))) {
+    const hasProjectFile = await stat(join(resolved, PROJECT_FILE_NAME)).then(() => true).catch(() => false);
+    if (hasProjectFile) {
       return null;
     }
     const id = randomUUID();

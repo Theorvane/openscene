@@ -136,9 +136,9 @@ describe('timeline IPC service', () => {
     });
   });
 
-  it('given a picked folder with unrelated files, when opened, then a safe invalid-input error is returned and nothing is written', async () => {
+  it('given a picked folder with unrelated files, when opened, then a project is initialized there without touching the files', async () => {
     await withTempDirectory(async (directory) => {
-      const cluttered = join(directory, 'cluttered');
+      const cluttered = join(directory, 'Location Footage');
       await mkdir(cluttered);
       await writeFile(join(cluttered, 'notes.txt'), 'not a project');
       const projects = new ProjectStore(
@@ -153,8 +153,35 @@ describe('timeline IPC service', () => {
 
       const opened = await service.openProjectFolder(undefined);
 
-      expect(opened).toEqual({ ok: false, error: { code: 'INVALID_INPUT', message: 'The selected folder already contains files that are not an OpenVideo project.' } });
-      expect(await projects.list()).toEqual([]);
+      if (!opened.ok || opened.value.cancelled) {
+        throw new Error('Expected the folder to become a project.');
+      }
+      expect(opened.value.created).toBe(true);
+      expect(opened.value.project.name).toBe('Location Footage');
+      await expect(readFile(join(cluttered, 'notes.txt'), 'utf8')).resolves.toBe('not a project');
+      expect(JSON.stringify(opened)).not.toContain(directory);
+    });
+  });
+
+  it('given a picked folder with an unreadable project file, when opened, then a safe invalid-input error is returned and the file survives', async () => {
+    await withTempDirectory(async (directory) => {
+      const corrupt = join(directory, 'corrupt');
+      await mkdir(corrupt);
+      await writeFile(join(corrupt, 'project.json'), '{not valid json', 'utf8');
+      const projects = new ProjectStore(
+        join(directory, 'projects'),
+        new ProjectLocationRegistry(join(directory, 'project-locations.json'))
+      );
+      const service = new TimelineIpcService({
+        projects,
+        assets: new AssetLibraryStore(join(directory, 'projects'), projects),
+        selectProjectDirectory: async () => ({ canceled: false, filePaths: [corrupt] })
+      });
+
+      const opened = await service.openProjectFolder(undefined);
+
+      expect(opened).toEqual({ ok: false, error: { code: 'INVALID_INPUT', message: 'The selected folder has a project file that could not be read, so it was left untouched.' } });
+      await expect(readFile(join(corrupt, 'project.json'), 'utf8')).resolves.toBe('{not valid json');
     });
   });
 

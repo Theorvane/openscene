@@ -221,6 +221,7 @@ export function App(): ReactElement {
                 if (opened) navigateToPage('home');
               }}
               onOpenChat={openChatFromHistory}
+              errorText={editor.statusMessage.tone === 'danger' ? editor.statusMessage.text : undefined}
               isBusy={editor.isBusy}
             />
           </section>
