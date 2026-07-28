@@ -24,15 +24,16 @@ describe('app workspaces', () => {
     expect(workspaces.map((workspace) => workspace.statusLabel)).toEqual(['Local timeline', 'Local narration', 'Result studio']);
   });
 
-  it('returns a stable page model with Home as the initial page and Settings outside workspaces', () => {
+  it('returns a stable page model with Projects as the initial page and Settings outside workspaces', () => {
     const pages = APP_PAGES;
 
-    expect(APP_PAGE_IDS).toEqual(['home', 'edit', 'voice-generation', 'video-generation', 'settings']);
-    expect(getDefaultAppPageId()).toBe('home');
+    expect(APP_PAGE_IDS).toEqual(['home', 'projects', 'edit', 'voice-generation', 'video-generation', 'settings']);
+    expect(getDefaultAppPageId()).toBe('projects');
     expect(pages.map((page) => page.id)).toEqual(APP_PAGE_IDS);
-    expect(pages.map((page) => page.label)).toEqual(['Home', 'Editing', 'Voice Generation', 'Video Generation', 'Settings']);
+    expect(pages.map((page) => page.label)).toEqual(['Home', 'Projects', 'Editing', 'Voice Generation', 'Video Generation', 'Settings']);
     expect(APP_PAGE_BY_ID.settings.panelId).toBe('app-page-panel-settings');
     expect(isWorkspacePageId('home')).toBe(false);
+    expect(isWorkspacePageId('projects')).toBe(false);
     expect(isWorkspacePageId('edit')).toBe(true);
     expect(isWorkspacePageId('voice-generation')).toBe(true);
     expect(isWorkspacePageId('video-generation')).toBe(true);

@@ -1,6 +1,6 @@
 import type { AppWorkspaceId } from './appWorkspaces';
 
-export const APP_PAGE_IDS = ['home', 'edit', 'voice-generation', 'video-generation', 'settings'] as const;
+export const APP_PAGE_IDS = ['home', 'projects', 'edit', 'voice-generation', 'video-generation', 'settings'] as const;
 export type AppPageId = (typeof APP_PAGE_IDS)[number];
 
 export type AppPage = {
@@ -18,6 +18,12 @@ export const APP_PAGES = [
     label: 'Home',
     chromeLabel: 'Home',
     panelId: 'app-page-panel-home'
+  },
+  {
+    id: 'projects',
+    label: 'Projects',
+    chromeLabel: 'Projects',
+    panelId: 'app-page-panel-projects'
   },
   {
     id: 'edit',
@@ -47,14 +53,15 @@ export const APP_PAGES = [
 
 export const APP_PAGE_BY_ID = {
   home: APP_PAGES[0],
-  edit: APP_PAGES[1],
-  'voice-generation': APP_PAGES[2],
-  'video-generation': APP_PAGES[3],
-  settings: APP_PAGES[4]
+  projects: APP_PAGES[1],
+  edit: APP_PAGES[2],
+  'voice-generation': APP_PAGES[3],
+  'video-generation': APP_PAGES[4],
+  settings: APP_PAGES[5]
 } as const satisfies Readonly<Record<AppPageId, AppPage>>;
 
 export function getDefaultAppPageId(): AppPageId {
-  return 'home';
+  return 'projects';
 }
 
 export function isWorkspacePageId(pageId: AppPageId): pageId is WorkspacePageId {
@@ -64,6 +71,7 @@ export function isWorkspacePageId(pageId: AppPageId): pageId is WorkspacePageId 
     case 'video-generation':
       return true;
     case 'home':
+    case 'projects':
     case 'settings':
       return false;
     default:

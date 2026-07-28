@@ -6,6 +6,7 @@ import { FirstRunOnboarding } from './FirstRunOnboarding';
 import { HomePage } from './HomePage';
 import { NarrationPanel } from './NarrationPanel';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
+import { ProjectsPage } from './ProjectsPage';
 import { SettingsWorkspace } from './SettingsWorkspace';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
 import { APP_PAGE_BY_ID, getDefaultAppPageId, isWorkspacePageId } from './appPages';
@@ -138,6 +139,31 @@ export function App(): ReactElement {
               isBusy={editor.isBusy}
             />
           </section>
+          <section
+            aria-labelledby="projects-page-title"
+            className="app-page app-page--projects"
+            hidden={activePageId !== 'projects'}
+            id="app-page-panel-projects"
+            ref={setPagePanelRef('projects')}
+            role="region"
+            tabIndex={-1}
+          >
+            <ProjectsPage
+              project={editor.project}
+              projects={editor.projects}
+              newProjectName={editor.newProjectName}
+              onNewProjectNameChange={editor.setNewProjectName}
+              onCreateProject={async () => {
+                await editor.createProject();
+                setActiveWorkspace('edit');
+              }}
+              onOpenProject={async (projectId) => {
+                await editor.openProject(projectId);
+                setActiveWorkspace('edit');
+              }}
+              isBusy={editor.isBusy}
+            />
+          </section>
           <div className="app-stack local-edit-bay" hidden={!workspaceIsVisible}>
             <div className="app-workspace-panel-stack">
               <section
@@ -178,8 +204,8 @@ export function App(): ReactElement {
               </section>
             </div>
           </div>
-          <div
-            aria-labelledby="settings-page-title"
+          <section
+            aria-labelledby="settings-title"
             className="app-page app-page--settings"
             hidden={activePageId !== 'settings'}
             id="app-page-panel-settings"
@@ -188,10 +214,10 @@ export function App(): ReactElement {
             tabIndex={-1}
           >
             <SettingsWorkspace onReplayFirstRunOnboarding={replayFirstRunOnboarding} />
-          </div>
-          {showFirstRunOnboarding && <FirstRunOnboarding onComplete={completeFirstRunOnboarding} />}
+          </section>
         </div>
       </ProjectResultImportProvider>
+      {showFirstRunOnboarding && <FirstRunOnboarding onComplete={completeFirstRunOnboarding} />}
     </AppShell>
   );
 }

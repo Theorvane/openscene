@@ -57,6 +57,14 @@ function HomeIcon(): ReactElement {
   );
 }
 
+function FolderIcon(): ReactElement {
+  return (
+    <svg className="product-chrome__button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    </svg>
+  );
+}
+
 function AppShellContent({ activePage, children, onPageChange, selectedContextAsset, activeProjectName }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
@@ -64,6 +72,7 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
   const dragOriginRef = useRef<ChatPanelDragOrigin | null>(null);
   const chatPanelWidth = layoutPreference.chatPanelWidth;
   const homeIsActive = activePage.id === 'home';
+  const projectsIsActive = activePage.id === 'projects';
   const settingsIsActive = activePage.id === 'settings';
 
   const setChatPanelWidth = (width: number): void => {
@@ -127,6 +136,16 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
               >
                 <HomeIcon />
                 Home
+              </Button>
+              <Button
+                aria-controls="app-page-panel-projects"
+                aria-current={projectsIsActive ? 'page' : undefined}
+                className="product-chrome__nav-button"
+                onClick={() => onPageChange('projects')}
+                variant={projectsIsActive ? 'primary' : 'ghost'}
+              >
+                <FolderIcon />
+                Projects
               </Button>
               <Button
                 aria-controls="app-page-panel-settings"
