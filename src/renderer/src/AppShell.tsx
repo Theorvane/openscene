@@ -8,7 +8,7 @@ import {
   clampAgentChatPanelWidth,
   getNextAgentChatPanelWidthFromKey
 } from './agentChatLayoutPreferences';
-import type { AppPage, AppPageId } from './appPages';
+import { isWorkspacePageId, type AppPage, type AppPageId } from './appPages';
 import { AgentChatPanel } from './AgentChatPanel';
 import { AgentChatProvider, useAgentChat } from './AgentChatContext';
 import { ThemeSelector } from './ThemeSelector';
@@ -74,6 +74,7 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
   const homeIsActive = activePage.id === 'home';
   const projectsIsActive = activePage.id === 'projects';
   const settingsIsActive = activePage.id === 'settings';
+  const showChatPanel = isWorkspacePageId(activePage.id);
 
   const setChatPanelWidth = (width: number): void => {
     const containerWidth = shellBodyRef.current?.getBoundingClientRect().width;
@@ -170,26 +171,30 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
             </div>
           )}
         </div>
-        <div
-          aria-controls="app-shell-workspace app-shell-agent-chat"
-          aria-label="Resize Edit Agent chat panel"
-          aria-orientation="vertical"
-          aria-valuemax={AGENT_CHAT_LAYOUT_MAX_WIDTH}
-          aria-valuemin={AGENT_CHAT_LAYOUT_MIN_WIDTH}
-          aria-valuenow={chatPanelWidth}
-          aria-valuetext={`Edit Agent chat ${chatPanelWidth} pixels`}
-          className="agent-chat-resize-splitter"
-          onKeyDown={onChatSplitterKeyDown}
-          onPointerDown={onChatSplitterPointerDown}
-          onPointerMove={onChatSplitterPointerMove}
-          onPointerUp={releasePointer}
-          role="separator"
-          tabIndex={0}
-          title="Drag to resize Edit Agent chat panel"
-        />
-        <aside id="app-shell-agent-chat" className="agent-chat-panel-shell" style={{ width: `${chatPanelWidth}px` }}>
-          <AgentChatPanel selectedContextAsset={selectedContextAsset} width={chatPanelWidth} />
-        </aside>
+        {showChatPanel && (
+          <>
+            <div
+              aria-controls="app-shell-workspace app-shell-agent-chat"
+              aria-label="Resize Edit Agent chat panel"
+              aria-orientation="vertical"
+              aria-valuemax={AGENT_CHAT_LAYOUT_MAX_WIDTH}
+              aria-valuemin={AGENT_CHAT_LAYOUT_MIN_WIDTH}
+              aria-valuenow={chatPanelWidth}
+              aria-valuetext={`Edit Agent chat ${chatPanelWidth} pixels`}
+              className="agent-chat-resize-splitter"
+              onKeyDown={onChatSplitterKeyDown}
+              onPointerDown={onChatSplitterPointerDown}
+              onPointerMove={onChatSplitterPointerMove}
+              onPointerUp={releasePointer}
+              role="separator"
+              tabIndex={0}
+              title="Drag to resize Edit Agent chat panel"
+            />
+            <aside id="app-shell-agent-chat" className="agent-chat-panel-shell" style={{ width: `${chatPanelWidth}px` }}>
+              <AgentChatPanel selectedContextAsset={selectedContextAsset} width={chatPanelWidth} />
+            </aside>
+          </>
+        )}
       </div>
     </main>
   );
