@@ -109,17 +109,41 @@ export function useTimelineEditor() {
     const response = await window.videoTool.createProject({ name: newProjectName });
     setIsBusy(false);
     if (response.ok) {
-      setLoadedProject(response.value);
+      if (response.value.cancelled) {
+        return false;
+      }
+      const project = response.value.project;
+      setLoadedProject(project);
       setSelectedAssetId('');
       setSelectedClipId('');
       setHasUnsavedTimeline(false);
       await refreshProjects();
-      setStatusMessage({ tone: 'success', text: `Created ${response.value.name}.` });
+      setStatusMessage({ tone: 'success', text: `Created ${project.name} in its own folder.` });
       return true;
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
     return false;
   }, [newProjectName, refreshProjects]);
+
+  const openProjectFolder = useCallback(async (): Promise<boolean> => {
+    setIsBusy(true);
+    const response = await window.videoTool.openProjectFolder();
+    setIsBusy(false);
+    if (response.ok) {
+      if (response.value.cancelled) {
+        return false;
+      }
+      const project = response.value.project;
+      setLoadedProject(project);
+      setSelectedAssetId(project.assets[0]?.id ?? '');
+      setSelectedClipId('');
+      setHasUnsavedTimeline(false);
+      await refreshProjects();
+      return true;
+    }
+    setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
+    return false;
+  }, [refreshProjects]);
 
   const deleteCurrentProject = useCallback(async () => {
     if (project === null) return;
@@ -286,7 +310,7 @@ export function useTimelineEditor() {
   return {
     addTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importTtsResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
-    openProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
+    openProject, openProjectFolder, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
     selectedAsset, selectedAssetId, selectedClip, selectedClipId, setNewProjectName, setSelectedAssetId, setSelectedClipId,
     splitSelectedClip, statusMessage, trimSelectedClip, updateAssetMetadata, updateSelectedClipEffects,
     activePlaybackClip: playback.activePlaybackClip, canRedoTimeline: (timelineHistory?.future.length ?? 0) > 0,

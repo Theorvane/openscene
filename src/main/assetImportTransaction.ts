@@ -18,8 +18,7 @@ import {
   ProjectStoreError,
   assertOpaqueId,
   isInsideDirectory,
-  projectAssetPath,
-  projectDirectory
+  projectAssetPathWithinDirectory
 } from './projectStoreSupport';
 
 export type ImportAssetFromPathInput = {
@@ -50,8 +49,7 @@ type ImportBatchInput = {
   readonly now: Date;
 };
 
-function resolveAssetsDirectory(rootDirectory: string, projectId: string): string {
-  const projectPath = projectDirectory(rootDirectory, projectId);
+function resolveAssetsDirectory(projectPath: string): string {
   const assetsPath = join(projectPath, PROJECT_ASSETS_DIRECTORY);
   if (!isInsideDirectory(projectPath, assetsPath)) {
     throw new ProjectStoreError('Resolved assets path escaped its project directory.');
@@ -59,9 +57,8 @@ function resolveAssetsDirectory(rootDirectory: string, projectId: string): strin
   return assetsPath;
 }
 
-async function ensureAssetsDirectory(rootDirectory: string, projectId: string): Promise<EnsuredAssetsDirectory> {
-  const projectPath = projectDirectory(rootDirectory, projectId);
-  const assetsPath = resolveAssetsDirectory(rootDirectory, projectId);
+async function ensureAssetsDirectory(projectPath: string): Promise<EnsuredAssetsDirectory> {
+  const assetsPath = resolveAssetsDirectory(projectPath);
   let created = false;
   try {
     const stats = await lstat(assetsPath);
@@ -85,7 +82,7 @@ async function ensureAssetsDirectory(rootDirectory: string, projectId: string): 
 }
 
 async function prepareImport(
-  rootDirectory: string,
+  projectPath: string,
   assetsDirectory: string,
   input: ImportAssetFromPathInput,
   timestamp: string
@@ -132,7 +129,7 @@ async function prepareImport(
     asset,
     sourcePath: input.sourcePath,
     assetDirectory: join(assetsDirectory, assetId),
-    destinationPath: projectAssetPath(rootDirectory, input.projectId, projectRelativePath)
+    destinationPath: projectAssetPathWithinDirectory(projectPath, projectRelativePath)
   };
 }
 
@@ -151,16 +148,17 @@ export async function importAssetBatch(input: ImportBatchInput): Promise<readonl
   if (project === null) {
     throw new ProjectStoreError(`Project ${firstImport.projectId} was not found.`);
   }
-  const assetsDirectory = resolveAssetsDirectory(input.rootDirectory, firstImport.projectId);
+  const projectPath = await input.projects.resolveDirectory(firstImport.projectId);
+  const assetsDirectory = resolveAssetsDirectory(projectPath);
   const timestamp = input.now.toISOString();
   const prepared = await Promise.all(
-    input.imports.map((candidate) => prepareImport(input.rootDirectory, assetsDirectory, candidate, timestamp))
+    input.imports.map((candidate) => prepareImport(projectPath, assetsDirectory, candidate, timestamp))
   );
   assertAssetImportQuota(
     { selectedFileBytes: prepared.map(({ asset }) => asset.byteLength), existingProjectBytes: projectAssetBytes(project) },
     input.limits
   );
-  const ensuredAssetsDirectory = await ensureAssetsDirectory(input.rootDirectory, firstImport.projectId);
+  const ensuredAssetsDirectory = await ensureAssetsDirectory(projectPath);
   const createdDirectories: string[] = [];
   try {
     for (const candidate of prepared) {

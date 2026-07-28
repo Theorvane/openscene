@@ -10,6 +10,7 @@ import { ExportIpcService } from './exportIpcService';
 import { registerExportIpcHandlers } from './exportIpcHandlers';
 import { ExportJobStore } from './exportJobStore';
 import { LocalTtsJobStore } from './localTtsJobStore';
+import { ProjectLocationRegistry } from './projectLocations';
 import { ProjectStore } from './projectStore';
 import { RecordingFileStore } from './recordingStore';
 import { registerResultAssetImportHandlers } from './resultAssetImportHandlers';
@@ -39,7 +40,8 @@ registerTimelineAssetScheme();
 
 const sourceCatalog = new SourceCatalog();
 const recordingStore = new RecordingFileStore(resolveRecordingsDirectory());
-const projectStore = new ProjectStore(join(app.getPath('userData'), 'projects'));
+const projectLocations = new ProjectLocationRegistry(join(app.getPath('userData'), 'project-locations.json'));
+const projectStore = new ProjectStore(join(app.getPath('userData'), 'projects'), projectLocations);
 const assetLibraryStore = new AssetLibraryStore(join(app.getPath('userData'), 'projects'), projectStore);
 const voiceProfileStore = new VoiceProfileStore(join(app.getPath('userData'), 'voice-profiles'));
 const ttsJobStore = new LocalTtsJobStore();
@@ -53,6 +55,10 @@ const timelineIpcService = new TimelineIpcService({
   selectMediaFiles: ({ acceptedKinds, extensions }) => dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],
     filters: dialogFilters(acceptedKinds, extensions)
+  }),
+  selectProjectDirectory: () => dialog.showOpenDialog({
+    title: 'Choose a project folder',
+    properties: ['openDirectory', 'createDirectory']
   })
 });
 const voiceTtsService = new VoiceTtsIpcService({

@@ -33,6 +33,7 @@ import type {
 } from '../shared/models';
 import type {
   CreateProjectInput,
+  CreateProjectResult,
   DeleteProjectInput,
   GetAssetPlaybackUrlInput,
   ImportProjectAssetsInput,
@@ -41,6 +42,7 @@ import type {
   LocalProjectSnapshot,
   LocalProjectSummary,
   MediaAsset,
+  OpenProjectFolderResult,
   OpenProjectInput,
   SaveTimelineInput,
   UpdateAssetMetadataInput
@@ -88,8 +90,9 @@ export interface VideoToolApi {
   openTtsResult(input: TtsJobActionInput): Promise<ApiResponse<{ opened: boolean }>>;
   revealTtsResult(input: TtsJobActionInput): Promise<ApiResponse<{ revealed: boolean }>>;
   listProjects(): Promise<ApiResponse<readonly LocalProjectSummary[]>>;
-  createProject(input: CreateProjectInput): Promise<ApiResponse<LocalProjectSnapshot>>;
+  createProject(input: CreateProjectInput): Promise<ApiResponse<CreateProjectResult>>;
   openProject(input: OpenProjectInput): Promise<ApiResponse<LocalProjectSnapshot>>;
+  openProjectFolder(): Promise<ApiResponse<OpenProjectFolderResult>>;
   deleteProject(input: DeleteProjectInput): Promise<ApiResponse<{ readonly deleted: boolean }>>;
   importProjectAssets(input: ImportProjectAssetsInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
   importRecordingResultAsset(input: ImportRecordingResultAssetInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
@@ -165,8 +168,9 @@ const videoTool: VideoToolApi = {
   revealTtsResult: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.revealTtsResult, input) as Promise<ApiResponse<{ revealed: boolean }>>,
   listProjects: () => ipcRenderer.invoke(IPC_CHANNELS.projectsList) as Promise<ApiResponse<readonly LocalProjectSummary[]>>,
-  createProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsCreate, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
+  createProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsCreate, input) as Promise<ApiResponse<CreateProjectResult>>,
   openProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsOpen, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
+  openProjectFolder: () => ipcRenderer.invoke(IPC_CHANNELS.projectsOpenFolder) as Promise<ApiResponse<OpenProjectFolderResult>>,
   deleteProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsDelete, input) as Promise<ApiResponse<{ readonly deleted: boolean }>>,
   importProjectAssets: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.projectAssetsImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,

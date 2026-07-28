@@ -10,8 +10,7 @@ import {
   ProjectStoreError,
   assertOpaqueId,
   isInsideDirectory,
-  projectAssetPath,
-  projectDirectory
+  projectAssetPathWithinDirectory
 } from './projectStoreSupport';
 
 export { DEFAULT_ASSET_IMPORT_LIMITS } from './assetImportPolicy';
@@ -77,8 +76,8 @@ export class AssetLibraryStore {
     if (asset === null) {
       return null;
     }
-    const projectPath = projectDirectory(this.rootDirectory, projectId);
-    const filePath = projectAssetPath(this.rootDirectory, projectId, asset.projectRelativePath);
+    const projectPath = await this.projects.resolveDirectory(projectId);
+    const filePath = projectAssetPathWithinDirectory(projectPath, asset.projectRelativePath);
     try {
       const projectStats = await lstat(projectPath);
       if (projectStats.isSymbolicLink() || !projectStats.isDirectory()) {

@@ -187,6 +187,10 @@ export function App(): ReactElement {
                 const opened = await editor.openProject(projectId);
                 if (opened) navigateToPage('home');
               }}
+              onOpenProjectFolder={async () => {
+                const opened = await editor.openProjectFolder();
+                if (opened) navigateToPage('home');
+              }}
               isBusy={editor.isBusy}
             />
           </section>

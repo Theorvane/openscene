@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { AssetLibraryStore } from '../src/main/assetLibraryStore';
+import { ProjectLocationRegistry } from '../src/main/projectLocations';
 import { ProjectStore } from '../src/main/projectStore';
 import { TimelineIpcService } from '../src/main/timelineIpcService';
 import { DEFAULT_CLIP_EFFECTS } from '../src/shared/timelineTypes';
@@ -22,25 +23,110 @@ describe('timeline IPC service', () => {
   it('given project requests, when handled through the IPC service, then path-free project responses are returned', async () => {
     await withTempDirectory(async (directory) => {
       // Given
-      const projects = new ProjectStore(join(directory, 'projects'));
-      const service = new TimelineIpcService({ projects, assets: new AssetLibraryStore(join(directory, 'projects'), projects) });
+      const workspace = join(directory, 'workspace');
+      await mkdir(workspace);
+      const projects = new ProjectStore(
+        join(directory, 'projects'),
+        new ProjectLocationRegistry(join(directory, 'project-locations.json'))
+      );
+      const service = new TimelineIpcService({
+        projects,
+        assets: new AssetLibraryStore(join(directory, 'projects'), projects),
+        selectProjectDirectory: async () => ({ canceled: false, filePaths: [workspace] })
+      });
 
       // When
       const created = await service.createProject({ name: 'Cutdown' });
-      if (!created.ok) {
+      if (!created.ok || created.value.cancelled) {
         throw new Error('Expected project creation to succeed.');
       }
+      const project = created.value.project;
       const listed = await service.listProjects(undefined);
-      const opened = await service.openProject({ projectId: created.value.id });
+      const opened = await service.openProject({ projectId: project.id });
       const invalid = await service.openProject({ projectId: '../escape' });
-      const deleted = await service.deleteProject({ projectId: created.value.id });
+      const deleted = await service.deleteProject({ projectId: project.id });
 
       // Then
-      expect(listed).toEqual({ ok: true, value: [{ id: created.value.id, name: 'Cutdown', createdAt: created.value.createdAt, updatedAt: created.value.updatedAt }] });
-      expect(opened).toEqual({ ok: true, value: created.value });
+      expect(listed).toEqual({
+        ok: true,
+        value: [{ id: project.id, name: 'Cutdown', createdAt: project.createdAt, updatedAt: project.updatedAt, storage: 'external', folderName: 'Cutdown' }]
+      });
+      expect(opened).toEqual({ ok: true, value: project });
       expect(invalid).toEqual({ ok: false, error: { code: 'INVALID_INPUT', message: 'The project lookup payload was not valid.' } });
       expect(deleted).toEqual({ ok: true, value: { deleted: true } });
       expect(JSON.stringify({ created, listed, opened, deleted })).not.toContain(directory);
+    });
+  });
+
+  it('given a cancelled directory dialog, when a project is created, then a cancelled result is returned without touching disk', async () => {
+    await withTempDirectory(async (directory) => {
+      const projects = new ProjectStore(
+        join(directory, 'projects'),
+        new ProjectLocationRegistry(join(directory, 'project-locations.json'))
+      );
+      const service = new TimelineIpcService({ projects, assets: new AssetLibraryStore(join(directory, 'projects'), projects) });
+
+      const created = await service.createProject({ name: 'Cutdown' });
+
+      expect(created).toEqual({ ok: true, value: { cancelled: true } });
+      expect(await projects.list()).toEqual([]);
+    });
+  });
+
+  it('given a picked folder containing a project, when the folder is opened, then the project is registered and returned', async () => {
+    await withTempDirectory(async (directory) => {
+      const workspace = join(directory, 'workspace');
+      await mkdir(workspace);
+      const projects = new ProjectStore(
+        join(directory, 'projects'),
+        new ProjectLocationRegistry(join(directory, 'project-locations.json'))
+      );
+      const seedService = new TimelineIpcService({
+        projects,
+        assets: new AssetLibraryStore(join(directory, 'projects'), projects),
+        selectProjectDirectory: async () => ({ canceled: false, filePaths: [workspace] })
+      });
+      const created = await seedService.createProject({ name: 'Folder Cut' });
+      if (!created.ok || created.value.cancelled) {
+        throw new Error('Expected seed project creation to succeed.');
+      }
+      const projectFolder = join(workspace, 'Folder Cut');
+      await projects.delete(created.value.project.id);
+      expect(await projects.list()).toEqual([]);
+
+      const service = new TimelineIpcService({
+        projects,
+        assets: new AssetLibraryStore(join(directory, 'projects'), projects),
+        selectProjectDirectory: async () => ({ canceled: false, filePaths: [projectFolder] })
+      });
+      const reopened = await service.openProjectFolder(undefined);
+
+      if (!reopened.ok || reopened.value.cancelled) {
+        throw new Error('Expected the project folder to open.');
+      }
+      expect(reopened.value.project.id).toBe(created.value.project.id);
+      expect((await projects.list()).map((summary) => summary.folderName)).toEqual(['Folder Cut']);
+      expect(JSON.stringify(reopened)).not.toContain(directory);
+    });
+  });
+
+  it('given a picked folder without a project file, when opened, then a safe invalid-input error is returned', async () => {
+    await withTempDirectory(async (directory) => {
+      const emptyFolder = join(directory, 'empty');
+      await mkdir(emptyFolder);
+      const projects = new ProjectStore(
+        join(directory, 'projects'),
+        new ProjectLocationRegistry(join(directory, 'project-locations.json'))
+      );
+      const service = new TimelineIpcService({
+        projects,
+        assets: new AssetLibraryStore(join(directory, 'projects'), projects),
+        selectProjectDirectory: async () => ({ canceled: false, filePaths: [emptyFolder] })
+      });
+
+      const opened = await service.openProjectFolder(undefined);
+
+      expect(opened).toEqual({ ok: false, error: { code: 'INVALID_INPUT', message: 'The selected folder does not contain an OpenVideo project.' } });
     });
   });
 

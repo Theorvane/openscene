@@ -1,6 +1,6 @@
 import { constants } from 'node:fs';
 import { lstat, open, realpath, rename, rm, type FileHandle } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import type { LocalProjectSnapshot } from '../shared/timelineTypes';
@@ -45,11 +45,20 @@ export function projectDirectory(rootDirectory: string, projectId: string): stri
 }
 
 export function projectAssetPath(rootDirectory: string, projectId: string, projectRelativePath: string): string {
+  return projectAssetPathWithinDirectory(projectDirectory(rootDirectory, projectId), projectRelativePath);
+}
+
+/**
+ * Resolve a project-relative asset path against an explicit project directory
+ * (internal root/id folders and registered external folders share the same
+ * confinement rule: the resolved path may never escape the project directory).
+ */
+export function projectAssetPathWithinDirectory(projectDirectoryPath: string, projectRelativePath: string): string {
   const parsedPath = getRelativePath({ path: projectRelativePath }, 'path');
   if (parsedPath === null) {
     throw new ProjectStoreError('Invalid project-relative asset path.');
   }
-  const directory = projectDirectory(rootDirectory, projectId);
+  const directory = resolve(projectDirectoryPath);
   const assetPath = resolve(directory, parsedPath);
   if (!isInsideDirectory(directory, assetPath)) {
     throw new ProjectStoreError('Resolved asset path escaped its project directory.');
@@ -85,10 +94,22 @@ async function directoryMatches(directory: string, identity: DirectoryIdentity):
 }
 
 export async function readProjectSnapshot(rootDirectory: string, projectId: string): Promise<LocalProjectSnapshot | null> {
-  const directory = projectDirectory(rootDirectory, projectId);
+  return readProjectSnapshotAtDirectory(projectDirectory(rootDirectory, projectId), projectId);
+}
+
+/**
+ * Read a snapshot from an explicit project directory. When expectedProjectId is
+ * null (opening a user-picked folder), the persisted id inside project.json is
+ * validated and used instead.
+ */
+export async function readProjectSnapshotAtDirectory(
+  projectDirectoryPath: string,
+  expectedProjectId: string | null
+): Promise<LocalProjectSnapshot | null> {
+  const directory = resolve(projectDirectoryPath);
   const projectFile = join(directory, PROJECT_FILE_NAME);
   try {
-    const identity = await getDirectoryIdentity(rootDirectory, directory);
+    const identity = await getDirectoryIdentity(dirname(directory), directory);
     if (identity === null) {
       return null;
     }
@@ -99,6 +120,13 @@ export async function readProjectSnapshot(rootDirectory: string, projectId: stri
         return null;
       }
       const raw: unknown = JSON.parse(await file.readFile('utf8'));
+      const persistedId = typeof raw === 'object' && raw !== null && 'id' in raw && typeof (raw as { id: unknown }).id === 'string'
+        ? (raw as { id: string }).id
+        : null;
+      const projectId = expectedProjectId ?? persistedId;
+      if (projectId === null || !isOpaqueId(projectId)) {
+        return null;
+      }
       return parsePersistedProjectForRead(raw, projectId);
     } finally {
       await file.close();
@@ -112,10 +140,14 @@ export async function readProjectSnapshot(rootDirectory: string, projectId: stri
 }
 
 export async function writeProjectSnapshot(rootDirectory: string, snapshot: LocalProjectSnapshot): Promise<void> {
-  const directory = projectDirectory(rootDirectory, snapshot.id);
+  return writeProjectSnapshotAtDirectory(projectDirectory(rootDirectory, snapshot.id), snapshot);
+}
+
+export async function writeProjectSnapshotAtDirectory(projectDirectoryPath: string, snapshot: LocalProjectSnapshot): Promise<void> {
+  const directory = resolve(projectDirectoryPath);
   const projectFile = join(directory, PROJECT_FILE_NAME);
   const temporaryFile = join(directory, `.${PROJECT_FILE_NAME}.${randomUUID()}.tmp`);
-  const identity = await getDirectoryIdentity(rootDirectory, directory);
+  const identity = await getDirectoryIdentity(dirname(directory), directory);
   if (identity === null || !isInsideDirectory(directory, temporaryFile)) {
     throw new ProjectStoreError('Resolved temporary project path escaped its project directory.');
   }

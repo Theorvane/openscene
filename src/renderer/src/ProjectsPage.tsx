@@ -11,6 +11,7 @@ type ProjectsPageProps = {
   readonly onNewProjectNameChange?: (name: string) => void;
   readonly onCreateProject?: () => Promise<void>;
   readonly onOpenProject?: (projectId: string) => Promise<void>;
+  readonly onOpenProjectFolder?: () => Promise<void>;
   readonly isBusy?: boolean;
 };
 
@@ -21,6 +22,7 @@ export function ProjectsPage({
   onNewProjectNameChange,
   onCreateProject,
   onOpenProject,
+  onOpenProjectFolder,
   isBusy = false
 }: ProjectsPageProps): ReactElement {
   return (
@@ -72,7 +74,13 @@ export function ProjectsPage({
             >
               Create Project Folder ➔
             </Button>
+            <Button onClick={() => void onOpenProjectFolder?.()} disabled={isBusy}>
+              Open Existing Folder…
+            </Button>
           </div>
+          <p className="home-project-hub__hint">
+            Creating a project asks for a location and makes a real folder there; opening picks a folder that already contains an OpenVideo project.
+          </p>
         </div>
 
         {projects.length > 0 && (
@@ -91,7 +99,10 @@ export function ProjectsPage({
                         <strong className="home-project-item__name">📁 {item.name}</strong>
                         {isSelected && <span className="home-project-item__badge">● Active</span>}
                       </div>
-                      <span className="home-project-item__date">Updated: {formatTimestamp(item.updatedAt)}</span>
+                      <span className="home-project-item__date">
+                        Updated: {formatTimestamp(item.updatedAt)}
+                        {item.storage === 'external' && item.folderName ? ` · 📂 ${item.folderName}` : ''}
+                      </span>
                     </div>
                     <Button
                       variant={isSelected ? 'primary' : 'ghost'}
