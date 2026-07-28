@@ -3484,6 +3484,60 @@ button {
   }
 }
 
+.agent-chat-panel__title-label::before {
+  content: "";
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 64%, var(--border));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 80%, var(--card));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: status-pulse 2.4s infinite ease-in-out;
+}
+
+@keyframes status-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.75;
+  }
+}
+
+.agent-chat-panel__title-meta {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-chat-panel__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
+
+.agent-chat-panel__actions .button {
+  min-height: var(--control-compact-min-height);
+  padding: var(--space-1) var(--space-2);
+}
+
+.ai-domain-model-selector {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
 .agent-chat-log {
   display: flex;
   flex-direction: column;
@@ -3587,17 +3641,39 @@ button {
 }
 
 .agent-chat-message {
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--line-subtle);
+  padding: var(--space-3);
+  margin: var(--space-1) 0;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-inset-rule);
+  transition: all 140ms ease;
 }
 
 .agent-chat-message:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.agent-chat-message--user {
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface-inset));
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--line-subtle));
+}
+
+.agent-chat-message--assistant {
+  background: var(--card);
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--line-subtle));
+}
+
+.agent-chat-message--tool {
+  background: var(--surface-inset);
+  border-color: color-mix(in srgb, var(--success) 22%, var(--line-subtle));
 }
 
 .agent-chat-message__role {
-  display: block;
-  margin: 0 0 2px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
   font-family: var(--font-mono);
   font-size: var(--text-micro);
   font-weight: 700;
