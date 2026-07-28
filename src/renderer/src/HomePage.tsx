@@ -84,7 +84,7 @@ export function HomePage({
   return (
     <div className="home-page">
       <header className="home-page__hero">
-        <p className="section-kicker">Stage 2 / 3 · Main Studio Menu</p>
+        <p className="section-kicker">Main Menu</p>
         <h1 id="home-page-title">Select Studio Workspace</h1>
         <p>
           Choose a studio tool below for your active project folder. Entering a workspace opens the full toolset and activates the Edit Agent chat assistant.
@@ -105,7 +105,7 @@ export function HomePage({
       ) : (
         <div className="home-active-project-banner home-active-project-banner--empty" role="status">
           <div className="home-active-project-banner__info">
-            <span className="home-active-project-banner__kicker">● Stage 1 Required</span>
+            <span className="home-active-project-banner__kicker">● Project Required</span>
             <strong className="home-active-project-banner__name">No Project Folder Selected</strong>
           </div>
           <Button variant="primary" onClick={onGoToProjects}>

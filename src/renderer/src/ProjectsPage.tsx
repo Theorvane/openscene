@@ -26,7 +26,7 @@ export function ProjectsPage({
   return (
     <div className="projects-page">
       <header className="projects-page__hero">
-        <p className="section-kicker">Stage 1 / 3 · Project Selection</p>
+        <p className="section-kicker">Projects</p>
         <h1 id="projects-page-title">Local Project Folders</h1>
         <p>
           OpenVideo stores every project in a dedicated local folder. Create a new project folder or select an existing folder below to unlock the studio menu and workspaces.
