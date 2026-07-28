@@ -18,7 +18,9 @@ describe('app page shell source contract', () => {
     expect(app).toContain('const [activePageId, setActivePageId] = useState<AppPageId>(() => getDefaultAppPageId());');
     expect(app).toContain('const [activeWorkspaceId, setActiveWorkspaceId] = useState<AppWorkspaceId>(() => getDefaultAppWorkspaceId());');
     expect(app).toContain('const workspaceIsVisible = isWorkspacePageId(activePageId);');
-    expect(app).toContain('<HomePage onWorkspaceOpen={setActiveWorkspace} workspaces={APP_WORKSPACES} />');
+    expect(app).toContain('<HomePage');
+    expect(app).toContain('onWorkspaceOpen={setActiveWorkspace}');
+    expect(app).toContain('workspaces={APP_WORKSPACES}');
     expect(app).toContain('<SettingsWorkspace onReplayFirstRunOnboarding={replayFirstRunOnboarding} />');
     expect(app).toContain('hidden={!workspaceIsVisible}');
   });

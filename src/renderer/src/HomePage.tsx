@@ -1,11 +1,20 @@
 import type { ReactElement } from 'react';
 
+import type { LocalProjectSnapshot, LocalProjectSummary } from '../../shared/timelineTypes';
 import type { AppWorkspace, AppWorkspaceId } from './appWorkspaces';
+import { formatTimestamp } from './format';
 import { Button } from './ui';
 
 type HomePageProps = {
   readonly onWorkspaceOpen: (workspaceId: AppWorkspaceId) => void;
   readonly workspaces: readonly AppWorkspace[];
+  readonly project?: LocalProjectSnapshot | null;
+  readonly projects?: readonly LocalProjectSummary[];
+  readonly newProjectName?: string;
+  readonly onNewProjectNameChange?: (name: string) => void;
+  readonly onCreateProject?: () => Promise<void>;
+  readonly onOpenProject?: (projectId: string) => Promise<void>;
+  readonly isBusy?: boolean;
 };
 
 const WORKSPACE_COPY = {
@@ -66,16 +75,89 @@ function assertNever(value: never): never {
   throw new Error(`Unexpected home workspace id: ${String(value)}`);
 }
 
-export function HomePage({ onWorkspaceOpen, workspaces }: HomePageProps): ReactElement {
+export function HomePage({
+  onWorkspaceOpen,
+  workspaces,
+  project = null,
+  projects = [],
+  newProjectName = '',
+  onNewProjectNameChange,
+  onCreateProject,
+  onOpenProject,
+  isBusy = false
+}: HomePageProps): ReactElement {
   return (
     <div className="home-page">
       <header className="home-page__hero">
         <p className="section-kicker">Local studio home</p>
-        <h1 id="home-page-title">Start with the local tool you need.</h1>
+        <h1 id="home-page-title">Start with a project.</h1>
         <p>
-          OpenVideo keeps editing, consent-based narration, generated result management, and the Edit Agent in one local-first desktop shell.
+          Create or select a local project first. All editing, voice synthesis, video jobs, and Edit Agent operations center around your project.
         </p>
       </header>
+
+      {/* Project Creation & Selection Hub */}
+      <section className="home-project-hub" aria-label="Project management hub">
+        <div className="home-project-hub__creator">
+          <div className="home-project-hub__header">
+            <span className="home-project-hub__kicker">New Project</span>
+            <h2 className="home-project-hub__title">Create Project</h2>
+          </div>
+          <div className="home-project-hub__form">
+            <label className="field-label" htmlFor="home-project-name-input">
+              Project Name
+              <input
+                id="home-project-name-input"
+                type="text"
+                value={newProjectName}
+                onChange={(e) => onNewProjectNameChange?.(e.target.value)}
+                placeholder="My New Video Cut"
+                disabled={isBusy}
+              />
+            </label>
+            <Button
+              variant="primary"
+              onClick={() => void onCreateProject?.()}
+              disabled={isBusy || newProjectName.trim().length === 0}
+            >
+              Create Project
+            </Button>
+          </div>
+        </div>
+
+        {projects.length > 0 && (
+          <div className="home-project-hub__list-section">
+            <span className="home-project-hub__kicker">Recent Projects ({projects.length})</span>
+            <div className="home-project-hub__grid">
+              {projects.map((item) => {
+                const isSelected = project?.id === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className={`home-project-item${isSelected ? ' home-project-item--active' : ''}`}
+                  >
+                    <div className="home-project-item__body">
+                      <div className="home-project-item__header">
+                        <strong className="home-project-item__name">{item.name}</strong>
+                        {isSelected && <span className="home-project-item__badge">Active</span>}
+                      </div>
+                      <span className="home-project-item__date">{formatTimestamp(item.updatedAt)}</span>
+                    </div>
+                    <Button
+                      variant={isSelected ? 'primary' : 'ghost'}
+                      onClick={() => void onOpenProject?.(item.id)}
+                      disabled={isBusy}
+                    >
+                      {isSelected ? 'Open Editor' : 'Select'}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
+
       <div className="home-card-grid" aria-label="OpenVideo workspaces">
         {workspaces.map((workspace) => {
           const card = WORKSPACE_COPY[workspace.id];

@@ -33,7 +33,9 @@ describe('first-run onboarding source contract', () => {
     expect(app).toContain('FirstRunOnboarding');
     expect(app).toContain('readFirstRunOnboardingCompletion(window.localStorage)');
     expect(app).toContain('writeFirstRunOnboardingCompletion(window.localStorage)');
-    expect(app).toContain('<HomePage onWorkspaceOpen={setActiveWorkspace} workspaces={APP_WORKSPACES} />');
-    expect(app).toContain('<AppShell activePage={activePage} onPageChange={setActivePage} selectedContextAsset={selectedContextAsset}>');
+    expect(app).toContain('<HomePage');
+    expect(app).toContain('onWorkspaceOpen={setActiveWorkspace}');
+    expect(app).toContain('workspaces={APP_WORKSPACES}');
+    expect(app).toContain('<AppShell activePage={activePage} onPageChange={setActivePage}');
   });
 });

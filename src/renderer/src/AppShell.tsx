@@ -35,6 +35,7 @@ type AppShellProps = {
   readonly children: ReactNode;
   readonly onPageChange: (pageId: AppPageId) => void;
   readonly selectedContextAsset: EditAgentContextAsset | null;
+  readonly activeProjectName?: string | null | undefined;
 };
 
 function SettingsIcon(): ReactElement {
@@ -56,7 +57,7 @@ function HomeIcon(): ReactElement {
   );
 }
 
-function AppShellContent({ activePage, children, onPageChange, selectedContextAsset }: AppShellProps): ReactElement {
+function AppShellContent({ activePage, children, onPageChange, selectedContextAsset, activeProjectName }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
   const shellBodyRef = useRef<HTMLDivElement | null>(null);
@@ -111,6 +112,9 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
           <header className="product-chrome" aria-label="Application chrome">
             <div className="product-chrome__context" aria-label="Current page">
               <span className="product-chrome__workspace">{activePage.chromeLabel}</span>
+              {activeProjectName && (
+                <span className="product-chrome__project-pill">Project: {activeProjectName}</span>
+              )}
               <span className="local-pill">Local</span>
             </div>
             <div className="product-chrome__actions">
@@ -139,44 +143,43 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
           </header>
           <div className="agent-workspace-lock__content">{children}</div>
           {isBusy && (
-            <div className="agent-workspace-lock__message" aria-hidden="true">
-              Agent is working in this project. Workspace controls are temporarily locked.
+            <div aria-live="polite">
+              <div className="agent-workspace-lock__message" aria-hidden="true">
+                Edit Agent is updating your workspace...
+              </div>
+              <span className="agent-workspace-lock__announcement">Edit Agent is updating your workspace</span>
             </div>
           )}
         </div>
-        {isBusy && (
-          <div className="agent-workspace-lock__announcement" role="status" aria-live="polite">
-            Agent is working in this project. Workspace controls are temporarily locked.
-          </div>
-        )}
         <div
-          className="agent-chat-resize-splitter"
-          role="separator"
-          tabIndex={0}
-          aria-label="Resize Edit Agent chat"
+          aria-controls="app-shell-workspace app-shell-agent-chat"
+          aria-label="Resize Edit Agent chat panel"
           aria-orientation="vertical"
-          aria-valuemin={AGENT_CHAT_LAYOUT_MIN_WIDTH}
           aria-valuemax={AGENT_CHAT_LAYOUT_MAX_WIDTH}
+          aria-valuemin={AGENT_CHAT_LAYOUT_MIN_WIDTH}
           aria-valuenow={chatPanelWidth}
           aria-valuetext={`Edit Agent chat ${chatPanelWidth} pixels`}
-          aria-controls="app-shell-workspace app-shell-agent-chat"
+          className="agent-chat-resize-splitter"
           onKeyDown={onChatSplitterKeyDown}
           onPointerDown={onChatSplitterPointerDown}
           onPointerMove={onChatSplitterPointerMove}
           onPointerUp={releasePointer}
-          onPointerCancel={releasePointer}
-          onDoubleClick={() => setChatPanelWidth(AGENT_CHAT_LAYOUT_DEFAULT_WIDTH)}
+          role="separator"
+          tabIndex={0}
+          title="Drag to resize Edit Agent chat panel"
         />
-        <AgentChatPanel selectedContextAsset={selectedContextAsset} width={chatPanelWidth} />
+        <aside id="app-shell-agent-chat" className="agent-chat-panel-shell" style={{ width: `${chatPanelWidth}px` }}>
+          <AgentChatPanel selectedContextAsset={selectedContextAsset} width={chatPanelWidth} />
+        </aside>
       </div>
     </main>
   );
 }
 
-export function AppShell({ activePage, children, onPageChange, selectedContextAsset }: AppShellProps): ReactElement {
+export function AppShell(props: AppShellProps): ReactElement {
   return (
     <AgentChatProvider>
-      <AppShellContent activePage={activePage} onPageChange={onPageChange} selectedContextAsset={selectedContextAsset}>{children}</AppShellContent>
+      <AppShellContent {...props} />
     </AgentChatProvider>
   );
 }

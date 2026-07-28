@@ -108,7 +108,7 @@ export function App(): ReactElement {
   const workspaceIsVisible = isWorkspacePageId(activePageId);
 
   return (
-    <AppShell activePage={activePage} onPageChange={setActivePage} selectedContextAsset={selectedContextAsset}>
+    <AppShell activePage={activePage} onPageChange={setActivePage} selectedContextAsset={selectedContextAsset} activeProjectName={editor.project?.name}>
       <ProjectResultImportProvider editor={editor}>
         <div className="app-page-stack">
           <section
@@ -120,7 +120,23 @@ export function App(): ReactElement {
             role="region"
             tabIndex={-1}
           >
-            <HomePage onWorkspaceOpen={setActiveWorkspace} workspaces={APP_WORKSPACES} />
+            <HomePage
+              onWorkspaceOpen={setActiveWorkspace}
+              workspaces={APP_WORKSPACES}
+              project={editor.project}
+              projects={editor.projects}
+              newProjectName={editor.newProjectName}
+              onNewProjectNameChange={editor.setNewProjectName}
+              onCreateProject={async () => {
+                await editor.createProject();
+                setActiveWorkspace('edit');
+              }}
+              onOpenProject={async (projectId) => {
+                await editor.openProject(projectId);
+                setActiveWorkspace('edit');
+              }}
+              isBusy={editor.isBusy}
+            />
           </section>
           <div className="app-stack local-edit-bay" hidden={!workspaceIsVisible}>
             <div className="app-workspace-panel-stack">
