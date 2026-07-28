@@ -226,6 +226,10 @@ export function useTimelineEditor() {
     replaceTimeline((timeline) => splitClip(timeline, { clipId: selectedClip.clip.id, atMs: playback.playheadMs, rightClipId: createOpaqueId('clip') }), 'Split selected clip at the playhead.');
   }, [playback.playheadMs, replaceTimeline, selectedClip]);
 
+  const splitClipAt = useCallback((clipId: string, atMs: number) => {
+    replaceTimeline((timeline) => splitClip(timeline, { clipId, atMs, rightClipId: createOpaqueId('clip') }), 'Split clip with the razor tool.');
+  }, [replaceTimeline]);
+
   const updateSelectedClipEffects = useCallback((effects: Partial<ClipEffects>) => {
     if (selectedClip === null) return;
     replaceTimeline((timeline) => updateClipEffects(timeline, { clipId: selectedClip.clip.id, effects }), 'Updated selected clip effects.');
@@ -288,7 +292,7 @@ export function useTimelineEditor() {
     activePlaybackClip: playback.activePlaybackClip, canRedoTimeline: (timelineHistory?.future.length ?? 0) > 0,
     canUndoTimeline: (timelineHistory?.past.length ?? 0) > 0, isPlaying: playback.isPlaying, moveClipToTrack,
     placeAssetOnTrack, playheadMs: playback.playheadMs, redoTimeline, setIsPlaying: playback.setIsPlaying,
-    setPlayheadMs: playback.setPlayheadMs, splitAtPlayhead, trimClipTo, undoTimeline
+    setPlayheadMs: playback.setPlayheadMs, splitAtPlayhead, splitClipAt, trimClipTo, undoTimeline
   };
 }
 

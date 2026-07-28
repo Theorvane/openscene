@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type DragEvent, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactElement } from 'react';
 
 import { formatDuration } from '../format';
 import { buildTimelineView, clientXToTimelineMs } from './editorTimelineView';
@@ -129,8 +129,84 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
 
   const trackMinHeight = (kind: string): string => (kind === 'video' ? '56px' : '42px');
 
+  const clampZoom = (zoom: number): number => Math.min(5, Math.max(1, Math.round(zoom * 100) / 100));
+
   const zoomBy = (factor: number): void => {
-    setZoomLevel((current) => Math.min(5, Math.max(1, Math.round(current * factor * 10) / 10)));
+    setZoomLevel((current) => clampZoom(current * factor));
+  };
+
+  // Ctrl/Cmd + wheel (or trackpad pinch) zooms around the cursor: the time under
+  // the pointer stays anchored while the content width scales. Plain and shift
+  // wheel keep native scrolling. Attached natively so preventDefault is honored.
+  const stackRef = useRef<HTMLDivElement | null>(null);
+  const zoomAnchorRef = useRef<{ anchorX: number; scrollLeft: number; previousZoom: number } | null>(null);
+  const zoomLevelRef = useRef(zoomLevel);
+  zoomLevelRef.current = zoomLevel;
+
+  useEffect(() => {
+    const stack = stackRef.current;
+    if (stack === null) return;
+
+    const onWheel = (event: WheelEvent): void => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const zoomMultiplier = event.deltaY > 0 ? 1 / 1.1 : 1.1;
+      const previousZoom = zoomLevelRef.current;
+      const nextZoom = clampZoom(previousZoom * zoomMultiplier);
+      if (nextZoom === previousZoom) return;
+      zoomAnchorRef.current = {
+        anchorX: event.clientX - stack.getBoundingClientRect().left,
+        scrollLeft: stack.scrollLeft,
+        previousZoom
+      };
+      setZoomLevel(nextZoom);
+    };
+
+    stack.addEventListener('wheel', onWheel, { passive: false });
+    return () => stack.removeEventListener('wheel', onWheel);
+  }, [project === null]);
+
+  useLayoutEffect(() => {
+    const stack = stackRef.current;
+    const anchor = zoomAnchorRef.current;
+    if (stack === null || anchor === null) return;
+    zoomAnchorRef.current = null;
+    const contentX = (anchor.scrollLeft + anchor.anchorX) * (zoomLevel / anchor.previousZoom);
+    stack.scrollLeft = Math.max(0, contentX - anchor.anchorX);
+  }, [zoomLevel]);
+
+  // Hand tool: drag the track area to pan the timeline horizontally.
+  const panOriginRef = useRef<{ pointerX: number; scrollLeft: number } | null>(null);
+
+  const onStackPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (activeTool !== 'hand') return;
+    const stack = stackRef.current;
+    if (stack === null) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panOriginRef.current = { pointerX: event.clientX, scrollLeft: stack.scrollLeft };
+  };
+
+  const onStackPointerMove = (event: React.PointerEvent<HTMLDivElement>): void => {
+    const origin = panOriginRef.current;
+    const stack = stackRef.current;
+    if (origin === null || stack === null || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    stack.scrollLeft = origin.scrollLeft + origin.pointerX - event.clientX;
+  };
+
+  const onStackPointerUp = (event: React.PointerEvent<HTMLDivElement>): void => {
+    panOriginRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  // Razor tool: clicking a clip splits it at the clicked timeline position.
+  const razorSplitClip = (event: React.MouseEvent<HTMLButtonElement>, clipId: string): void => {
+    if (view === null) return;
+    const lane = event.currentTarget.parentElement;
+    if (lane === null) return;
+    const laneRect = lane.getBoundingClientRect();
+    const atMs = clientXToTimelineMs({ clientX: event.clientX, laneLeft: laneRect.left, laneWidth: laneRect.width, durationMs: view.durationMs, snapMs: 10 });
+    editor.splitClipAt(clipId, atMs);
   };
 
   return (
@@ -213,7 +289,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
             onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
             style={{ width: '96px', accentColor: 'var(--primary)', cursor: 'ew-resize' }}
             aria-label="Timeline zoom level"
-            title="Adjust timeline zoom level"
+            title="Adjust timeline zoom level (Ctrl/Cmd + scroll on the tracks)"
           />
           <button
             type="button"
@@ -230,7 +306,15 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
       {project === null || view === null ? (
         <div className="timeline-empty">Open a project to see editable local tracks.</div>
       ) : (
-        <div className="timeline-stack" style={{ overflowX: 'auto', position: 'relative', height: '100%' }}>
+        <div
+          className="timeline-stack"
+          ref={stackRef}
+          onPointerDown={onStackPointerDown}
+          onPointerMove={onStackPointerMove}
+          onPointerUp={onStackPointerUp}
+          onPointerCancel={onStackPointerUp}
+          style={{ overflowX: 'auto', position: 'relative', height: '100%', cursor: activeTool === 'hand' ? (panOriginRef.current === null ? 'grab' : 'grabbing') : undefined }}
+        >
           {/* Scrollable Container based on zoomLevel */}
           <div style={{ width: `calc(100% * ${zoomLevel})`, minWidth: '100%', position: 'relative', display: 'grid', gap: '4px', padding: 'var(--space-2) var(--space-3)' }}>
 
@@ -362,7 +446,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                   }}
                   onDragLeave={() => setDragOverTrackId((current) => (current === track.id ? null : current))}
                   onDrop={(event) => !lockedTracks[track.id] && onLaneDrop(event, track.id)}
-                  onPointerDown={(event) => !lockedTracks[track.id] && scrubLane(event)}
+                  onPointerDown={(event) => activeTool !== 'hand' && !lockedTracks[track.id] && scrubLane(event)}
                   role="application"
                   aria-label={`${track.name} lane. Drop assets or clips here.`}
                   style={{
@@ -374,7 +458,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                     backgroundImage: lockedTracks[track.id]
                       ? 'repeating-linear-gradient(45deg, rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 6px, transparent 6px, transparent 12px)'
                       : undefined,
-                    cursor: lockedTracks[track.id] ? 'not-allowed' : 'default',
+                    cursor: lockedTracks[track.id] ? 'not-allowed' : activeTool === 'razor' ? 'crosshair' : 'default',
                     position: 'relative'
                   }}
                 >
@@ -385,12 +469,19 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                   {(view.blocksByTrackId[track.id] ?? []).map((block) => (
                     <button
                       className={`timeline-clip timeline-clip--${block.kind}${editor.selectedClipId === block.clip.id ? ' timeline-clip--selected' : ''}`}
-                      draggable={!lockedTracks[track.id]}
+                      draggable={!lockedTracks[track.id] && activeTool === 'select'}
                       key={block.clip.id}
                       type="button"
-                      onClick={() => !lockedTracks[track.id] && editor.setSelectedClipId(block.clip.id)}
-                      onDragStart={(event) => {
+                      onClick={(event) => {
                         if (lockedTracks[track.id]) return;
+                        if (activeTool === 'razor') {
+                          razorSplitClip(event, block.clip.id);
+                          return;
+                        }
+                        editor.setSelectedClipId(block.clip.id);
+                      }}
+                      onDragStart={(event) => {
+                        if (lockedTracks[track.id] || activeTool !== 'select') return;
                         writeTimelineDrag(event, {
                           kind: 'clip',
                           clipId: block.clip.id,
@@ -403,14 +494,14 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                           }) - block.clip.timelineStartMs
                         });
                       }}
-                      style={{ left: `${block.leftPercent}%`, width: `${Math.max(block.widthPercent, 2)}%` }}
+                      style={{ left: `${block.leftPercent}%`, width: `${Math.max(block.widthPercent, 2)}%`, cursor: activeTool === 'razor' ? 'crosshair' : undefined }}
                       title={`${block.assetName} starts at ${formatDuration(block.clip.timelineStartMs)}`}
                       aria-label={`${block.assetName}, ${block.kind} clip from ${formatDuration(block.clip.timelineStartMs)} for ${formatDuration(block.clip.sourceEndMs - block.clip.sourceStartMs)}`}
                     >
-                      <span className="timeline-clip__handle timeline-clip__handle--left" draggable={!lockedTracks[track.id]} onDragStart={(event) => writeTimelineDrag(event, { kind: 'trim', clipId: block.clip.id, edge: 'left' })} aria-hidden="true" />
+                      <span className="timeline-clip__handle timeline-clip__handle--left" draggable={!lockedTracks[track.id] && activeTool === 'select'} onDragStart={(event) => writeTimelineDrag(event, { kind: 'trim', clipId: block.clip.id, edge: 'left' })} aria-hidden="true" />
                       <strong>{block.assetName}</strong>
                       <small>{formatDuration(block.clip.sourceEndMs - block.clip.sourceStartMs)}</small>
-                      <span className="timeline-clip__handle timeline-clip__handle--right" draggable={!lockedTracks[track.id]} onDragStart={(event) => writeTimelineDrag(event, { kind: 'trim', clipId: block.clip.id, edge: 'right' })} aria-hidden="true" />
+                      <span className="timeline-clip__handle timeline-clip__handle--right" draggable={!lockedTracks[track.id] && activeTool === 'select'} onDragStart={(event) => writeTimelineDrag(event, { kind: 'trim', clipId: block.clip.id, edge: 'right' })} aria-hidden="true" />
                     </button>
                   ))}
                 </div>
