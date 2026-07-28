@@ -318,61 +318,76 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
           {/* Scrollable Container based on zoomLevel */}
           <div style={{ width: `calc(100% * ${zoomLevel})`, minWidth: '100%', position: 'relative', display: 'grid', gap: '4px', padding: 'var(--space-2) var(--space-3)' }}>
 
-            {/* Slim mono ruler with a round scrub-dot playhead handle; press or drag to seek */}
+            {/* Slim mono ruler. The scale cell mirrors the track grid (104px rail + lane),
+                so the scrub dot, the lane playhead line, and seek mapping share the exact
+                same horizontal coordinate space. */}
             <div
               className="timeline-ruler"
-              onPointerDown={onRulerPointerDown}
-              onPointerMove={onRulerPointerMove}
-              role="slider"
-              aria-label="Timeline playhead position"
-              aria-valuemin={0}
-              aria-valuemax={view.durationMs}
-              aria-valuenow={editor.playheadMs}
-              aria-valuetext={`Playhead at ${formatDuration(editor.playheadMs)}`}
-              tabIndex={-1}
               style={{
-                cursor: 'ew-resize',
+                display: 'grid',
+                gridTemplateColumns: '104px minmax(0, 1fr)',
+                height: '20px',
                 position: 'relative',
                 overflow: 'visible',
-                backgroundImage: 'repeating-linear-gradient(90deg, var(--border) 0px, var(--border) 1px, transparent 1px, transparent 2.5%)',
-                backgroundSize: '100% 6px',
-                backgroundPosition: 'bottom',
-                backgroundRepeat: 'repeat-x',
-                height: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                padding: '0 var(--space-3)',
+                padding: 0,
                 border: 'none',
                 background: 'transparent'
               }}
             >
-              <span style={{ fontSize: 'var(--text-micro)', fontFamily: 'var(--font-mono)', color: 'var(--text-weaker)' }}>00:00.0</span>
-              <strong style={{ margin: '0 auto', fontSize: 'var(--text-micro)', color: 'var(--text-strong)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>
+              {/* Rail cell: current playhead readout, aligned over the track labels */}
+              <strong style={{ alignSelf: 'center', padding: '0 var(--space-2)', fontSize: 'var(--text-micro)', color: 'var(--text-strong)', fontFamily: 'var(--font-mono)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {formatDuration(editor.playheadMs)}
               </strong>
-              <span style={{ fontSize: 'var(--text-micro)', fontFamily: 'var(--font-mono)', color: 'var(--text-weaker)', textAlign: 'right' }}>
-                {formatDuration(view.durationMs)}
-              </span>
 
-              {/* Playhead scrub-dot handle */}
+              {/* Scale cell: same width and left edge as the track lanes */}
               <div
+                onPointerDown={onRulerPointerDown}
+                onPointerMove={onRulerPointerMove}
+                role="slider"
+                aria-label="Timeline playhead position"
+                aria-valuemin={0}
+                aria-valuemax={view.durationMs}
+                aria-valuenow={editor.playheadMs}
+                aria-valuetext={`Playhead at ${formatDuration(editor.playheadMs)}`}
+                tabIndex={-1}
                 style={{
-                  position: 'absolute',
-                  left: `${playheadPercent}%`,
-                  bottom: '-5px',
-                  width: '11px',
-                  height: '11px',
-                  background: 'var(--foreground)',
-                  border: '2px solid var(--card)',
-                  borderRadius: '50%',
-                  transform: 'translateX(-50%)',
                   cursor: 'ew-resize',
-                  zIndex: 10,
-                  boxShadow: 'var(--shadow-control)',
-                  transition: 'left 80ms ease'
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  minWidth: 0,
+                  backgroundImage: 'repeating-linear-gradient(90deg, var(--border) 0px, var(--border) 1px, transparent 1px, transparent 2.5%)',
+                  backgroundSize: '100% 6px',
+                  backgroundPosition: 'bottom',
+                  backgroundRepeat: 'repeat-x'
                 }}
-                title="Scrub timeline playhead"
-              />
+              >
+                <span style={{ padding: '0 var(--space-2)', fontSize: 'var(--text-micro)', fontFamily: 'var(--font-mono)', color: 'var(--text-weaker)' }}>00:00.0</span>
+                <span style={{ padding: '0 var(--space-2)', fontSize: 'var(--text-micro)', fontFamily: 'var(--font-mono)', color: 'var(--text-weaker)', textAlign: 'right' }}>
+                  {formatDuration(view.durationMs)}
+                </span>
+
+                {/* Playhead scrub-dot handle — same percent space as the lane playhead line */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${playheadPercent}%`,
+                    bottom: '-5px',
+                    width: '11px',
+                    height: '11px',
+                    background: 'var(--foreground)',
+                    border: '2px solid var(--card)',
+                    borderRadius: '50%',
+                    transform: 'translateX(-50%)',
+                    cursor: 'ew-resize',
+                    zIndex: 10,
+                    boxShadow: 'var(--shadow-control)',
+                    transition: 'left 80ms ease'
+                  }}
+                  title="Scrub timeline playhead"
+                />
+              </div>
             </div>
 
             {/* Tracks */}
