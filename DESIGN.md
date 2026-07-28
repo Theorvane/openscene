@@ -75,7 +75,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 ## Bottom Timeline
 
 - The timeline is the bottom anchor of the editor. It spans the full workspace width on desktop.
-- Track lanes are flat inset wells with a sticky ruler, a thin destructive-red playhead with a scrub handle, and clip blocks that encode media kind with text labels plus tinted fills and borders.
+- Track lanes are flat rounded inset wells separated by small gaps, under a slim mono ruler. The playhead is a neutral foreground hairline with a round scrub-dot handle in the ruler. Clip blocks encode media kind with text labels plus tinted fills and borders, and reveal primary-colored grip trim handles on hover/selection.
 - Clip blocks show asset name and duration. Trim handles stay visible enough to discover, but should not dominate the clip label.
 - Timeline interactions must read as local edits. Do not suggest non-existent cloud sync, unsupported render formats, or frame-perfect mastering guarantees.
 - The timeline remains visible while users switch side dock tabs. It is not part of the left dock or inspector tab systems.
