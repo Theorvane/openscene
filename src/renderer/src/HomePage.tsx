@@ -103,8 +103,8 @@ export function HomePage({
             <span className="home-active-project-banner__kicker">📁 Active Project Folder</span>
             <strong className="home-active-project-banner__name">{project.name}</strong>
           </div>
-          <Button variant="primary" onClick={() => onWorkspaceOpen('edit')}>
-            Open Timeline Editor
+          <Button variant="primary" onClick={() => void onOpenProject?.(project.id)}>
+            Open Menu
           </Button>
         </div>
       )}
@@ -161,7 +161,7 @@ export function HomePage({
                       onClick={() => void onOpenProject?.(item.id)}
                       disabled={isBusy}
                     >
-                      {isSelected ? 'Open Editor' : 'Select Project'}
+                      {isSelected ? 'Open Menu' : 'Select Project'}
                     </Button>
                   </div>
                 );

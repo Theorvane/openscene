@@ -41,7 +41,7 @@ export function ProjectsPage({
             <strong className="home-active-project-banner__name">{project.name}</strong>
           </div>
           <Button variant="primary" onClick={() => void onOpenProject?.(project.id)}>
-            Open Timeline Editor
+            Open Menu
           </Button>
         </div>
       )}
@@ -98,7 +98,7 @@ export function ProjectsPage({
                       onClick={() => void onOpenProject?.(item.id)}
                       disabled={isBusy}
                     >
-                      {isSelected ? 'Open Editor' : 'Select Project'}
+                      {isSelected ? 'Open Menu' : 'Select Project'}
                     </Button>
                   </div>
                 );

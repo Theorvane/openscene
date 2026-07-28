@@ -130,11 +130,11 @@ export function App(): ReactElement {
               onNewProjectNameChange={editor.setNewProjectName}
               onCreateProject={async () => {
                 await editor.createProject();
-                setActiveWorkspace('edit');
+                setActivePage('home');
               }}
               onOpenProject={async (projectId) => {
                 await editor.openProject(projectId);
-                setActiveWorkspace('edit');
+                setActivePage('home');
               }}
               isBusy={editor.isBusy}
             />
@@ -155,11 +155,11 @@ export function App(): ReactElement {
               onNewProjectNameChange={editor.setNewProjectName}
               onCreateProject={async () => {
                 await editor.createProject();
-                setActiveWorkspace('edit');
+                setActivePage('home');
               }}
               onOpenProject={async (projectId) => {
                 await editor.openProject(projectId);
-                setActiveWorkspace('edit');
+                setActivePage('home');
               }}
               isBusy={editor.isBusy}
             />
