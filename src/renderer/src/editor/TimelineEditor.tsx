@@ -205,7 +205,7 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
 
   return (
     <section className={workspaceClassName} style={workspaceStyle} aria-labelledby="timeline-editor-title">
-      <TimelineEditorLeftDock activeTabId={leftDockTabId} editor={editor} floatingProjectVisible={floatingProjectVisible} leftDockVisible={layoutPreference.leftDockVisible} onActiveTabChange={setLeftDockTabId} />
+      <TimelineEditorLeftDock editor={editor} leftDockVisible={layoutPreference.leftDockVisible} />
 
       <EditorLeftDockSplitter leftDockVisible={layoutPreference.leftDockVisible} leftDockWidth={layoutPreference.leftDockWidth} onLeftDockWidthChange={setLeftDockWidth} />
 
