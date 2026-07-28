@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { AgentChatDisplayMessage, AgentChatStatus, AgentToolCallProposal } from '../../shared/agentChat';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import type { AiDomainModelConfig } from '../../shared/aiDomainModels';
@@ -30,12 +30,20 @@ interface AgentChatController {
 
 const AgentChatContext = createContext<AgentChatController | null>(null);
 
+/** A persisted conversation to load into the chat panel (from home screen history). */
+export type AgentChatRestoreRequest = {
+  readonly conversationId: string;
+  readonly messages: readonly AgentChatDisplayMessage[];
+};
+
 type AgentChatProviderProps = {
   readonly activeProject: EditAgentProjectContext | null;
+  readonly restoreRequest?: AgentChatRestoreRequest | null;
+  readonly onRestoreHandled?: () => void;
   readonly children: ReactNode;
 };
 
-export function AgentChatProvider({ activeProject, children }: AgentChatProviderProps): ReactElement {
+export function AgentChatProvider({ activeProject, restoreRequest = null, onRestoreHandled, children }: AgentChatProviderProps): ReactElement {
   const { providerConfig } = useLlmModel();
   const { selectedModel: getSelectedDomainModel } = useAiDomainModel();
   const selectedModel = getSelectedDomainModel('edit-agent');
@@ -47,8 +55,23 @@ export function AgentChatProvider({ activeProject, children }: AgentChatProvider
   const [status, setStatus] = useState<AgentChatStatus>('idle');
   const [error, setError] = useState<string | undefined>(undefined);
   const [isBusy, setIsBusy] = useState(false);
+  // Transcript restored from history: sent along with the next message so the
+  // main process can re-seed an empty (e.g. post-relaunch) conversation thread.
+  const restoredSeedRef = useRef<readonly AgentChatDisplayMessage[] | null>(null);
 
   const isLocalModel = selectedModel.providerId === 'local_ollama';
+
+  useEffect(() => {
+    if (restoreRequest === null) return;
+    conversationIdRef.current = restoreRequest.conversationId;
+    restoredSeedRef.current = restoreRequest.messages;
+    setMessages(restoreRequest.messages);
+    setPendingApproval(null);
+    setStatus('idle');
+    setError(undefined);
+    setInput('');
+    onRestoreHandled?.();
+  }, [restoreRequest, onRestoreHandled]);
 
   const sendMessage = async (text: string): Promise<void> => {
     if (text.trim().length === 0 || isBusy || !isLocalModel) return;
@@ -64,10 +87,12 @@ export function AgentChatProvider({ activeProject, children }: AgentChatProvider
         text,
         modelId: selectedModel.id,
         ollamaBaseUrl: providerConfig.ollamaBaseUrl,
-        activeProject: activeProject ?? undefined
+        activeProject: activeProject ?? undefined,
+        restoredMessages: restoredSeedRef.current ?? undefined
       });
 
       if (response.ok) {
+        restoredSeedRef.current = null;
         setMessages(response.value.messages);
         setPendingApproval(response.value.pendingApproval);
         setStatus(response.value.status);
@@ -123,6 +148,7 @@ export function AgentChatProvider({ activeProject, children }: AgentChatProvider
         return;
       }
 
+      restoredSeedRef.current = null;
       setMessages([]);
       setPendingApproval(null);
       setStatus('idle');

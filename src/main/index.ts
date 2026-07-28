@@ -35,6 +35,7 @@ import { buildAgentChatGraph } from './agentChatGraph';
 import { AgentChatSessionManager } from './agentChatSession';
 import { createOllamaAgentChatModel } from './agentChatModel';
 import { registerAgentChatIpcHandlers } from './agentChatIpcHandlers';
+import { AgentChatHistoryStore } from './agentChatHistoryStore';
 
 registerTimelineAssetScheme();
 
@@ -345,7 +346,7 @@ async function installIpcHandlers(): Promise<void> {
     createModel: createOllamaAgentChatModel(agentChatTools)
   });
   const agentChatSessions = new AgentChatSessionManager(agentChatGraphBundle);
-  registerAgentChatIpcHandlers(ipcMain, agentChatSessions);
+  registerAgentChatIpcHandlers(ipcMain, agentChatSessions, new AgentChatHistoryStore(projectStore));
 }
 
 app.whenReady().then(async () => {

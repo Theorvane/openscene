@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 
+import type { AgentChatHistoryEntry } from '../../shared/agentChat';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import { AppShell } from './AppShell';
+import type { AgentChatRestoreRequest } from './AgentChatContext';
 import { FirstRunOnboarding } from './FirstRunOnboarding';
 import { HomePage } from './HomePage';
 import { NarrationPanel } from './NarrationPanel';
@@ -35,6 +37,8 @@ export function App(): ReactElement {
   });
   const pagePanelRefs = useRef<Partial<Record<AppPageId, HTMLElement>>>({});
   const pendingFocusPageRef = useRef<AppPageId | null>(null);
+  const [chatHistory, setChatHistory] = useState<readonly AgentChatHistoryEntry[]>([]);
+  const [chatRestoreRequest, setChatRestoreRequest] = useState<AgentChatRestoreRequest | null>(null);
   const activePage = APP_PAGE_BY_ID[activePageId];
   const activeProjectContext = useMemo<EditAgentProjectContext | null>(() => {
     if (editor.project === null) return null;
@@ -131,10 +135,52 @@ export function App(): ReactElement {
     navigateToPage('projects');
   }, [activePageId, hasActiveProject, navigateToPage]);
 
+  useEffect(() => {
+    // Refresh the home screen chat history whenever Projects is shown (and as
+    // the known project list changes underneath it).
+    if (activePageId !== 'projects') return;
+    let cancelled = false;
+    void window.videoTool.agentChatHistoryList().then((response) => {
+      if (cancelled || !response.ok) return;
+      setChatHistory(response.value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePageId, editor.projects]);
+
+  const openChatFromHistory = useCallback(async (entry: AgentChatHistoryEntry): Promise<void> => {
+    const opened = await editor.openProject(entry.projectId);
+    if (!opened) return;
+    const conversation = await window.videoTool.agentChatHistoryGet({
+      projectId: entry.projectId,
+      conversationId: entry.conversationId
+    });
+    if (conversation.ok && conversation.value !== null) {
+      setChatRestoreRequest({ conversationId: conversation.value.id, messages: conversation.value.messages });
+    }
+    // The project is open at this point, so enter the editor workspace
+    // directly (the guarded setters still see the pre-open project state).
+    requestPageFocus(EDIT_WORKSPACE.id);
+    setActiveWorkspaceId(EDIT_WORKSPACE.id);
+    setActivePageId(EDIT_WORKSPACE.id);
+  }, [editor, requestPageFocus]);
+
+  const clearChatRestoreRequest = useCallback((): void => {
+    setChatRestoreRequest(null);
+  }, []);
+
   const workspaceIsVisible = isWorkspacePageId(activePageId);
 
   return (
-    <AppShell activePage={activePage} hasActiveProject={hasActiveProject} onPageChange={setActivePage} activeProjectContext={activeProjectContext}>
+    <AppShell
+      activePage={activePage}
+      hasActiveProject={hasActiveProject}
+      onPageChange={setActivePage}
+      activeProjectContext={activeProjectContext}
+      chatRestoreRequest={chatRestoreRequest}
+      onChatRestoreHandled={clearChatRestoreRequest}
+    >
       <ProjectResultImportProvider editor={editor}>
         <div className="app-page-stack">
           <section
@@ -165,6 +211,7 @@ export function App(): ReactElement {
             <ProjectsPage
               project={editor.project}
               projects={editor.projects}
+              chats={chatHistory}
               onOpenProject={async (projectId) => {
                 const opened = await editor.openProject(projectId);
                 if (opened) navigateToPage('home');
@@ -173,6 +220,7 @@ export function App(): ReactElement {
                 const opened = await editor.openProjectFolder();
                 if (opened) navigateToPage('home');
               }}
+              onOpenChat={openChatFromHistory}
               isBusy={editor.isBusy}
             />
           </section>

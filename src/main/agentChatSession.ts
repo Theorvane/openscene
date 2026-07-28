@@ -39,14 +39,40 @@ export class AgentChatSessionManager {
     const { HumanMessage } = await import('@langchain/core/messages');
 
     try {
+      const seed = await this.restoredSeed(input);
       const result = await this.graph.invoke(
-        { messages: [new HumanMessage(input.text)] },
+        { messages: [...seed, new HumanMessage(input.text)] },
         this.runnableConfig(input.conversationId)
       );
       return await this.toTurnState(input.conversationId, result);
     } catch (err) {
       return this.errorState(input.conversationId, err);
     }
+  }
+
+  /** Project the given conversation is scoped to, if any. */
+  getActiveProject(conversationId: string): EditAgentProjectContext | null {
+    return this.conversationConfigs.get(conversationId)?.activeProject ?? null;
+  }
+
+  /**
+   * When a conversation restored from persisted history continues after the
+   * in-memory thread is gone (e.g. app relaunch), replay the transcript into
+   * the empty thread so the model keeps its context. A thread that already
+   * has messages wins over the restored copy.
+   */
+  private async restoredSeed(input: AgentChatSendInput): Promise<BaseMessage[]> {
+    const restored = input.restoredMessages ?? [];
+    if (restored.length === 0) return [];
+
+    const snapshot = await this.graph.getState(this.runnableConfig(input.conversationId)).catch(() => null);
+    const existing = ((snapshot?.values as { messages?: BaseMessage[] } | undefined)?.messages ?? []) as BaseMessage[];
+    if (existing.length > 0) return [];
+
+    const { AIMessage, HumanMessage } = await import('@langchain/core/messages');
+    return restored
+      .filter((message) => message.role !== 'tool' && message.text.trim().length > 0)
+      .map((message) => (message.role === 'user' ? new HumanMessage(message.text) : new AIMessage(message.text)));
   }
 
   async respondToApproval(input: AgentChatApprovalInput): Promise<AgentChatTurnState> {

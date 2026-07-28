@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
 
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import {
@@ -10,7 +10,7 @@ import {
 } from './agentChatLayoutPreferences';
 import { isWorkspacePageId, type AppPage, type AppPageId } from './appPages';
 import { AgentChatPanel } from './AgentChatPanel';
-import { AgentChatProvider, useAgentChat } from './AgentChatContext';
+import { AgentChatProvider, useAgentChat, type AgentChatRestoreRequest } from './AgentChatContext';
 import { Button } from './ui';
 import { useAgentChatLayoutPreference } from './useAgentChatLayoutPreference';
 
@@ -35,6 +35,8 @@ type AppShellProps = {
   readonly hasActiveProject: boolean;
   readonly onPageChange: (pageId: AppPageId) => void;
   readonly activeProjectContext: EditAgentProjectContext | null;
+  readonly chatRestoreRequest?: AgentChatRestoreRequest | null;
+  readonly onChatRestoreHandled?: () => void;
 };
 
 function SettingsIcon(): ReactElement {
@@ -64,7 +66,7 @@ function FolderIcon(): ReactElement {
   );
 }
 
-function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext }: AppShellProps): ReactElement {
+function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext, chatRestoreRequest = null }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
   const shellBodyRef = useRef<HTMLDivElement | null>(null);
@@ -90,6 +92,16 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
       chatPanelCollapsed: collapsed
     }));
   };
+
+  useEffect(() => {
+    // Opening a saved chat from the home screen should always land in a
+    // visible chat panel, even if it was collapsed last time.
+    if (chatRestoreRequest === null) return;
+    updateLayoutPreference((currentPreference) => ({
+      ...currentPreference,
+      chatPanelCollapsed: false
+    }));
+  }, [chatRestoreRequest, updateLayoutPreference]);
 
   const releasePointer = (event: PointerEvent<HTMLDivElement>): void => {
     dragOriginRef.current = null;
@@ -227,7 +239,11 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
 
 export function AppShell(props: AppShellProps): ReactElement {
   return (
-    <AgentChatProvider activeProject={props.activeProjectContext}>
+    <AgentChatProvider
+      activeProject={props.activeProjectContext}
+      restoreRequest={props.chatRestoreRequest ?? null}
+      {...(props.onChatRestoreHandled === undefined ? {} : { onRestoreHandled: props.onChatRestoreHandled })}
+    >
       <AppShellContent {...props} />
     </AgentChatProvider>
   );

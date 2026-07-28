@@ -32,6 +32,12 @@ export interface AgentChatSendInput {
   readonly ollamaBaseUrl?: string | undefined;
   readonly contextAssets?: readonly EditAgentContextAsset[] | undefined;
   readonly activeProject?: EditAgentProjectContext | undefined;
+  /**
+   * Transcript restored from persisted chat history. When the in-memory
+   * conversation thread is empty (e.g. after a relaunch), these messages
+   * re-seed the model so the conversation can continue where it left off.
+   */
+  readonly restoredMessages?: readonly AgentChatDisplayMessage[] | undefined;
 }
 
 export type AgentToolApprovalDecision = 'approve' | 'deny';
@@ -43,5 +49,29 @@ export interface AgentChatApprovalInput {
 }
 
 export interface AgentChatResetInput {
+  readonly conversationId: string;
+}
+
+/** One persisted Edit Agent conversation, stored inside its project folder. */
+export interface AgentChatStoredConversation {
+  readonly id: string;
+  readonly title: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly messages: readonly AgentChatDisplayMessage[];
+}
+
+/** Path-free summary row for the home screen chat history list. */
+export interface AgentChatHistoryEntry {
+  readonly projectId: string;
+  readonly projectName: string;
+  readonly conversationId: string;
+  readonly title: string;
+  readonly updatedAt: string;
+  readonly messageCount: number;
+}
+
+export interface AgentChatHistoryGetInput {
+  readonly projectId: string;
   readonly conversationId: string;
 }

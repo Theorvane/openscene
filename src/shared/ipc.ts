@@ -52,7 +52,9 @@ export const IPC_CHANNELS = {
   mcpExecuteTool: 'mcp:execute-tool',
   agentChatSend: 'agent-chat:send',
   agentChatApprove: 'agent-chat:approve',
-  agentChatReset: 'agent-chat:reset'
+  agentChatReset: 'agent-chat:reset',
+  agentChatHistoryList: 'agent-chat:history-list',
+  agentChatHistoryGet: 'agent-chat:history-get'
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
