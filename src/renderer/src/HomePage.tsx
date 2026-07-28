@@ -89,29 +89,42 @@ export function HomePage({
   return (
     <div className="home-page">
       <header className="home-page__hero">
-        <p className="section-kicker">Local studio home</p>
-        <h1 id="home-page-title">Start with a project.</h1>
+        <p className="section-kicker">Local Folder Studio</p>
+        <h1 id="home-page-title">Start with a folder-based project.</h1>
         <p>
-          Create or select a local project first. All editing, voice synthesis, video jobs, and Edit Agent operations center around your project.
+          OpenVideo stores every project in a dedicated local folder. Create a project folder or open an existing one to unlock timeline editing, voice tools, video generation, and Edit Agent chat.
         </p>
       </header>
 
-      {/* Project Creation & Selection Hub */}
-      <section className="home-project-hub" aria-label="Project management hub">
+      {/* Active Project Banner if open */}
+      {project !== null && (
+        <div className="home-active-project-banner" role="status">
+          <div className="home-active-project-banner__info">
+            <span className="home-active-project-banner__kicker">📁 Active Project Folder</span>
+            <strong className="home-active-project-banner__name">{project.name}</strong>
+          </div>
+          <Button variant="primary" onClick={() => onWorkspaceOpen('edit')}>
+            Open Timeline Editor
+          </Button>
+        </div>
+      )}
+
+      {/* Folder-Based Project Creation & Selection Hub */}
+      <section className="home-project-hub" aria-label="Project folder management hub">
         <div className="home-project-hub__creator">
           <div className="home-project-hub__header">
-            <span className="home-project-hub__kicker">New Project</span>
-            <h2 className="home-project-hub__title">Create Project</h2>
+            <span className="home-project-hub__kicker">📁 Folder-Based Creation</span>
+            <h2 className="home-project-hub__title">Create New Project Folder</h2>
           </div>
           <div className="home-project-hub__form">
             <label className="field-label" htmlFor="home-project-name-input">
-              Project Name
+              Project Folder Name
               <input
                 id="home-project-name-input"
                 type="text"
                 value={newProjectName}
                 onChange={(e) => onNewProjectNameChange?.(e.target.value)}
-                placeholder="My New Video Cut"
+                placeholder="My New Video Project"
                 disabled={isBusy}
               />
             </label>
@@ -120,14 +133,14 @@ export function HomePage({
               onClick={() => void onCreateProject?.()}
               disabled={isBusy || newProjectName.trim().length === 0}
             >
-              Create Project
+              Create Project Folder
             </Button>
           </div>
         </div>
 
         {projects.length > 0 && (
           <div className="home-project-hub__list-section">
-            <span className="home-project-hub__kicker">Recent Projects ({projects.length})</span>
+            <span className="home-project-hub__kicker">📁 Saved Project Folders ({projects.length})</span>
             <div className="home-project-hub__grid">
               {projects.map((item) => {
                 const isSelected = project?.id === item.id;
@@ -138,7 +151,7 @@ export function HomePage({
                   >
                     <div className="home-project-item__body">
                       <div className="home-project-item__header">
-                        <strong className="home-project-item__name">{item.name}</strong>
+                        <strong className="home-project-item__name">📁 {item.name}</strong>
                         {isSelected && <span className="home-project-item__badge">Active</span>}
                       </div>
                       <span className="home-project-item__date">{formatTimestamp(item.updatedAt)}</span>
@@ -148,7 +161,7 @@ export function HomePage({
                       onClick={() => void onOpenProject?.(item.id)}
                       disabled={isBusy}
                     >
-                      {isSelected ? 'Open Editor' : 'Select'}
+                      {isSelected ? 'Open Editor' : 'Select Project'}
                     </Button>
                   </div>
                 );
