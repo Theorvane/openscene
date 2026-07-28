@@ -71,26 +71,26 @@ export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelPr
         </div>
 
         <div className="agent-chat-log" aria-live="polite">
-          <section className="agent-chat-context" aria-label="Edit Agent asset context">
-            <p className="agent-chat-context__title">Project context</p>
-            {selectedContextAsset !== null && (
-              <div className="agent-chat-context__candidate">
-                <span className="agent-chat-context__eyebrow">Selected asset</span>
-                <span className="agent-chat-context__name">{selectedContextAsset.label}</span>
-                <span className="agent-chat-context__meta">{selectedContextAsset.mediaKind}</span>
-                <Button
-                  variant="ghost"
-                  onClick={attachSelectedContextAsset}
-                  disabled={isBusy || selectedContextIsAttached}
-                  aria-label={`Attach ${selectedContextAsset.label} to Edit Agent context`}
-                >
-                  {selectedContextIsAttached ? 'Attached' : 'Attach'}
-                </Button>
+          {selectedContextAsset !== null && !selectedContextIsAttached && (
+            <div className="agent-chat-context-banner">
+              <div className="agent-chat-context-banner__info">
+                <span className="agent-chat-context-banner__eyebrow">Active selection</span>
+                <span className="agent-chat-context-banner__name">{selectedContextAsset.label}</span>
               </div>
-            )}
-            {contextAssets.length === 0 ? (
-              <p className="agent-chat-log__hint">Import an AI voice or video result, then add its project asset here before asking for an edit.</p>
-            ) : (
+              <Button
+                variant="ghost"
+                onClick={attachSelectedContextAsset}
+                disabled={isBusy}
+                aria-label={`Attach ${selectedContextAsset.label} to Edit Agent context`}
+              >
+                Attach
+              </Button>
+            </div>
+          )}
+
+          {contextAssets.length > 0 && (
+            <div className="agent-chat-context-list">
+              <p className="agent-chat-context-list__title">Attached context</p>
               <ul className="agent-chat-context__assets">
                 {contextAssets.map((asset) => (
                   <li key={`${asset.projectId}:${asset.assetId}`}>
@@ -109,18 +109,25 @@ export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelPr
                   </li>
                 ))}
               </ul>
-            )}
-          </section>
+            </div>
+          )}
+
           {!isLocalModel && (
-            <p className="agent-chat-log__hint">
-              Agent chat currently uses a local Ollama model. Pick a Local Engine model below to control OpenVideo with chat.
-            </p>
+            <div className="agent-chat-hint-card agent-chat-hint-card--warning">
+              <span className="agent-chat-hint-card__icon">⚠️</span>
+              <p className="agent-chat-hint-card__text">
+                Agent chat currently uses a local Ollama model. Pick a Local Engine model below to control OpenVideo with chat.
+              </p>
+            </div>
           )}
 
           {messages.length === 0 && (
-            <p className="agent-chat-log__hint">
-              Ask the agent to generate video or speech, add a clip to the timeline, check a job, or export a project. Changes ask for approval before they run.
-            </p>
+            <div className="agent-chat-hint-card agent-chat-hint-card--welcome">
+              <span className="agent-chat-hint-card__icon">✦</span>
+              <p className="agent-chat-hint-card__text">
+                Ask the agent to generate video or speech, add a clip to the timeline, check a job, or export a project. Changes ask for approval before they run.
+              </p>
+            </div>
           )}
 
           {messages.map((message) => (

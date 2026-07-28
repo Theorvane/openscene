@@ -3657,11 +3657,101 @@ button {
 .agent-chat-log__hint {
   margin: 0;
   padding: var(--space-2) var(--space-3);
-  border: 1px dashed color-mix(in srgb, var(--border) 72%, transparent);
+  border: 1px solid var(--line-subtle);
   border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  background: var(--surface-inset);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.agent-chat-hint-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-1) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  box-shadow: var(--shadow-inset-rule);
+  transition: all 140ms ease;
+}
+
+.agent-chat-hint-card--welcome {
+  border-color: color-mix(in srgb, var(--primary) 24%, var(--line-subtle));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 6%, transparent), var(--surface-inset));
+}
+
+.agent-chat-hint-card--warning {
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--line-subtle));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--warning) 8%, transparent), var(--surface-inset));
+}
+
+.agent-chat-hint-card__icon {
+  flex-shrink: 0;
+  color: var(--primary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.agent-chat-hint-card__text {
+  margin: 0;
   color: var(--color-muted);
   font-size: var(--text-caption);
   line-height: 1.5;
+}
+
+.agent-chat-context-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--line-subtle));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface-inset));
+}
+
+.agent-chat-context-banner__info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.agent-chat-context-banner__eyebrow {
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agent-chat-context-banner__name {
+  color: var(--color-text);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-chat-context-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agent-chat-context-list__title {
+  margin: 0;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .agent-chat-context {
