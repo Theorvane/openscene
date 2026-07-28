@@ -253,8 +253,7 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
     <section className="program-monitor clip-controls" aria-labelledby="program-monitor-title">
       <div className="panel-heading">
         <div>
-          <p className="section-kicker">Desktop NLE Monitor</p>
-          <h2 id="program-monitor-title" style={{ fontSize: '1.1rem', letterSpacing: '-0.02em' }}>Program Monitor</h2>
+          <h2 id="program-monitor-title" style={{ margin: 0, fontSize: 'var(--text-small)', fontWeight: 600, letterSpacing: 'var(--tracking-tight)' }}>Program Monitor</h2>
         </div>
       </div>
 
@@ -327,78 +326,69 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
         </div>
       </div>
 
-      {/* Premiere Pro Style Transport Control Panel */}
-      <div 
+      {/* Flat under-canvas transport row: timecode left, playback centered, view options right */}
+      <div
         className="monitor-controls"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'auto 1fr auto',
+          gridTemplateColumns: '1fr auto 1fr',
           alignItems: 'center',
-          gap: 'var(--space-4)',
-          background: 'var(--surface-raised-soft)',
-          padding: 'var(--space-2) var(--space-3)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-sm)',
-          marginTop: 'var(--space-2)'
+          gap: 'var(--space-3)',
+          padding: 'var(--space-2) var(--space-2) 0',
+          marginTop: 'var(--space-1)'
         }}
       >
-        {/* Left Side: Timecode Indicator */}
-        <div 
+        {/* Left: current / total timecode */}
+        <div
           className="timecode-display"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '1rem',
-            color: 'var(--accent)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            padding: '2px 6px',
-            background: 'var(--background)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-xs)',
-            transition: 'color var(--transition-fast)'
-          }}
+          style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)', minWidth: 0 }}
           title="Current playhead position (HH:MM:SS:FF)"
         >
-          {formatTimecode(editor.playheadMs)}
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-caption)', fontWeight: 500, color: 'var(--text-strong)' }}>
+            {formatTimecode(editor.playheadMs)}
+          </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-caption)', color: 'var(--text-weaker)' }}>
+            / {formatTimecode(durationMs)}
+          </span>
         </div>
 
-        {/* Center: Playback control buttons */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-2)' }}>
-          <button 
-            className="button button--ghost" 
-            style={{ padding: '4px 8px', minHeight: '28px' }}
+        {/* Center: playback controls */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'var(--space-1)' }}>
+          <button
+            className="button button--ghost"
+            style={{ padding: '2px 8px', minHeight: '26px' }}
             aria-label="Step backward one frame"
-            title="Step backward 1 frame" 
+            title="Step backward 1 frame"
             onClick={() => stepFrame('backward')}
             disabled={project === null}
           >
             ⏮
           </button>
-          <button 
-            className="button" 
-            style={{ padding: '4px 12px', minHeight: '28px', minWidth: '60px' }}
+          <button
+            className="button button--ghost"
+            style={{ padding: '2px 10px', minHeight: '26px', minWidth: '44px', fontSize: 'var(--text-body)' }}
             aria-label={editor.isPlaying ? 'Pause timeline playback' : 'Play timeline playback'}
             title="Play / Pause"
             onClick={() => editor.setIsPlaying(!editor.isPlaying)}
             disabled={project === null}
           >
-            {editor.isPlaying ? '⏸ Pause' : '▶ Play'}
+            {editor.isPlaying ? '⏸' : '▶'}
           </button>
-          <button 
-            className="button button--stop" 
-            style={{ padding: '4px 12px', minHeight: '28px' }}
+          <button
+            className="button button--ghost"
+            style={{ padding: '2px 8px', minHeight: '26px' }}
             aria-label="Stop timeline playback and return to start"
-            title="Stop playback" 
+            title="Stop playback"
             onClick={stopPlayback}
             disabled={project === null}
           >
-            ⏹ Stop
+            ⏹
           </button>
-          <button 
-            className="button button--ghost" 
-            style={{ padding: '4px 8px', minHeight: '28px' }}
+          <button
+            className="button button--ghost"
+            style={{ padding: '2px 8px', minHeight: '26px' }}
             aria-label="Step forward one frame"
-            title="Step forward 1 frame" 
+            title="Step forward 1 frame"
             onClick={() => stepFrame('forward')}
             disabled={project === null}
           >
@@ -406,8 +396,8 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
           </button>
         </div>
 
-        {/* Right Side: Resolution/Scale dropdowns and duration */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        {/* Right: view options */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-1)' }}>
           {/* Safe Margins Button */}
           <button
             type="button"
@@ -415,33 +405,36 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
             aria-pressed={showSafeMargins}
             onClick={() => setShowSafeMargins(!showSafeMargins)}
             style={{
-              background: showSafeMargins ? 'var(--primary)' : 'var(--background)',
-              border: '1px solid var(--border)',
-              color: showSafeMargins ? 'var(--primary-foreground)' : 'var(--foreground)',
+              background: showSafeMargins ? 'var(--surface-control-selected)' : 'transparent',
+              border: 'none',
+              color: showSafeMargins ? 'var(--color-primary)' : 'var(--text-weak)',
               fontSize: 'var(--text-micro)',
-              padding: '2px 6px',
+              padding: '2px 8px',
               borderRadius: 'var(--radius-xs)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              height: '20px'
+              height: '22px',
+              transition: 'background var(--transition-fast), color var(--transition-fast)'
             }}
             title="Toggle Broadcast Safe Margins Guide"
           >
             Grid
           </button>
           {/* Zoom/Fit Selector */}
-          <select 
-            value={scale} 
+          <select
+            value={scale}
             onChange={(e) => setScale(e.target.value)}
+            aria-label="Preview scale"
             style={{
-              background: 'var(--background)',
-              border: '1px solid var(--border)',
-              color: 'var(--foreground)',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-weak)',
               fontSize: 'var(--text-micro)',
-              padding: '2px 4px',
-              borderRadius: 'var(--radius-xs)'
+              padding: '2px 2px',
+              borderRadius: 'var(--radius-xs)',
+              cursor: 'pointer'
             }}
           >
             <option value="Fit">Fit</option>
@@ -450,34 +443,24 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
           </select>
 
           {/* Quality Selector */}
-          <select 
-            value={resolution} 
+          <select
+            value={resolution}
             onChange={(e) => setResolution(e.target.value)}
+            aria-label="Preview playback quality"
             style={{
-              background: 'var(--background)',
-              border: '1px solid var(--border)',
-              color: 'var(--foreground)',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-weak)',
               fontSize: 'var(--text-micro)',
-              padding: '2px 4px',
-              borderRadius: 'var(--radius-xs)'
+              padding: '2px 2px',
+              borderRadius: 'var(--radius-xs)',
+              cursor: 'pointer'
             }}
           >
             <option value="Full">Full</option>
             <option value="1/2">1/2</option>
             <option value="1/4">1/4</option>
           </select>
-
-          {/* Total Duration */}
-          <span 
-            style={{
-              fontSize: 'var(--text-caption)',
-              fontFamily: 'var(--font-mono)',
-              color: 'var(--muted-foreground)',
-              marginLeft: 'var(--space-2)'
-            }}
-          >
-            / {formatTimecode(durationMs)}
-          </span>
         </div>
       </div>
     </section>
