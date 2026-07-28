@@ -1982,10 +1982,12 @@ button {
 .editor-left-dock {
   grid-area: project;
   display: grid;
-  grid-template-rows: auto minmax(120px, 0.7fr) minmax(0, 1.3fr);
-  gap: var(--space-2);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .editor-left-dock-splitter {

@@ -37,8 +37,8 @@ export function AssetBin({ editor }: AssetBinProps): ReactElement {
     <section className="asset-bin" aria-labelledby="assets-title" style={COMPACT_PANEL_STYLE}>
       <div className="panel-heading" style={COMPACT_PANEL_HEADING_STYLE}>
         <div>
-          <p className="section-kicker">Assets</p>
-          <h2 id="assets-title" style={COMPACT_PANEL_TITLE_STYLE}>Media bin</h2>
+          <p className="section-kicker">Media Dock</p>
+          <h2 id="assets-title" style={COMPACT_PANEL_TITLE_STYLE}>Media Bin</h2>
         </div>
         <div className="transport-strip__buttons">
           <button className="button" type="button" onClick={() => void editor.importAssets(['video'])} disabled={project === null || editor.isBusy}>Import video</button>
