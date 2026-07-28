@@ -50,7 +50,8 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 - The left dock is labeled `Project and media` and contains two tabs: `Project` for `ProjectRail` and `Media` for `AssetBin`.
 - Default to `Project` unless an asset is selected, then reveal `Media`. Keep both tabs compact and dock scoped.
 - Project cards should prioritize project name, local status, save state, and selection.
-- Asset cards should show media kind, asset name, duration or metadata status, and selection. Video and audio are distinguished with labels, border treatment, and pattern, not bright accent colors.
+- The media view offers grid and list presentations. Grid tiles use a 16:9 preview well with an uppercase kind label and a mono duration badge, with the asset name and size below; list rows use a small kind thumb, name, and right-aligned mono duration. Both must show media kind, asset name, duration or metadata status, and selection, and video/audio stay distinguished with text labels and subtle tint, not hue alone.
+- An empty media library renders as a dashed import drop-zone CTA; a missing project keeps the existing empty slate.
 - Assets must show `Reading metadata` until browser metadata has been persisted through `updateAssetMetadata`.
 - `AssetMetadataProbeHost` is hidden infrastructure outside the dock panels. It may request secure playback URLs and probe browser metadata, but it must not become visible UI or imply analysis beyond local duration and video dimensions.
 
