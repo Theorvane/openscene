@@ -43,7 +43,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 ## Program Header And Command Surface
 
 - The Edit workspace keeps `Local studio`, `OpenVideo`, and the `Timeline editor` subtitle as visually hidden region labels for accessibility; no visible branding header renders inside the workspace, and app chrome must not duplicate it.
-- Timeline commands such as Play, Rewind, Undo, Redo, Split at playhead, add track actions, layout changes, and Save timeline live in the native Timeline menu bridge.
+- Timeline commands such as Play, Rewind, Undo, Redo, add track actions, layout changes, and Save timeline live in the native Timeline menu bridge. The timeline toolbar additionally exposes reference-style selected-clip tools — split at playhead, split left/right (trim to playhead), duplicate, and delete — as icon buttons that disable without a selection, plus a snapping magnet toggle; unimplemented tools (separate audio, freeze frame) render disabled with coming-soon tooltips.
 - Keyboard shortcut customization lives in Settings → Shortcuts, which renders the `Shortcut map` disclosure (`TimelineShortcutMap`). It must support remap, disable, reset, validation, persistence, and `role="status"` feedback; the Editing workspace consumes the stored preferences without rendering the remap surface.
 - Save state must remain explicit. Local timeline mutations are unsaved until `saveTimeline` succeeds.
 
@@ -79,7 +79,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 ## Bottom Timeline
 
 - The timeline is the bottom anchor of the editor. It spans the full workspace width on desktop.
-- Track lanes are flat rounded inset wells separated by small gaps, under a slim mono ruler. The playhead is a neutral foreground hairline with a round scrub-dot handle in the ruler. Clip blocks encode media kind with text labels plus tinted fills and borders, and reveal primary-colored grip trim handles on hover/selection.
+- Track lanes are flat rounded inset wells separated by small gaps, under a slim adaptive ruler: tick and label intervals come from a time ladder chosen by real pixel density (labels ~90px apart, denser ticks that always divide the label interval), labels are mono times that gain tenths only at sub-second intervals and hours for hour-long timelines, and the right-pinned total suppresses colliding tick labels. Track mute/solo/lock render as icon toggles (speaker, headphones, padlock) with aria-pressed state. The playhead is a neutral foreground hairline with a round scrub-dot handle in the ruler. Clip blocks encode media kind with text labels plus tinted fills and borders, and reveal primary-colored grip trim handles on hover/selection.
 - Clip blocks show asset name and duration. Trim handles stay visible enough to discover, but should not dominate the clip label.
 - Timeline interactions must read as local edits. Do not suggest non-existent cloud sync, unsupported render formats, or frame-perfect mastering guarantees.
 - Timeline mouse tools: the select tool drags/trims clips and scrubs; the razor tool splits a clip at the clicked time (undoable, crosshair cursor, dragging disabled); the hand tool pans the track area horizontally (grab cursor). Ctrl/Cmd + wheel (trackpad pinch) zooms around the cursor with the time under the pointer anchored; plain and shift wheel keep native scrolling.

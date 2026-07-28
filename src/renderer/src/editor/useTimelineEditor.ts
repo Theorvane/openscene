@@ -4,6 +4,7 @@ import {
   addTrack,
   deleteClip,
   moveClip,
+  placeClip,
   splitClip,
   trimClipLeft,
   trimClipRight,
@@ -230,6 +231,20 @@ export function useTimelineEditor() {
     replaceTimeline((timeline) => splitClip(timeline, { clipId, atMs, rightClipId: createOpaqueId('clip') }), 'Split clip with the razor tool.');
   }, [replaceTimeline]);
 
+  const duplicateSelectedClip = useCallback(() => {
+    if (selectedClip === null) return;
+    const source = selectedClip.clip;
+    const duplicatedStartMs = source.timelineStartMs + (source.sourceEndMs - source.sourceStartMs);
+    const timeline = replaceTimeline(
+      (current) => placeClip(current, {
+        trackId: selectedClip.track.id,
+        clip: { ...source, id: createOpaqueId('clip'), timelineStartMs: duplicatedStartMs }
+      }),
+      'Duplicated the selected clip after itself.'
+    );
+    if (timeline === null) return;
+  }, [replaceTimeline, selectedClip]);
+
   const updateSelectedClipEffects = useCallback((effects: Partial<ClipEffects>) => {
     if (selectedClip === null) return;
     replaceTimeline((timeline) => updateClipEffects(timeline, { clipId: selectedClip.clip.id, effects }), 'Updated selected clip effects.');
@@ -284,7 +299,7 @@ export function useTimelineEditor() {
   }, [project, setLoadedProject]);
 
   return {
-    addTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, hasUnsavedTimeline, importAssets,
+    addTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importTtsResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
     openProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
     selectedAsset, selectedAssetId, selectedClip, selectedClipId, setNewProjectName, setSelectedAssetId, setSelectedClipId,

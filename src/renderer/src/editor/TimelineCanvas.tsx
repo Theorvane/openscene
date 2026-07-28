@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactElement, type ReactNode } from 'react';
 
 import { formatDuration } from '../format';
 import { buildTimelineView, clientXToTimelineMs } from './editorTimelineView';
+import { buildRulerTicks } from './timelineRulerTicks';
 import type { TimelineEditorController } from './useTimelineEditor';
 
 type TimelineCanvasProps = {
@@ -54,17 +55,54 @@ const ACTIVE_TOOL_BUTTON_STYLE = {
   color: 'var(--color-primary)'
 } as const satisfies CSSProperties;
 
+const DISABLED_TOOL_BUTTON_STYLE = {
+  ...TOOL_BUTTON_STYLE,
+  color: 'var(--text-weaker)',
+  cursor: 'not-allowed',
+  opacity: 0.45
+} as const satisfies CSSProperties;
+
+function toolIcon(path: ReactNode, size = 14): ReactElement {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      {path}
+    </svg>
+  );
+}
+
+const ICONS = {
+  select: toolIcon(<path d="M5 3l14 8.5-6.2 1.4L10 19z" />),
+  razor: toolIcon(<><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="6.5" cy="17.5" r="2.5" /><path d="M8.7 8.2L20 19M8.7 15.8L20 5" /></>),
+  hand: toolIcon(<path d="M8 12V6.5a1.5 1.5 0 013 0V11m0-5.5v-1a1.5 1.5 0 013 0V11m0-4.5a1.5 1.5 0 013 0V13c0 4-2.5 7-6.5 7-3 0-4.6-1.6-6-4.5L3.4 12c-.6-1.3.9-2.5 2-1.6L8 13" />),
+  text: toolIcon(<path d="M5 6V4h14v2M12 4v16m-3 0h6" />),
+  splitAtPlayhead: toolIcon(<><path d="M12 3v18" strokeDasharray="2.5 2.5" /><path d="M4 7h5M4 12h5M4 17h5M15 7h5M15 12h5M15 17h5" /></>),
+  splitLeft: toolIcon(<><path d="M14 3v18" /><path d="M17 7h4M17 12h4M17 17h4M10 12H3m0 0l3-3m-3 3l3 3" /></>),
+  splitRight: toolIcon(<><path d="M10 3v18" /><path d="M3 7h4M3 12h4M3 17h4M14 12h7m0 0l-3-3m3 3l-3 3" /></>),
+  duplicate: toolIcon(<><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></>),
+  trash: toolIcon(<><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m3 0l-.8 12a2 2 0 01-2 1.9H8.8a2 2 0 01-2-1.9L6 7" /><path d="M10 11v6M14 11v6" /></>),
+  separateAudio: toolIcon(<><path d="M4 14v-4M8 17V7M12 20V4M16 17V7M20 14v-4" /></>),
+  freeze: toolIcon(<><path d="M12 2v20M4 6l16 12M20 6L4 18" /></>),
+  magnet: toolIcon(<><path d="M6 4v7a6 6 0 0012 0V4" /><path d="M6 4h4v5H6zM14 4h4v5h-4z" fill="currentColor" stroke="none" /></>),
+  volumeOn: toolIcon(<><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11" /></>, 12),
+  volumeOff: toolIcon(<><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9l5 6M21 9l-5 6" /></>, 12),
+  headphones: toolIcon(<><path d="M4 14v-2a8 8 0 0116 0v2" /><rect x="3" y="14" width="4" height="6" rx="1.5" /><rect x="17" y="14" width="4" height="6" rx="1.5" /></>, 12),
+  lock: toolIcon(<><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" /></>, 12),
+  unlock: toolIcon(<><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 017.8-1.3" /></>, 12)
+} as const;
+
 const TRACK_TOGGLE_STYLE = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '20px',
+  height: '18px',
   border: 'none',
   borderRadius: 'var(--radius-xs)',
   background: 'transparent',
   color: 'var(--text-weaker)',
-  fontFamily: 'var(--font-mono)',
-  fontSize: '9px',
-  fontWeight: 600,
-  padding: '2px 4px',
+  padding: 0,
   cursor: 'pointer',
-  lineHeight: 1.1,
+  lineHeight: 1,
   transition: 'background var(--transition-fast), color var(--transition-fast)'
 } as const satisfies CSSProperties;
 
@@ -90,6 +128,9 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
   const [soloTracks, setSoloTracks] = useState<Record<string, boolean>>({});
   const [lockedTracks, setLockedTracks] = useState<Record<string, boolean>>({});
   const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
+  const [snappingEnabled, setSnappingEnabled] = useState(true);
+  const snapMs = snappingEnabled ? 100 : 10;
+  const selectedClip = editor.selectedClip;
 
   const onLaneDrop = (event: DragEvent<HTMLDivElement>, trackId: string): void => {
     if (view === null) return;
@@ -98,7 +139,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
     const payload = readTimelineDrag(event);
     if (payload === null) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const atMs = clientXToTimelineMs({ clientX: event.clientX, laneLeft: rect.left, laneWidth: rect.width, durationMs: view.durationMs, snapMs: 100 });
+    const atMs = clientXToTimelineMs({ clientX: event.clientX, laneLeft: rect.left, laneWidth: rect.width, durationMs: view.durationMs, snapMs });
     if (payload.kind === 'asset') editor.placeAssetOnTrack(payload.assetId, trackId, atMs);
     if (payload.kind === 'clip') editor.moveClipToTrack(payload.clipId, trackId, Math.max(0, atMs - payload.offsetMs));
     if (payload.kind === 'trim') editor.trimClipTo(payload.clipId, payload.edge, atMs);
@@ -107,14 +148,14 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
   const scrubLane = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (view === null) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    editor.setPlayheadMs(clientXToTimelineMs({ clientX: event.clientX, laneLeft: rect.left, laneWidth: rect.width, durationMs: view.durationMs, snapMs: 100 }));
+    editor.setPlayheadMs(clientXToTimelineMs({ clientX: event.clientX, laneLeft: rect.left, laneWidth: rect.width, durationMs: view.durationMs, snapMs }));
   };
 
   // Ruler scrubbing: press to seek, drag while pressed to keep scrubbing.
   const scrubRuler = (event: React.PointerEvent<HTMLDivElement>): void => {
     if (view === null) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    editor.setPlayheadMs(clientXToTimelineMs({ clientX: event.clientX, laneLeft: rect.left, laneWidth: rect.width, durationMs: view.durationMs, snapMs: 100 }));
+    editor.setPlayheadMs(clientXToTimelineMs({ clientX: event.clientX, laneLeft: rect.left, laneWidth: rect.width, durationMs: view.durationMs, snapMs }));
   };
 
   const onRulerPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -174,6 +215,24 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
     const contentX = (anchor.scrollLeft + anchor.anchorX) * (zoomLevel / anchor.previousZoom);
     stack.scrollLeft = Math.max(0, contentX - anchor.anchorX);
   }, [zoomLevel]);
+
+  // Adaptive ruler: measure the scale cell so tick/label intervals can follow
+  // the real pixel density (re-measures on zoom and container resize).
+  const rulerScaleRef = useRef<HTMLDivElement | null>(null);
+  const [rulerWidthPx, setRulerWidthPx] = useState(0);
+
+  useEffect(() => {
+    const scale = rulerScaleRef.current;
+    if (scale === null) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      setRulerWidthPx(width);
+    });
+    observer.observe(scale);
+    return () => observer.disconnect();
+  }, [project === null]);
+
+  const rulerTicks = view === null ? [] : buildRulerTicks({ durationMs: view.durationMs, rulerWidthPx });
 
   // Hand tool: drag the track area to pan the timeline horizontally.
   const panOriginRef = useRef<{ pointerX: number; scrollLeft: number } | null>(null);
@@ -235,42 +294,117 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
               onClick={() => setActiveTool('select')}
               style={activeTool === 'select' ? ACTIVE_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
               aria-pressed={activeTool === 'select'}
+              aria-label="Selection tool"
               title="Selection Tool (V)"
             >
-              ↖
+              {ICONS.select}
             </button>
             <button
               type="button"
               onClick={() => setActiveTool('razor')}
               style={activeTool === 'razor' ? ACTIVE_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
               aria-pressed={activeTool === 'razor'}
+              aria-label="Razor tool"
               title="Razor Cut Tool (C)"
             >
-              ✂
+              {ICONS.razor}
             </button>
             <button
               type="button"
               onClick={() => setActiveTool('hand')}
               style={activeTool === 'hand' ? ACTIVE_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
               aria-pressed={activeTool === 'hand'}
+              aria-label="Hand tool"
               title="Hand Tool (H)"
             >
-              ✋
+              {ICONS.hand}
             </button>
             <button
               type="button"
               onClick={() => setActiveTool('text')}
-              style={activeTool === 'text' ? { ...ACTIVE_TOOL_BUTTON_STYLE, fontWeight: 700 } : { ...TOOL_BUTTON_STYLE, fontWeight: 700 }}
+              style={activeTool === 'text' ? ACTIVE_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
               aria-pressed={activeTool === 'text'}
+              aria-label="Type tool"
               title="Type Tool (T)"
             >
-              T
+              {ICONS.text}
+            </button>
+          </div>
+          <span aria-hidden="true" style={{ width: '1px', height: '18px', background: 'var(--border)' }} />
+          {/* Clip tools (reference toolbar): act on the selected clip */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }} role="toolbar" aria-label="Selected clip tools">
+            <button
+              type="button"
+              onClick={editor.splitAtPlayhead}
+              disabled={selectedClip === null}
+              style={selectedClip === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
+              aria-label="Split selected clip at playhead"
+              title="Split at playhead"
+            >
+              {ICONS.splitAtPlayhead}
+            </button>
+            <button
+              type="button"
+              onClick={() => selectedClip !== null && editor.trimClipTo(selectedClip.clip.id, 'left', editor.playheadMs)}
+              disabled={selectedClip === null}
+              style={selectedClip === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
+              aria-label="Trim selected clip start to playhead"
+              title="Split left (keep right side)"
+            >
+              {ICONS.splitLeft}
+            </button>
+            <button
+              type="button"
+              onClick={() => selectedClip !== null && editor.trimClipTo(selectedClip.clip.id, 'right', editor.playheadMs)}
+              disabled={selectedClip === null}
+              style={selectedClip === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
+              aria-label="Trim selected clip end to playhead"
+              title="Split right (keep left side)"
+            >
+              {ICONS.splitRight}
+            </button>
+            <button
+              type="button"
+              onClick={editor.duplicateSelectedClip}
+              disabled={selectedClip === null}
+              style={selectedClip === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
+              aria-label="Duplicate selected clip"
+              title="Duplicate clip"
+            >
+              {ICONS.duplicate}
+            </button>
+            <button
+              type="button"
+              onClick={editor.deleteSelectedClip}
+              disabled={selectedClip === null}
+              style={selectedClip === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
+              aria-label="Delete selected clip"
+              title="Delete clip"
+            >
+              {ICONS.trash}
+            </button>
+            <button type="button" disabled style={DISABLED_TOOL_BUTTON_STYLE} aria-label="Separate audio (coming soon)" title="Separate audio — coming soon">
+              {ICONS.separateAudio}
+            </button>
+            <button type="button" disabled style={DISABLED_TOOL_BUTTON_STYLE} aria-label="Freeze frame (coming soon)" title="Freeze frame — coming soon">
+              {ICONS.freeze}
             </button>
           </div>
         </div>
 
-        {/* Zoom cluster: − slider + */}
+        {/* Right cluster: snapping toggle + zoom */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+          <button
+            type="button"
+            onClick={() => setSnappingEnabled((enabled) => !enabled)}
+            style={snappingEnabled ? ACTIVE_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
+            aria-pressed={snappingEnabled}
+            aria-label="Toggle snapping"
+            title={snappingEnabled ? 'Snapping on' : 'Snapping off'}
+          >
+            {ICONS.magnet}
+          </button>
+          <span aria-hidden="true" style={{ width: '1px', height: '18px', background: 'var(--border)' }} />
           <button
             type="button"
             onClick={() => zoomBy(1 / 1.4)}
@@ -340,8 +474,10 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                 {formatDuration(editor.playheadMs)}
               </strong>
 
-              {/* Scale cell: same width and left edge as the track lanes */}
+              {/* Scale cell: same width and left edge as the track lanes; ticks and
+                  labels are real times chosen adaptively from the pixel density. */}
               <div
+                ref={rulerScaleRef}
                 onPointerDown={onRulerPointerDown}
                 onPointerMove={onRulerPointerMove}
                 role="slider"
@@ -354,18 +490,65 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                 style={{
                   cursor: 'ew-resize',
                   position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
                   minWidth: 0,
-                  backgroundImage: 'repeating-linear-gradient(90deg, var(--border) 0px, var(--border) 1px, transparent 1px, transparent 2.5%)',
-                  backgroundSize: '100% 6px',
-                  backgroundPosition: 'bottom',
-                  backgroundRepeat: 'repeat-x'
+                  overflow: 'hidden'
                 }}
               >
-                <span style={{ padding: '0 var(--space-2)', fontSize: 'var(--text-micro)', fontFamily: 'var(--font-mono)', color: 'var(--text-weaker)' }}>00:00.0</span>
-                <span style={{ padding: '0 var(--space-2)', fontSize: 'var(--text-micro)', fontFamily: 'var(--font-mono)', color: 'var(--text-weaker)', textAlign: 'right' }}>
+                {rulerTicks.map((tick) => (
+                  <span
+                    key={tick.timeMs}
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      left: `${tick.percent}%`,
+                      bottom: 0,
+                      width: '1px',
+                      height: tick.major ? '7px' : '4px',
+                      background: tick.major ? 'var(--border-strong)' : 'var(--border)'
+                    }}
+                  />
+                ))}
+                {rulerTicks.map((tick) => {
+                  if (tick.label === undefined) return null;
+                  const nearRightEdge = rulerWidthPx > 0 && (rulerWidthPx * (100 - tick.percent)) / 100 < 56;
+                  if (nearRightEdge && tick.timeMs !== 0) return null;
+                  return (
+                    <span
+                      key={`label-${tick.timeMs}`}
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        left: `${tick.percent}%`,
+                        top: '1px',
+                        transform: tick.timeMs === 0 ? 'none' : 'translateX(-50%)',
+                        paddingLeft: tick.timeMs === 0 ? '3px' : 0,
+                        fontSize: 'var(--text-micro)',
+                        fontFamily: 'var(--font-mono)',
+                        color: 'var(--text-weaker)',
+                        lineHeight: 1,
+                        whiteSpace: 'nowrap',
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      {tick.label}
+                    </span>
+                  );
+                })}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: '1px',
+                    paddingRight: '3px',
+                    fontSize: 'var(--text-micro)',
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--text-weak)',
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none'
+                  }}
+                >
                   {formatDuration(view.durationMs)}
                 </span>
 
@@ -424,30 +607,33 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                   <div style={{ display: 'flex', gap: '2px' }}>
                     <button
                       type="button"
-                      title="Mute track"
+                      title={mutedTracks[track.id] ? 'Unmute track' : 'Mute track'}
+                      aria-label={mutedTracks[track.id] ? 'Unmute track' : 'Mute track'}
                       aria-pressed={Boolean(mutedTracks[track.id])}
                       onClick={(e) => { e.stopPropagation(); setMutedTracks(prev => ({ ...prev, [track.id]: !prev[track.id] })); }}
                       style={trackToggleStyle(Boolean(mutedTracks[track.id]), 'danger')}
                     >
-                      M
+                      {mutedTracks[track.id] ? ICONS.volumeOff : ICONS.volumeOn}
                     </button>
                     <button
                       type="button"
                       title="Solo track"
+                      aria-label="Solo track"
                       aria-pressed={Boolean(soloTracks[track.id])}
                       onClick={(e) => { e.stopPropagation(); setSoloTracks(prev => ({ ...prev, [track.id]: !prev[track.id] })); }}
                       style={trackToggleStyle(Boolean(soloTracks[track.id]), 'warning')}
                     >
-                      S
+                      {ICONS.headphones}
                     </button>
                     <button
                       type="button"
-                      title="Lock track toggle"
+                      title={lockedTracks[track.id] ? 'Unlock track' : 'Lock track'}
+                      aria-label={lockedTracks[track.id] ? 'Unlock track' : 'Lock track'}
                       aria-pressed={Boolean(lockedTracks[track.id])}
                       onClick={(e) => { e.stopPropagation(); setLockedTracks(prev => ({ ...prev, [track.id]: !prev[track.id] })); }}
                       style={trackToggleStyle(Boolean(lockedTracks[track.id]), 'primary')}
                     >
-                      L
+                      {lockedTracks[track.id] ? ICONS.lock : ICONS.unlock}
                     </button>
                   </div>
                 </div>

@@ -25,6 +25,7 @@
     "src/renderer/src/editor/editorLayoutPreferences.ts",
     "src/renderer/src/editor/editorNativeMenuState.ts",
     "src/renderer/src/editor/editorShortcuts.ts",
+    "src/renderer/src/editor/timelineRulerTicks.ts",
     "src/renderer/src/editor/clipEffectControls.ts",
     "src/renderer/src/editor/mediaLoadFailures.ts",
     "src/renderer/src/editor/programMonitorMediaSync.ts",
