@@ -50,7 +50,8 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 - The left dock is labeled `Project and media` and contains two tabs: `Project` for `ProjectRail` and `Media` for `AssetBin`.
 - Default to `Project` unless an asset is selected, then reveal `Media`. Keep both tabs compact and dock scoped.
 - Project cards should prioritize project name, local status, save state, and selection.
-- Asset cards should show media kind, asset name, duration or metadata status, and selection. Video and audio are distinguished with labels, border treatment, and pattern, not bright accent colors.
+- The media view offers grid and list presentations. Grid tiles use a 16:9 preview well with an uppercase kind label and a mono duration badge, with the asset name and size below; list rows use a small kind thumb, name, and right-aligned mono duration. Both must show media kind, asset name, duration or metadata status, and selection, and video/audio stay distinguished with text labels and subtle tint, not hue alone.
+- An empty media library renders as a dashed import drop-zone CTA; a missing project keeps the existing empty slate.
 - Assets must show `Reading metadata` until browser metadata has been persisted through `updateAssetMetadata`.
 - `AssetMetadataProbeHost` is hidden infrastructure outside the dock panels. It may request secure playback URLs and probe browser metadata, but it must not become visible UI or imply analysis beyond local duration and video dimensions.
 
@@ -68,6 +69,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 - Default to `Selection` when a timeline clip is selected, `Asset` when an asset is selected, and `Project` otherwise.
 - Disable inspector tabs that cannot produce useful content. With no project, only `Project` stays available. Keep `Asset` unavailable while imported metadata is still pending.
 - `Selection` owns selected clip controls. `Asset` owns imported media metadata. `Project` owns current project metadata and project deletion.
+- Inspector content uses collapsible property groups separated by hairline borders: an xs medium group title with a −/+ toggle, and label/value property rows (caption muted label on the left, mono value or quiet compact input on the right). Selected-clip trim/nudge actions render as a compact two-column button grid above the groups.
 - Clip controls belong here when they affect the selected clip. Timeline wide commands belong in the native Timeline menu bridge.
 - Keep destructive actions visually distinct with the danger color and clear labels.
 - Keep the inspector status card visible below the tab panels. Status messages use `role="status"` and must stay readable after any tab switch.
