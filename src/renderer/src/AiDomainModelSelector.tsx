@@ -1,6 +1,11 @@
 import type { ReactElement } from 'react';
 
-import { formatAiModelOptionLabel, getDomainModels, type AiDomain } from '../../shared/aiDomainModels';
+import {
+  formatAiModelOptionLabel,
+  getDomainModels,
+  type AiDomain,
+  type AiDomainModelConfig
+} from '../../shared/aiDomainModels';
 import { useAiDomainModel } from './AiDomainModelContext';
 
 type AiDomainModelSelectorProps = {
@@ -18,6 +23,15 @@ export function AiDomainModelSelector({ domain, label, description }: AiDomainMo
   const isZenModel = activeModel.id === 'qwen2.5-coder' || activeModel.id === 'local-video-runner' || activeModel.id === 'local-qwen-tts';
 
   const specLabel = isLocal ? activeModel.precisionBit : activeModel.contextWindow;
+
+  const providerGroups = models.reduce<Record<string, AiDomainModelConfig[]>>((acc, model) => {
+    const key = model.providerLabel;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(model);
+    return acc;
+  }, {});
 
   return (
     <div className="ai-domain-model-selector">
@@ -43,10 +57,14 @@ export function AiDomainModelSelector({ domain, label, description }: AiDomainMo
           onChange={(event) => setSelectedModelId(domain, event.target.value)}
           aria-describedby={description ? descriptionId : undefined}
         >
-          {models.map((model) => (
-            <option key={model.id} value={model.id} disabled={!model.available}>
-              {formatAiModelOptionLabel(model)}
-            </option>
+          {Object.entries(providerGroups).map(([providerLabel, providerModels]) => (
+            <optgroup key={providerLabel} label={providerLabel}>
+              {providerModels.map((model) => (
+                <option key={model.id} value={model.id} disabled={!model.available}>
+                  {formatAiModelOptionLabel(model)}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </div>

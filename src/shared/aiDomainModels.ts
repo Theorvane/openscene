@@ -1,5 +1,20 @@
 export type AiDomain = 'voice-generation' | 'video-generation' | 'edit-agent';
 
+export type AiDomainProvider = {
+  readonly id: string;
+  readonly label: string;
+  readonly executionPath: 'local' | 'api';
+};
+
+export const AI_DOMAIN_PROVIDERS: readonly AiDomainProvider[] = [
+  { id: 'local_ollama', label: 'Ollama Local', executionPath: 'local' },
+  { id: 'local_qwen', label: 'Local Engine', executionPath: 'local' },
+  { id: 'local_video', label: 'Local Engine', executionPath: 'local' },
+  { id: 'openai', label: 'OpenAI', executionPath: 'api' },
+  { id: 'gemini', label: 'Google Gemini', executionPath: 'api' },
+  { id: 'elevenlabs', label: 'ElevenLabs', executionPath: 'api' }
+] as const;
+
 export type AiDomainModelConfig = {
   readonly id: string;
   readonly providerId: string;
@@ -55,7 +70,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
   },
   {
     id: 'gemini-veo',
-    providerId: 'gemini_veo',
+    providerId: 'gemini',
     label: 'Veo Video Generator',
     providerLabel: 'Google Gemini',
     description: 'Cloud video generation model.',
@@ -67,7 +82,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
   },
   {
     id: 'openai-sora',
-    providerId: 'openai_sora',
+    providerId: 'openai',
     label: 'Sora',
     providerLabel: 'OpenAI',
     description: 'Cloud video generation model.',

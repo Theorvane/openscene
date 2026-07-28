@@ -4044,10 +4044,26 @@ button {
 
 .agent-chat-prompt-card__toolbar .ai-domain-model-selector__select {
   min-height: 28px;
+  max-width: 260px;
   padding: 2px var(--space-2);
   font-size: var(--text-micro);
   border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--card) 80%, transparent);
+  background: color-mix(in srgb, var(--card) 85%, transparent);
+}
+
+.ai-domain-model-selector__select optgroup {
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-micro);
+  background: var(--popover);
+}
+
+.ai-domain-model-selector__select option {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  background: var(--card);
 }
 
 .agent-chat-panel__input {
