@@ -2803,6 +2803,188 @@ button {
   margin-top: auto;
 }
 
+.inspector-panel__title {
+  margin: 0;
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+
+.inspector-section {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+}
+
+.inspector-section__title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspector-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.inspector-action-grid .inspector-action {
+  min-height: 26px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.inspector-danger-action {
+  justify-self: start;
+  min-height: 26px;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+/* Collapsible property groups (reference NLE properties panel) */
+.property-group {
+  display: grid;
+  border-top: 1px solid var(--border);
+}
+
+.property-group:last-of-type {
+  border-bottom: 1px solid var(--border);
+}
+
+.property-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-1);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.property-group__title {
+  color: var(--text-weak);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
+
+.property-group__title--expanded {
+  color: var(--text-strong);
+}
+
+.property-group__toggle {
+  color: var(--text-weaker);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  line-height: 1;
+}
+
+.property-group__body {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) var(--space-3);
+}
+
+.property-row {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+}
+
+.property-row__label {
+  color: var(--text-weak);
+  font-size: var(--text-caption);
+}
+
+.property-row__value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.property-axis-label {
+  color: var(--text-weaker);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+.property-number-input {
+  width: 52px;
+  min-height: 22px;
+  padding: 1px var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  color: var(--color-text);
+  background: var(--input);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  text-align: center;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.property-number-input:focus-visible {
+  border-color: var(--ring);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-shadow);
+}
+
+.property-slider {
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+  accent-color: var(--primary);
+  cursor: ew-resize;
+}
+
+.property-value-chip {
+  flex-shrink: 0;
+  min-width: 38px;
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.property-value-chip--capitalize {
+  text-transform: capitalize;
+}
+
+.property-dial {
+  position: relative;
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-inset);
+}
+
+.property-dial__needle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1px;
+  height: 5px;
+  background: var(--text-weak);
+  transform-origin: 50% 100%;
+}
+
 .tab-marker {
   display: inline-block;
   margin-left: var(--space-1);
@@ -2825,6 +3007,8 @@ button {
 .button:focus-visible,
 .source-card:focus-visible,
 .asset-card:focus-visible,
+.property-group__header:focus-visible,
+.property-slider:focus-visible,
 .project-card:focus-visible,
 .timeline-clip:focus-visible,
 .command-bar__button:focus-visible,
