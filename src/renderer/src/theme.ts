@@ -23,14 +23,14 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
   {
     id: 'dark-zinc',
     label: 'Dark Zinc',
-    description: 'Opencode minimalist zinc studio',
+    description: 'Minimalist neutral zinc studio',
     light: {
       accentColor: '#4f46e5',
-      bgPreview: '#fafafa'
+      bgPreview: '#f8f8f8'
     },
     dark: {
-      accentColor: '#6366f1',
-      bgPreview: '#09090b'
+      accentColor: '#818cf8',
+      bgPreview: '#101010'
     }
   },
   {
@@ -56,7 +56,7 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
     },
     dark: {
       accentColor: '#f439a0',
-      bgPreview: '#06070a'
+      bgPreview: '#08090d'
     }
   },
   {

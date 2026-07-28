@@ -1,6 +1,6 @@
 # OpenVideo Design System
 
-OpenVideo is a compact local studio command desk for arranging recordings, imported media, generated local assets, and narration in one persistent desktop shell. The renderer should feel like a real post-production desk: warm work surface, graphite rails, copper command accents, cyan review signals, and dense tactile controls. It must not read as a cloud video generator, generic SaaS dashboard, provider console, or marketing page.
+OpenVideo is a compact local studio command desk for arranging recordings, imported media, generated local assets, and narration in one persistent desktop shell. The renderer follows a restrained desktop-tool design language: flat neutral surfaces, hairline borders, a strong/weak/weaker text hierarchy, one interactive accent, soft single-source elevation, and dense tactile controls. The warm command desk survives as the default light preset (`daylight-glass`); the neutral zinc foundation is the default dark preset (`dark-zinc`). It must not read as a cloud video generator, generic SaaS dashboard, provider console, or marketing page.
 
 ## Core Principles
 
@@ -75,7 +75,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 ## Bottom Timeline
 
 - The timeline is the bottom anchor of the editor. It spans the full workspace width on desktop.
-- Track lanes use a time grid, sticky ruler, visible cyan or copper playhead, and clip blocks that encode media kind with text, border treatment, and pattern.
+- Track lanes are flat inset wells with a sticky ruler, a thin destructive-red playhead with a scrub handle, and clip blocks that encode media kind with text labels plus tinted fills and borders.
 - Clip blocks show asset name and duration. Trim handles stay visible enough to discover, but should not dominate the clip label.
 - Timeline interactions must read as local edits. Do not suggest non-existent cloud sync, unsupported render formats, or frame-perfect mastering guarantees.
 - The timeline remains visible while users switch side dock tabs. It is not part of the left dock or inspector tab systems.
@@ -92,25 +92,27 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 ## Theme System
 
 - The renderer uses semantic theme tokens: `--background`, `--foreground`, `--card`, `--primary`, `--secondary`, `--muted`, `--accent`, `--destructive`, `--success`, `--warning`, `--info`, `--border`, `--input`, and `--ring`.
-- Light mode is the Issue #59 command-desk visual contract: warm ivory canvas, graphite foreground, parchment and aluminum panels, copper primary actions, cyan review accents, station-grid guide lines, beveled control shadows, and restrained dark text contrast.
-- Dark mode is not a dimmed copy of light mode. It is the same local command desk after-hours: near-black graphite canvas, blue-black equipment bays, amber/copper command accents, cyan focus/review signals, pale foreground, tighter shadows, and non-monochrome layered cards that preserve NLE contrast.
-- Light and dark themes must read as distinct operating environments at the root token level. `--background`, `--card`, `--muted`, `--border`, `--primary`, `--accent`, `--shadow-panel`, and `--editor-lilac-grid` should differ enough that Home, Settings, Program Monitor, timeline, inspector, tabs, and Agent Chat remain visually distinguishable without component-specific overrides.
+- The Issue #63 foundation is a neutral near-white/near-black surface stack: light `#f8f8f8` canvas with `#fcfcfc`/`#ffffff` panels, dark `#101010` canvas with `#161616`/`#1c1c1c` panels, hairline borders, and hex text tiers (`--text-strong` / `--text-weak` / `--text-weaker`, mirrored by `--color-faint`) that all hold WCAG AA against the surfaces they sit on.
+- Presets only swap accent and surface temperature on top of that foundation. `daylight-glass` keeps the warm command desk light identity (ivory canvas, copper primary, cyan review accent); `dark-zinc` is the neutral dark identity; `midnight-neon` and `obsidian-pro` stay expressive alternates with light and dark variants.
+- The typography scale is pixel-locked by role: 11px micro, 12px caption, 13px small, 14px body, 15px subhead, 17px title, and a clamped hero. Headings sit at weight 500–600 with tight (−0.01em to −0.02em) tracking; weight 700 is reserved for tiny uppercase labels. Uppercase mono metadata uses restrained letter-spacing (0.04–0.08em).
+- Elevation is layered and low-alpha with a single top light source (`--shadow-control`, `--shadow-panel`, `--shadow-editorial`). Panels are flat cards — no glass blur, canvas grids, or decorative gradients.
+- Light and dark themes must read as distinct operating environments at the root token level. `--background`, `--card`, `--muted`, `--border`, `--input`, `--shadow-panel`, and `--surface-control` should differ enough that Home, Settings, Program Monitor, timeline, inspector, tabs, and Agent Chat remain visually distinguishable without component-specific overrides.
 - Theme-specific presentation belongs in renderer CSS. React theme controls should expose semantic state with class names, `aria-*`, `data-*`, and fixed preset identifiers; they should not carry layout, panel, or control styling inline. Fixed visual marks such as preset swatches may use CSS classes keyed by stable preset ids.
 - The persisted preset id `daylight-glass` remains a compatibility identifier only. Do not rename it. User-facing copy may describe that light preset as Command Desk, but compatibility identifiers listed in `AGENTS.md` must remain stable.
 - `dark-zinc` remains the dark fallback preset and `daylight-glass` remains the light fallback preset. Missing, invalid, or mode-incompatible presets must continue to resolve to those compatibility ids.
-- Legacy `--editor-*` and `--color-*` names are aliases over semantic command-desk tokens. Keep new styling on semantic tokens and only use aliases to match existing renderer classes.
+- Legacy `--editor-*` and `--color-*` names are aliases over the semantic tokens. Keep new styling on semantic tokens and only use aliases to match existing renderer classes.
 - Atmosphere, panels, timeline grids, controls, tabs, and selected states use color for semantic hierarchy and interaction, not decoration. Pair hue with contrast, opacity, borders, shadows, labels, and subtle patterns so media kind is never signaled by color alone.
 
-## Command Desk Refinement Contract
+## Reference Design Refinement Contract
 
-- Keep the product direction original, restrained, and local first. The refinement may borrow from generic public design principles such as hierarchy, rhythm, contrast, and editorial spacing, but it must not borrow third party brand expression.
-- Preserve OpenVideo as an expressive light and dark desktop NLE with a command-desk material system. Do not change the product into a cloud editor, provider console, marketing dashboard, or generative media suite.
+- Keep the product direction original, restrained, and local first. The refinement may borrow from generic public design principles such as hierarchy, rhythm, contrast, editorial spacing, and neutral surface systems common to modern desktop agent tools, but it must not borrow third party brand expression.
+- Preserve OpenVideo as an expressive light and dark desktop NLE. Do not change the product into a cloud editor, provider console, marketing dashboard, or generative media suite.
 - Strengthen hierarchy through scale, weight, placement, and concise labels. Program monitor, timeline, dock tabs, inspector tabs, Agent Chat, and Home workspace entry cards should each have one clear job and a visible reading order.
 - Use measured whitespace, not empty decoration. Give the monitor and timeline enough breathing room to feel primary, keep command clusters tight, and separate dock, inspector, chat, and status content with consistent gaps.
-- Build surface depth with semantic theme tokens only. Light surfaces may carry ivory enamel, brushed parchment insets, graphite rails, copper hairline emphasis, cyan review lights, soft shadows, opacity changes, and subtle hatch patterns. Dark surfaces remain cool and readable without reducing NLE contrast.
+- Build surface depth with semantic theme tokens only: flat card panels, hairline borders, inset wells, and the layered low-alpha shadow scale. Dark surfaces remain cool and readable without reducing NLE contrast.
 - Keep navigation clarity accessible. Home workspace entry cards need visible labels, static local status, `aria-controls`, and focus movement to the active mounted region.
 - Preserve mounted workspace state retention. Visual refinements must keep inactive Editing, Voice Generation, and Video Generation regions hidden rather than unmounted.
-- Keep compact controls and focus treatment intact. Shortcut map controls stay dense, tabs stay compact, and the 2px focus outline with 2px offset and 4px halo remains visible in both themes.
+- Keep compact controls and focus treatment intact. Shortcut map controls stay dense, tabs stay compact, and the 2px focus outline with 2px offset and 4px halo remains visible in both themes. Default controls use the 36px minimum height; compact controls use 30px.
 - Respect reduced motion. Any hover lift, reveal, or panel transition must stay short and must not override `prefers-reduced-motion`.
 - Third party brand elements are excluded: no borrowed names, color values, logos, typography, copy, layouts, gradients, or token names.
 
@@ -129,15 +131,15 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 - Titles use the display stack. Controls use the body stack. Metadata, section kickers, timers, command labels, media badges, tab labels, and theme switch text use monospace.
 - Status semantics stay restrained: default is muted graphite, success is green, warning or busy is amber, and danger or destructive states are red. Use these only for state, not decoration.
 - Home workspace entry icons are decorative inline SVGs with `aria-hidden="true"`; accessible names come from visible labels and existing button semantics, not from icon-only controls.
-- Video clips and media badges use solid semantic borders with angled hatch labels. Audio uses dashed borders and a different stripe direction. Both must keep visible `Video` or `Audio` text, and media kind must not depend on hue alone.
-- Controls should feel tactile with small hover lift, bevel, and border changes. Respect `prefers-reduced-motion` and keep transitions short.
-- Compact controls use the 36px minimum. Default controls use the 42px minimum where space allows. Tabs are compact desk pills until selected, then solid semantic selected pills with an `Active` marker.
+- Video and audio clips use flat tinted fills with solid semantic borders (primary tint for video, success tint for audio). Both must keep visible `Video` or `Audio` text labels, so media kind never depends on hue alone.
+- Controls should feel tactile with subtle background and border changes on hover. Respect `prefers-reduced-motion` and keep transitions short.
+- Compact controls use the 30px minimum. Default controls use the 36px minimum where space allows. Tabs are compact underline tabs; the selected tab carries the accent underline and an `Active` marker.
 
 ## Accessibility Rules
 
 - Preserve semantic regions and labels: `product-chrome`, `Home`, `Settings`, `OpenVideo workspaces`, `Project and media`, `Timeline editor`, inspector, Voice Generation, and Video Generation. Timeline commands are available through the native menu bridge rather than as a renderer toolbar landmark.
 - Keep keyboard focus visible with the semantic focus ring on Home workspace cards, workspace regions, buttons, timeline lanes, clips, inputs, and dock tabs. The implemented rule is a 2px `--focus-ring` outline, 2px offset, and 4px `--focus-shadow` halo.
-- Maintain 42px default control height where space allows. Compact shortcut map buttons may be 36px because the customization grid is dense.
+- Maintain 36px default control height where space allows. Compact shortcut map buttons may be 30px because the customization grid is dense.
 - Do not rely on color alone. Pair tones with labels such as video, audio, selected, saved, and metadata status, plus border or pattern changes where media kind differs.
 - Dock and inspector tabs inside the Edit workspace must use the ARIA tab contract: `role="tablist"`, `role="tab"`, `role="tabpanel"`, `aria-selected`, `aria-controls`, and `aria-labelledby`.
 - Use roving tab focus. The selected tab has `tabIndex=0`; inactive tabs have `tabIndex=-1`; disabled tabs are skipped.

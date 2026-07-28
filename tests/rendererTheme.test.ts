@@ -11,13 +11,12 @@ const minimumNormalTextContrast = 4.5;
 const minimumExpressiveColorChroma = 24;
 const minimumDistinctSemanticColorDistance = 64;
 const minimumDistinctSurfaceColorDistance = 80;
-const commandDeskContractTokens = [
-  '--command-desk-canvas: #f4efe5;',
-  '--command-desk-graphite: #1f2933;',
-  '--command-desk-grid: rgba(94, 83, 69, 0.14);',
-  '--command-desk-panel: rgba(255, 251, 242, 0.86);',
-  '--command-desk-panel-border: rgba(91, 75, 55, 0.24);',
-  '--command-desk-accent: linear-gradient(135deg, #9a4f1f 0%, #256e72 48%, #0ea5a8 100%);'
+const commandDeskPresetTokens = [
+  '--background: #f4efe5;',
+  '--foreground: #1f2933;',
+  '--card: #fdfaf2;',
+  '--primary: #9a4f1f;',
+  '--accent: #047d8a;'
 ] as const;
 
 const commandDeskSurfaceSelectors = [
@@ -282,30 +281,31 @@ describe('renderer theme contract', () => {
     expect(rendererStyles).toMatch(new RegExp(`${token}:\\s*[^;]+;`));
   });
 
-  it('Given Issue #59 command desk reference, When renderer CSS tokens are checked, Then light mode owns the local studio command desk visual contract', () => {
-    const lightTheme = getThemeTokenBlock('light');
+  it('Given Issue #63 reference design language, When the default light preset is checked, Then it keeps the warm command desk identity', () => {
+    const daylightPresetBlock = /:root\[data-preset="daylight-glass"\]\[data-theme="light"\],\s*:root\[data-preset="daylight-glass"\]\s*\{([\s\S]*?)\}/.exec(
+      rendererStyles
+    )?.[1];
 
-    expect(lightTheme).toContain('--background: var(--command-desk-canvas);');
-    expect(lightTheme).toContain('--foreground: var(--command-desk-graphite);');
-    for (const token of commandDeskContractTokens) {
-      expect(lightTheme).toContain(token);
+    expect(daylightPresetBlock).toBeDefined();
+    for (const token of commandDeskPresetTokens) {
+      expect(daylightPresetBlock).toContain(token);
     }
   });
 
-  it('Given Issue #59 command desk reference, When renderer CSS surfaces are checked, Then existing editor classes use command desk panels, grids, and accents', () => {
+  it('Given Issue #63 reference design language, When renderer CSS surfaces are checked, Then editor classes are flat card panels with hairline borders', () => {
     for (const selector of commandDeskSurfaceSelectors) {
       expect(rendererStyles).toContain(selector);
     }
 
-    expect(rendererStyles).toContain('var(--command-desk-panel)');
-    expect(rendererStyles).toContain('var(--command-desk-panel-border)');
-    expect(rendererStyles).toContain('var(--command-desk-grid)');
-    expect(rendererStyles).toContain('var(--command-desk-accent)');
+    expect(rendererStyles).toMatch(
+      /\.project-rail,\s*\.asset-bin,\s*\.timeline-panel,\s*\.inspector-panel\s*\{[\s\S]*?border: 1px solid var\(--border\);[\s\S]*?background: var\(--card\);/
+    );
     expect(rendererStyles).not.toContain('linear-gradient(to bottom, #2b2e4a 0%, #171822 100%)');
     expect(rendererStyles).not.toContain('linear-gradient(to bottom, #103126 0%, #091c16 100%)');
     expect(rendererStyles).not.toMatch(/linear-gradient\(135deg,\s*rgba\(255, 255, 255, 0\.9\),\s*rgba\((238, 242, 255|236, 253, 245)/);
-    expect(rendererStyles).toMatch(/\.timeline-clip\s*\{[\s\S]*?color-mix\(in srgb, var\(--card\) 94%, var\(--primary\)\)/);
-    expect(rendererStyles).toMatch(/\.timeline-clip--audio\s*\{[\s\S]*?color-mix\(in srgb, var\(--card\) 92%, var\(--success\)\)/);
+    expect(rendererStyles).not.toContain('backdrop-filter: blur(18px)');
+    expect(rendererStyles).toMatch(/\.timeline-clip\s*\{[\s\S]*?color-mix\(in srgb, var\(--primary\) 18%, var\(--card\)\)/);
+    expect(rendererStyles).toMatch(/\.timeline-clip--audio\s*\{[\s\S]*?color-mix\(in srgb, var\(--success\) 16%, var\(--card\)\)/);
   });
 
   it('Given Issue #61 distinct operating environments, When root theme tokens are compared, Then light and dark surfaces are structurally different', () => {
@@ -319,7 +319,7 @@ describe('renderer theme contract', () => {
     }
 
     expect(getThemeCustomPropertyValue('light', '--shadow-panel')).not.toBe(getThemeCustomPropertyValue('dark', '--shadow-panel'));
-    expect(getThemeCustomPropertyValue('light', '--command-desk-grid')).not.toBe(getThemeCustomPropertyValue('dark', '--command-desk-grid'));
+    expect(getThemeCustomPropertyValue('light', '--surface-control')).not.toBe(getThemeCustomPropertyValue('dark', '--surface-control'));
   });
 
   it('Given Issue #61 ThemeSelector presentation, When source and CSS are checked, Then styling lives in renderer CSS classes', () => {

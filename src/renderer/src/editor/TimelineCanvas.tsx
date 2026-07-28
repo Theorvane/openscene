@@ -281,14 +281,13 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                     position: 'absolute',
                     left: `${playheadPercent}%`,
                     top: 'calc(100% - 4px)',
-                    width: '12px',
-                    height: '14px',
-                    background: 'var(--ring)',
+                    width: '11px',
+                    height: '13px',
+                    background: 'var(--destructive)',
                     clipPath: 'polygon(50% 100%, 0% 50%, 0% 0%, 100% 0%, 100% 50%)',
                     transform: 'translateX(-50%)',
                     cursor: 'ew-resize',
                     zIndex: 10,
-                    boxShadow: '0 0 10px var(--ring), 0 0 4px var(--ring)',
                     transition: 'left 80ms ease'
                   }}
                   title="Scrub timeline playhead"
