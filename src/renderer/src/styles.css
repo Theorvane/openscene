@@ -476,6 +476,20 @@ button {
   white-space: nowrap;
 }
 
+.product-chrome__stage-pill {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-selected);
+  border-radius: 999px;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface-inset));
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .product-chrome__project-pill {
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--line-selected);

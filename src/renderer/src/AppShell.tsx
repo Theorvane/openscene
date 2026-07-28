@@ -65,6 +65,23 @@ function FolderIcon(): ReactElement {
   );
 }
 
+function getStageBadge(pageId: AppPageId): string {
+  switch (pageId) {
+    case 'projects':
+      return 'Stage 1 · Projects';
+    case 'home':
+      return 'Stage 2 · Main Menu';
+    case 'edit':
+    case 'voice-generation':
+    case 'video-generation':
+      return 'Stage 3 · Workspace';
+    case 'settings':
+      return 'Settings';
+    default:
+      return 'Local';
+  }
+}
+
 function AppShellContent({ activePage, children, onPageChange, selectedContextAsset, activeProjectName }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
@@ -121,23 +138,14 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
         <div id="app-shell-workspace" className="agent-workspace-lock" aria-busy={isBusy} inert={isBusy}>
           <header className="product-chrome" aria-label="Application chrome">
             <div className="product-chrome__context" aria-label="Current page">
+              <span className="product-chrome__stage-pill">{getStageBadge(activePage.id)}</span>
               <span className="product-chrome__workspace">{activePage.chromeLabel}</span>
               {activeProjectName && (
-                <span className="product-chrome__project-pill">Project: {activeProjectName}</span>
+                <span className="product-chrome__project-pill">📁 Project: {activeProjectName}</span>
               )}
-              <span className="local-pill">Local</span>
+              <span className="local-pill">● Local</span>
             </div>
             <div className="product-chrome__actions">
-              <Button
-                aria-controls="app-page-panel-home"
-                aria-current={homeIsActive ? 'page' : undefined}
-                className="product-chrome__nav-button"
-                onClick={() => onPageChange('home')}
-                variant={homeIsActive ? 'primary' : 'ghost'}
-              >
-                <HomeIcon />
-                Home
-              </Button>
               <Button
                 aria-controls="app-page-panel-projects"
                 aria-current={projectsIsActive ? 'page' : undefined}
@@ -147,6 +155,16 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
               >
                 <FolderIcon />
                 Projects
+              </Button>
+              <Button
+                aria-controls="app-page-panel-home"
+                aria-current={homeIsActive ? 'page' : undefined}
+                className="product-chrome__nav-button"
+                onClick={() => onPageChange('home')}
+                variant={homeIsActive ? 'primary' : 'ghost'}
+              >
+                <HomeIcon />
+                Menu
               </Button>
               <Button
                 aria-controls="app-page-panel-settings"

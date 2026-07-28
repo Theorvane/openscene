@@ -20,18 +20,18 @@ type HomePageProps = {
 const WORKSPACE_COPY = {
   edit: {
     heading: 'Editing (영상 편집)',
-    description: 'Open the local timeline editor, review project media assets, cut clips, and export MP4 videos with local FFmpeg.',
-    action: 'Enter Timeline Editor'
+    description: 'Open the timeline editor, manage media bin assets, cut clips, and export MP4 output with local FFmpeg.',
+    action: 'Enter Timeline Editor ➔'
   },
   'voice-generation': {
     heading: 'Voice Generation (음성 합성)',
-    description: 'Create consent-based narration scripts, synthesize speech using local Qwen TTS or Cloud models, and import into timeline.',
-    action: 'Enter Voice Studio'
+    description: 'Synthesize voice narration scripts, configure local Qwen TTS or cloud engines, and import voice tracks into your timeline.',
+    action: 'Enter Voice Studio ➔'
   },
   'video-generation': {
     heading: 'Video Generation (비디오 생성)',
-    description: 'Generate video clips from prompts with AI video models, track local job status, and add generated videos directly into project assets.',
-    action: 'Enter Video Studio'
+    description: 'Generate video clips from AI prompt engines, monitor job completion, and add generated videos directly to project assets.',
+    action: 'Enter Video Studio ➔'
   }
 } as const satisfies Readonly<Record<AppWorkspaceId, { readonly heading: string; readonly description: string; readonly action: string }>>;
 
@@ -84,10 +84,10 @@ export function HomePage({
   return (
     <div className="home-page">
       <header className="home-page__hero">
-        <p className="section-kicker">Stage 2 · Main Studio Menu</p>
+        <p className="section-kicker">Stage 2 / 3 · Main Studio Menu</p>
         <h1 id="home-page-title">Select Studio Workspace</h1>
         <p>
-          Choose a studio tool to work on your active project folder. The Edit Agent chat assistant will automatically assist you in your selected workspace.
+          Choose a studio tool below for your active project folder. Entering a workspace opens the full toolset and activates the Edit Agent chat assistant.
         </p>
       </header>
 
@@ -95,7 +95,7 @@ export function HomePage({
       {project !== null ? (
         <div className="home-active-project-banner" role="status">
           <div className="home-active-project-banner__info">
-            <span className="home-active-project-banner__kicker">📁 Active Project Folder</span>
+            <span className="home-active-project-banner__kicker">● Active Project Folder</span>
             <strong className="home-active-project-banner__name">{project.name}</strong>
           </div>
           <Button variant="ghost" onClick={onGoToProjects}>
@@ -105,11 +105,11 @@ export function HomePage({
       ) : (
         <div className="home-active-project-banner home-active-project-banner--empty" role="status">
           <div className="home-active-project-banner__info">
-            <span className="home-active-project-banner__kicker">📁 Stage 1 Required</span>
+            <span className="home-active-project-banner__kicker">● Stage 1 Required</span>
             <strong className="home-active-project-banner__name">No Project Folder Selected</strong>
           </div>
           <Button variant="primary" onClick={onGoToProjects}>
-            Go to Projects Page
+            Go to Projects Page ➔
           </Button>
         </div>
       )}
@@ -129,7 +129,7 @@ export function HomePage({
                 <CardIcon workspaceId={workspace.id} />
               </span>
               <span className="home-card__body">
-                <span className="home-card__kicker">{workspace.statusLabel}</span>
+                <span className="home-card__kicker">STAGE 3 · {workspace.statusLabel}</span>
                 <span className="home-card__title">{card.heading}</span>
                 <span className="home-card__description">{card.description}</span>
                 <span className="home-card__action">{card.action}</span>

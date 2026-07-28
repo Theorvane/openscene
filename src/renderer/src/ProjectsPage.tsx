@@ -26,10 +26,10 @@ export function ProjectsPage({
   return (
     <div className="projects-page">
       <header className="projects-page__hero">
-        <p className="section-kicker">📁 Local Project Hub</p>
+        <p className="section-kicker">Stage 1 / 3 · Project Selection</p>
         <h1 id="projects-page-title">Local Project Folders</h1>
         <p>
-          OpenVideo stores every project in a dedicated local folder. Create a project folder or open an existing one to unlock timeline editing, voice tools, video generation, and Edit Agent chat.
+          OpenVideo stores every project in a dedicated local folder. Create a new project folder or select an existing folder below to unlock the studio menu and workspaces.
         </p>
       </header>
 
@@ -37,11 +37,11 @@ export function ProjectsPage({
       {project !== null && (
         <div className="home-active-project-banner" role="status">
           <div className="home-active-project-banner__info">
-            <span className="home-active-project-banner__kicker">📁 Active Project Folder</span>
+            <span className="home-active-project-banner__kicker">● Active Project Folder</span>
             <strong className="home-active-project-banner__name">{project.name}</strong>
           </div>
           <Button variant="primary" onClick={() => void onOpenProject?.(project.id)}>
-            Open Menu
+            Proceed to Main Menu ➔
           </Button>
         </div>
       )}
@@ -50,7 +50,7 @@ export function ProjectsPage({
       <section className="home-project-hub" aria-label="Project folder management hub">
         <div className="home-project-hub__creator">
           <div className="home-project-hub__header">
-            <span className="home-project-hub__kicker">📁 Folder-Based Creation</span>
+            <span className="home-project-hub__kicker">📁 Folder-Based Setup</span>
             <h2 className="home-project-hub__title">Create New Project Folder</h2>
           </div>
           <div className="home-project-hub__form">
@@ -70,14 +70,14 @@ export function ProjectsPage({
               onClick={() => void onCreateProject?.()}
               disabled={isBusy || newProjectName.trim().length === 0}
             >
-              Create Project Folder
+              Create Project Folder ➔
             </Button>
           </div>
         </div>
 
         {projects.length > 0 && (
           <div className="home-project-hub__list-section">
-            <span className="home-project-hub__kicker">📁 Saved Project Folders ({projects.length})</span>
+            <span className="home-project-hub__kicker">📁 Saved Local Projects ({projects.length})</span>
             <div className="home-project-hub__grid">
               {projects.map((item) => {
                 const isSelected = project?.id === item.id;
@@ -89,16 +89,16 @@ export function ProjectsPage({
                     <div className="home-project-item__body">
                       <div className="home-project-item__header">
                         <strong className="home-project-item__name">📁 {item.name}</strong>
-                        {isSelected && <span className="home-project-item__badge">Active</span>}
+                        {isSelected && <span className="home-project-item__badge">● Active</span>}
                       </div>
-                      <span className="home-project-item__date">{formatTimestamp(item.updatedAt)}</span>
+                      <span className="home-project-item__date">Updated: {formatTimestamp(item.updatedAt)}</span>
                     </div>
                     <Button
                       variant={isSelected ? 'primary' : 'ghost'}
                       onClick={() => void onOpenProject?.(item.id)}
                       disabled={isBusy}
                     >
-                      {isSelected ? 'Open Menu' : 'Select Project'}
+                      {isSelected ? 'Open Menu ➔' : 'Select Project'}
                     </Button>
                   </div>
                 );
