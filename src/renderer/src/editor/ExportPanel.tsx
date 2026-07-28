@@ -18,6 +18,7 @@ function getActionStatus(responseMessage: string): StatusMessage {
 
 export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
   const [job, setJob] = useState<LocalExportJob | null>(null);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
@@ -111,30 +112,41 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
       : getActionStatus(errorMessage(response.error)));
   }, [actionState.canReveal, job]);
 
+  const isExporting = actionState.canCancel;
+  const triggerLabel = isExporting ? `Exporting ${statusView.progressValue}%` : 'Export';
+
   return (
-    <section className="export-panel" aria-labelledby="export-panel-title">
-      <div className="panel-heading export-panel__heading">
-        <div>
-          <p className="section-kicker">Local render</p>
-          <h2 id="export-panel-title">MP4 export</h2>
+    <section className="export-control" aria-labelledby="export-panel-title">
+      <h2 id="export-panel-title" className="visually-hidden">MP4 export</h2>
+      <Button
+        className="export-control__trigger"
+        variant="primary"
+        aria-expanded={isPopoverOpen}
+        aria-controls="export-popover"
+        onClick={() => setIsPopoverOpen((open) => !open)}
+      >
+        {triggerLabel}
+      </Button>
+      {isPopoverOpen && (
+        <div id="export-popover" className="export-popover" role="dialog" aria-label="MP4 export">
+          <div className="export-popover__actions" role="toolbar" aria-label="MP4 export actions">
+            <Button variant="primary" onClick={() => void startExport()} disabled={!actionState.canStart || isStarting}>Export MP4</Button>
+            <Button variant="stop" onClick={() => void cancelExport()} disabled={!actionState.canCancel || isCancelling}>Cancel</Button>
+            <Button onClick={() => void openExport()} disabled={!actionState.canOpen || isOpening}>Open</Button>
+            <Button onClick={() => void revealExport()} disabled={!actionState.canReveal || isRevealing}>Reveal</Button>
+          </div>
+          <StatusCard className="export-panel__status" tone={statusView.tone} aria-atomic="true">
+            <strong>{statusView.title}</strong>
+            <span>{statusView.detail}</span>
+          </StatusCard>
+          <label className="export-panel__progress-label" htmlFor="export-progress">
+            Export progress
+            <progress id="export-progress" max={100} value={statusView.progressValue} aria-valuetext={`${statusView.progressValue}%`} />
+          </label>
+          <p className="export-panel__boundary">Local-only FFmpeg export. The renderer receives job state and result actions only, never output paths or FFmpeg arguments.</p>
+          {actionStatus !== null && <StatusCard className="export-panel__status" tone={actionStatus.tone}>{actionStatus.text}</StatusCard>}
         </div>
-        <div className="transport-strip__buttons export-panel__actions" role="toolbar" aria-label="MP4 export actions">
-          <Button className="command-bar__button" variant="primary" onClick={() => void startExport()} disabled={!actionState.canStart || isStarting}>Export MP4</Button>
-          <Button className="command-bar__button" variant="stop" onClick={() => void cancelExport()} disabled={!actionState.canCancel || isCancelling}>Cancel</Button>
-          <Button className="command-bar__button" onClick={() => void openExport()} disabled={!actionState.canOpen || isOpening}>Open</Button>
-          <Button className="command-bar__button" onClick={() => void revealExport()} disabled={!actionState.canReveal || isRevealing}>Reveal</Button>
-        </div>
-      </div>
-      <StatusCard className="export-panel__status" tone={statusView.tone} aria-atomic="true">
-        <strong>{statusView.title}</strong>
-        <span>{statusView.detail}</span>
-      </StatusCard>
-      <label className="export-panel__progress-label" htmlFor="export-progress">
-        Export progress
-        <progress id="export-progress" max={100} value={statusView.progressValue} aria-valuetext={`${statusView.progressValue}%`} />
-      </label>
-      <p className="export-panel__boundary">Local-only FFmpeg export. The renderer receives job state and result actions only, never output paths or FFmpeg arguments.</p>
-      {actionStatus !== null && <StatusCard className="export-panel__status" tone={actionStatus.tone}>{actionStatus.text}</StatusCard>}
+      )}
     </section>
   );
 }

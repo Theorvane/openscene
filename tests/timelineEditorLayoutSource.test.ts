@@ -145,18 +145,21 @@ describe('timeline editor layout source contract', () => {
     expect(styles).toContain('position: static;');
   });
 
-  it('Given configurable editor shortcuts, When rendered, Then the program header exposes remap controls and status messaging without IPC', async () => {
+  it('Given configurable editor shortcuts, When rendered, Then Settings exposes remap controls and the editor consumes stored preferences without IPC', async () => {
     const source = await readTimelineEditorSource();
     const shortcutSource = await readShortcutSource();
+    const settingsSource = await readFile(new URL('../src/renderer/src/SettingsWorkspace.tsx', import.meta.url), 'utf8');
 
     expect(source).toContain('useEditorShortcutPreference');
-    expect(source).toContain('shortcutPreferences={shortcutPreferences}');
     expect(source).toContain('TimelineShortcutMap');
     expect(source).toContain('className="shortcut-map__status" role="status"');
     expect(source).toContain('shortcut-input-${binding.actionId}');
     expect(source).toContain('Disable shortcut');
     expect(source).toContain('Reset shortcut');
     expect(source).toContain('Shortcut unavailable');
+    expect(source).not.toContain('<TimelineShortcutMap');
+    expect(settingsSource).toContain('<TimelineShortcutMap shortcutPreferences={shortcutPreferences} onShortcutPreferencesChange={updateShortcutPreferences} />');
+    expect(settingsSource).toContain("id: 'shortcuts'");
     expect(source).not.toContain('Timeline commands');
     expect(source).not.toContain('Split at playhead</button>');
     expect(shortcutSource).toContain('EDITOR_SHORTCUT_STORAGE_KEY');

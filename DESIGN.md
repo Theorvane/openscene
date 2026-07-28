@@ -12,7 +12,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Layout Contract
 
-- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Projects, Home (Menu), and Settings buttons, and the theme switch. It reads as the desk toolbar, not the product billboard; the active Edit program header owns product branding. The Menu button stays disabled with a short hint until a project is open; Projects and Settings stay reachable at all times.
+- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Projects, Home (Menu), and Settings buttons, and the theme switch. It reads as the desk toolbar, not the product billboard; the Edit workspace keeps its own branding visually hidden for accessibility only. The Menu button stays disabled with a short hint until a project is open; Projects and Settings stay reachable at all times.
 - The right `AgentChatPanel` is the only user-facing Edit Agent UI. It is the rightmost flex child beside the mounted workspace stack and owns Edit Agent model/connection status, the project scope chip, conversation and tool stream, approval queue, reset/status, and prompt controls. The sidebar is collapsible: a header control collapses it to a slim labeled rail with an expand button, the collapsed state persists with the chat layout preference, and conversation state lives in `AgentChatProvider` so collapsing never loses the chat.
 - The Edit Agent operates at project scope. The renderer passes a safe active-project context (projectId, name, asset and track counts — never filesystem paths) with every send; the agent system prompt instructs the model to operate on that project by default. There is no per-asset attach flow in the panel.
 - Do not render a global agent model selector in `product-chrome`, add a separate `EditAgentWorkspace`, or move Edit Agent controls into the left workspace navigation. Direct AI Video and AI Voice studios keep their own domain-specific controls, and Settings keeps provider credentials and primary model configuration separate from the Edit Agent chat surface.
@@ -41,9 +41,9 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Program Header And Command Surface
 
-- The Program header owns `Local studio`, `OpenVideo`, and the visible `Timeline editor` subtitle. App chrome must not duplicate this branding.
+- The Edit workspace keeps `Local studio`, `OpenVideo`, and the `Timeline editor` subtitle as visually hidden region labels for accessibility; no visible branding header renders inside the workspace, and app chrome must not duplicate it.
 - Timeline commands such as Play, Rewind, Undo, Redo, Split at playhead, add track actions, layout changes, and Save timeline live in the native Timeline menu bridge.
-- The only visible command customization surface in the workspace is the Program header `Shortcut map` disclosure. It must support remap, disable, reset, validation, persistence, and `role="status"` feedback.
+- Keyboard shortcut customization lives in Settings → Shortcuts, which renders the `Shortcut map` disclosure (`TimelineShortcutMap`). It must support remap, disable, reset, validation, persistence, and `role="status"` feedback; the Editing workspace consumes the stored preferences without rendering the remap surface.
 - Save state must remain explicit. Local timeline mutations are unsaved until `saveTimeline` succeeds.
 
 ## Project And Media Dock
@@ -51,15 +51,16 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 - The left dock is labeled `Project and media` and contains two tabs: `Project` for `ProjectRail` and `Media` for `AssetBin`.
 - Default to `Project` unless an asset is selected, then reveal `Media`. Keep both tabs compact and dock scoped.
 - Project cards should prioritize project name, local status, save state, and selection.
-- Asset cards should show media kind, asset name, duration or metadata status, and selection. Video and audio are distinguished with labels, border treatment, and pattern, not bright accent colors.
+- The media view offers grid and list presentations. Grid tiles use a 16:9 preview well with an uppercase kind label and a mono duration badge, with the asset name and size below; list rows use a small kind thumb, name, and right-aligned mono duration. Both must show media kind, asset name, duration or metadata status, and selection, and video/audio stay distinguished with text labels and subtle tint, not hue alone.
+- An empty media library renders as a dashed import drop-zone CTA; a missing project keeps the existing empty slate.
 - Assets must show `Reading metadata` until browser metadata has been persisted through `updateAssetMetadata`.
 - `AssetMetadataProbeHost` is hidden infrastructure outside the dock panels. It may request secure playback URLs and probe browser metadata, but it must not become visible UI or imply analysis beyond local duration and video dimensions.
 
 ## Program Monitor
 
-- The central program region is the largest panel. It contains the `Timeline editor` heading and `ProgramMonitor` preview surface.
+- The central program region is the largest panel. It contains the `ProgramMonitor` preview surface with a visually hidden heading; no visible header row sits above the monitor.
 - The monitor is for local timeline review. It is a best-effort v3 evaluator surface for keyframes, transitions, and audio mix, not final mastering, frame-perfect export, cloud preview, or AI generation.
-- The MP4 export panel is the local final-output surface for supported saved timelines. It may show job state, progress, cancel, open, and reveal controls, but never local output paths, FFmpeg executable paths, or FFmpeg argv.
+- MP4 export is a compact control in the monitor transport row: a primary Export trigger that opens a small popover with job state, progress, and Export/Cancel/Open/Reveal actions. It may show job state and result actions, but never local output paths, FFmpeg executable paths, or FFmpeg argv.
 - Empty states may be expressive, but they must guide users toward creating a project, importing assets, or selecting timeline media.
 - The monitor remains visible while users switch side dock tabs. It is the stable review surface for the current playhead and active timeline media.
 
@@ -69,6 +70,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 - Default to `Selection` when a timeline clip is selected, `Asset` when an asset is selected, and `Project` otherwise.
 - Disable inspector tabs that cannot produce useful content. With no project, only `Project` stays available. Keep `Asset` unavailable while imported metadata is still pending.
 - `Selection` owns selected clip controls. `Asset` owns imported media metadata. `Project` owns current project metadata and project deletion.
+- Inspector content uses collapsible property groups separated by hairline borders: an xs medium group title with a −/+ toggle, and label/value property rows (caption muted label on the left, mono value or quiet compact input on the right). Selected-clip trim/nudge actions render as a compact two-column button grid above the groups.
 - Clip controls belong here when they affect the selected clip. Timeline wide commands belong in the native Timeline menu bridge.
 - Keep destructive actions visually distinct with the danger color and clear labels.
 - Keep the inspector status card visible below the tab panels. Status messages use `role="status"` and must stay readable after any tab switch.
@@ -76,7 +78,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 ## Bottom Timeline
 
 - The timeline is the bottom anchor of the editor. It spans the full workspace width on desktop.
-- Track lanes are flat inset wells with a sticky ruler, a thin destructive-red playhead with a scrub handle, and clip blocks that encode media kind with text labels plus tinted fills and borders.
+- Track lanes are flat rounded inset wells separated by small gaps, under a slim mono ruler. The playhead is a neutral foreground hairline with a round scrub-dot handle in the ruler. Clip blocks encode media kind with text labels plus tinted fills and borders, and reveal primary-colored grip trim handles on hover/selection.
 - Clip blocks show asset name and duration. Trim handles stay visible enough to discover, but should not dominate the clip label.
 - Timeline interactions must read as local edits. Do not suggest non-existent cloud sync, unsupported render formats, or frame-perfect mastering guarantees.
 - The timeline remains visible while users switch side dock tabs. It is not part of the left dock or inspector tab systems.

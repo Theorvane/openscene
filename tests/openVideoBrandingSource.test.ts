@@ -38,7 +38,7 @@ describe('OpenVideo branding source contract', () => {
     expect(videoGenWorkspaceSource).toContain('AI Video Generation');
     expect(narrationLogicSource).toContain('This is my local narration reference for OpenVideo.');
     expect(designSource).toContain('# OpenVideo Design System');
-    expect(designSource).toContain('The Program header owns `Local studio`, `OpenVideo`, and the visible `Timeline editor` subtitle.');
+    expect(designSource).toContain('The Edit workspace keeps `Local studio`, `OpenVideo`, and the `Timeline editor` subtitle as visually hidden region labels for accessibility;');
   });
 
   it('Given compatibility-sensitive contracts, When source files are read, Then the rebrand keeps persisted and bridge identifiers unchanged', async () => {

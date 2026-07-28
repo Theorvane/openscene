@@ -1,11 +1,14 @@
-import type { CSSProperties, ReactElement } from 'react';
+import { useState, type CSSProperties, type ReactElement } from 'react';
 
 import { formatBytes, formatDuration } from '../format';
+import type { MediaAsset } from '../../../shared/timelineTypes';
 import type { TimelineEditorController } from './useTimelineEditor';
 
 type AssetBinProps = {
   readonly editor: TimelineEditorController;
 };
+
+type AssetViewMode = 'grid' | 'list';
 
 const TIMELINE_DRAG_TYPE = 'application/x-window-loom-timeline';
 
@@ -14,66 +17,130 @@ const COMPACT_PANEL_STYLE = {
   padding: 'var(--space-3)'
 } as const satisfies CSSProperties;
 
-const COMPACT_PANEL_HEADING_STYLE = {
-  alignItems: 'center'
-} as const satisfies CSSProperties;
-
-const COMPACT_PANEL_TITLE_STYLE = {
-  fontSize: 'var(--text-subhead)',
-  letterSpacing: '-0.03em',
-  lineHeight: 1.12,
-  margin: 0
-} as const satisfies CSSProperties;
-
-const ASSET_CARD_ENTRY_STYLE = {
-  display: 'grid',
-  gap: 'var(--space-2)'
-} as const satisfies CSSProperties;
+function assetDurationLabel(asset: MediaAsset, failureMessage: string | undefined): string {
+  if (failureMessage !== undefined) return failureMessage;
+  if (asset.metadata === null) return 'Reading metadata';
+  return formatDuration(asset.metadata.durationMs);
+}
 
 export function AssetBin({ editor }: AssetBinProps): ReactElement {
   const project = editor.project;
+  const [viewMode, setViewMode] = useState<AssetViewMode>('grid');
+
+  const onAssetDragStart = (event: React.DragEvent, assetId: string): void => {
+    event.dataTransfer.setData(TIMELINE_DRAG_TYPE, JSON.stringify({ kind: 'asset', assetId }));
+    event.dataTransfer.effectAllowed = 'copy';
+  };
 
   return (
     <section className="asset-bin" aria-labelledby="assets-title" style={COMPACT_PANEL_STYLE}>
-      <div className="panel-heading" style={COMPACT_PANEL_HEADING_STYLE}>
-        <div>
-          <p className="section-kicker">Media Dock</p>
-          <h2 id="assets-title" style={COMPACT_PANEL_TITLE_STYLE}>Media Bin</h2>
+      {/* Slim dock header: title left, view toggle right */}
+      <div className="panel-heading asset-bin__header">
+        <h2 id="assets-title" className="asset-bin__title">Media</h2>
+        <div className="asset-bin__view-toggle" role="group" aria-label="Media view mode">
+          <button
+            className={`asset-bin__view-button${viewMode === 'grid' ? ' asset-bin__view-button--active' : ''}`}
+            type="button"
+            aria-pressed={viewMode === 'grid'}
+            title="Grid view"
+            onClick={() => setViewMode('grid')}
+          >
+            ▦
+          </button>
+          <button
+            className={`asset-bin__view-button${viewMode === 'list' ? ' asset-bin__view-button--active' : ''}`}
+            type="button"
+            aria-pressed={viewMode === 'list'}
+            title="List view"
+            onClick={() => setViewMode('list')}
+          >
+            ☰
+          </button>
         </div>
-        <div className="transport-strip__buttons">
-          <button className="button" type="button" onClick={() => void editor.importAssets(['video'])} disabled={project === null || editor.isBusy}>Import video</button>
-          <button className="button" type="button" onClick={() => void editor.importAssets(['audio'])} disabled={project === null || editor.isBusy}>Import audio</button>
-          <button className="button button--primary" type="button" onClick={editor.placeSelectedAsset} disabled={editor.selectedAsset?.metadata === null || editor.selectedAsset === null}>Place on timeline</button>
-        </div>
+      </div>
+
+      {/* Compact import toolbar */}
+      <div className="asset-bin__toolbar">
+        <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['video'])} disabled={project === null || editor.isBusy}>
+          + Video
+        </button>
+        <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['audio'])} disabled={project === null || editor.isBusy}>
+          + Audio
+        </button>
+        <button className="button button--primary asset-bin__toolbar-button" type="button" onClick={editor.placeSelectedAsset} disabled={editor.selectedAsset?.metadata === null || editor.selectedAsset === null}>
+          Place
+        </button>
       </div>
 
       {project === null ? (
         <div className="empty-slate">Create or open a project before importing local media.</div>
-      ) : (
-        <div className="asset-grid" aria-label="Imported project assets">
+      ) : project.assets.length === 0 ? (
+        <button
+          className="asset-bin__dropzone"
+          type="button"
+          onClick={() => void editor.importAssets(['video'])}
+          disabled={editor.isBusy}
+        >
+          <span aria-hidden="true" className="asset-bin__dropzone-icon">⬆</span>
+          <strong>Import media</strong>
+          <span>Local video and audio stay on this machine.</span>
+        </button>
+      ) : viewMode === 'grid' ? (
+        <div className="asset-grid asset-grid--tiles" aria-label="Imported project assets">
           {project.assets.map((asset) => {
             const failureMessage = editor.metadataProbeFailuresByAssetId[asset.id];
             const selected = editor.selectedAssetId === asset.id;
 
             return (
-              <div key={asset.id} style={ASSET_CARD_ENTRY_STYLE}>
+              <div key={asset.id} className="asset-tile-entry">
                 <button
-                  className={`asset-card${selected ? ' asset-card--selected' : ''}`}
+                  className={`asset-tile${selected ? ' asset-tile--selected' : ''}`}
                   draggable={asset.metadata !== null}
                   type="button"
                   onClick={() => editor.setSelectedAssetId(asset.id)}
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData(TIMELINE_DRAG_TYPE, JSON.stringify({ kind: 'asset', assetId: asset.id }));
-                    event.dataTransfer.effectAllowed = 'copy';
-                  }}
+                  onDragStart={(event) => onAssetDragStart(event, asset.id)}
+                  title={asset.displayName}
                 >
-                  <span className={`asset-card__kind asset-card__kind--${asset.kind}`}>{asset.kind}</span>
-                  <strong>{asset.displayName}</strong>
-                  <small>{formatBytes(asset.byteLength)}</small>
-                  <span>{failureMessage ?? (asset.metadata === null ? 'Reading metadata' : formatDuration(asset.metadata.durationMs))}</span>
+                  <span className={`asset-tile__preview asset-tile__preview--${asset.kind}`} aria-hidden="true">
+                    <span className="asset-tile__glyph">{asset.kind === 'video' ? '🎬' : '🎵'}</span>
+                    <span className={`asset-tile__kind asset-card__kind asset-card__kind--${asset.kind}`}>{asset.kind}</span>
+                    <span className="asset-tile__duration">{assetDurationLabel(asset, failureMessage)}</span>
+                  </span>
+                  <strong className="asset-tile__name">{asset.displayName}</strong>
+                  <small className="asset-tile__meta">{formatBytes(asset.byteLength)}</small>
                 </button>
                 {selected && failureMessage !== undefined ? (
-                  <button className="button" type="button" onClick={() => editor.retryAssetMetadataProbe(asset.id)}>Retry metadata</button>
+                  <button className="button asset-bin__retry" type="button" onClick={() => editor.retryAssetMetadataProbe(asset.id)}>Retry metadata</button>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="asset-grid asset-grid--list" aria-label="Imported project assets">
+          {project.assets.map((asset) => {
+            const failureMessage = editor.metadataProbeFailuresByAssetId[asset.id];
+            const selected = editor.selectedAssetId === asset.id;
+
+            return (
+              <div key={asset.id} className="asset-tile-entry">
+                <button
+                  className={`asset-row${selected ? ' asset-row--selected' : ''}`}
+                  draggable={asset.metadata !== null}
+                  type="button"
+                  onClick={() => editor.setSelectedAssetId(asset.id)}
+                  onDragStart={(event) => onAssetDragStart(event, asset.id)}
+                  title={asset.displayName}
+                >
+                  <span className={`asset-row__thumb asset-row__thumb--${asset.kind}`} aria-hidden="true">{asset.kind === 'video' ? '🎬' : '🎵'}</span>
+                  <span className="asset-row__body">
+                    <strong className="asset-row__name">{asset.displayName}</strong>
+                    <small className="asset-row__meta">{asset.kind} · {formatBytes(asset.byteLength)}</small>
+                  </span>
+                  <span className="asset-row__duration">{assetDurationLabel(asset, failureMessage)}</span>
+                </button>
+                {selected && failureMessage !== undefined ? (
+                  <button className="button asset-bin__retry" type="button" onClick={() => editor.retryAssetMetadataProbe(asset.id)}>Retry metadata</button>
                 ) : null}
               </div>
             );
