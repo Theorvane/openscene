@@ -5,8 +5,9 @@ import { DEFAULT_LLM_MODELS, type LlmProviderId } from '../../shared/llmModels';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { useLlmModel, type LlmCredentialKey } from './LlmProviderContext';
 import { useTheme } from './ThemeProvider';
-import { THEME_PRESETS, type ThemePresetId } from './theme';
+import { THEME_PRESETS } from './theme';
 import { Button, MetadataList, Panel, PanelHeading, StatusCard } from './ui';
+import { classNames } from './ui/classNames';
 
 const SETTINGS_SECTIONS = [
   { id: 'appearance', title: 'Appearance', description: 'Theme mode and command desk presets.' },
@@ -163,8 +164,8 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
             <MetadataList items={[{ term: 'Active mode', description: mode }, { term: 'Preference', description: preference }]} />
             <div className="settings-preset-grid">
               {THEME_PRESETS.map((item) => (
-                <button key={item.id} className="settings-preset-card" type="button" aria-pressed={item.id === preset} onClick={() => setPreset(item.id as ThemePresetId)}>
-                  <span className="settings-preset-card__swatch" style={{ background: item.accentColor }} />
+                <button key={item.id} className="settings-preset-card" type="button" aria-pressed={item.id === preset} onClick={() => setPreset(item.id)}>
+                  <span className={classNames('settings-preset-card__swatch', 'preset-swatch', `preset-swatch--${item.id}`)} />
                   <strong>{item.label}</strong>
                   <small>{item.description}</small>
                 </button>

@@ -6,47 +6,71 @@ export type ThemePreference = ThemeMode | 'system';
 
 export type ThemePresetId = 'dark-zinc' | 'daylight-glass' | 'midnight-neon' | 'obsidian-pro';
 
+export interface ThemePresetVariant {
+  readonly accentColor: string;
+  readonly bgPreview: string;
+}
+
 export interface ThemePreset {
   readonly id: ThemePresetId;
   readonly label: string;
-  readonly mode: ThemeMode;
   readonly description: string;
-  readonly accentColor: string;
-  readonly bgPreview: string;
+  readonly light: ThemePresetVariant;
+  readonly dark: ThemePresetVariant;
 }
 
 export const THEME_PRESETS: readonly ThemePreset[] = [
   {
     id: 'dark-zinc',
     label: 'Dark Zinc',
-    mode: 'dark',
-    description: 'Opencode minimalist dark zinc studio',
-    accentColor: '#6366f1',
-    bgPreview: '#09090b'
+    description: 'Opencode minimalist zinc studio',
+    light: {
+      accentColor: '#4f46e5',
+      bgPreview: '#fafafa'
+    },
+    dark: {
+      accentColor: '#6366f1',
+      bgPreview: '#09090b'
+    }
   },
   {
     id: 'daylight-glass',
     label: 'Command Desk',
-    mode: 'light',
-    description: 'Warm local studio command desk',
-    accentColor: '#9a4f1f',
-    bgPreview: '#f4efe5'
+    description: 'Warm glass studio command desk',
+    light: {
+      accentColor: '#9a4f1f',
+      bgPreview: '#f4efe5'
+    },
+    dark: {
+      accentColor: '#d97706',
+      bgPreview: '#141210'
+    }
   },
   {
     id: 'midnight-neon',
     label: 'Midnight Neon',
-    mode: 'dark',
     description: 'Cyberpunk neon glow studio',
-    accentColor: '#f439a0',
-    bgPreview: '#06070a'
+    light: {
+      accentColor: '#c026d3',
+      bgPreview: '#f5f3ff'
+    },
+    dark: {
+      accentColor: '#f439a0',
+      bgPreview: '#06070a'
+    }
   },
   {
     id: 'obsidian-pro',
     label: 'Obsidian Pro',
-    mode: 'dark',
-    description: 'Deep OLED black pro suite',
-    accentColor: '#3b82f6',
-    bgPreview: '#000000'
+    description: 'Deep OLED black & pro slate suite',
+    light: {
+      accentColor: '#2563eb',
+      bgPreview: '#f8fafc'
+    },
+    dark: {
+      accentColor: '#3b82f6',
+      bgPreview: '#000000'
+    }
   }
 ] as const;
 
@@ -91,14 +115,10 @@ export function toggleThemeMode(mode: ThemeMode): ThemeMode {
   }
 }
 
-export function resolveThemePreset(presetId: ThemePresetId, mode: ThemeMode): ThemePresetId {
+export function resolveThemePreset(presetId: ThemePresetId, _mode?: ThemeMode): ThemePresetId {
   const presetConfig = THEME_PRESETS.find((p) => p.id === presetId);
-  if (presetConfig !== undefined && presetConfig.mode === mode) {
+  if (presetConfig !== undefined) {
     return presetId;
   }
-  return mode === 'light' ? 'daylight-glass' : 'dark-zinc';
-}
-
-export function shouldToggleThemeOnSwitchKeyDown(key: string): boolean {
-  return key === ' ' || key === 'Spacebar';
+  return 'dark-zinc';
 }

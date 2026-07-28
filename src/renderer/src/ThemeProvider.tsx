@@ -139,11 +139,6 @@ export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
   }, [systemMode]);
 
   const setPreset = useCallback((nextPreset: ThemePresetId): void => {
-    const presetConfig = THEME_PRESETS.find((p) => p.id === nextPreset);
-    if (presetConfig !== undefined) {
-      setPreferenceState(presetConfig.mode);
-      persistThemePreference(presetConfig.mode);
-    }
     setPresetState(nextPreset);
     persistThemePreset(nextPreset);
   }, []);

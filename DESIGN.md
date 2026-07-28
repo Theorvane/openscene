@@ -93,8 +93,11 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 - The renderer uses semantic theme tokens: `--background`, `--foreground`, `--card`, `--primary`, `--secondary`, `--muted`, `--accent`, `--destructive`, `--success`, `--warning`, `--info`, `--border`, `--input`, and `--ring`.
 - Light mode is the Issue #59 command-desk visual contract: warm ivory canvas, graphite foreground, parchment and aluminum panels, copper primary actions, cyan review accents, station-grid guide lines, beveled control shadows, and restrained dark text contrast.
-- Dark mode mirrors the same command desk in low light: graphite canvas, blue-black panels, copper command accents, cyan focus/review signals, pale foreground, and non-monochrome layered cards that preserve NLE contrast.
+- Dark mode is not a dimmed copy of light mode. It is the same local command desk after-hours: near-black graphite canvas, blue-black equipment bays, amber/copper command accents, cyan focus/review signals, pale foreground, tighter shadows, and non-monochrome layered cards that preserve NLE contrast.
+- Light and dark themes must read as distinct operating environments at the root token level. `--background`, `--card`, `--muted`, `--border`, `--primary`, `--accent`, `--shadow-panel`, and `--editor-lilac-grid` should differ enough that Home, Settings, Program Monitor, timeline, inspector, tabs, and Agent Chat remain visually distinguishable without component-specific overrides.
+- Theme-specific presentation belongs in renderer CSS. React theme controls should expose semantic state with class names, `aria-*`, `data-*`, and fixed preset identifiers; they should not carry layout, panel, or control styling inline. Fixed visual marks such as preset swatches may use CSS classes keyed by stable preset ids.
 - The persisted preset id `daylight-glass` remains a compatibility identifier only. Do not rename it. User-facing copy may describe that light preset as Command Desk, but compatibility identifiers listed in `AGENTS.md` must remain stable.
+- `dark-zinc` remains the dark fallback preset and `daylight-glass` remains the light fallback preset. Missing, invalid, or mode-incompatible presets must continue to resolve to those compatibility ids.
 - Legacy `--editor-*` and `--color-*` names are aliases over semantic command-desk tokens. Keep new styling on semantic tokens and only use aliases to match existing renderer classes.
 - Atmosphere, panels, timeline grids, controls, tabs, and selected states use color for semantic hierarchy and interaction, not decoration. Pair hue with contrast, opacity, borders, shadows, labels, and subtle patterns so media kind is never signaled by color alone.
 
@@ -114,10 +117,12 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 ## Theme Switching
 
 - `bootstrapRendererTheme` applies the resolved mode before React mounts by setting `document.documentElement.dataset.theme` and `document.documentElement.style.colorScheme`.
+- `bootstrapRendererTheme` also applies the resolved preset through `document.documentElement.dataset.preset`; visual CSS may branch from `data-theme` and `data-preset`, but JavaScript behavior must keep the same parser/resolver path.
 - Missing, invalid, or unreadable stored preferences resolve to `system`. The system mode comes from `window.matchMedia('(prefers-color-scheme: dark)')`, with light as the non-browser fallback.
 - The persisted key is `window-loom-theme`. Only explicit `light` or `dark` values are stored. Toggling from a system-resolved mode stores the opposite explicit mode.
+- The persisted preset key is `window-loom-theme-preset`. Keep `dark-zinc`, `daylight-glass`, `midnight-neon`, and `obsidian-pro` as the complete stable preset id set until a separate migration is designed.
 - `ThemeProvider` listens for system preference changes while the current preference is `system`, then reapplies the resolved mode through the same root `data-theme` path.
-- The product chrome theme control is a compact ghost `Button` with `role="switch"`, `aria-checked={mode === 'dark'}`, visible `Theme` and current mode text, and an aria label that names the current mode and next mode.
+- The product chrome theme control is a compact ghost `Button` with `role="switch"`, `aria-checked={mode === 'dark'}`, visible `Theme` and current mode text, and an aria label that names the current mode and active preset. Clicking opens the preset dialog; pressing Space on the focused switch toggles the explicit light/dark mode.
 
 ## Type, Status, And Motion
 

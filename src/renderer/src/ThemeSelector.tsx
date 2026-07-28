@@ -1,122 +1,91 @@
-import { useState, type KeyboardEvent, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 import { useTheme } from './ThemeProvider';
-import { THEME_PRESETS, shouldToggleThemeOnSwitchKeyDown, type ThemePresetId } from './theme';
-import { Button } from './ui';
+import { THEME_PRESETS } from './theme';
+import { classNames } from './ui/classNames';
+
+const themePresetDialogId = 'theme-preset-dialog';
 
 export function ThemeSelector(): ReactElement {
-  const { mode, preference, preset, toggleTheme, setPreset, setPreference } = useTheme();
+  const { mode, preference, preset, setPreset, setPreference } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  const activePreset = THEME_PRESETS.find((p) => p.id === preset) ?? THEME_PRESETS[0]!;
+  const activePreset = THEME_PRESETS.find((p) => p.id === preset);
 
-  const handleSwitchKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
-    if (!shouldToggleThemeOnSwitchKeyDown(event.key)) return;
+  useEffect(() => {
+    if (!isOpen) return;
+    dialogRef.current?.focus();
+  }, [isOpen]);
+
+  const closeDialog = (): void => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key !== 'Escape') return;
     event.preventDefault();
-    toggleTheme();
+    closeDialog();
   };
 
   return (
-    <div className="theme-selector-wrapper" style={{ position: 'relative' }}>
-      <Button
-        className="theme-switch"
-        role="switch"
-        variant="ghost"
-        aria-checked={mode === 'dark'}
-        aria-label={`Theme is ${mode} (${activePreset.label}). Click to open theme presets.`}
+    <div className="theme-selector-wrapper">
+      <button
+        ref={triggerRef}
+        className={classNames('button', 'button--ghost', 'theme-switch')}
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-controls={themePresetDialogId}
+        aria-label={`Open theme presets. Current theme is ${mode} (${activePreset?.label ?? 'Theme preset'}).`}
         onClick={() => setIsOpen((prev) => !prev)}
-        onKeyDown={handleSwitchKeyDown}
       >
         <span className="theme-switch__label">Theme</span>
-        <span className="theme-switch__value">{mode === 'dark' ? '🌙 Dark' : '☀️ Light'}</span>
-      </Button>
+        <span className="theme-switch__value">{mode === 'dark' ? 'Dark' : 'Light'}</span>
+      </button>
 
       {isOpen && (
         <div
+          ref={dialogRef}
+          id={themePresetDialogId}
           className="theme-preset-popover"
           role="dialog"
           aria-label="Theme Presets"
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            right: 0,
-            zIndex: 1000,
-            width: '260px',
-            padding: '10px',
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            boxShadow: 'var(--shadow-panel)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px'
-          }}
+          tabIndex={-1}
+          onKeyDown={handleDialogKeyDown}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-            <span style={{ fontSize: 'var(--text-caption)', fontWeight: 600, color: 'var(--muted-foreground)' }}>Theme & Presets</span>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: 'var(--text-small)' }}
-            >
-              ✕
+          <div className="theme-preset-popover__header">
+            <span className="theme-preset-popover__title">Theme & Presets</span>
+            <button className="theme-preset-popover__close" type="button" onClick={closeDialog}>
+              Close
             </button>
           </div>
 
-          {/* Mode Switcher Segmented Control */}
-          <div style={{ display: 'flex', gap: '4px', marginBottom: '4px', background: 'var(--surface-inset)', padding: '2px', borderRadius: 'var(--radius-xs)', border: '1px solid var(--border)' }}>
+          <div className="theme-mode-segment" role="group" aria-label="Theme mode preference">
             <button
               type="button"
+              className="theme-mode-segment__button"
+              aria-pressed={preference === 'light'}
               onClick={() => setPreference('light')}
-              style={{
-                flex: 1,
-                padding: '4px 6px',
-                fontSize: 'var(--text-micro)',
-                fontFamily: 'var(--font-mono)',
-                fontWeight: 600,
-                border: 'none',
-                borderRadius: '3px',
-                background: preference === 'light' ? 'var(--card)' : 'transparent',
-                color: preference === 'light' ? 'var(--foreground)' : 'var(--muted-foreground)',
-                cursor: 'pointer'
-              }}
             >
-              ☀️ Light
+              Light
             </button>
             <button
               type="button"
+              className="theme-mode-segment__button"
+              aria-pressed={preference === 'dark'}
               onClick={() => setPreference('dark')}
-              style={{
-                flex: 1,
-                padding: '4px 6px',
-                fontSize: 'var(--text-micro)',
-                fontFamily: 'var(--font-mono)',
-                fontWeight: 600,
-                border: 'none',
-                borderRadius: '3px',
-                background: preference === 'dark' ? 'var(--card)' : 'transparent',
-                color: preference === 'dark' ? 'var(--foreground)' : 'var(--muted-foreground)',
-                cursor: 'pointer'
-              }}
             >
-              🌙 Dark
+              Dark
             </button>
             <button
               type="button"
+              className="theme-mode-segment__button"
+              aria-pressed={preference === 'system'}
               onClick={() => setPreference('system')}
-              style={{
-                flex: 1,
-                padding: '4px 6px',
-                fontSize: 'var(--text-micro)',
-                fontFamily: 'var(--font-mono)',
-                fontWeight: 600,
-                border: 'none',
-                borderRadius: '3px',
-                background: preference === 'system' ? 'var(--card)' : 'transparent',
-                color: preference === 'system' ? 'var(--foreground)' : 'var(--muted-foreground)',
-                cursor: 'pointer'
-              }}
             >
-              💻 Auto
+              Auto
             </button>
           </div>
 
@@ -126,45 +95,20 @@ export function ThemeSelector(): ReactElement {
               <button
                 key={item.id}
                 type="button"
-                className={`preset-card ${isSelected ? 'preset-card--selected' : ''}`}
+                className={classNames('preset-card', isSelected ? 'preset-card--selected' : undefined)}
+                aria-pressed={isSelected}
                 onClick={() => {
-                  setPreset(item.id as ThemePresetId);
-                  setIsOpen(false);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '8px 10px',
-                  border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
-                  borderRadius: 'var(--radius-xs)',
-                  background: isSelected ? 'var(--surface-control-selected)' : 'var(--surface-inset)',
-                  color: 'var(--foreground)',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 120ms ease'
+                  setPreset(item.id);
+                  closeDialog();
                 }}
               >
-                <span
-                  style={{
-                    width: '14px',
-                    height: '14px',
-                    borderRadius: '50%',
-                    background: item.accentColor,
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    flexShrink: 0
-                  }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: 'var(--text-small)', fontWeight: 600 }}>{item.label}</span>
-                    <span style={{ fontSize: 'var(--text-micro)', opacity: 0.7, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
-                      {item.mode}
-                    </span>
+                <span className={classNames('preset-card__swatch', `preset-card__swatch--${item.id}`)} />
+                <div className="preset-card__body">
+                  <div className="preset-card__meta">
+                    <span className="preset-card__label">{item.label}</span>
+                    <span className="preset-card__mode">{mode === 'dark' ? 'Dark' : 'Light'}</span>
                   </div>
-                  <span style={{ fontSize: 'var(--text-micro)', color: 'var(--muted-foreground)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.description}
-                  </span>
+                  <span className="preset-card__description">{item.description}</span>
                 </div>
               </button>
             );

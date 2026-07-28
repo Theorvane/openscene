@@ -2,12 +2,15 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { parseThemePreference, resolveThemeMode, shouldToggleThemeOnSwitchKeyDown, toggleThemeMode } from '../src/renderer/src/theme';
+import { parseThemePreference, resolveThemeMode, toggleThemeMode } from '../src/renderer/src/theme';
 
 const rendererStyles = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8');
+const themeSelectorSource = readFileSync(new URL('../src/renderer/src/ThemeSelector.tsx', import.meta.url), 'utf8');
+const settingsWorkspaceSource = readFileSync(new URL('../src/renderer/src/SettingsWorkspace.tsx', import.meta.url), 'utf8');
 const minimumNormalTextContrast = 4.5;
 const minimumExpressiveColorChroma = 24;
 const minimumDistinctSemanticColorDistance = 64;
+const minimumDistinctSurfaceColorDistance = 80;
 const commandDeskContractTokens = [
   '--command-desk-canvas: #f4efe5;',
   '--command-desk-graphite: #1f2933;',
@@ -116,6 +119,17 @@ function getThemeHexCustomProperty(mode: ThemeMode, name: string): string {
   return hexValue;
 }
 
+function getResolvedThemeHexCustomProperty(mode: ThemeMode, name: string): string {
+  const value = getThemeCustomPropertyValue(mode, name);
+  const hexValue = /^#[0-9a-fA-F]{6}$/.exec(value)?.[0];
+  if (hexValue !== undefined) return hexValue;
+
+  const referencedToken = /^var\((--[a-z0-9-]+)\)$/.exec(value)?.[1];
+  if (referencedToken !== undefined) return getThemeHexCustomProperty(mode, referencedToken);
+
+  throw new Error(`${name} in ${mode} theme could not be resolved to a static hex declaration.`);
+}
+
 function parseHexColor(hexColor: string): RgbColor {
   return {
     red: Number.parseInt(hexColor.slice(1, 3), 16),
@@ -194,16 +208,6 @@ describe('renderer theme contract', () => {
     expect(toggledToLight).toBe('light');
   });
 
-  it('Given the theme switch has focus, When Space is pressed, Then the switch key contract requests a toggle', () => {
-    const shouldToggleOnSpace = shouldToggleThemeOnSwitchKeyDown(' ');
-    const shouldToggleOnLegacySpace = shouldToggleThemeOnSwitchKeyDown('Spacebar');
-    const shouldToggleOnEnter = shouldToggleThemeOnSwitchKeyDown('Enter');
-
-    expect(shouldToggleOnSpace).toBe(true);
-    expect(shouldToggleOnLegacySpace).toBe(true);
-    expect(shouldToggleOnEnter).toBe(false);
-  });
-
   it('Given light theme status-card normal text, When contrast is computed, Then it meets WCAG AA normal text contrast', () => {
     const normalStatusText = getThemeHexCustomProperty('light', '--status-normal');
     const statusSurface = getThemeHexCustomProperty('light', '--muted');
@@ -232,6 +236,14 @@ describe('renderer theme contract', () => {
     const primary = getThemeHexCustomProperty(mode, '--primary');
     const primaryForeground = getThemeHexCustomProperty(mode, '--primary-foreground');
     const contrastRatio = getContrastRatio(primaryForeground, primary);
+
+    expect(contrastRatio).toBeGreaterThanOrEqual(minimumNormalTextContrast);
+  });
+
+  it.each(themeModes)('Given %s theme base foreground on card, When contrast is computed, Then normal text meets WCAG AA contrast', (mode) => {
+    const foreground = getResolvedThemeHexCustomProperty(mode, '--foreground');
+    const card = getThemeHexCustomProperty(mode, '--card');
+    const contrastRatio = getContrastRatio(foreground, card);
 
     expect(contrastRatio).toBeGreaterThanOrEqual(minimumNormalTextContrast);
   });
@@ -294,6 +306,45 @@ describe('renderer theme contract', () => {
     expect(rendererStyles).not.toMatch(/linear-gradient\(135deg,\s*rgba\(255, 255, 255, 0\.9\),\s*rgba\((238, 242, 255|236, 253, 245)/);
     expect(rendererStyles).toMatch(/\.timeline-clip\s*\{[\s\S]*?color-mix\(in srgb, var\(--card\) 94%, var\(--primary\)\)/);
     expect(rendererStyles).toMatch(/\.timeline-clip--audio\s*\{[\s\S]*?color-mix\(in srgb, var\(--card\) 92%, var\(--success\)\)/);
+  });
+
+  it('Given Issue #61 distinct operating environments, When root theme tokens are compared, Then light and dark surfaces are structurally different', () => {
+    const comparedTokens = ['--background', '--card', '--muted', '--border', '--input'] as const;
+
+    for (const token of comparedTokens) {
+      const lightColor = getResolvedThemeHexCustomProperty('light', token);
+      const darkColor = getResolvedThemeHexCustomProperty('dark', token);
+
+      expect(getRgbDistance(lightColor, darkColor)).toBeGreaterThanOrEqual(minimumDistinctSurfaceColorDistance);
+    }
+
+    expect(getThemeCustomPropertyValue('light', '--shadow-panel')).not.toBe(getThemeCustomPropertyValue('dark', '--shadow-panel'));
+    expect(getThemeCustomPropertyValue('light', '--command-desk-grid')).not.toBe(getThemeCustomPropertyValue('dark', '--command-desk-grid'));
+  });
+
+  it('Given Issue #61 ThemeSelector presentation, When source and CSS are checked, Then styling lives in renderer CSS classes', () => {
+    expect(themeSelectorSource).not.toContain('style={{');
+    expect(themeSelectorSource).not.toMatch(/[🌙☀️💻✕]/u);
+    expect(settingsWorkspaceSource).not.toContain('style={{ background: item.accentColor }}');
+    expect(rendererStyles).toContain('.theme-preset-popover');
+    expect(rendererStyles).toContain('.theme-mode-segment__button[aria-pressed="true"]');
+    expect(rendererStyles).toContain('.preset-card[aria-pressed="true"]');
+    expect(rendererStyles).toContain('.preset-swatch--daylight-glass');
+    expect(rendererStyles).toContain('.preset-swatch--dark-zinc');
+  });
+
+  it('Given Issue #61 ThemeSelector accessibility, When source is checked, Then the trigger owns a disclosure dialog contract', () => {
+    expect(themeSelectorSource).not.toContain('role="switch"');
+    expect(themeSelectorSource).not.toContain('aria-checked');
+    expect(themeSelectorSource).not.toContain('shouldToggleThemeOnSwitchKeyDown');
+    expect(themeSelectorSource).toContain('aria-haspopup="dialog"');
+    expect(themeSelectorSource).toContain('aria-expanded={isOpen}');
+    expect(themeSelectorSource).toContain('aria-controls={themePresetDialogId}');
+    expect(themeSelectorSource).toContain('id={themePresetDialogId}');
+    expect(themeSelectorSource).toContain('ref={triggerRef}');
+    expect(themeSelectorSource).toContain('ref={dialogRef}');
+    expect(themeSelectorSource).toContain('tabIndex={-1}');
+    expect(themeSelectorSource).toContain('onKeyDown={handleDialogKeyDown}');
   });
 
   it('Given the agent chat input, When focus-visible CSS is checked, Then it uses the documented ring, offset, and halo', () => {

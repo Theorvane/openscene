@@ -200,7 +200,10 @@
   --shadow-control: 0 10px 24px rgba(0, 0, 0, 0.26);
 }
 
-/* Preset Theme Overrides */
+/* Preset Theme Overrides - Light & Dark variants for every preset */
+
+/* 1. Midnight Neon */
+:root[data-preset="midnight-neon"][data-theme="dark"],
 :root[data-preset="midnight-neon"] {
   --editor-canvas: #06070a;
   --editor-glass: rgba(13, 14, 21, 0.88);
@@ -213,6 +216,25 @@
   --border: #212438;
 }
 
+:root[data-preset="midnight-neon"][data-theme="light"] {
+  --editor-canvas: #f5f3ff;
+  --editor-glass: rgba(255, 255, 255, 0.9);
+  --background: #f5f3ff;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --foreground: #1e1b4b;
+  --primary: #7c3aed;
+  --accent: #d946ef;
+  --ring: #c026d3;
+  --border: #ddd6fe;
+  --surface-control: rgba(237, 233, 254, 0.8);
+  --surface-control-hover: rgba(221, 214, 254, 0.92);
+  --surface-control-selected: rgba(192, 38, 211, 0.15);
+  --surface-inset: rgba(245, 243, 255, 0.95);
+}
+
+/* 2. Obsidian Pro */
+:root[data-preset="obsidian-pro"][data-theme="dark"],
 :root[data-preset="obsidian-pro"] {
   --editor-canvas: #000000;
   --editor-glass: rgba(18, 18, 18, 0.94);
@@ -225,6 +247,25 @@
   --border: #222222;
 }
 
+:root[data-preset="obsidian-pro"][data-theme="light"] {
+  --editor-canvas: #f8fafc;
+  --editor-glass: rgba(255, 255, 255, 0.92);
+  --background: #f8fafc;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --foreground: #0f172a;
+  --primary: #2563eb;
+  --accent: #0284c7;
+  --ring: #3b82f6;
+  --border: #cbd5e1;
+  --surface-control: rgba(241, 245, 249, 0.85);
+  --surface-control-hover: rgba(226, 232, 240, 0.92);
+  --surface-control-selected: rgba(37, 99, 235, 0.15);
+  --surface-inset: rgba(248, 250, 252, 0.95);
+}
+
+/* 3. Daylight Glass (Command Desk) */
+:root[data-preset="daylight-glass"][data-theme="light"],
 :root[data-preset="daylight-glass"] {
   --command-desk-canvas: #f4efe5;
   --command-desk-panel: rgba(255, 251, 242, 0.86);
@@ -232,13 +273,57 @@
   --editor-glass: var(--command-desk-panel);
   --background: #f4efe5;
   --card: #fffaf0;
+  --border: #e7decb;
+  --primary: #9a4f1f;
+  --accent: #d28a3a;
 }
 
+:root[data-preset="daylight-glass"][data-theme="dark"] {
+  --command-desk-canvas: #141210;
+  --command-desk-panel: rgba(28, 25, 23, 0.9);
+  --editor-canvas: var(--command-desk-canvas);
+  --editor-glass: var(--command-desk-panel);
+  --background: #141210;
+  --card: #1c1917;
+  --popover: #26221f;
+  --foreground: #f5f2eb;
+  --border: #38322c;
+  --primary: #d97706;
+  --accent: #f59e0b;
+  --ring: #d97706;
+  --surface-control: rgba(38, 34, 31, 0.8);
+  --surface-control-hover: rgba(56, 50, 44, 0.92);
+  --surface-control-selected: rgba(217, 119, 6, 0.2);
+  --surface-inset: rgba(20, 18, 16, 0.9);
+}
+
+/* 4. Dark Zinc */
+:root[data-preset="dark-zinc"][data-theme="dark"],
 :root[data-preset="dark-zinc"] {
   --editor-canvas: #09090b;
   --editor-glass: rgba(18, 18, 22, 0.88);
   --background: #09090b;
   --card: #141417;
+  --border: #27272a;
+  --primary: #6366f1;
+  --accent: #818cf8;
+}
+
+:root[data-preset="dark-zinc"][data-theme="light"] {
+  --editor-canvas: #fafafa;
+  --editor-glass: rgba(255, 255, 255, 0.92);
+  --background: #fafafa;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --foreground: #18181b;
+  --border: #e4e4e7;
+  --primary: #4f46e5;
+  --accent: #6366f1;
+  --ring: #4f46e5;
+  --surface-control: rgba(244, 244, 245, 0.85);
+  --surface-control-hover: rgba(228, 228, 231, 0.92);
+  --surface-control-selected: rgba(79, 70, 229, 0.15);
+  --surface-inset: rgba(250, 250, 250, 0.95);
 }
 
 * {
@@ -438,6 +523,211 @@ button {
 
 .theme-switch__value {
   color: var(--color-primary);
+}
+
+.theme-selector-wrapper {
+  position: relative;
+}
+
+.theme-preset-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 260px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--popover);
+  box-shadow: var(--shadow-panel), var(--shadow-inset-rule);
+}
+
+.theme-preset-popover__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.theme-preset-popover__title {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.theme-preset-popover__close {
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.theme-preset-popover__close:hover,
+.theme-preset-popover__close:focus-visible {
+  border-color: var(--ring);
+  color: var(--foreground);
+  background: var(--surface-control-hover);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus-shadow);
+}
+
+.theme-mode-segment {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface-inset);
+}
+
+.theme-mode-segment__button {
+  flex: 1;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.theme-mode-segment__button[aria-pressed="true"] {
+  border-color: var(--line-selected);
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: var(--shadow-inset-rule);
+}
+
+.theme-mode-segment__button:hover,
+.theme-mode-segment__button:focus-visible {
+  border-color: var(--ring);
+  color: var(--foreground);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus-shadow);
+}
+
+.preset-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--foreground);
+  background: var(--surface-inset);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.preset-card:hover,
+.preset-card:focus-visible {
+  border-color: var(--ring);
+  background: var(--surface-control-hover);
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus-shadow);
+}
+
+.preset-card--selected,
+.preset-card[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: var(--surface-control-selected);
+}
+
+.preset-card__swatch,
+.preset-swatch {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 1px solid color-mix(in srgb, var(--foreground) 18%, transparent);
+  border-radius: 999px;
+  box-shadow: var(--shadow-inset-rule);
+}
+
+.preset-card__body {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.preset-card__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.preset-card__label {
+  overflow: hidden;
+  font-size: var(--text-small);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-card__mode {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.preset-card__description {
+  display: block;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: var(--text-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-swatch,
+.settings-preset-card__swatch {
+  width: 100%;
+  min-height: 42px;
+  border-radius: var(--radius-sm);
+}
+
+.preset-card__swatch--dark-zinc,
+.preset-swatch--dark-zinc {
+  background: #6366f1;
+}
+
+.preset-card__swatch--daylight-glass,
+.preset-swatch--daylight-glass {
+  background: #9a4f1f;
+}
+
+.preset-card__swatch--midnight-neon,
+.preset-swatch--midnight-neon {
+  background: #f439a0;
+}
+
+.preset-card__swatch--obsidian-pro,
+.preset-swatch--obsidian-pro {
+  background: #3b82f6;
 }
 
 .local-edit-bay {
