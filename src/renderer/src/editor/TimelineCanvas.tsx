@@ -89,10 +89,12 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
   const [mutedTracks, setMutedTracks] = useState<Record<string, boolean>>({});
   const [soloTracks, setSoloTracks] = useState<Record<string, boolean>>({});
   const [lockedTracks, setLockedTracks] = useState<Record<string, boolean>>({});
+  const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
 
   const onLaneDrop = (event: DragEvent<HTMLDivElement>, trackId: string): void => {
     if (view === null) return;
     event.preventDefault();
+    setDragOverTrackId(null);
     const payload = readTimelineDrag(event);
     if (payload === null) return;
     const rect = event.currentTarget.getBoundingClientRect();
@@ -107,6 +109,25 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
     const rect = event.currentTarget.getBoundingClientRect();
     editor.setPlayheadMs(clientXToTimelineMs({ clientX: event.clientX, laneLeft: rect.left, laneWidth: rect.width, durationMs: view.durationMs, snapMs: 100 }));
   };
+
+  // Ruler scrubbing: press to seek, drag while pressed to keep scrubbing.
+  const scrubRuler = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (view === null) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    editor.setPlayheadMs(clientXToTimelineMs({ clientX: event.clientX, laneLeft: rect.left, laneWidth: rect.width, durationMs: view.durationMs, snapMs: 100 }));
+  };
+
+  const onRulerPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    scrubRuler(event);
+  };
+
+  const onRulerPointerMove = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    scrubRuler(event);
+  };
+
+  const trackMinHeight = (kind: string): string => (kind === 'video' ? '56px' : '42px');
 
   const zoomBy = (factor: number): void => {
     setZoomLevel((current) => Math.min(5, Math.max(1, Math.round(current * factor * 10) / 10)));
@@ -213,10 +234,20 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
           {/* Scrollable Container based on zoomLevel */}
           <div style={{ width: `calc(100% * ${zoomLevel})`, minWidth: '100%', position: 'relative', display: 'grid', gap: '4px', padding: 'var(--space-2) var(--space-3)' }}>
 
-            {/* Slim mono ruler with a round scrub-dot playhead handle */}
+            {/* Slim mono ruler with a round scrub-dot playhead handle; press or drag to seek */}
             <div
               className="timeline-ruler"
+              onPointerDown={onRulerPointerDown}
+              onPointerMove={onRulerPointerMove}
+              role="slider"
+              aria-label="Timeline playhead position"
+              aria-valuemin={0}
+              aria-valuemax={view.durationMs}
+              aria-valuenow={editor.playheadMs}
+              aria-valuetext={`Playhead at ${formatDuration(editor.playheadMs)}`}
+              tabIndex={-1}
               style={{
+                cursor: 'ew-resize',
                 position: 'relative',
                 overflow: 'visible',
                 backgroundImage: 'repeating-linear-gradient(90deg, var(--border) 0px, var(--border) 1px, transparent 1px, transparent 2.5%)',
@@ -267,6 +298,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                 key={track.id}
                 style={{
                   gridTemplateColumns: '104px minmax(0, 1fr)',
+                  minHeight: trackMinHeight(track.kind),
                   opacity: mutedTracks[track.id] ? 0.55 : 1
                 }}
               >
@@ -323,13 +355,22 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                 {/* Track Lane */}
                 <div
                   className="timeline-track__lane"
-                  onDragOver={(event) => !lockedTracks[track.id] && event.preventDefault()}
+                  onDragOver={(event) => {
+                    if (lockedTracks[track.id]) return;
+                    event.preventDefault();
+                    setDragOverTrackId(track.id);
+                  }}
+                  onDragLeave={() => setDragOverTrackId((current) => (current === track.id ? null : current))}
                   onDrop={(event) => !lockedTracks[track.id] && onLaneDrop(event, track.id)}
                   onPointerDown={(event) => !lockedTracks[track.id] && scrubLane(event)}
                   role="application"
                   aria-label={`${track.name} lane. Drop assets or clips here.`}
                   style={{
+                    minHeight: trackMinHeight(track.kind),
                     opacity: lockedTracks[track.id] ? 0.6 : 1,
+                    outline: dragOverTrackId === track.id ? '1.5px dashed var(--ring)' : undefined,
+                    outlineOffset: dragOverTrackId === track.id ? '-1.5px' : undefined,
+                    background: dragOverTrackId === track.id ? 'color-mix(in srgb, var(--primary) 7%, var(--surface-inset))' : undefined,
                     backgroundImage: lockedTracks[track.id]
                       ? 'repeating-linear-gradient(45deg, rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 6px, transparent 6px, transparent 12px)'
                       : undefined,
