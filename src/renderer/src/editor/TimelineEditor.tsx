@@ -28,7 +28,7 @@ import { ProgramMonitor } from './ProgramMonitor';
 import { ProjectRail } from './ProjectRail';
 import { TimelineCanvas } from './TimelineCanvas';
 import { TimelineEditorLeftDock } from './TimelineEditorLeftDock';
-import { EditorInspectorSplitter, EditorLeftDockSplitter, EditorProgramSplitter, TimelineShortcutMap } from './TimelineEditorLayoutControls';
+import { EditorInspectorSplitter, EditorLeftDockSplitter, EditorProgramSplitter } from './TimelineEditorLayoutControls';
 import { useEditorLayoutPreference } from './useEditorLayoutPreference';
 import { useEditorNativeMenuCommands } from './useEditorNativeMenuCommands';
 import { useEditorShortcutPreference } from './useEditorShortcutPreference';
@@ -97,7 +97,7 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   const [leftDockTabId, setLeftDockTabId] = useState<EditorLeftDockTabId>('project');
   const [inspectorTabId, setInspectorTabId] = useState<InspectorTabId>('project');
   const { layoutPreference, updateLayoutPreference } = useEditorLayoutPreference();
-  const { shortcutPreferences, updateShortcutPreferences } = useEditorShortcutPreference();
+  const { shortcutPreferences } = useEditorShortcutPreference();
   const inspectorTabs = getInspectorTabs(editor);
   const projectIdentity = editor.project?.id ?? '';
   const selectedAssetIdentity = editor.selectedAsset?.id ?? '';
@@ -218,18 +218,14 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
       />
 
       <main className="editor-program-region" id="editor-program-panel" aria-labelledby="timeline-editor-title">
-        <div className="panel-heading editor-program-region__heading">
-          <div>
-            <p className="section-kicker">Local studio</p>
-            <h1 id="timeline-editor-title">OpenVideo</h1>
-            <span className="editor-program-region__subtitle">Timeline editor</span>
-          </div>
-          <div className="editor-program-region__actions">
-            <TimelineShortcutMap shortcutPreferences={shortcutPreferences} onShortcutPreferencesChange={updateShortcutPreferences} />
-          </div>
+        {/* Branding stays for accessibility and region labeling but is no longer visible chrome. */}
+        <div className="visually-hidden">
+          <p className="section-kicker">Local studio</p>
+          <h1 id="timeline-editor-title">OpenVideo</h1>
+          <span className="editor-program-region__subtitle">Timeline editor</span>
         </div>
-        {floatingProgramVisible ? <div className="empty-slate">Program Monitor is floating above the workspace.</div> : <ProgramMonitor editor={editor} />}
-        {floatingExportVisible ? <div className="empty-slate">Export controls are floating above the workspace.</div> : <ExportPanel editor={editor} />}
+        {floatingProgramVisible ? <div className="empty-slate">Program Monitor is floating above the workspace.</div> : <ProgramMonitor editor={editor} exportControl={floatingExportVisible ? null : <ExportPanel editor={editor} />} />}
+        {floatingProgramVisible && !floatingExportVisible && <ExportPanel editor={editor} />}
       </main>
 
       <EditorProgramSplitter programPercent={layoutPreference.programPercent} onProgramPercentChange={setProgramPercent} />

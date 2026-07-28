@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactElement, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode, type SyntheticEvent } from 'react';
 
 import type { TimelineEditorController } from './useTimelineEditor';
 import { effectCssTransform } from './clipEffectControls';
@@ -17,6 +17,7 @@ import { buildProgramMonitorPreview, type ProgramMonitorAudioLayer, type Program
 
 type ProgramMonitorProps = {
   readonly editor: TimelineEditorController;
+  readonly exportControl?: ReactNode;
 };
 
 type ProgramMonitorMediaElement = (HTMLAudioElement | HTMLVideoElement) & TimelineMediaEffectsElement;
@@ -57,7 +58,7 @@ function firstPreviewLayerAsset(
   return visualLayer?.asset ?? audioLayer?.asset ?? null;
 }
 
-export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
+export function ProgramMonitor({ editor, exportControl }: ProgramMonitorProps): ReactElement {
   const [previewLoadState, setPreviewLoadState] = useState<ProgramMonitorPreviewLoadState>(
     programMonitorPreviewLoadState({ type: 'loading' })
   );
@@ -251,11 +252,7 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
 
   return (
     <section className="program-monitor clip-controls" aria-labelledby="program-monitor-title">
-      <div className="panel-heading">
-        <div>
-          <h2 id="program-monitor-title" style={{ margin: 0, fontSize: 'var(--text-small)', fontWeight: 600, letterSpacing: 'var(--tracking-tight)' }}>Program Monitor</h2>
-        </div>
-      </div>
+      <h2 id="program-monitor-title" className="visually-hidden">Program Monitor</h2>
 
       <div className="monitor-container" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--space-3)', minHeight: 0 }}>
         {/* Preview Frame */}
@@ -461,6 +458,7 @@ export function ProgramMonitor({ editor }: ProgramMonitorProps): ReactElement {
             <option value="1/2">1/2</option>
             <option value="1/4">1/4</option>
           </select>
+          {exportControl}
         </div>
       </div>
     </section>

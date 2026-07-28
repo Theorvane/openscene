@@ -12,7 +12,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Layout Contract
 
-- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Projects, Home (Menu), and Settings buttons, and the theme switch. It reads as the desk toolbar, not the product billboard; the active Edit program header owns product branding. The Menu button stays disabled with a short hint until a project is open; Projects and Settings stay reachable at all times.
+- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Projects, Home (Menu), and Settings buttons, and the theme switch. It reads as the desk toolbar, not the product billboard; the Edit workspace keeps its own branding visually hidden for accessibility only. The Menu button stays disabled with a short hint until a project is open; Projects and Settings stay reachable at all times.
 - The persistent right `AgentChatPanel` is the only user-facing Edit Agent UI. It is always the rightmost flex child beside the mounted workspace stack and owns Edit Agent model/connection status, selected and attached project context, conversation and tool stream, approval queue, reset/status, and prompt controls.
 - Do not render a global agent model selector in `product-chrome`, add a separate `EditAgentWorkspace`, or move Edit Agent controls into the left workspace navigation. Direct AI Video and AI Voice studios keep their own domain-specific controls, and Settings keeps provider credentials and primary model configuration separate from the Edit Agent chat surface.
 - `app-page-stack` owns top-level page visibility for Home, mounted workspaces, and Settings. Active page state is separate from active workspace state.
@@ -40,9 +40,9 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Program Header And Command Surface
 
-- The Program header owns `Local studio`, `OpenVideo`, and the visible `Timeline editor` subtitle. App chrome must not duplicate this branding.
+- The Edit workspace keeps `Local studio`, `OpenVideo`, and the `Timeline editor` subtitle as visually hidden region labels for accessibility; no visible branding header renders inside the workspace, and app chrome must not duplicate it.
 - Timeline commands such as Play, Rewind, Undo, Redo, Split at playhead, add track actions, layout changes, and Save timeline live in the native Timeline menu bridge.
-- The only visible command customization surface in the workspace is the Program header `Shortcut map` disclosure. It must support remap, disable, reset, validation, persistence, and `role="status"` feedback.
+- Keyboard shortcut customization lives in Settings → Shortcuts, which renders the `Shortcut map` disclosure (`TimelineShortcutMap`). It must support remap, disable, reset, validation, persistence, and `role="status"` feedback; the Editing workspace consumes the stored preferences without rendering the remap surface.
 - Save state must remain explicit. Local timeline mutations are unsaved until `saveTimeline` succeeds.
 
 ## Project And Media Dock
@@ -56,9 +56,9 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Program Monitor
 
-- The central program region is the largest panel. It contains the `Timeline editor` heading and `ProgramMonitor` preview surface.
+- The central program region is the largest panel. It contains the `ProgramMonitor` preview surface with a visually hidden heading; no visible header row sits above the monitor.
 - The monitor is for local timeline review. It is a best-effort v3 evaluator surface for keyframes, transitions, and audio mix, not final mastering, frame-perfect export, cloud preview, or AI generation.
-- The MP4 export panel is the local final-output surface for supported saved timelines. It may show job state, progress, cancel, open, and reveal controls, but never local output paths, FFmpeg executable paths, or FFmpeg argv.
+- MP4 export is a compact control in the monitor transport row: a primary Export trigger that opens a small popover with job state, progress, and Export/Cancel/Open/Reveal actions. It may show job state and result actions, but never local output paths, FFmpeg executable paths, or FFmpeg argv.
 - Empty states may be expressive, but they must guide users toward creating a project, importing assets, or selecting timeline media.
 - The monitor remains visible while users switch side dock tabs. It is the stable review surface for the current playhead and active timeline media.
 

@@ -2068,12 +2068,12 @@ button {
   grid-area: program;
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: var(--space-4);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-2);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--card);
@@ -2700,6 +2700,49 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-inset);
+}
+
+/* Compact export control: primary trigger + small popover with status/progress/actions. */
+.export-control {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.export-control__trigger {
+  min-height: 26px;
+  padding: 2px var(--space-3);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.export-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 40;
+  display: grid;
+  gap: var(--space-2);
+  width: 300px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--popover);
+  box-shadow: var(--shadow-editorial);
+}
+
+.export-popover__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.export-popover__actions .button {
+  min-height: 26px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-caption);
+  white-space: nowrap;
 }
 
 .export-panel__heading {

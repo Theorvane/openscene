@@ -3,6 +3,8 @@ import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import type { LocalFfmpegRuntimeStatus } from '../../shared/exportTypes';
 import { DEFAULT_LLM_MODELS, type LlmProviderId } from '../../shared/llmModels';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
+import { TimelineShortcutMap } from './editor/TimelineEditorLayoutControls';
+import { useEditorShortcutPreference } from './editor/useEditorShortcutPreference';
 import { useLlmModel, type LlmCredentialKey } from './LlmProviderContext';
 import { useTheme } from './ThemeProvider';
 import { THEME_PRESETS } from './theme';
@@ -15,6 +17,7 @@ const SETTINGS_SECTIONS = [
   { id: 'voice', title: 'Voice', description: 'Voice model preference and consent-based local narration boundaries.' },
   { id: 'video', title: 'Video', description: 'Video model preference and local result import boundaries.' },
   { id: 'edit-agent', title: 'Edit Agent', description: 'Primary model, provider credentials, and the persistent right-side agent.' },
+  { id: 'shortcuts', title: 'Shortcuts', description: 'Timeline editor keyboard shortcut remapping.' },
   { id: 'data-privacy', title: 'Data & Privacy', description: 'Local storage, provider authorization, and deletion expectations.' }
 ] as const;
 
@@ -105,6 +108,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
   const [credentialSaveState, setCredentialSaveState] = useState<CredentialSaveState>(IDLE_CREDENTIAL_SAVE_STATE);
   const [testState, setTestState] = useState<ModelTestState>({ status: 'idle' });
   const [ffmpegState, setFfmpegState] = useState<FfmpegStatusState>({ status: 'loading' });
+  const { shortcutPreferences, updateShortcutPreferences } = useEditorShortcutPreference();
   const activeSection = getSettingsSection(activeSectionId);
   const ffmpegView = ffmpegStatusText(ffmpegState);
 
@@ -222,6 +226,13 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
             <Button variant="default" onClick={() => void runModelTest()} disabled={testState.status === 'running'}>{testState.status === 'running' ? 'Testing...' : 'Test selected model'}</Button>
             {testState.status === 'success' && <StatusCard tone="success">Model responded: {testState.completion}</StatusCard>}
             {testState.status === 'error' && <StatusCard tone="danger">{testState.error}</StatusCard>}
+          </>
+        );
+      case 'shortcuts':
+        return (
+          <>
+            <TimelineShortcutMap shortcutPreferences={shortcutPreferences} onShortcutPreferencesChange={updateShortcutPreferences} />
+            <StatusCard tone="neutral">Shortcut changes persist locally and apply immediately inside the Editing workspace.</StatusCard>
           </>
         );
       case 'data-privacy':
