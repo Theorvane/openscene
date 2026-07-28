@@ -160,23 +160,40 @@ export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelPr
         </div>
 
         <form className="agent-chat-panel__form" onSubmit={submitMessage}>
-          <input
-            type="text"
-            className="agent-chat-panel__input"
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder={pendingApproval ? 'Respond to the approval above first...' : 'Tell OpenVideo what to do…'}
-            aria-label="Edit Agent prompt"
-            disabled={isBusy || !isLocalModel || pendingApproval !== null}
-          />
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={isBusy || !isLocalModel || pendingApproval !== null || input.trim().length === 0}
-            aria-label="Send Edit Agent prompt"
-          >
-            {isBusy ? 'Working…' : 'Send'}
-          </Button>
+          <div className="agent-chat-prompt-card">
+            <textarea
+              className="agent-chat-panel__input agent-chat-prompt-card__textarea"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  if (!isBusy && isLocalModel && pendingApproval === null && input.trim().length > 0) {
+                    void sendMessage(input);
+                  }
+                }
+              }}
+              placeholder={pendingApproval ? 'Respond to the approval above first...' : 'Tell OpenVideo what to do…'}
+              aria-label="Edit Agent prompt"
+              disabled={isBusy || !isLocalModel || pendingApproval !== null}
+              rows={2}
+            />
+            <div className="agent-chat-prompt-card__toolbar">
+              <div className="agent-chat-prompt-card__meta">
+                <span className="agent-chat-prompt-card__model-tag">
+                  {isLocalModel ? '★ Qwen 2.5 Coder · Local' : 'Select Local Model'}
+                </span>
+              </div>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={isBusy || !isLocalModel || pendingApproval !== null || input.trim().length === 0}
+                aria-label="Send Edit Agent prompt"
+              >
+                {isBusy ? 'Working…' : 'Send'}
+              </Button>
+            </div>
+          </div>
         </form>
       </div>
     </aside>

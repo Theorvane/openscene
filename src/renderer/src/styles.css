@@ -3878,8 +3878,8 @@ button {
 
 .agent-chat-panel__form {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--line-subtle);
   background:
@@ -3888,13 +3888,70 @@ button {
   backdrop-filter: blur(12px);
 }
 
+.agent-chat-prompt-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-md);
+  background: var(--input);
+  box-shadow: var(--shadow-inset-rule), 0 4px 16px color-mix(in srgb, var(--background) 24%, transparent);
+  overflow: hidden;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.agent-chat-prompt-card:focus-within {
+  border-color: var(--ring);
+}
+
+.agent-chat-prompt-card__textarea {
+  width: 100%;
+  min-height: 48px;
+  max-height: 140px;
+  padding: var(--space-3) var(--space-3);
+  border: none;
+  background: transparent;
+  resize: vertical;
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.agent-chat-prompt-card__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  background: color-mix(in srgb, var(--card) 60%, transparent);
+}
+
+.agent-chat-prompt-card__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.agent-chat-prompt-card__model-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
 .agent-chat-panel__input {
   min-width: 0;
   flex: 1;
-  min-height: 38px;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line-control);
-  border-radius: var(--radius-sm);
   background: var(--input);
   color: var(--foreground);
   font-family: var(--font-body);
@@ -3922,11 +3979,12 @@ button {
 }
 
 .agent-chat-panel__form .button[type="submit"] {
-  min-width: 80px;
-  min-height: 38px;
-  padding: var(--space-2) var(--space-4);
+  min-width: 76px;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-caption);
   font-weight: 600;
   box-shadow: var(--shadow-control), var(--shadow-inset-rule);
   transition: transform 120ms ease, opacity 120ms ease, box-shadow 120ms ease;
