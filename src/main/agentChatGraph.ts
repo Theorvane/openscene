@@ -11,7 +11,7 @@ import {
 import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { Annotation, END, MemorySaver, START, StateGraph, interrupt } from '@langchain/langgraph';
 import type { AgentToolCallProposal, AgentToolApprovalDecision } from '../shared/agentChat';
-import type { EditAgentContextAsset } from '../shared/editAgentContext';
+import { parseEditAgentProjectContext, type EditAgentContextAsset, type EditAgentProjectContext } from '../shared/editAgentContext';
 
 const AGENT_CHAT_SYSTEM_PROMPT =
   'You are the OpenVideo in-app agent. You can call the provided tools to check AI job status, ' +
@@ -40,10 +40,31 @@ function getEditAssetContext(rawContext: string | undefined): readonly EditAgent
   }
 }
 
-function buildAgentSystemPrompt(contextAssets: readonly EditAgentContextAsset[]): string {
-  if (contextAssets.length === 0) return AGENT_CHAT_SYSTEM_PROMPT;
-  const assetList = contextAssets.map((asset) => `${asset.mediaKind} assetId=${asset.assetId}, projectId=${asset.projectId}, label=${asset.label}`).join('; ');
-  return `${AGENT_CHAT_SYSTEM_PROMPT} The user explicitly attached these project assets for this turn: ${assetList}. Use only these asset IDs; never infer paths or credentials.`;
+function getEditProjectContext(rawContext: string | undefined): EditAgentProjectContext | null {
+  if (!rawContext) return null;
+  try {
+    return parseEditAgentProjectContext(JSON.parse(rawContext));
+  } catch {
+    return null;
+  }
+}
+
+function buildAgentSystemPrompt(
+  contextAssets: readonly EditAgentContextAsset[],
+  projectContext: EditAgentProjectContext | null
+): string {
+  let prompt = AGENT_CHAT_SYSTEM_PROMPT;
+
+  if (projectContext !== null) {
+    prompt += ` The active project scope for this conversation is projectId=${projectContext.projectId}, name=${projectContext.name}, with ${projectContext.assetCount} imported assets and ${projectContext.trackCount} timeline tracks. Operate on this project by default and use its projectId for every project-scoped tool call; never infer paths or credentials.`;
+  }
+
+  if (contextAssets.length > 0) {
+    const assetList = contextAssets.map((asset) => `${asset.mediaKind} assetId=${asset.assetId}, projectId=${asset.projectId}, label=${asset.label}`).join('; ');
+    prompt += ` The user explicitly attached these project assets for this turn: ${assetList}. Use only these asset IDs; never infer paths or credentials.`;
+  }
+
+  return prompt;
 }
 
 export interface AgentChatModelHandle {
@@ -74,14 +95,16 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
 
   const builder = new StateGraph(AgentChatState)
     .addNode('agent', async (state, config) => {
-      const configurable = (config?.configurable ?? {}) as { modelId?: string; ollamaBaseUrl?: string; editAssetContext?: string };
+      const configurable = (config?.configurable ?? {}) as { modelId?: string; ollamaBaseUrl?: string; editAssetContext?: string; editProjectContext?: string };
       if (!configurable.modelId) {
         throw new Error('agentChatGraph: a modelId must be provided via config.configurable.');
       }
 
       const model = options.createModel({ modelId: configurable.modelId, ollamaBaseUrl: configurable.ollamaBaseUrl });
       const hasSystemPrompt = state.messages.length > 0 && isSystemMessage(state.messages[0]!);
-      const messages = hasSystemPrompt ? state.messages : [new SystemMessage(buildAgentSystemPrompt(getEditAssetContext(configurable.editAssetContext))), ...state.messages];
+      const messages = hasSystemPrompt
+        ? state.messages
+        : [new SystemMessage(buildAgentSystemPrompt(getEditAssetContext(configurable.editAssetContext), getEditProjectContext(configurable.editProjectContext))), ...state.messages];
 
       const response = await model.invoke(messages);
       return { messages: [response] };

@@ -9,13 +9,14 @@ import type {
   AgentChatTurnState,
   AgentToolCallProposal
 } from '../shared/agentChat';
-import type { EditAgentContextAsset } from '../shared/editAgentContext';
+import type { EditAgentContextAsset, EditAgentProjectContext } from '../shared/editAgentContext';
 import { isAiLike, isHumanMessage, isToolMessage, type AgentChatGraphBundle } from './agentChatGraph';
 
 interface ConversationConfig {
   readonly modelId: string;
   readonly ollamaBaseUrl: string | undefined;
   readonly contextAssets: readonly EditAgentContextAsset[];
+  readonly activeProject: EditAgentProjectContext | null;
 }
 
 export class AgentChatSessionManager {
@@ -32,7 +33,8 @@ export class AgentChatSessionManager {
     this.conversationConfigs.set(input.conversationId, {
       modelId: input.modelId,
       ollamaBaseUrl: input.ollamaBaseUrl,
-      contextAssets: input.contextAssets ?? []
+      contextAssets: input.contextAssets ?? [],
+      activeProject: input.activeProject ?? null
     });
     const { HumanMessage } = await import('@langchain/core/messages');
 
@@ -85,7 +87,8 @@ export class AgentChatSessionManager {
         thread_id: conversationId,
         modelId: stored?.modelId,
         ollamaBaseUrl: stored?.ollamaBaseUrl,
-        editAssetContext: JSON.stringify(stored?.contextAssets ?? [])
+        editAssetContext: JSON.stringify(stored?.contextAssets ?? []),
+        editProjectContext: JSON.stringify(stored?.activeProject ?? null)
       }
     };
   }

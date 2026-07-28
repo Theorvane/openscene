@@ -155,4 +155,55 @@ describe('agent chat graph', () => {
     expect(afterReset.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
     expect(afterReset.messages[0]!.text).toBe('second');
   });
+
+  it('injects the active project scope into the system prompt when the send carries one', async () => {
+    const seenSystemPrompts: string[] = [];
+    const capturingModel: AgentChatModelFactory = () => ({
+      invoke: async (messages) => {
+        const first = messages[0]!;
+        seenSystemPrompts.push(typeof first.content === 'string' ? first.content : '');
+        return new AIMessage('Working on your project.');
+      }
+    });
+    const bundle = buildAgentChatGraph({
+      tools: fakeTools,
+      mutatingToolNames: MUTATING_TOOL_NAMES,
+      createModel: capturingModel
+    });
+    const session = new AgentChatSessionManager(bundle);
+
+    await session.sendMessage({
+      conversationId: 'c6',
+      text: 'trim the intro',
+      modelId: 'qwen2.5-coder',
+      activeProject: { projectId: 'proj-1', name: 'Demo Reel', assetCount: 4, trackCount: 2 }
+    });
+
+    expect(seenSystemPrompts[0]).toContain('projectId=proj-1');
+    expect(seenSystemPrompts[0]).toContain('name=Demo Reel');
+    expect(seenSystemPrompts[0]).toContain('4 imported assets');
+    expect(seenSystemPrompts[0]).toContain('2 timeline tracks');
+    expect(seenSystemPrompts[0]).toContain('Operate on this project by default');
+  });
+
+  it('keeps the base system prompt when no project scope is provided', async () => {
+    const seenSystemPrompts: string[] = [];
+    const capturingModel: AgentChatModelFactory = () => ({
+      invoke: async (messages) => {
+        const first = messages[0]!;
+        seenSystemPrompts.push(typeof first.content === 'string' ? first.content : '');
+        return new AIMessage('Hello.');
+      }
+    });
+    const bundle = buildAgentChatGraph({
+      tools: fakeTools,
+      mutatingToolNames: MUTATING_TOOL_NAMES,
+      createModel: capturingModel
+    });
+    const session = new AgentChatSessionManager(bundle);
+
+    await session.sendMessage({ conversationId: 'c7', text: 'hi', modelId: 'qwen2.5-coder' });
+
+    expect(seenSystemPrompts[0]).not.toContain('active project scope');
+  });
 });

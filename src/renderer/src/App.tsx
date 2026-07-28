@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 
-import type { EditAgentContextAsset } from '../../shared/editAgentContext';
+import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import { AppShell } from './AppShell';
 import { FirstRunOnboarding } from './FirstRunOnboarding';
 import { HomePage } from './HomePage';
@@ -36,17 +36,16 @@ export function App(): ReactElement {
   const pagePanelRefs = useRef<Partial<Record<AppPageId, HTMLElement>>>({});
   const pendingFocusPageRef = useRef<AppPageId | null>(null);
   const activePage = APP_PAGE_BY_ID[activePageId];
-  const selectedContextAsset = useMemo<EditAgentContextAsset | null>(() => {
-    if (editor.project === null || editor.selectedAsset === null) return null;
+  const activeProjectContext = useMemo<EditAgentProjectContext | null>(() => {
+    if (editor.project === null) return null;
 
     return {
       projectId: editor.project.id,
-      assetId: editor.selectedAsset.id,
-      label: editor.selectedAsset.displayName,
-      mediaKind: editor.selectedAsset.kind,
-      ...(editor.selectedAsset.metadata === null ? {} : { durationMs: editor.selectedAsset.metadata.durationMs })
+      name: editor.project.name,
+      assetCount: editor.project.assets.length,
+      trackCount: editor.project.timeline.tracks.length
     };
-  }, [editor.project, editor.selectedAsset]);
+  }, [editor.project]);
 
   const setPagePanelRef = useCallback((pageId: AppPageId) => (element: HTMLElement | null): void => {
     if (element === null) {
@@ -135,7 +134,7 @@ export function App(): ReactElement {
   const workspaceIsVisible = isWorkspacePageId(activePageId);
 
   return (
-    <AppShell activePage={activePage} hasActiveProject={hasActiveProject} onPageChange={setActivePage} selectedContextAsset={selectedContextAsset} activeProjectName={editor.project?.name}>
+    <AppShell activePage={activePage} hasActiveProject={hasActiveProject} onPageChange={setActivePage} activeProjectContext={activeProjectContext}>
       <ProjectResultImportProvider editor={editor}>
         <div className="app-page-stack">
           <section

@@ -1,20 +1,19 @@
 import { useEffect, useRef, type CSSProperties, type FormEvent, type ReactElement } from 'react';
 
-import type { EditAgentContextAsset } from '../../shared/editAgentContext';
 import { useAgentChat } from './AgentChatContext';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { Button } from './ui';
 
 type AgentChatPanelProps = {
-  readonly selectedContextAsset: EditAgentContextAsset | null;
   readonly width: number;
+  readonly onCollapse: () => void;
 };
 
 type AgentChatPanelStyle = CSSProperties & {
   readonly '--agent-chat-panel-width': string;
 };
 
-export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelProps): ReactElement {
+export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): ReactElement {
   const {
     selectedModel,
     isLocalModel,
@@ -25,9 +24,7 @@ export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelPr
     status,
     error,
     isBusy,
-    contextAssets,
-    attachContextAsset,
-    removeContextAsset,
+    activeProject,
     sendMessage,
     respondToApproval,
     resetConversation
@@ -44,13 +41,6 @@ export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelPr
     void sendMessage(input);
   };
 
-  const attachSelectedContextAsset = (): void => {
-    if (selectedContextAsset === null) return;
-    attachContextAsset(selectedContextAsset);
-  };
-
-  const selectedContextIsAttached = selectedContextAsset !== null
-    && contextAssets.some((asset) => asset.projectId === selectedContextAsset.projectId && asset.assetId === selectedContextAsset.assetId);
   const panelStyle: AgentChatPanelStyle = { '--agent-chat-panel-width': `${width}px` };
 
   return (
@@ -67,50 +57,35 @@ export function AgentChatPanel({ selectedContextAsset, width }: AgentChatPanelPr
             <Button variant="ghost" onClick={resetConversation} disabled={isBusy} title="Reset conversation" aria-label="Reset conversation">
               Reset
             </Button>
+            <Button
+              variant="ghost"
+              onClick={onCollapse}
+              title="Collapse agent chat"
+              aria-label="Collapse agent chat sidebar"
+              aria-controls="app-shell-agent-chat"
+              aria-expanded={true}
+            >
+              ⇥
+            </Button>
           </div>
         </div>
 
-        <div className="agent-chat-log" aria-live="polite">
-          {selectedContextAsset !== null && !selectedContextIsAttached && (
-            <div className="agent-chat-context-banner">
-              <div className="agent-chat-context-banner__info">
-                <span className="agent-chat-context-banner__eyebrow">Active selection</span>
-                <span className="agent-chat-context-banner__name">{selectedContextAsset.label}</span>
-              </div>
-              <Button
-                variant="ghost"
-                onClick={attachSelectedContextAsset}
-                disabled={isBusy}
-                aria-label={`Attach ${selectedContextAsset.label} to Edit Agent context`}
-              >
-                Attach
-              </Button>
-            </div>
+        {/* Project scope: every conversation operates on the active project. */}
+        <div className="agent-chat-project-scope">
+          {activeProject === null ? (
+            <span className="agent-chat-project-scope__empty">Open a project to give the agent project scope.</span>
+          ) : (
+            <>
+              <span className="agent-chat-project-scope__eyebrow">Project scope</span>
+              <span className="agent-chat-project-scope__name">{activeProject.name}</span>
+              <span className="agent-chat-project-scope__meta">
+                {activeProject.assetCount} assets · {activeProject.trackCount} tracks
+              </span>
+            </>
           )}
+        </div>
 
-          {contextAssets.length > 0 && (
-            <div className="agent-chat-context-list">
-              <p className="agent-chat-context-list__title">Attached context</p>
-              <ul className="agent-chat-context__assets">
-                {contextAssets.map((asset) => (
-                  <li key={`${asset.projectId}:${asset.assetId}`}>
-                    <span>
-                      <span className="agent-chat-context__name">{asset.label}</span>
-                      <span className="agent-chat-context__meta">{asset.mediaKind}</span>
-                    </span>
-                    <Button
-                      variant="ghost"
-                      onClick={() => removeContextAsset(asset.projectId, asset.assetId)}
-                      disabled={isBusy}
-                      aria-label={`Remove ${asset.label} from Edit Agent context`}
-                    >
-                      Remove
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+        <div className="agent-chat-log" aria-live="polite">
 
           {!isLocalModel && (
             <div className="agent-chat-hint-card agent-chat-hint-card--warning">

@@ -357,7 +357,7 @@ describe('renderer theme contract', () => {
     expect(rendererStyles).toMatch(/@media \(max-width:\s*1120px\)\s*\{[\s\S]*?body\s*\{[\s\S]*?overflow:\s*hidden;[\s\S]*?\.app-shell\s*\{[\s\S]*?height:\s*100vh;[\s\S]*?min-height:\s*0;[\s\S]*?overflow:\s*hidden;[\s\S]*?#root\s*\{[\s\S]*?height:\s*100vh;/);
     expect(rendererStyles).toMatch(/\.app-shell__body\s*\{[\s\S]*?height:\s*100%;[\s\S]*?max-height:\s*100%;[\s\S]*?overflow:\s*hidden;/);
     expect(rendererStyles).toMatch(/\.agent-chat-panel-shell\s*\{[\s\S]*?align-self:\s*stretch;[\s\S]*?height:\s*100%;[\s\S]*?max-height:\s*100%;[\s\S]*?overflow:\s*hidden;/);
-    expect(rendererStyles).toMatch(/\.agent-chat-panel\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\) auto;[\s\S]*?max-height:\s*100%;[\s\S]*?overflow:\s*hidden;/);
+    expect(rendererStyles).toMatch(/\.agent-chat-panel\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto auto minmax\(0, 1fr\) auto;[\s\S]*?max-height:\s*100%;[\s\S]*?overflow:\s*hidden;/);
     expect(rendererStyles).toMatch(/\.agent-chat-log\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/);
   });
 

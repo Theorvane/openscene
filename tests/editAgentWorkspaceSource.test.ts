@@ -16,8 +16,8 @@ describe('Edit Agent workspace wiring', () => {
     expect(context).toContain('messages');
     expect(context).toContain('pendingApproval');
     expect(context).toContain('resetConversation');
-    expect(context).toContain('contextAssets');
-    expect(context).toContain('attachContextAsset');
+    expect(context).toContain('activeProject');
+    expect(context).toContain('sendMessage');
     expect(panel).toContain('selectedModel.label');
     expect(panel).toContain('AiDomainModelSelector domain="edit-agent"');
     expect(panel).toContain('agent-chat-log');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addEditAgentContextAsset, type EditAgentContextAsset } from '../src/shared/editAgentContext';
+import { addEditAgentContextAsset, parseEditAgentProjectContext, type EditAgentContextAsset } from '../src/shared/editAgentContext';
 
 const VIDEO_ASSET: EditAgentContextAsset = {
   projectId: 'project-1',
@@ -22,5 +22,22 @@ describe('Edit Agent asset context', () => {
   it('rejects blank project or asset identifiers', () => {
     expect(() => addEditAgentContextAsset([], { ...VIDEO_ASSET, assetId: ' ' })).toThrow('assetId');
     expect(() => addEditAgentContextAsset([], { ...VIDEO_ASSET, projectId: '' })).toThrow('projectId');
+  });
+});
+
+describe('Edit Agent project context', () => {
+  const PROJECT_CONTEXT = { projectId: 'proj-1', name: 'Demo Reel', assetCount: 4, trackCount: 2 };
+
+  it('accepts a complete safe project context and keeps only the known fields', () => {
+    expect(parseEditAgentProjectContext({ ...PROJECT_CONTEXT, outputPath: '/tmp/x' })).toEqual(PROJECT_CONTEXT);
+  });
+
+  it('rejects malformed, blank, or non-numeric project contexts', () => {
+    expect(parseEditAgentProjectContext(null)).toBeNull();
+    expect(parseEditAgentProjectContext('proj-1')).toBeNull();
+    expect(parseEditAgentProjectContext({ ...PROJECT_CONTEXT, projectId: ' ' })).toBeNull();
+    expect(parseEditAgentProjectContext({ ...PROJECT_CONTEXT, name: '' })).toBeNull();
+    expect(parseEditAgentProjectContext({ ...PROJECT_CONTEXT, assetCount: 'four' })).toBeNull();
+    expect(parseEditAgentProjectContext({ ...PROJECT_CONTEXT, trackCount: Number.NaN })).toBeNull();
   });
 });

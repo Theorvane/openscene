@@ -18,26 +18,38 @@ describe('agent chat layout preferences', () => {
   });
 
   it('Given missing or malformed storage, When parsed, Then the default chat width is used', () => {
-    expect(parseAgentChatLayoutPreference(null)).toEqual({ schemaVersion: 1, chatPanelWidth: AGENT_CHAT_LAYOUT_DEFAULT_WIDTH });
-    expect(parseAgentChatLayoutPreference('{')).toEqual({ schemaVersion: 1, chatPanelWidth: AGENT_CHAT_LAYOUT_DEFAULT_WIDTH });
+    expect(parseAgentChatLayoutPreference(null)).toEqual({ schemaVersion: 1, chatPanelWidth: AGENT_CHAT_LAYOUT_DEFAULT_WIDTH, chatPanelCollapsed: false });
+    expect(parseAgentChatLayoutPreference('{')).toEqual({ schemaVersion: 1, chatPanelWidth: AGENT_CHAT_LAYOUT_DEFAULT_WIDTH, chatPanelCollapsed: false });
     expect(parseAgentChatLayoutPreference(JSON.stringify({ schemaVersion: 1, chatPanel: { width: 'wide' } }))).toEqual({
       schemaVersion: 1,
-      chatPanelWidth: AGENT_CHAT_LAYOUT_DEFAULT_WIDTH
+      chatPanelWidth: AGENT_CHAT_LAYOUT_DEFAULT_WIDTH,
+      chatPanelCollapsed: false
     });
   });
 
   it('Given stored chat widths outside the range, When parsed or serialized, Then values are integer-clamped', () => {
     expect(parseAgentChatLayoutPreference(JSON.stringify({ schemaVersion: 1, chatPanel: { width: 260.8 } }))).toEqual({
       schemaVersion: 1,
-      chatPanelWidth: AGENT_CHAT_LAYOUT_MIN_WIDTH
+      chatPanelWidth: AGENT_CHAT_LAYOUT_MIN_WIDTH,
+      chatPanelCollapsed: false
     });
     expect(parseAgentChatLayoutPreference(JSON.stringify({ schemaVersion: 1, chatPanel: { width: 640 } }))).toEqual({
       schemaVersion: 1,
-      chatPanelWidth: AGENT_CHAT_LAYOUT_MAX_WIDTH
+      chatPanelWidth: AGENT_CHAT_LAYOUT_MAX_WIDTH,
+      chatPanelCollapsed: false
     });
-    expect(JSON.parse(serializeAgentChatLayoutPreference({ schemaVersion: 1, chatPanelWidth: 384.7 }))).toEqual({
+    expect(JSON.parse(serializeAgentChatLayoutPreference({ schemaVersion: 1, chatPanelWidth: 384.7, chatPanelCollapsed: false }))).toEqual({
       schemaVersion: 1,
-      chatPanel: { width: 385 }
+      chatPanel: { width: 385, collapsed: false }
+    });
+    expect(parseAgentChatLayoutPreference(JSON.stringify({ schemaVersion: 1, chatPanel: { width: 360, collapsed: true } }))).toEqual({
+      schemaVersion: 1,
+      chatPanelWidth: 360,
+      chatPanelCollapsed: true
+    });
+    expect(JSON.parse(serializeAgentChatLayoutPreference({ schemaVersion: 1, chatPanelWidth: 360, chatPanelCollapsed: true }))).toEqual({
+      schemaVersion: 1,
+      chatPanel: { width: 360, collapsed: true }
     });
   });
 

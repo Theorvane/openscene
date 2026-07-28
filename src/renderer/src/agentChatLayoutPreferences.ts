@@ -11,6 +11,7 @@ const AGENT_CHAT_LAYOUT_SHIFT_STEP = 48;
 export type AgentChatLayoutPreference = {
   readonly schemaVersion: typeof AGENT_CHAT_LAYOUT_SCHEMA_VERSION;
   readonly chatPanelWidth: number;
+  readonly chatPanelCollapsed: boolean;
 };
 
 export type AgentChatPanelResizeKeyInput = {
@@ -21,14 +22,15 @@ export type AgentChatPanelResizeKeyInput = {
 
 export const AGENT_CHAT_LAYOUT_DEFAULT_PREFERENCE: AgentChatLayoutPreference = {
   schemaVersion: AGENT_CHAT_LAYOUT_SCHEMA_VERSION,
-  chatPanelWidth: AGENT_CHAT_LAYOUT_DEFAULT_WIDTH
+  chatPanelWidth: AGENT_CHAT_LAYOUT_DEFAULT_WIDTH,
+  chatPanelCollapsed: false
 };
 
 function isStoredPreferenceRecord(value: unknown): value is { readonly schemaVersion?: unknown; readonly chatPanel?: unknown } {
   return typeof value === 'object' && value !== null;
 }
 
-function isStoredChatPanelRecord(value: unknown): value is { readonly width?: unknown } {
+function isStoredChatPanelRecord(value: unknown): value is { readonly width?: unknown; readonly collapsed?: unknown } {
   return typeof value === 'object' && value !== null;
 }
 
@@ -53,7 +55,8 @@ export function parseAgentChatLayoutPreference(storedPreference: string | null |
 
     return {
       schemaVersion: AGENT_CHAT_LAYOUT_SCHEMA_VERSION,
-      chatPanelWidth: clampAgentChatPanelWidth(parsedPreference.chatPanel.width)
+      chatPanelWidth: clampAgentChatPanelWidth(parsedPreference.chatPanel.width),
+      chatPanelCollapsed: parsedPreference.chatPanel.collapsed === true
     };
   } catch (error) {
     if (error instanceof SyntaxError) return AGENT_CHAT_LAYOUT_DEFAULT_PREFERENCE;
@@ -65,7 +68,8 @@ export function serializeAgentChatLayoutPreference(preference: AgentChatLayoutPr
   return JSON.stringify({
     schemaVersion: AGENT_CHAT_LAYOUT_SCHEMA_VERSION,
     chatPanel: {
-      width: clampAgentChatPanelWidth(preference.chatPanelWidth)
+      width: clampAgentChatPanelWidth(preference.chatPanelWidth),
+      collapsed: preference.chatPanelCollapsed === true
     }
   });
 }

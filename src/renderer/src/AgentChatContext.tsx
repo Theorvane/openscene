@@ -1,6 +1,6 @@
 import { createContext, useContext, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { AgentChatDisplayMessage, AgentChatStatus, AgentToolCallProposal } from '../../shared/agentChat';
-import { addEditAgentContextAsset, removeEditAgentContextAsset, type EditAgentContextAsset } from '../../shared/editAgentContext';
+import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import type { AiDomainModelConfig } from '../../shared/aiDomainModels';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useLlmModel } from './LlmProviderContext';
@@ -22,9 +22,7 @@ interface AgentChatController {
   readonly status: AgentChatStatus;
   readonly error: string | undefined;
   readonly isBusy: boolean;
-  readonly contextAssets: readonly EditAgentContextAsset[];
-  readonly attachContextAsset: (asset: EditAgentContextAsset) => void;
-  readonly removeContextAsset: (projectId: string, assetId: string) => void;
+  readonly activeProject: EditAgentProjectContext | null;
   readonly sendMessage: (text: string) => Promise<void>;
   readonly respondToApproval: (decision: 'approve' | 'deny') => Promise<void>;
   readonly resetConversation: () => Promise<void>;
@@ -32,7 +30,12 @@ interface AgentChatController {
 
 const AgentChatContext = createContext<AgentChatController | null>(null);
 
-export function AgentChatProvider({ children }: { readonly children: ReactNode }): ReactElement {
+type AgentChatProviderProps = {
+  readonly activeProject: EditAgentProjectContext | null;
+  readonly children: ReactNode;
+};
+
+export function AgentChatProvider({ activeProject, children }: AgentChatProviderProps): ReactElement {
   const { providerConfig } = useLlmModel();
   const { selectedModel: getSelectedDomainModel } = useAiDomainModel();
   const selectedModel = getSelectedDomainModel('edit-agent');
@@ -44,7 +47,6 @@ export function AgentChatProvider({ children }: { readonly children: ReactNode }
   const [status, setStatus] = useState<AgentChatStatus>('idle');
   const [error, setError] = useState<string | undefined>(undefined);
   const [isBusy, setIsBusy] = useState(false);
-  const [contextAssets, setContextAssets] = useState<readonly EditAgentContextAsset[]>([]);
 
   const isLocalModel = selectedModel.providerId === 'local_ollama';
 
@@ -62,7 +64,7 @@ export function AgentChatProvider({ children }: { readonly children: ReactNode }
         text,
         modelId: selectedModel.id,
         ollamaBaseUrl: providerConfig.ollamaBaseUrl,
-        contextAssets
+        activeProject: activeProject ?? undefined
       });
 
       if (response.ok) {
@@ -133,14 +135,6 @@ export function AgentChatProvider({ children }: { readonly children: ReactNode }
     }
   };
 
-  const attachContextAsset = (asset: EditAgentContextAsset): void => {
-    setContextAssets((current) => addEditAgentContextAsset(current, asset));
-  };
-
-  const removeContextAsset = (projectId: string, assetId: string): void => {
-    setContextAssets((current) => removeEditAgentContextAsset(current, projectId, assetId));
-  };
-
   const controller: AgentChatController = {
     selectedModel,
     isLocalModel,
@@ -151,9 +145,7 @@ export function AgentChatProvider({ children }: { readonly children: ReactNode }
     status,
     error,
     isBusy,
-    contextAssets,
-    attachContextAsset,
-    removeContextAsset,
+    activeProject,
     sendMessage,
     respondToApproval,
     resetConversation

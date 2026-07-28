@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
 
-import type { EditAgentContextAsset } from '../../shared/editAgentContext';
+import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import {
   AGENT_CHAT_LAYOUT_DEFAULT_WIDTH,
   AGENT_CHAT_LAYOUT_MAX_WIDTH,
@@ -35,8 +35,7 @@ type AppShellProps = {
   readonly children: ReactNode;
   readonly hasActiveProject: boolean;
   readonly onPageChange: (pageId: AppPageId) => void;
-  readonly selectedContextAsset: EditAgentContextAsset | null;
-  readonly activeProjectName?: string | null | undefined;
+  readonly activeProjectContext: EditAgentProjectContext | null;
 };
 
 function SettingsIcon(): ReactElement {
@@ -83,12 +82,13 @@ function getStageBadge(pageId: AppPageId): string {
   }
 }
 
-function AppShellContent({ activePage, children, hasActiveProject, onPageChange, selectedContextAsset, activeProjectName }: AppShellProps): ReactElement {
+function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
   const shellBodyRef = useRef<HTMLDivElement | null>(null);
   const dragOriginRef = useRef<ChatPanelDragOrigin | null>(null);
   const chatPanelWidth = layoutPreference.chatPanelWidth;
+  const chatPanelCollapsed = layoutPreference.chatPanelCollapsed;
   const homeIsActive = activePage.id === 'home';
   const projectsIsActive = activePage.id === 'projects';
   const settingsIsActive = activePage.id === 'settings';
@@ -99,6 +99,13 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
     updateLayoutPreference((currentPreference) => ({
       ...currentPreference,
       chatPanelWidth: clampAgentChatPanelWidth(width, containerWidth)
+    }));
+  };
+
+  const setChatPanelCollapsed = (collapsed: boolean): void => {
+    updateLayoutPreference((currentPreference) => ({
+      ...currentPreference,
+      chatPanelCollapsed: collapsed
     }));
   };
 
@@ -141,8 +148,8 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
             <div className="product-chrome__context" aria-label="Current page">
               <span className="product-chrome__stage-pill">{getStageBadge(activePage.id)}</span>
               <span className="product-chrome__workspace">{activePage.chromeLabel}</span>
-              {activeProjectName && (
-                <span className="product-chrome__project-pill">📁 Project: {activeProjectName}</span>
+              {activeProjectContext && (
+                <span className="product-chrome__project-pill">📁 Project: {activeProjectContext.name}</span>
               )}
               <span className="local-pill">● Local</span>
             </div>
@@ -192,7 +199,22 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
             </div>
           )}
         </div>
-        {showChatPanel && (
+        {showChatPanel && chatPanelCollapsed && (
+          <div className="agent-chat-collapsed-rail">
+            <button
+              className="agent-chat-collapsed-rail__button"
+              type="button"
+              aria-controls="app-shell-agent-chat"
+              aria-expanded={false}
+              title="Expand Edit Agent chat sidebar"
+              onClick={() => setChatPanelCollapsed(false)}
+            >
+              <span aria-hidden="true" className="agent-chat-collapsed-rail__glyph">⇤</span>
+              <span className="agent-chat-collapsed-rail__label">Edit Agent</span>
+            </button>
+          </div>
+        )}
+        {showChatPanel && !chatPanelCollapsed && (
           <>
             <div
               aria-controls="app-shell-workspace app-shell-agent-chat"
@@ -211,9 +233,7 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
               tabIndex={0}
               title="Drag to resize Edit Agent chat panel"
             />
-            <aside id="app-shell-agent-chat" className="agent-chat-panel-shell" style={{ width: `${chatPanelWidth}px` }}>
-              <AgentChatPanel selectedContextAsset={selectedContextAsset} width={chatPanelWidth} />
-            </aside>
+            <AgentChatPanel width={chatPanelWidth} onCollapse={() => setChatPanelCollapsed(true)} />
           </>
         )}
       </div>
@@ -223,7 +243,7 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
 
 export function AppShell(props: AppShellProps): ReactElement {
   return (
-    <AgentChatProvider>
+    <AgentChatProvider activeProject={props.activeProjectContext}>
       <AppShellContent {...props} />
     </AgentChatProvider>
   );

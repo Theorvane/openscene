@@ -15,21 +15,27 @@ async function readSource(url: URL): Promise<string> {
 }
 
 describe('persistent agent control surface', () => {
-  it('keeps AgentChatPanel mounted in AppShell and removes the toggle control', async () => {
+  it('renders the chat sidebar collapsible with a persisted rail while keeping conversation state in the provider', async () => {
     const [appShell, panel, styles] = await Promise.all([
       readSource(APP_SHELL_SOURCE_URL),
       readSource(AGENT_PANEL_SOURCE_URL),
       readSource(STYLES_SOURCE_URL)
     ]);
 
-    expect(appShell).toContain('<AgentChatPanel selectedContextAsset={selectedContextAsset} width={chatPanelWidth} />');
-    expect(appShell).not.toContain('AgentChatToggleButton');
+    expect(appShell).toContain('<AgentChatPanel width={chatPanelWidth} onCollapse={() => setChatPanelCollapsed(true)} />');
+    expect(appShell).toContain('{showChatPanel && chatPanelCollapsed && (');
+    expect(appShell).toContain('{showChatPanel && !chatPanelCollapsed && (');
+    expect(appShell).toContain('className="agent-chat-collapsed-rail__button"');
+    expect(appShell).toContain('onClick={() => setChatPanelCollapsed(false)}');
+    expect(appShell).toContain('aria-controls="app-shell-agent-chat"');
+    expect(panel).toContain('aria-label="Collapse agent chat sidebar"');
     expect(panel).not.toContain('isOpen');
     expect(panel).not.toContain('closeOpen');
     expect(styles).toContain('.agent-chat-panel-shell {');
     expect(styles).toContain('width: var(--agent-chat-panel-width);');
     expect(styles).toContain('min-width: 300px;');
     expect(styles).toContain('max-width: 520px;');
+    expect(styles).toContain('.agent-chat-collapsed-rail {');
     expect(styles).not.toContain('.agent-chat-panel-shell--open');
   });
 
@@ -63,28 +69,29 @@ describe('persistent agent control surface', () => {
     expect(hook).toContain('serializeAgentChatLayoutPreference');
   });
 
-  it('passes only a safe selected project asset candidate into the persistent AgentChatPanel', async () => {
-    const [app, appShell, panel] = await Promise.all([
+  it('scopes the Edit Agent to a safe active-project context instead of a selected asset', async () => {
+    const [app, appShell, panel, context] = await Promise.all([
       readSource(APP_SOURCE_URL),
       readSource(APP_SHELL_SOURCE_URL),
-      readSource(AGENT_PANEL_SOURCE_URL)
+      readSource(AGENT_PANEL_SOURCE_URL),
+      readSource(AGENT_CONTEXT_SOURCE_URL)
     ]);
 
-    expect(app).toContain('const selectedContextAsset = useMemo<EditAgentContextAsset | null>(() => {');
+    expect(app).toContain('const activeProjectContext = useMemo<EditAgentProjectContext | null>(() => {');
     expect(app).toContain('projectId: editor.project.id,');
-    expect(app).toContain('assetId: editor.selectedAsset.id,');
-    expect(app).toContain('label: editor.selectedAsset.displayName,');
-    expect(app).toContain('mediaKind: editor.selectedAsset.kind,');
-    expect(app).toContain('durationMs: editor.selectedAsset.metadata.durationMs');
+    expect(app).toContain('name: editor.project.name,');
+    expect(app).toContain('assetCount: editor.project.assets.length,');
+    expect(app).toContain('trackCount: editor.project.timeline.tracks.length');
     expect(app).not.toContain('projectRelativePath');
     expect(app).not.toContain('mimeType');
     expect(app).not.toContain('byteLength');
-    expect(appShell).toContain('readonly selectedContextAsset: EditAgentContextAsset | null;');
-    expect(appShell).toContain('<AgentChatPanel selectedContextAsset={selectedContextAsset} width={chatPanelWidth} />');
-    expect(panel).toContain('readonly selectedContextAsset: EditAgentContextAsset | null;');
+    expect(appShell).toContain('readonly activeProjectContext: EditAgentProjectContext | null;');
+    expect(appShell).toContain('<AgentChatProvider activeProject={props.activeProjectContext}>');
     expect(panel).toContain('readonly width: number;');
-    expect(panel).toContain('attachContextAsset(selectedContextAsset);');
-    expect(panel).toContain('disabled={isBusy}');
+    expect(panel).toContain('agent-chat-project-scope');
+    expect(panel).toContain('Open a project to give the agent project scope.');
+    expect(panel).not.toContain('Active selection');
+    expect(context).toContain('activeProject: activeProject ?? undefined');
   });
 
   it('locks only the non-chat workspace while an agent turn is in flight', async () => {
