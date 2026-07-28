@@ -3327,12 +3327,26 @@ button {
   background: currentColor;
 }
 
-.ai-domain-model-selector__control {
-  position: relative;
+.ai-domain-model-selector__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   width: 100%;
 }
 
-.ai-domain-model-selector__select {
+.ai-domain-model-selector__control {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-domain-model-selector__spec-control {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ai-domain-model-selector__select,
+.ai-domain-model-selector__spec-select {
   width: 100%;
   min-width: 0;
   min-height: 34px;
@@ -3349,12 +3363,14 @@ button {
   transition: all 140ms ease;
 }
 
-.ai-domain-model-selector__select:hover {
+.ai-domain-model-selector__select:hover,
+.ai-domain-model-selector__spec-select:hover {
   border-color: var(--ring);
   background: var(--surface-control-hover);
 }
 
-.ai-domain-model-selector__select:focus-visible {
+.ai-domain-model-selector__select:focus-visible,
+.ai-domain-model-selector__spec-select:focus-visible {
   border-color: var(--ring);
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
@@ -4043,9 +4059,10 @@ button {
   display: none;
 }
 
-.agent-chat-prompt-card__toolbar .ai-domain-model-selector__select {
+.agent-chat-prompt-card__toolbar .ai-domain-model-selector__select,
+.agent-chat-prompt-card__toolbar .ai-domain-model-selector__spec-select {
   min-height: 28px;
-  max-width: 260px;
+  max-width: 220px;
   padding: 2px var(--space-2);
   font-size: var(--text-micro);
   border-radius: var(--radius-xs);

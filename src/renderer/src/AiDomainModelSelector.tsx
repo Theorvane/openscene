@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 
 import {
   formatAiModelOptionLabel,
@@ -22,7 +22,13 @@ export function AiDomainModelSelector({ domain, label, description }: AiDomainMo
   const isLocal = activeModel.executionPath === 'local';
   const isZenModel = activeModel.id === 'qwen2.5-coder' || activeModel.id === 'local-video-runner' || activeModel.id === 'local-qwen-tts';
 
-  const specLabel = isLocal ? activeModel.precisionBit : activeModel.contextWindow;
+  const defaultSpecOptions = isLocal
+    ? (activeModel.availablePrecisions ?? ['4-bit (Q4_K_M)', '8-bit (Q8_0)', '16-bit (FP16)'])
+    : (activeModel.availableContexts ?? ['32k', '64k', '128k', '256k']);
+  const defaultSpec = isLocal ? (activeModel.precisionBit ?? '4-bit (Q4_K_M)') : (activeModel.contextWindow ?? '128k');
+
+  const [selectedSpec, setSelectedSpec] = useState<string>(defaultSpec);
+  const activeSpec = defaultSpecOptions.includes(selectedSpec) ? selectedSpec : defaultSpec;
 
   const providerGroups = models.reduce<Record<string, AiDomainModelConfig[]>>((acc, model) => {
     const key = model.providerLabel;
@@ -49,29 +55,48 @@ export function AiDomainModelSelector({ domain, label, description }: AiDomainMo
       </div>
       {description && <p id={descriptionId} className="ai-domain-model-selector__description">{description}</p>}
       
-      <div className="ai-domain-model-selector__control">
-        <select
-          id={`${domain}-model`}
-          className="ai-domain-model-selector__select"
-          value={selectedModelId(domain)}
-          onChange={(event) => setSelectedModelId(domain, event.target.value)}
-          aria-describedby={description ? descriptionId : undefined}
-        >
-          {Object.entries(providerGroups).map(([providerLabel, providerModels]) => (
-            <optgroup key={providerLabel} label={providerLabel}>
-              {providerModels.map((model) => (
-                <option key={model.id} value={model.id} disabled={!model.available}>
-                  {formatAiModelOptionLabel(model)}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+      <div className="ai-domain-model-selector__controls">
+        <div className="ai-domain-model-selector__control">
+          <select
+            id={`${domain}-model`}
+            className="ai-domain-model-selector__select"
+            value={selectedModelId(domain)}
+            onChange={(event) => setSelectedModelId(domain, event.target.value)}
+            aria-describedby={description ? descriptionId : undefined}
+            title="Select Model"
+          >
+            {Object.entries(providerGroups).map(([providerLabel, providerModels]) => (
+              <optgroup key={providerLabel} label={providerLabel}>
+                {providerModels.map((model) => (
+                  <option key={model.id} value={model.id} disabled={!model.available}>
+                    {formatAiModelOptionLabel(model)}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        <div className="ai-domain-model-selector__spec-control">
+          <select
+            id={`${domain}-context-spec`}
+            className="ai-domain-model-selector__spec-select"
+            value={activeSpec}
+            onChange={(event) => setSelectedSpec(event.target.value)}
+            title={isLocal ? 'Select Quantization / Bit Precision' : 'Select Context Window'}
+          >
+            {defaultSpecOptions.map((spec) => (
+              <option key={spec} value={spec}>
+                {isLocal ? `Bit: ${spec}` : `Ctx: ${spec}`}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="ai-domain-model-selector__status" role="status">
         <span className="ai-domain-model-selector__status-tag">{activeModel.providerLabel}</span>
-        {specLabel && <span className="ai-domain-model-selector__status-spec">{specLabel}</span>}
+        <span className="ai-domain-model-selector__status-spec">{activeSpec}</span>
         <div className="ai-domain-model-selector__status-info">
           <strong>{activeModel.label}</strong>: {activeModel.description}
         </div>

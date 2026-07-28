@@ -26,7 +26,9 @@ export type AiDomainModelConfig = {
   readonly available: boolean;
   readonly unavailableReason?: string;
   readonly contextWindow?: string;
+  readonly availableContexts?: readonly string[];
   readonly precisionBit?: string;
+  readonly availablePrecisions?: readonly string[];
 };
 
 export type AiDomainModelPreferences = Record<AiDomain, string>;
@@ -42,6 +44,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     description: 'User-configured local Qwen speech synthesis runner.',
     executionPath: 'local',
     precisionBit: '16-bit',
+    availablePrecisions: ['8-bit', '16-bit', 'FP32'],
     domains: ['voice-generation'],
     available: true
   },
@@ -53,6 +56,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     description: 'Cloud speech synthesis model.',
     executionPath: 'api',
     contextWindow: '128k',
+    availableContexts: ['32k', '64k', '128k'],
     domains: ['voice-generation'],
     available: false,
     unavailableReason: 'ElevenLabs adapter is not implemented in this build.'
@@ -65,6 +69,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     description: 'User-configured local video synthesis runner.',
     executionPath: 'local',
     precisionBit: 'FP16',
+    availablePrecisions: ['8-bit (Q8_0)', 'FP16', 'FP32'],
     domains: ['video-generation'],
     available: true
   },
@@ -76,6 +81,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     description: 'Cloud video generation model.',
     executionPath: 'api',
     contextWindow: '1M',
+    availableContexts: ['128k', '512k', '1M'],
     domains: ['video-generation'],
     available: false,
     unavailableReason: 'Gemini Veo adapter is not implemented in this build.'
@@ -88,6 +94,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     description: 'Cloud video generation model.',
     executionPath: 'api',
     contextWindow: '128k',
+    availableContexts: ['32k', '64k', '128k'],
     domains: ['video-generation'],
     available: false,
     unavailableReason: 'OpenAI Sora adapter is not implemented in this build.'
@@ -100,6 +107,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     description: 'Local tool-calling model for LangGraph edit operations.',
     executionPath: 'local',
     precisionBit: '4-bit (Q4_K_M)',
+    availablePrecisions: ['4-bit (Q4_K_M)', '8-bit (Q8_0)', '16-bit (FP16)'],
     domains: ['edit-agent'],
     available: true
   },
@@ -111,6 +119,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     description: 'Cloud tool-calling model for agentic timeline editing.',
     executionPath: 'api',
     contextWindow: '128k',
+    availableContexts: ['32k', '64k', '128k', '256k'],
     domains: ['edit-agent'],
     available: false,
     unavailableReason: 'OpenAI tool-calling adapter is not implemented in this build.'
@@ -123,13 +132,7 @@ export function formatAiModelOptionLabel(model: AiDomainModelConfig): string {
   const isZen = model.id === 'qwen2.5-coder' || model.id === 'local-video-runner' || model.id === 'local-qwen-tts';
   const prefix = isZen ? '★ ' : '';
   const statusSuffix = model.available ? '' : ' (Unavailable)';
-
-  if (model.executionPath === 'local') {
-    const bit = model.precisionBit ?? '4-bit';
-    return `${prefix}${model.providerLabel} → ${model.label} → ${bit}${statusSuffix}`;
-  }
-  const context = model.contextWindow ?? '128k';
-  return `${prefix}${model.providerLabel} → ${model.label} → ${context}${statusSuffix}`;
+  return `${prefix}${model.providerLabel} → ${model.label}${statusSuffix}`;
 }
 
 export function getDomainModels(domain: AiDomain): readonly AiDomainModelConfig[] {
