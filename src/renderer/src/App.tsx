@@ -9,7 +9,7 @@ import { ProjectResultImportProvider } from './ProjectResultImportContext';
 import { ProjectsPage } from './ProjectsPage';
 import { SettingsWorkspace } from './SettingsWorkspace';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
-import { APP_PAGE_BY_ID, getDefaultAppPageId, isWorkspacePageId } from './appPages';
+import { APP_PAGE_BY_ID, getDefaultAppPageId, isProjectRequiredPageId, isWorkspacePageId } from './appPages';
 import type { AppPageId } from './appPages';
 import { APP_WORKSPACES, getDefaultAppWorkspaceId } from './appWorkspaces';
 import type { AppWorkspaceId } from './appWorkspaces';
@@ -67,7 +67,9 @@ export function App(): ReactElement {
     pendingFocusPageRef.current = pageId;
   }, []);
 
-  const setActivePage = useCallback((pageId: AppPageId): void => {
+  const hasActiveProject = editor.project !== null;
+
+  const navigateToPage = useCallback((pageId: AppPageId): void => {
     if (pageId === activePageId) {
       focusPagePanel(pageId);
       return;
@@ -77,7 +79,23 @@ export function App(): ReactElement {
     setActivePageId(pageId);
   }, [activePageId, focusPagePanel, requestPageFocus]);
 
+  const setActivePage = useCallback((pageId: AppPageId): void => {
+    // Stage flow guard: Home (Menu) and workspaces need an active project,
+    // so project-less navigation lands on Projects instead.
+    if (isProjectRequiredPageId(pageId) && !hasActiveProject) {
+      navigateToPage('projects');
+      return;
+    }
+
+    navigateToPage(pageId);
+  }, [hasActiveProject, navigateToPage]);
+
   const setActiveWorkspace = useCallback((workspaceId: AppWorkspaceId): void => {
+    if (!hasActiveProject) {
+      navigateToPage('projects');
+      return;
+    }
+
     if (workspaceId === activeWorkspaceId && activePageId === workspaceId) {
       focusPagePanel(workspaceId);
       return;
@@ -86,7 +104,7 @@ export function App(): ReactElement {
     requestPageFocus(workspaceId);
     setActiveWorkspaceId(workspaceId);
     setActivePageId(workspaceId);
-  }, [activePageId, activeWorkspaceId, focusPagePanel, requestPageFocus]);
+  }, [activePageId, activeWorkspaceId, focusPagePanel, hasActiveProject, navigateToPage, requestPageFocus]);
 
   const completeFirstRunOnboarding = useCallback((): void => {
     writeFirstRunOnboardingCompletion(window.localStorage);
@@ -106,10 +124,18 @@ export function App(): ReactElement {
     focusPagePanel(activePageId);
   }, [activePageId, focusPagePanel]);
 
+  useEffect(() => {
+    // If the active project disappears (deleted or failed to load) while on a
+    // project-required page, fall back to the Projects stage.
+    if (hasActiveProject || !isProjectRequiredPageId(activePageId)) return;
+
+    navigateToPage('projects');
+  }, [activePageId, hasActiveProject, navigateToPage]);
+
   const workspaceIsVisible = isWorkspacePageId(activePageId);
 
   return (
-    <AppShell activePage={activePage} onPageChange={setActivePage} selectedContextAsset={selectedContextAsset} activeProjectName={editor.project?.name}>
+    <AppShell activePage={activePage} hasActiveProject={hasActiveProject} onPageChange={setActivePage} selectedContextAsset={selectedContextAsset} activeProjectName={editor.project?.name}>
       <ProjectResultImportProvider editor={editor}>
         <div className="app-page-stack">
           <section
@@ -129,12 +155,12 @@ export function App(): ReactElement {
               newProjectName={editor.newProjectName}
               onNewProjectNameChange={editor.setNewProjectName}
               onCreateProject={async () => {
-                await editor.createProject();
-                setActivePage('home');
+                const created = await editor.createProject();
+                if (created) navigateToPage('home');
               }}
               onOpenProject={async (projectId) => {
-                await editor.openProject(projectId);
-                setActivePage('home');
+                const opened = await editor.openProject(projectId);
+                if (opened) navigateToPage('home');
               }}
               onGoToProjects={() => setActivePage('projects')}
               isBusy={editor.isBusy}
@@ -155,12 +181,12 @@ export function App(): ReactElement {
               newProjectName={editor.newProjectName}
               onNewProjectNameChange={editor.setNewProjectName}
               onCreateProject={async () => {
-                await editor.createProject();
-                setActivePage('home');
+                const created = await editor.createProject();
+                if (created) navigateToPage('home');
               }}
               onOpenProject={async (projectId) => {
-                await editor.openProject(projectId);
-                setActivePage('home');
+                const opened = await editor.openProject(projectId);
+                if (opened) navigateToPage('home');
               }}
               isBusy={editor.isBusy}
             />

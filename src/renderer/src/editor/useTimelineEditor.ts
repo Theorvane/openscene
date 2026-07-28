@@ -88,7 +88,7 @@ export function useTimelineEditor() {
     setMetadataProbeRetryRevisionsByAssetId((current) => ({ ...current, [assetId]: (current[assetId] ?? 0) + 1 }));
   }, [clearMetadataProbeFailure]);
 
-  const openProject = useCallback(async (projectId: string) => {
+  const openProject = useCallback(async (projectId: string): Promise<boolean> => {
     setIsBusy(true);
     const response = await window.videoTool.openProject({ projectId });
     setIsBusy(false);
@@ -98,12 +98,13 @@ export function useTimelineEditor() {
       setSelectedClipId('');
       setHasUnsavedTimeline(false);
       setStatusMessage({ tone: 'success', text: `Opened ${response.value.name}.` });
-      return;
+      return true;
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
+    return false;
   }, []);
 
-  const createProject = useCallback(async () => {
+  const createProject = useCallback(async (): Promise<boolean> => {
     setIsBusy(true);
     const response = await window.videoTool.createProject({ name: newProjectName });
     setIsBusy(false);
@@ -114,9 +115,10 @@ export function useTimelineEditor() {
       setHasUnsavedTimeline(false);
       await refreshProjects();
       setStatusMessage({ tone: 'success', text: `Created ${response.value.name}.` });
-      return;
+      return true;
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
+    return false;
   }, [newProjectName, refreshProjects]);
 
   const deleteCurrentProject = useCallback(async () => {

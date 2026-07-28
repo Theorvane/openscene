@@ -33,6 +33,7 @@ function AppShellBackground(): ReactElement {
 type AppShellProps = {
   readonly activePage: AppPage;
   readonly children: ReactNode;
+  readonly hasActiveProject: boolean;
   readonly onPageChange: (pageId: AppPageId) => void;
   readonly selectedContextAsset: EditAgentContextAsset | null;
   readonly activeProjectName?: string | null | undefined;
@@ -82,7 +83,7 @@ function getStageBadge(pageId: AppPageId): string {
   }
 }
 
-function AppShellContent({ activePage, children, onPageChange, selectedContextAsset, activeProjectName }: AppShellProps): ReactElement {
+function AppShellContent({ activePage, children, hasActiveProject, onPageChange, selectedContextAsset, activeProjectName }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
   const shellBodyRef = useRef<HTMLDivElement | null>(null);
@@ -160,7 +161,9 @@ function AppShellContent({ activePage, children, onPageChange, selectedContextAs
                 aria-controls="app-page-panel-home"
                 aria-current={homeIsActive ? 'page' : undefined}
                 className="product-chrome__nav-button"
+                disabled={!hasActiveProject}
                 onClick={() => onPageChange('home')}
+                title={hasActiveProject ? undefined : 'Open or create a project first'}
                 variant={homeIsActive ? 'primary' : 'ghost'}
               >
                 <HomeIcon />

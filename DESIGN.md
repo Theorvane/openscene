@@ -4,7 +4,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Core Principles
 
-- Treat Home as the initial page. Editing, Voice Generation, and Video Generation are persistent local workspaces opened from Home.
+- Navigation follows the stage flow Projects → Home (Menu) → workspace. Projects is the initial page; Home and the persistent local workspaces (Editing, Voice Generation, Video Generation) require an active project and are opened from Home.
 - Keep every renderer claim local. Projects, recordings, imports, voice samples, generated results, and timeline edits stay on the user's machine unless a future reviewed provider operation explicitly says otherwise.
 - Never expose raw local filesystem paths in renderer UI for imported timeline assets. Show names, durations, media kind, status, and secure playback URLs only when playback needs them.
 - Use dense but readable panels with mono section kickers, strong desk labels, clear control copy, and compact metadata.
@@ -12,7 +12,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Layout Contract
 
-- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Home and Settings buttons, and the theme switch. It reads as the desk toolbar, not the product billboard; the active Edit program header owns product branding.
+- `product-chrome` is a compact top bar with the current page, a concise `Local` indicator, Projects, Home (Menu), and Settings buttons, and the theme switch. It reads as the desk toolbar, not the product billboard; the active Edit program header owns product branding. The Menu button stays disabled with a short hint until a project is open; Projects and Settings stay reachable at all times.
 - The persistent right `AgentChatPanel` is the only user-facing Edit Agent UI. It is always the rightmost flex child beside the mounted workspace stack and owns Edit Agent model/connection status, selected and attached project context, conversation and tool stream, approval queue, reset/status, and prompt controls.
 - Do not render a global agent model selector in `product-chrome`, add a separate `EditAgentWorkspace`, or move Edit Agent controls into the left workspace navigation. Direct AI Video and AI Voice studios keep their own domain-specific controls, and Settings keeps provider credentials and primary model configuration separate from the Edit Agent chat surface.
 - `app-page-stack` owns top-level page visibility for Home, mounted workspaces, and Settings. Active page state is separate from active workspace state.
@@ -32,7 +32,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Home And Settings Pages
 
-- Home is the first page after launch and uses semantic page structure with `home-page-title` labeling its region.
+- Projects is the first page after launch. Home is reachable only with an active project — creating or opening a project routes to Home on success — and uses semantic page structure with `home-page-title` labeling its region. Navigation to a project-required page without a project (including losing the active project mid-session) falls back to Projects.
 - Home entry cards are native `Button` controls with `aria-controls` pointing to the mounted workspace region they open. Card order is Editing, Voice Generation, Video Generation.
 - Home copy must stay truthful to the local-first product boundary: it can describe local editing, consent-based local narration, configured provider seams, and local result import, but must not imply account, analytics, cloud upload, or bundled model/runtime setup.
 - Product chrome opens Home and Settings with native `Button` controls, visible labels, inline SVG icons, `aria-current="page"` when active, and `aria-controls` for each page region.

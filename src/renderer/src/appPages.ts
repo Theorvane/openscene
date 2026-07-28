@@ -79,6 +79,26 @@ export function isWorkspacePageId(pageId: AppPageId): pageId is WorkspacePageId 
   }
 }
 
+/**
+ * Stage flow: Projects → Home (Menu) → workspace. Home and every workspace
+ * operate on the active project, so they are unreachable until one is open;
+ * Projects and Settings stay reachable at all times.
+ */
+export function isProjectRequiredPageId(pageId: AppPageId): boolean {
+  switch (pageId) {
+    case 'home':
+    case 'edit':
+    case 'voice-generation':
+    case 'video-generation':
+      return true;
+    case 'projects':
+    case 'settings':
+      return false;
+    default:
+      return assertNever(pageId);
+  }
+}
+
 function assertNever(value: never): never {
   throw new Error(`Unexpected app page id: ${String(value)}`);
 }

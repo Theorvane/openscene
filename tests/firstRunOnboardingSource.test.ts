@@ -36,6 +36,6 @@ describe('first-run onboarding source contract', () => {
     expect(app).toContain('<HomePage');
     expect(app).toContain('onWorkspaceOpen={setActiveWorkspace}');
     expect(app).toContain('workspaces={APP_WORKSPACES}');
-    expect(app).toContain('<AppShell activePage={activePage} onPageChange={setActivePage}');
+    expect(app).toContain('<AppShell activePage={activePage} hasActiveProject={hasActiveProject} onPageChange={setActivePage}');
   });
 });

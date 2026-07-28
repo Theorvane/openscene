@@ -37,6 +37,23 @@ describe('app page shell source contract', () => {
     expect(app).not.toContain('aria-label="Application workspaces"');
   });
 
+  it('gates Home and workspace navigation behind an active project (Projects → Menu → workspace)', async () => {
+    const [app, appShell] = await Promise.all([readSource(APP_SOURCE_URL), readSource(APP_SHELL_SOURCE_URL)]);
+
+    expect(app).toContain('const hasActiveProject = editor.project !== null;');
+    expect(app).toContain('if (isProjectRequiredPageId(pageId) && !hasActiveProject) {');
+    expect(app).toContain("navigateToPage('projects');");
+    expect(app).toContain('if (hasActiveProject || !isProjectRequiredPageId(activePageId)) return;');
+    expect(app).toContain('const created = await editor.createProject();');
+    expect(app).toContain("if (created) navigateToPage('home');");
+    expect(app).toContain('const opened = await editor.openProject(projectId);');
+    expect(app).toContain("if (opened) navigateToPage('home');");
+    expect(app).toContain('hasActiveProject={hasActiveProject}');
+    expect(appShell).toContain('readonly hasActiveProject: boolean;');
+    expect(appShell).toContain('disabled={!hasActiveProject}');
+    expect(appShell).toContain("title={hasActiveProject ? undefined : 'Open or create a project first'}");
+  });
+
   it('keeps mounted workspace panels directly labeled after removing the sidebar', async () => {
     const app = await readSource(APP_SOURCE_URL);
 

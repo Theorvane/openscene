@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { APP_PAGE_BY_ID, APP_PAGE_IDS, APP_PAGES, getDefaultAppPageId, isWorkspacePageId } from '../src/renderer/src/appPages';
+import { APP_PAGE_BY_ID, APP_PAGE_IDS, APP_PAGES, getDefaultAppPageId, isProjectRequiredPageId, isWorkspacePageId } from '../src/renderer/src/appPages';
 import { APP_WORKSPACE_IDS, APP_WORKSPACES, getDefaultAppWorkspaceId } from '../src/renderer/src/appWorkspaces';
 
 describe('app workspaces', () => {
@@ -38,5 +38,14 @@ describe('app workspaces', () => {
     expect(isWorkspacePageId('voice-generation')).toBe(true);
     expect(isWorkspacePageId('video-generation')).toBe(true);
     expect(isWorkspacePageId('settings')).toBe(false);
+  });
+
+  it('requires an active project for Home and every workspace page, but never for Projects or Settings', () => {
+    expect(isProjectRequiredPageId('home')).toBe(true);
+    expect(isProjectRequiredPageId('edit')).toBe(true);
+    expect(isProjectRequiredPageId('voice-generation')).toBe(true);
+    expect(isProjectRequiredPageId('video-generation')).toBe(true);
+    expect(isProjectRequiredPageId('projects')).toBe(false);
+    expect(isProjectRequiredPageId('settings')).toBe(false);
   });
 });
