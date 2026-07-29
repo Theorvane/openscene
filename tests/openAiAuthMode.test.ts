@@ -9,14 +9,17 @@ describe('unified OpenAI auth mode selection', () => {
     expect(isOpenAiCodexModelKey('openai/gpt-5.4')).toBe(true);
     expect(isOpenAiCodexModelKey('openai/gpt-5.4-mini')).toBe(true);
     expect(isOpenAiCodexModelKey('openai/gpt-5.5')).toBe(true);
-    // Newer than 5.4 passes the version rule.
+    // Newer than 5.4 passes the version rule, including the whole 5.6 family.
+    expect(isOpenAiCodexModelKey('openai/gpt-5.6')).toBe(true);
     expect(isOpenAiCodexModelKey('openai/gpt-5.6-luna')).toBe(true);
+    expect(isOpenAiCodexModelKey('openai/gpt-5.6-sol')).toBe(true);
+    expect(isOpenAiCodexModelKey('openai/gpt-5.6-terra')).toBe(true);
 
     // Older Codex builds and Pro tiers are rejected by the backend with a bare
     // 400, so they must never route through the sign-in.
     expect(isOpenAiCodexModelKey('openai/gpt-5.3-codex')).toBe(false);
     expect(isOpenAiCodexModelKey('openai/gpt-5.5-pro')).toBe(false);
-    expect(isOpenAiCodexModelKey('openai/gpt-5.6')).toBe(false);
+    expect(isOpenAiCodexModelKey('openai/gpt-5.6-pro')).toBe(false);
     expect(isOpenAiCodexModelKey('openai/gpt-5')).toBe(false);
     // Models re-listed by aggregators are not ChatGPT-eligible.
     expect(isOpenAiCodexModelKey('openrouter/openai/gpt-5.4')).toBe(false);

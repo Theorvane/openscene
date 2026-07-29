@@ -22,7 +22,9 @@ export type ChatGptOAuthStatus =
  * bare 400, so it must never be offered on the sign-in transport.
  */
 const CHATGPT_ALLOWED_MODEL_IDS = new Set(['gpt-5.5', 'gpt-5.3-codex-spark', 'gpt-5.4', 'gpt-5.4-mini']);
-const CHATGPT_DENIED_MODEL_IDS = new Set(['gpt-5.5-pro', 'gpt-5.6']);
+// opencode's snapshot also excludes the bare `gpt-5.6` id while admitting its
+// variants; we admit the whole 5.6 family and let the backend be the authority.
+const CHATGPT_DENIED_MODEL_IDS = new Set(['gpt-5.5-pro']);
 
 function isChatGptServedModelId(modelId: string): boolean {
   if (CHATGPT_ALLOWED_MODEL_IDS.has(modelId)) return true;
