@@ -61,5 +61,9 @@ describe('unified OpenAI provider renderer contract', () => {
     // An OpenAI group carried only by a sign-in says so, so an empty-looking
     // model list is never a mystery.
     expect(pickerModel).toContain("linkedBySignIn ? 'ChatGPT' : 'Not connected'");
+    // The hint distinguishes "nothing connected" from the impossible empty list,
+    // so a stale build cannot masquerade as a missing connection.
+    expect(picker).toContain('No models resolved — restart the app');
+    expect(picker).toContain('Connect a provider in Settings → Providers to add its models here.');
   });
 });

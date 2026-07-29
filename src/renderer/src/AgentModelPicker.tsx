@@ -88,7 +88,17 @@ export function AgentModelPicker(): ReactElement {
               </div>
             );
           })}
-          <p className="agent-model-picker__hint">Connect providers in Settings → Providers to add their models here.</p>
+          {groups.length === 0 ? (
+            /* The local engine is always listed, so an empty list means the
+               running build predates this code or the catalog failed to load. */
+            <p className="agent-model-picker__hint">
+              No models resolved — restart the app to pick up the current build.
+            </p>
+          ) : groups.every((group) => group.models[0]?.executionPath === 'local') ? (
+            <p className="agent-model-picker__hint">
+              Connect a provider in Settings → Providers to add its models here.
+            </p>
+          ) : null}
         </div>
       )}
     </div>
