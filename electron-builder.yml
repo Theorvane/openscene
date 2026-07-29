@@ -1,0 +1,26 @@
+# Packaging for the release workflow. electron-vite compiles main, preload, and
+# renderer into out/; this only wraps that output into a macOS app.
+appId: tech.theorvane.openvideo
+productName: OpenVideo
+copyright: Open source under the MIT License
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**
+  - package.json
+extraResources:
+  # The window icon is read from resources/ at runtime on platforms that take one.
+  - from: resources/icon.png
+    to: icon.png
+mac:
+  category: public.app-category.video
+  icon: build/icon.png
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  # No Apple Developer credentials exist for this repository, so the build is
+  # unsigned; forcing discovery off keeps CI from failing on a missing identity.
+  identity: null

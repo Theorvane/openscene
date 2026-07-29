@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "build": "npm run typecheck && electron-vite build",
-    "preview": "electron-vite preview"
+    "preview": "electron-vite preview",
+    "package": "npm run build && electron-builder --mac --publish never"
   },
   "dependencies": {
     "@langchain/anthropic": "^1.5.2",
@@ -21,7 +22,6 @@
     "@langchain/openai": "^1.5.5",
     "@theorvane/type-mcp": "^0.2.0",
     "@vitejs/plugin-react": "5.1.4",
-    "electron": "latest",
     "electron-vite": "latest",
     "react": "latest",
     "react-dom": "latest",
@@ -31,8 +31,11 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.0.12",
     "typescript": "latest",
     "vite": "7.3.6",
     "vitest": "latest"
-  }
+  },
+  "author": "Theorvane"
 }
