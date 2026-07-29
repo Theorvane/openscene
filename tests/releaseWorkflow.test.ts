@@ -96,6 +96,20 @@ describe('release workflow', () => {
     expect(floating).toEqual([]);
   });
 
+  it('verifies the release on the same toolchain CI verifies every PR on', () => {
+    // The suite drives a real FFmpeg binary in the export and import paths, so a
+    // release gate that runs it without one fails on its environment rather than
+    // on the commit. This caught v0.1.0: `verify` passed on the promotion PR and
+    // the release job then failed on five FFmpeg tests, because only ci.yml
+    // installed it. Pin them together so the next drift fails in CI, not once per
+    // release.
+    const ci = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
+    const toolchain = /brew install ([^\n]+)/;
+    const ciTools = ci.match(toolchain)?.[1]?.trim();
+    expect(ciTools).toBeDefined();
+    expect(workflow).toContain(`brew install ${ciTools ?? ''}`);
+  });
+
   it('declares a target for every platform the workflow builds', () => {
     for (const platform of ['mac:', 'win:', 'linux:']) {
       expect(builderConfig).toContain(platform);

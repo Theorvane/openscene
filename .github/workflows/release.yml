@@ -46,6 +46,13 @@ jobs:
         if: steps.version.outputs.already-released == 'false'
         run: npm ci
 
+      # The export and import tests drive a real FFmpeg binary rather than a
+      # stub, so the release gate needs the same toolchain ci.yml gives every
+      # PR. Without it the suite fails on its environment, not on the commit.
+      - name: Install FFmpeg
+        if: steps.version.outputs.already-released == 'false'
+        run: brew install ffmpeg
+
       # Verified once, on the platform the test suite is developed against.
       # The per-platform jobs below package; they do not re-run the suite.
       - name: Verify the commit being released
