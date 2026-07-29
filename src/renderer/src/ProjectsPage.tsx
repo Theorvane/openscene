@@ -13,6 +13,8 @@ type ProjectsPageProps = {
   readonly onOpenProject?: (projectId: string) => Promise<void>;
   readonly onOpenProjectFolder?: () => Promise<void>;
   readonly onOpenChat?: (entry: AgentChatHistoryEntry) => Promise<void>;
+  readonly onRemoveProject?: (projectId: string) => Promise<void>;
+  readonly onDeleteChat?: (entry: AgentChatHistoryEntry) => Promise<void>;
   readonly errorText?: string | undefined;
   readonly isBusy?: boolean;
 };
@@ -42,6 +44,8 @@ export function ProjectsPage({
   onOpenProject,
   onOpenProjectFolder,
   onOpenChat,
+  onRemoveProject,
+  onDeleteChat,
   errorText,
   isBusy = false
 }: ProjectsPageProps): ReactElement {
@@ -71,7 +75,7 @@ export function ProjectsPage({
             {projects.map((item) => {
               const isSelected = project?.id === item.id;
               return (
-                <li key={item.id}>
+                <li key={item.id} className="projects-home__row">
                   <button
                     type="button"
                     className={`projects-home__project${isSelected ? ' projects-home__project--active' : ''}`}
@@ -89,6 +93,20 @@ export function ProjectsPage({
                       </span>
                     </span>
                   </button>
+                  {onRemoveProject !== undefined && (
+                    <button
+                      type="button"
+                      className="projects-home__row-remove"
+                      title={item.storage === 'external'
+                        ? `Remove ${item.name} from this list (the folder stays on disk)`
+                        : `Delete ${item.name} and its local project files`}
+                      aria-label={`Remove ${item.name} from the project list`}
+                      disabled={isBusy}
+                      onClick={() => void onRemoveProject(item.id)}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </li>
               );
             })}
@@ -108,7 +126,7 @@ export function ProjectsPage({
               <h3 className="projects-home__chat-group-title">{group.title}</h3>
               <ul className="projects-home__chat-list">
                 {group.entries.map((entry) => (
-                  <li key={`${entry.projectId}:${entry.conversationId}`}>
+                  <li key={`${entry.projectId}:${entry.conversationId}`} className="projects-home__row">
                     <button
                       type="button"
                       className="projects-home__chat"
@@ -121,6 +139,18 @@ export function ProjectsPage({
                         <span className="projects-home__chat-time">{formatAgentChatTime(entry.updatedAt)}</span>
                       </span>
                     </button>
+                    {onDeleteChat !== undefined && (
+                      <button
+                        type="button"
+                        className="projects-home__row-remove"
+                        title={`Delete the "${entry.title}" conversation`}
+                        aria-label={`Delete the ${entry.title} conversation`}
+                        disabled={isBusy}
+                        onClick={() => void onDeleteChat(entry)}
+                      >
+                        ✕
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

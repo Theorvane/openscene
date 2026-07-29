@@ -97,6 +97,16 @@ export class AgentChatHistoryStore {
     const conversations = await this.list(projectId);
     return conversations.find((conversation) => conversation.id === conversationId) ?? null;
   }
+
+  /** Forgets one conversation. Returns false when it was already gone. */
+  async delete(projectId: string, conversationId: string): Promise<boolean> {
+    const directory = await this.projects.resolveDirectory(projectId);
+    const conversations = await readHistoryFile(directory);
+    const remaining = conversations.filter((conversation) => conversation.id !== conversationId);
+    if (remaining.length === conversations.length) return false;
+    await writeHistoryFile(directory, remaining);
+    return true;
+  }
 }
 
 function deriveTitle(messages: readonly AgentChatDisplayMessage[]): string | null {

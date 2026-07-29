@@ -63,6 +63,22 @@ export function registerAgentChatIpcHandlers(
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.agentChatHistoryDelete, async (_event, request) => {
+    if (history === null) return ok(false);
+    const input = request as Partial<AgentChatHistoryGetInput> | undefined;
+    if (typeof input?.projectId !== 'string' || typeof input.conversationId !== 'string') {
+      return fail('INVALID_INPUT', 'The chat history delete payload was not valid.');
+    }
+    try {
+      // Drop the in-memory thread too, so a deleted conversation cannot be
+      // resumed by a panel still pointing at that id.
+      await sessions.resetConversation({ conversationId: input.conversationId });
+      return ok(await history.delete(input.projectId, input.conversationId));
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to delete the agent chat conversation');
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.agentChatHistoryGet, async (_event, request) => {
     if (history === null) return ok(null);
     const input = request as Partial<AgentChatHistoryGetInput> | undefined;

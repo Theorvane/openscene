@@ -48,7 +48,8 @@ export const IPC_CHANNELS = {
   agentChatApprove: 'agent-chat:approve',
   agentChatReset: 'agent-chat:reset',
   agentChatHistoryList: 'agent-chat:history-list',
-  agentChatHistoryGet: 'agent-chat:history-get'
+  agentChatHistoryGet: 'agent-chat:history-get',
+  agentChatHistoryDelete: 'agent-chat:history-delete'
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

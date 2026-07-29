@@ -996,6 +996,46 @@ button {
   color: var(--text-weak);
 }
 
+/* Row + hover-revealed remove control, shared by projects and chats. */
+.projects-home__row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.projects-home__row > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.projects-home__row-remove {
+  flex: none;
+  width: var(--control-compact-min-height);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-weaker);
+  background: transparent;
+  font-size: var(--text-caption);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+/* Always reachable by keyboard even though it is hover-revealed. */
+.projects-home__row:hover .projects-home__row-remove,
+.projects-home__row-remove:focus-visible {
+  opacity: 1;
+}
+
+.projects-home__row-remove:hover:not(:disabled) {
+  color: var(--color-danger);
+  border-color: var(--border);
+}
+
+.projects-home__row-remove:disabled {
+  cursor: not-allowed;
+}
+
 .projects-home__list {
   display: flex;
   flex-direction: column;

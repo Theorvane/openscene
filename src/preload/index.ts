@@ -112,6 +112,7 @@ export interface VideoToolApi {
   agentChatReset(input: AgentChatResetInput): Promise<ApiResponse<AgentChatTurnState>>;
   agentChatHistoryList(): Promise<ApiResponse<readonly AgentChatHistoryEntry[]>>;
   agentChatHistoryGet(input: AgentChatHistoryGetInput): Promise<ApiResponse<AgentChatStoredConversation | null>>;
+  agentChatHistoryDelete(input: AgentChatHistoryGetInput): Promise<ApiResponse<boolean>>;
 }
 
 const videoTool: VideoToolApi = {
@@ -202,7 +203,9 @@ const videoTool: VideoToolApi = {
   agentChatHistoryList: () =>
     ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryList) as Promise<ApiResponse<readonly AgentChatHistoryEntry[]>>,
   agentChatHistoryGet: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryGet, input) as Promise<ApiResponse<AgentChatStoredConversation | null>>
+    ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryGet, input) as Promise<ApiResponse<AgentChatStoredConversation | null>>,
+  agentChatHistoryDelete: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryDelete, input) as Promise<ApiResponse<boolean>>
 };
 
 contextBridge.exposeInMainWorld('videoTool', videoTool);

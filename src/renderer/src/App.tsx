@@ -156,6 +156,31 @@ export function App(): ReactElement {
     };
   }, [activePageId, editor.projects]);
 
+  const removeProject = useCallback(async (projectId: string): Promise<void> => {
+    // Removing the open project has to clear the editor too, which
+    // deleteCurrentProject already does; other rows only need the store call.
+    if (editor.project?.id === projectId) {
+      await editor.deleteCurrentProject();
+    } else {
+      const response = await window.videoTool.deleteProject({ projectId });
+      if (!response.ok) return;
+      await editor.refreshProjects();
+    }
+    const chats = await window.videoTool.agentChatHistoryList();
+    if (chats.ok) setChatHistory(chats.value);
+  }, [editor]);
+
+  const deleteChatFromHistory = useCallback(async (entry: AgentChatHistoryEntry): Promise<void> => {
+    const response = await window.videoTool.agentChatHistoryDelete({
+      projectId: entry.projectId,
+      conversationId: entry.conversationId
+    });
+    if (!response.ok) return;
+    setChatHistory((current) => current.filter((item) =>
+      item.projectId !== entry.projectId || item.conversationId !== entry.conversationId
+    ));
+  }, []);
+
   const openChatFromHistory = useCallback(async (entry: AgentChatHistoryEntry): Promise<void> => {
     const opened = await editor.openProject(entry.projectId);
     if (!opened) return;
@@ -230,6 +255,8 @@ export function App(): ReactElement {
                 if (opened) navigateToPage('edit');
               }}
               onOpenChat={openChatFromHistory}
+              onRemoveProject={removeProject}
+              onDeleteChat={deleteChatFromHistory}
               errorText={editor.statusMessage.tone === 'danger' ? editor.statusMessage.text : undefined}
               isBusy={editor.isBusy}
             />
