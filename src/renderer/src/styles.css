@@ -493,60 +493,90 @@ button {
   -webkit-app-region: no-drag;
 }
 
-/* Open-project tabs: the top bar says which projects are open, not which page
-   you are on. */
+/* Open-project tabs, following opencode's titlebar tabs: no borders, a filled
+   background only when active or hovered, dim titles that brighten on the
+   active tab, and a hairline divider between adjacent inactive tabs. */
 .project-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  max-width: 220px;
-  padding: 2px 2px 2px var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--text-weak);
+  height: 28px;
+  max-width: 200px;
+  min-width: 0;
+  padding: 0 var(--space-1) 0 var(--space-2);
+  border-radius: 6px;
+  color: var(--text-weaker);
+}
+
+.project-tab:hover,
+.project-tab:focus-within {
+  background: var(--surface-inset);
 }
 
 .project-tab--active {
-  border-color: var(--line-subtle);
   color: var(--text-strong);
   background: var(--surface-inset);
+}
+
+/* Divider sits between two inactive tabs only, never beside the active one. */
+.project-tab:not(:first-child):not(.project-tab--active)::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: calc(var(--space-2) / -2 - 1px);
+  width: 1px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--line-subtle);
+}
+
+.project-tab--active + .project-tab::before,
+.project-tab:hover::before,
+.project-tab:focus-within::before {
+  display: none;
 }
 
 .project-tab__select {
   overflow: hidden;
   min-width: 0;
-  min-height: 26px;
+  height: 100%;
   border: none;
   color: inherit;
   background: transparent;
   font: inherit;
-  font-size: var(--text-caption);
+  font-size: 13px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
 }
 
 .project-tab__close {
+  display: grid;
   flex: none;
+  place-items: center;
   width: 20px;
   height: 20px;
   border: none;
   border-radius: var(--radius-xs);
   color: var(--text-weaker);
   background: transparent;
-  font-size: var(--text-micro);
+  font-size: 10px;
   cursor: pointer;
   opacity: 0;
 }
 
-/* Reachable without a pointer, not only on hover. */
+/* Revealed on hover and on the active tab, and reachable by keyboard. */
 .project-tab:hover .project-tab__close,
+.project-tab--active .project-tab__close,
 .project-tab__close:focus-visible {
   opacity: 1;
 }
 
 .project-tab__close:hover {
   color: var(--color-danger);
+  background: var(--surface-hover);
 }
 
 .product-chrome__empty {
@@ -559,6 +589,8 @@ button {
   align-items: center;
   justify-content: flex-start;
   gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
   min-width: 0;
 }
 
