@@ -25,7 +25,6 @@ export function NarrationPanel(): ReactElement {
   const projectImport = useProjectResultImport();
   const isElevenLabs = voiceModel.providerId === 'elevenlabs';
 
-  const [apiKeyOverride, setApiKeyOverride] = useState('');
   const [voiceId, setVoiceId] = useState<string>(ELEVENLABS_VOICES[0].id);
   const [script, setScript] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -46,8 +45,7 @@ export function NarrationPanel(): ReactElement {
       const response = await window.videoTool.aiGenerateSpeech({
         script,
         voiceId: isElevenLabs ? voiceId : '',
-        modelId: voiceModel.id,
-        ...(apiKeyOverride.trim().length > 0 ? { apiKey: apiKeyOverride.trim() } : {})
+        modelId: voiceModel.id
       });
 
       if (!response.ok) {
@@ -107,17 +105,6 @@ export function NarrationPanel(): ReactElement {
             </select>
           </label>
         )}
-
-        <label className="studio-field">
-          <span className="studio-field__label">API key override</span>
-          <input
-            type="password"
-            value={apiKeyOverride}
-            onChange={(event) => setApiKeyOverride(event.target.value)}
-            placeholder="Optional — defaults to the key connected in Settings"
-            autoComplete="off"
-          />
-        </label>
 
         {status !== null && <StatusCard tone={status.tone}>{status.text}</StatusCard>}
 

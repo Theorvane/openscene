@@ -108,6 +108,8 @@ export function snapSoraSeconds(requested: number): number {
 
 export type VideoSynthesisInput = {
   readonly apiKey: string;
+  /** Optional image-to-video seed; only Veo accepts one in this build. */
+  readonly referenceImage?: { readonly mimeType: string; readonly base64: string };
   readonly modelId: string;
   readonly prompt: string;
   readonly aspectRatio: '16:9' | '9:16' | '1:1';
@@ -132,7 +134,12 @@ export async function generateVeoVideo(input: VideoSynthesisInput): Promise<Gene
     method: 'POST',
     headers,
     body: JSON.stringify({
-      instances: [{ prompt: input.prompt }],
+      instances: [{
+        prompt: input.prompt,
+        ...(input.referenceImage === undefined
+          ? {}
+          : { image: { bytesBase64Encoded: input.referenceImage.base64, mimeType: input.referenceImage.mimeType } })
+      }],
       parameters: { aspectRatio: input.aspectRatio === '1:1' ? '16:9' : input.aspectRatio }
     })
   });
@@ -171,6 +178,11 @@ export async function generateVeoVideo(input: VideoSynthesisInput): Promise<Gene
 
 /** OpenAI Sora over /v1/videos: create → poll → download content as MP4. */
 export async function generateSoraVideo(input: VideoSynthesisInput): Promise<GeneratedVideo> {
+  if (input.referenceImage !== undefined) {
+    // Sora takes an input_reference only as multipart, which this adapter does
+    // not send. Refuse rather than silently generating without the image.
+    throw new Error('OpenAI Sora reference images are not supported in this build; use Google Veo, or remove the reference image.');
+  }
   const fetchImpl = input.fetchImpl ?? fetch;
   const pollIntervalMs = input.pollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
   const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;

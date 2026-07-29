@@ -13,8 +13,17 @@ export interface ProviderApiConfig {
   elevenlabsApiKey?: string;
 }
 
+/** A picked reference image, carried inline so no path reaches the renderer. */
+export interface ReferenceImageSelection {
+  readonly displayName: string;
+  readonly mimeType: string;
+  readonly base64: string;
+}
+
 export interface VideoGenerationRequest {
   prompt: string;
+  /** Optional image-to-video seed. */
+  referenceImage?: ReferenceImageSelection;
   aspectRatio: '16:9' | '9:16' | '1:1';
   durationSeconds: number;
   stylePreset?: string;

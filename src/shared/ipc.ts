@@ -30,6 +30,7 @@ export const IPC_CHANNELS = {
   timelineMenuCommand: 'timeline-menu:command',
   timelineMenuState: 'timeline-menu:state',
   aiGenerateVideo: 'ai:generate-video',
+  aiSelectReferenceImage: 'ai:select-reference-image',
   aiGetVideoJob: 'ai:get-video-job',
   aiGenerateSpeech: 'ai:generate-speech',
   aiGetSpeechJob: 'ai:get-speech-job',

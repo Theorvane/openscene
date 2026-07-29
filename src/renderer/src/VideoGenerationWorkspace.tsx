@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import type { VideoGenerationJob } from '../../shared/providerSeams';
+import type { ReferenceImageSelection, VideoGenerationJob } from '../../shared/providerSeams';
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
@@ -30,13 +30,13 @@ export function VideoGenerationWorkspace(): ReactElement {
         Math.abs(candidate - durationSeconds) < Math.abs(best - durationSeconds) ? candidate : best
       );
   const [selectedStyle, setSelectedStyle] = useState<string>('Cinematic');
+  // Image-to-video seed: the bytes travel inline, so no path reaches here.
+  const [referenceImage, setReferenceImage] = useState<ReferenceImageSelection | null>(null);
   const [jobs, setJobs] = useState<readonly VideoGenerationJob[]>([]);
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{ text: string; tone: 'neutral' | 'success' | 'warning' | 'danger' }>({
-    text: 'Ready to generate AI video. Connect a video provider in Settings → Providers to begin.',
-    tone: 'neutral'
-  });
+  // Nothing to report until something happens; an idle card is just noise.
+  const [statusMsg, setStatusMsg] = useState<{ text: string; tone: 'neutral' | 'success' | 'warning' | 'danger' } | null>(null);
 
   const handleGenerate = async (): Promise<void> => {
     if (prompt.trim().length === 0) {
@@ -53,7 +53,8 @@ export function VideoGenerationWorkspace(): ReactElement {
         aspectRatio,
         durationSeconds: effectiveDuration,
         stylePreset: selectedStyle,
-        modelId: videoModel.id
+        modelId: videoModel.id,
+        ...(referenceImage === null ? {} : { referenceImage })
       });
 
       if (response.ok && response.value) {
@@ -87,6 +88,15 @@ export function VideoGenerationWorkspace(): ReactElement {
       setIsGenerating(false);
       setStatusMsg({ text: err instanceof Error ? err.message : 'Unexpected error during generation.', tone: 'danger' });
     }
+  };
+
+  const pickReferenceImage = async (): Promise<void> => {
+    const response = await window.videoTool.aiSelectReferenceImage();
+    if (!response.ok) {
+      setStatusMsg({ text: response.error.message, tone: 'danger' });
+      return;
+    }
+    if (response.value !== null) setReferenceImage(response.value);
   };
 
   const handleImportToProject = async (job: VideoGenerationJob): Promise<void> => {
@@ -162,7 +172,29 @@ export function VideoGenerationWorkspace(): ReactElement {
           </div>
         </div>
 
-        <StatusCard tone={statusMsg.tone}>{statusMsg.text}</StatusCard>
+        {statusMsg !== null && <StatusCard tone={statusMsg.tone}>{statusMsg.text}</StatusCard>}
+
+        <div className="studio-field">
+          <span className="studio-field__label">Reference image</span>
+          {referenceImage === null ? (
+            <div className="studio-reference">
+              <span className="studio-reference__empty">Optional — seeds image-to-video generation.</span>
+              <Button variant="ghost" onClick={() => void pickReferenceImage()}>Add image</Button>
+            </div>
+          ) : (
+            <div className="studio-reference">
+              <img
+                className="studio-reference__thumb"
+                src={`data:${referenceImage.mimeType};base64,${referenceImage.base64}`}
+                alt={`Reference image ${referenceImage.displayName}`}
+              />
+              <span className="studio-reference__name">{referenceImage.displayName}</span>
+              <Button variant="ghost" onClick={() => setReferenceImage(null)} aria-label="Remove reference image">
+                Remove
+              </Button>
+            </div>
+          )}
+        </div>
 
         <div className="studio-field">
           <span className="studio-field__label">Jobs</span>
@@ -200,7 +232,9 @@ export function VideoGenerationWorkspace(): ReactElement {
           aria-label="Video prompt"
         />
         <div className="studio-composer__toolbar">
-          <span className="studio-composer__hint">{effectiveDuration}s · {aspectRatio} · {selectedStyle}</span>
+          <span className="studio-composer__hint">
+            {effectiveDuration}s · {aspectRatio} · {selectedStyle}{referenceImage === null ? '' : ' · image'}
+          </span>
           <Button variant="primary" onClick={() => void handleGenerate()} disabled={isGenerating || prompt.trim().length === 0}>
             {isGenerating ? 'Generating…' : 'Generate'}
           </Button>

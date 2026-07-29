@@ -737,6 +737,42 @@ button {
   background: var(--surface-inset);
 }
 
+.studio-reference {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.studio-reference__thumb {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.studio-reference__empty {
+  flex: 1;
+  color: var(--text-weak);
+  font-size: var(--text-caption);
+}
+
+.studio-reference__name {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .studio-result {
   display: flex;
   align-items: center;

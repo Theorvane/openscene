@@ -13,6 +13,7 @@ import { ProjectLocationRegistry } from './projectLocations';
 import { ProjectStore } from './projectStore';
 import { RecordingFileStore } from './recordingStore';
 import { registerResultAssetImportHandlers } from './resultAssetImportHandlers';
+import { REFERENCE_IMAGE_EXTENSIONS, selectReferenceImage } from './referenceImagePicker';
 import { ResultAssetImportService } from './resultAssetImportService';
 import { registerTimelineAssetProtocol, registerTimelineAssetScheme } from './timelineAssetProtocol';
 import { registerTimelineIpcHandlers } from './timelineIpcHandlers';
@@ -231,6 +232,14 @@ async function installIpcHandlers(): Promise<void> {
   });
   registerTimelineIpcHandlers(ipcMain, timelineIpcService);
   registerResultAssetImportHandlers(ipcMain, resultAssetImportService);
+
+  ipcMain.handle(IPC_CHANNELS.aiSelectReferenceImage, () =>
+    selectReferenceImage(() => dialog.showOpenDialog({
+      title: 'Choose a reference image',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: [...REFERENCE_IMAGE_EXTENSIONS] }]
+    }))
+  );
   registerExportIpcHandlers(ipcMain, exportIpcService);
   registerChatGptOAuthIpcHandlers({
     service: chatGptOAuthService,

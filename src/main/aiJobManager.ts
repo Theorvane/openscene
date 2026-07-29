@@ -82,7 +82,8 @@ async function invokeCloudVideoProvider(
     modelId: model.id,
     prompt: request.prompt,
     aspectRatio: request.aspectRatio ?? ('16:9' as const),
-    durationSeconds: request.durationSeconds ?? 5
+    durationSeconds: request.durationSeconds ?? 5,
+    ...(request.referenceImage === undefined ? {} : { referenceImage: request.referenceImage })
   };
   try {
     let generated: { bytes: Buffer; providerJobId: string };
