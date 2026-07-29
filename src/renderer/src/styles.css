@@ -561,11 +561,22 @@ button {
   cursor: pointer;
 }
 
-/* The tab body carries role="tab", so the shared tab hover reaches it. It is
-   the selection target and stays inert; this out-specifies that rule. */
-.project-tab .project-tab__select:hover {
+/* The tab body carries role="tab" and aria-selected, so the shared tab rules
+   reach it and paint a second fill around the label on top of the tab's own.
+   The tab owns the fill; the body only carries the text. */
+.project-tab .project-tab__select[role="tab"],
+.project-tab .project-tab__select[role="tab"]:hover,
+.project-tab .project-tab__select[role="tab"][aria-selected="true"] {
+  min-height: 0;
+  padding: 0;
+  border-bottom: none;
   color: inherit;
   background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  /* Project names are user text: shown as typed, not shouted like a section. */
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .project-tab__close:hover {
@@ -585,6 +596,9 @@ button {
   gap: var(--space-2);
   min-width: 0;
   overflow: hidden;
+  padding: 3px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
   min-width: 0;
 }
 
