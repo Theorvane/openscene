@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties, type FormEvent, type ReactElemen
 
 import { useAgentChat } from './AgentChatContext';
 import { AgentChatMessageView } from './AgentChatMessageView';
+import { AgentChatSessionPicker } from './AgentChatSessionPicker';
 import { AgentModelPicker } from './AgentModelPicker';
 import { Button } from './ui';
 
@@ -72,6 +73,11 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
               ⇥
             </Button>
           </div>
+        </div>
+
+        {/* Sessions are per project, so work can be split across conversations. */}
+        <div className="agent-chat-panel__sessions">
+          <AgentChatSessionPicker />
         </div>
 
         {/* Project scope: every conversation operates on the active project. */}

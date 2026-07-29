@@ -7,6 +7,7 @@ import {
   placeClip,
   splitClip,
   trimClipLeft,
+  timelineDurationMs,
   trimClipRight,
   updateClipEffects
 } from '../../../shared/timelineLogic';
@@ -233,6 +234,23 @@ export function useTimelineEditor() {
     });
   }, [project]);
 
+  const clearSelection = useCallback(() => {
+    selectClip('');
+  }, [selectClip]);
+
+  const stepPlayhead = useCallback((deltaMs: number) => {
+    playback.setPlayheadMs(Math.max(0, playback.playheadMs + deltaMs), project?.timeline);
+  }, [playback, project]);
+
+  const goToTimelineStart = useCallback(() => {
+    playback.setPlayheadMs(0, project?.timeline);
+  }, [playback, project]);
+
+  const goToTimelineEnd = useCallback(() => {
+    if (project === null) return;
+    playback.setPlayheadMs(timelineDurationMs(project.timeline), project.timeline);
+  }, [playback, project]);
+
   const deleteSelectedClip = useCallback(() => {
     const clipIds = selectedClipIds.length > 0 ? selectedClipIds : selectedClip === null ? [] : [selectedClip.clip.id];
     if (clipIds.length === 0) return;
@@ -383,13 +401,13 @@ export function useTimelineEditor() {
     addTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
     openProject, openProjectFolder, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
-    selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,
+    clearSelection, goToTimelineEnd, goToTimelineStart, selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,
     setNewProjectName, setSelectedAssetId, setSelectedClipId: selectClip,
     splitSelectedClip, statusMessage, trimSelectedClip, updateAssetMetadata, updateSelectedClipEffects,
     activePlaybackClip: playback.activePlaybackClip, canRedoTimeline: (timelineHistory?.future.length ?? 0) > 0,
     canUndoTimeline: (timelineHistory?.past.length ?? 0) > 0, isPlaying: playback.isPlaying, moveClipToTrack,
     placeAssetOnTrack, playheadMs: playback.playheadMs, redoTimeline, setIsPlaying: playback.setIsPlaying,
-    setPlayheadMs: playback.setPlayheadMs, splitAtPlayhead, splitClipAt, trimClipTo, undoTimeline
+    setPlayheadMs: playback.setPlayheadMs, splitAtPlayhead, stepPlayhead, splitClipAt, trimClipTo, undoTimeline
   };
 }
 

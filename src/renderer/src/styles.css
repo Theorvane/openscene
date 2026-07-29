@@ -5204,6 +5204,128 @@ button {
   color: var(--text-weak);
 }
 
+/* Session switcher: conversations are kept per project so work can be split
+   across several and picked up again. */
+.agent-chat-panel__sessions {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.agent-chat-session-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agent-chat-session-picker__trigger {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--control-compact-min-height);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+
+.agent-chat-session-picker__trigger-label {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-chat-session-picker__trigger-caret {
+  flex: none;
+  color: var(--text-weak);
+}
+
+.agent-chat-session-picker__new {
+  flex: none;
+  min-width: var(--control-compact-min-height);
+  min-height: var(--control-compact-min-height);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.agent-chat-session-picker__new:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-chat-session-picker__popover {
+  /* Body portal, same reason as the model picker: the panel clips overflow. */
+  z-index: 200;
+  display: grid;
+  gap: 2px;
+  width: 280px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow-panel);
+}
+
+.agent-chat-session-picker__option {
+  display: flex;
+  overflow: hidden;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-caption);
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-chat-session-picker__option:hover:not(:disabled) {
+  background: var(--surface-inset);
+}
+
+.agent-chat-session-picker__option--active {
+  background: var(--surface-inset);
+  font-weight: 600;
+}
+
+.agent-chat-session-picker__option-title {
+  overflow: hidden;
+  flex: 1;
+  /* Without min-width a flex item refuses to shrink and the row overflows. */
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-chat-session-picker__option-meta {
+  flex: none;
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+.agent-chat-session-picker__hint {
+  margin: 0;
+  padding: var(--space-2);
+  color: var(--text-weak);
+  font-size: var(--text-micro);
+}
+
 .agent-model-picker__popover {
   /* Positioned by the picker and rendered in a body portal, because the chat
      panel and prompt card both clip overflow. */

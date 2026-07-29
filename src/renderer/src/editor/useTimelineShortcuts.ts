@@ -8,10 +8,21 @@ import {
 } from './editorShortcuts';
 import { isTextEditingShortcutTarget } from './editorTimelineView';
 
+/** One step is a coarse frame: fine enough to trim by, coarse enough to hold. */
+const PLAYHEAD_STEP_MS = 100;
+const CLIP_NUDGE_MS = 100;
+
 type TimelineShortcutInput = {
   readonly canSplit: boolean;
   readonly isLocked: boolean;
+  readonly clearSelection: () => void;
   readonly deleteSelectedClip: () => void;
+  readonly duplicateSelectedClip: () => void;
+  readonly goToTimelineEnd: () => void;
+  readonly goToTimelineStart: () => void;
+  readonly moveSelectedClip: (deltaMs: number) => void;
+  readonly saveTimeline: () => void;
+  readonly stepPlayhead: (deltaMs: number) => void;
   readonly redoTimeline: () => void;
   readonly resetLayout: () => void;
   readonly selectAllClips: () => void;
@@ -24,7 +35,16 @@ type TimelineShortcutInput = {
 };
 
 const actionHandlers: Readonly<Record<EditorShortcutActionId, (input: TimelineShortcutInput) => void>> = {
+  clearSelection: (input) => input.clearSelection(),
   deleteSelection: (input) => input.deleteSelectedClip(),
+  duplicateSelection: (input) => input.duplicateSelectedClip(),
+  goToEnd: (input) => input.goToTimelineEnd(),
+  goToStart: (input) => input.goToTimelineStart(),
+  nudgeSelectionLeft: (input) => input.moveSelectedClip(-CLIP_NUDGE_MS),
+  nudgeSelectionRight: (input) => input.moveSelectedClip(CLIP_NUDGE_MS),
+  saveTimeline: (input) => input.saveTimeline(),
+  stepBackward: (input) => input.stepPlayhead(-PLAYHEAD_STEP_MS),
+  stepForward: (input) => input.stepPlayhead(PLAYHEAD_STEP_MS),
   playPause: (input) => input.setIsPlaying((current) => !current),
   redo: (input) => input.redoTimeline(),
   resetLayout: (input) => input.resetLayout(),

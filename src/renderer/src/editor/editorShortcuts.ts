@@ -8,6 +8,15 @@ export const EDITOR_SHORTCUT_ACTION_IDS = [
   'deleteSelection',
   'splitSelection',
   'selectAll',
+  'clearSelection',
+  'duplicateSelection',
+  'saveTimeline',
+  'stepBackward',
+  'stepForward',
+  'nudgeSelectionLeft',
+  'nudgeSelectionRight',
+  'goToStart',
+  'goToEnd',
   'toggleLeftDock',
   'toggleInspector',
   'resetLayout',
@@ -72,7 +81,15 @@ const MODIFIER_TOKENS: Readonly<Record<string, EditorShortcutModifier>> = {
 };
 
 const KEY_TOKENS: Readonly<Record<string, string>> = {
+  arrowdown: 'ArrowDown',
+  arrowleft: 'ArrowLeft',
+  arrowright: 'ArrowRight',
+  arrowup: 'ArrowUp',
   backspace: 'Backspace',
+  down: 'ArrowDown',
+  left: 'ArrowLeft',
+  right: 'ArrowRight',
+  up: 'ArrowUp',
   delete: 'Delete',
   end: 'End',
   enter: 'Enter',
@@ -140,6 +157,60 @@ export const EDITOR_SHORTCUT_DEFINITIONS: readonly EditorShortcutDefinition[] = 
     ariaLabel: 'Select every clip on the timeline',
     defaultChord: { key: 'A', modifiers: ['Meta'] },
     label: 'Select all clips'
+  },
+  {
+    actionId: 'clearSelection',
+    ariaLabel: 'Clear the current selection',
+    defaultChord: { key: 'Escape', modifiers: [] },
+    label: 'Clear selection'
+  },
+  {
+    actionId: 'duplicateSelection',
+    ariaLabel: 'Duplicate the selected clip',
+    defaultChord: { key: 'D', modifiers: ['Meta'] },
+    label: 'Duplicate clip'
+  },
+  {
+    actionId: 'saveTimeline',
+    ariaLabel: 'Save the timeline to the project folder',
+    defaultChord: { key: 'S', modifiers: ['Meta'] },
+    label: 'Save timeline'
+  },
+  {
+    actionId: 'stepBackward',
+    ariaLabel: 'Move the playhead back one step',
+    defaultChord: { key: 'ArrowLeft', modifiers: [] },
+    label: 'Step back'
+  },
+  {
+    actionId: 'stepForward',
+    ariaLabel: 'Move the playhead forward one step',
+    defaultChord: { key: 'ArrowRight', modifiers: [] },
+    label: 'Step forward'
+  },
+  {
+    actionId: 'nudgeSelectionLeft',
+    ariaLabel: 'Nudge the selected clip earlier',
+    defaultChord: { key: 'ArrowLeft', modifiers: ['Alt'] },
+    label: 'Nudge clip earlier'
+  },
+  {
+    actionId: 'nudgeSelectionRight',
+    ariaLabel: 'Nudge the selected clip later',
+    defaultChord: { key: 'ArrowRight', modifiers: ['Alt'] },
+    label: 'Nudge clip later'
+  },
+  {
+    actionId: 'goToStart',
+    ariaLabel: 'Move the playhead to the start of the timeline',
+    defaultChord: { key: 'Home', modifiers: [] },
+    label: 'Go to start'
+  },
+  {
+    actionId: 'goToEnd',
+    ariaLabel: 'Move the playhead to the end of the timeline',
+    defaultChord: { key: 'End', modifiers: [] },
+    label: 'Go to end'
   },
   {
     actionId: 'toggleLeftDock',

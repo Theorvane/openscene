@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import type { AgentChatDisplayMessage, AgentChatStatus, AgentToolCallProposal } from '../../shared/agentChat';
+import type { AgentChatDisplayMessage, AgentChatHistoryEntry, AgentChatStatus, AgentToolCallProposal } from '../../shared/agentChat';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import type { AiDomainModelConfig } from '../../shared/aiDomainModels';
 import { isProviderConnected } from '../../shared/llmProviders';
@@ -11,6 +11,7 @@ import {
   serializeReasoningEfforts,
   withReasoningEffort
 } from './reasoningEffortPreferences';
+import { buildAgentChatSessionRows, type AgentChatSessionRow } from './agentChatSessions';
 import { mergePendingUserMessage } from './agentChatTranscript';
 import { useChatGptAuth } from './ChatGptAuthContext';
 import { useAiDomainModel } from './AiDomainModelContext';
@@ -39,6 +40,10 @@ interface AgentChatController {
   readonly error: string | undefined;
   readonly isBusy: boolean;
   readonly activeProject: EditAgentProjectContext | null;
+  /** Saved conversations for this project, plus the one currently open. */
+  readonly sessions: readonly AgentChatSessionRow[];
+  readonly startNewSession: () => void;
+  readonly switchSession: (conversationId: string) => Promise<void>;
   readonly sendMessage: (text: string) => Promise<void>;
   readonly respondToApproval: (decision: 'approve' | 'deny') => Promise<void>;
   readonly resetConversation: () => Promise<void>;
@@ -72,6 +77,10 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   const [status, setStatus] = useState<AgentChatStatus>('idle');
   const [error, setError] = useState<string | undefined>(undefined);
   const [isBusy, setIsBusy] = useState(false);
+  const [historyEntries, setHistoryEntries] = useState<readonly AgentChatHistoryEntry[]>([]);
+  // Re-read after each turn so a session that just got its title shows it.
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const [activeConversationId, setActiveConversationId] = useState(conversationIdRef.current);
   // Transcript restored from history: sent along with the next message so the
   // main process can re-seed an empty (e.g. post-relaunch) conversation thread.
   const restoredSeedRef = useRef<readonly AgentChatDisplayMessage[] | null>(null);
@@ -112,6 +121,7 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   useEffect(() => {
     if (restoreRequest === null) return;
     conversationIdRef.current = restoreRequest.conversationId;
+    setActiveConversationId(restoreRequest.conversationId);
     restoredSeedRef.current = restoreRequest.messages;
     setMessages(restoreRequest.messages);
     setPendingApproval(null);
@@ -120,6 +130,60 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     setInput('');
     onRestoreHandled?.();
   }, [restoreRequest, onRestoreHandled]);
+
+  const projectId = activeProject?.projectId ?? null;
+
+  useEffect(() => {
+    if (projectId === null) {
+      setHistoryEntries([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const response = await window.videoTool.agentChatHistoryList();
+      if (!cancelled && response.ok) setHistoryEntries(response.value);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, historyRevision]);
+
+  const sessions = buildAgentChatSessionRows({ entries: historyEntries, projectId, activeConversationId });
+
+  const startNewSession = (): void => {
+    if (isBusy) return;
+    // The previous session stays in the project's saved history; only the
+    // thread this panel points at changes.
+    conversationIdRef.current = createConversationId();
+    setActiveConversationId(conversationIdRef.current);
+    restoredSeedRef.current = null;
+    setMessages([]);
+    setPendingApproval(null);
+    setStatus('idle');
+    setError(undefined);
+    setInput('');
+    setHistoryRevision((revision) => revision + 1);
+  };
+
+  const switchSession = async (conversationId: string): Promise<void> => {
+    if (isBusy || projectId === null || conversationId === conversationIdRef.current) return;
+    const response = await window.videoTool.agentChatHistoryGet({ projectId, conversationId });
+    if (!response.ok || response.value === null) {
+      setStatus('error');
+      setError(response.ok ? 'That conversation is no longer in this project.' : response.error.message);
+      return;
+    }
+    conversationIdRef.current = conversationId;
+    setActiveConversationId(conversationId);
+    // Seed the main-process thread from the stored transcript, the same path
+    // the home screen uses when reopening a conversation.
+    restoredSeedRef.current = response.value.messages;
+    setMessages(response.value.messages);
+    setPendingApproval(null);
+    setStatus('idle');
+    setError(undefined);
+    setInput('');
+  };
 
   const sendMessage = async (text: string): Promise<void> => {
     if (text.trim().length === 0 || isBusy || !modelReady) return;
@@ -152,6 +216,7 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
 
       if (response.ok) {
         restoredSeedRef.current = null;
+        setHistoryRevision((revision) => revision + 1);
         setMessages(
           response.value.status === 'error'
             ? mergePendingUserMessage(response.value.messages, pendingUserMessage)
@@ -239,6 +304,9 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     error,
     isBusy,
     activeProject,
+    sessions,
+    startNewSession,
+    switchSession,
     sendMessage,
     respondToApproval,
     resetConversation

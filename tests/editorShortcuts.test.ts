@@ -40,6 +40,24 @@ describe('editor shortcuts', () => {
     expect(isEditorShortcutBindingMatch(backspace, custom)).toBe(false);
   });
 
+  it('Given arrow-key bindings, When parsed and pressed, Then they resolve like any other chord', () => {
+    // Arrows were unparseable before, so playhead and nudge chords could not exist.
+    expect(parseEditorShortcutChord('alt + left')).toEqual({ key: 'ArrowLeft', modifiers: ['Alt'] });
+    const bindings = getEditorShortcutBindings(EDITOR_SHORTCUT_DEFAULT_PREFERENCES);
+    const stepForward = bindings.find((binding) => binding.actionId === 'stepForward')!;
+    const nudgeRight = bindings.find((binding) => binding.actionId === 'nudgeSelectionRight')!;
+    const arrowRight = { altKey: false, ctrlKey: false, key: 'ArrowRight', metaKey: false, shiftKey: false };
+
+    expect(isEditorShortcutBindingMatch(arrowRight, stepForward)).toBe(true);
+    expect(isEditorShortcutBindingMatch(arrowRight, nudgeRight)).toBe(false);
+    expect(isEditorShortcutBindingMatch({ ...arrowRight, altKey: true }, nudgeRight)).toBe(true);
+    expect(isEditorShortcutBindingMatch({ ...arrowRight, altKey: true }, stepForward)).toBe(false);
+  });
+
+  it('Given the default bindings, When checked for conflicts, Then no two actions share a chord', () => {
+    expect(findEditorShortcutConflicts(getEditorShortcutBindings(EDITOR_SHORTCUT_DEFAULT_PREFERENCES))).toEqual([]);
+  });
+
   it('Given a disabled binding, When its chord is pressed, Then nothing matches', () => {
     const preferences = disableEditorShortcutBindingPreference(EDITOR_SHORTCUT_DEFAULT_PREFERENCES, 'selectAll');
     const binding = getEditorShortcutBindings(preferences).find((entry) => entry.actionId === 'selectAll')!;
@@ -67,6 +85,15 @@ describe('editor shortcuts', () => {
       'deleteSelection',
       'splitSelection',
       'selectAll',
+      'clearSelection',
+      'duplicateSelection',
+      'saveTimeline',
+      'stepBackward',
+      'stepForward',
+      'nudgeSelectionLeft',
+      'nudgeSelectionRight',
+      'goToStart',
+      'goToEnd',
       'toggleLeftDock',
       'toggleInspector',
       'resetLayout',

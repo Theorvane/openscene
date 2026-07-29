@@ -20,6 +20,9 @@ describe('Edit Agent workspace wiring', () => {
     expect(context).toContain('sendMessage');
     expect(panel).toContain('selectedModel.label');
     expect(panel).toContain('<AgentModelPicker reasoningEffort={reasoningEffort} onReasoningEffortChange={setReasoningEffort} />');
+    expect(panel).toContain('<AgentChatSessionPicker />');
+    expect(context).toContain('startNewSession');
+    expect(context).toContain('switchSession');
     expect(panel).toContain('agent-chat-log');
     expect(panel).toContain('messages.map((message) => (');
     // Rendering lives in AgentChatMessageView: markdown for turns, a collapsed
