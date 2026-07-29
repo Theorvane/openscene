@@ -106,8 +106,10 @@ export const MEDIA_PROVIDERS: readonly LlmProviderInfo[] = [
     description: 'Video generation over the Luma Dream Machine API.'
   },
   {
-    id: 'minimax',
-    label: 'MiniMax',
+    // Distinct from the catalog's `minimax` chat provider; both read the same
+    // MiniMax credential slot, so one key connects chat and video.
+    id: 'minimax_hailuo',
+    label: 'MiniMax Hailuo',
     kind: 'cloud',
     auth: 'api-key',
     adapter: 'media',

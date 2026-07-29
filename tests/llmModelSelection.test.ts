@@ -46,6 +46,13 @@ describe('LLM provider and model catalog configuration', () => {
     }
   });
 
+  it('keeps every provider id unique so no registry entry shadows another', () => {
+    // A media provider sharing an id with a catalog provider used to hide the
+    // catalog's chat models behind the media adapter.
+    const ids = LLM_PROVIDERS.map((provider) => provider.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
   it('registers connection semantics: local always on, cloud gated on its credential slot', () => {
     expect(LLM_PROVIDERS[0]?.id).toBe('local_ollama');
     expect(isProviderConnected('local_ollama', {})).toBe(true);

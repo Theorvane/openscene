@@ -136,7 +136,12 @@ async function createCloudChatModel(
 ): Promise<BaseChatModel> {
   if (spec.adapter === 'anthropic') {
     const { ChatAnthropic } = await import('@langchain/anthropic');
-    return new ChatAnthropic({ model: spec.rawModelId, apiKey });
+    return new ChatAnthropic({
+      model: spec.rawModelId,
+      apiKey,
+      // Anthropic-compatible gateways keep the wire format under their own host.
+      ...(spec.baseUrl === undefined ? {} : { anthropicApiUrl: spec.baseUrl })
+    });
   }
   if (spec.adapter === 'gemini') {
     const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai');

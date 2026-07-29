@@ -61,7 +61,7 @@ const VIDEO_MODEL_PROVIDERS: Record<string, { seam: VideoGenerationProviderId; c
   runway: { seam: 'runway_gen4', credentialKey: 'runwayApiKey' },
   kling: { seam: 'kling_v3', credentialKey: 'klingApiKey' },
   luma: { seam: 'luma_dream', credentialKey: 'lumaApiKey' },
-  minimax: { seam: 'minimax_hailuo', credentialKey: 'minimax' }
+  minimax_hailuo: { seam: 'minimax_hailuo', credentialKey: 'minimax' }
 };
 
 const SPEECH_MODEL_PROVIDERS: Record<string, { seam: TextToSpeechJob['provider']; credentialKey: string; label: string }> = {

@@ -40,10 +40,18 @@ const OPENAI_COMPATIBLE_ENDPOINTS = {
   togetherai: 'https://api.together.xyz/v1',
   cerebras: 'https://api.cerebras.ai/v1',
   perplexity: 'https://api.perplexity.ai',
-  deepinfra: 'https://api.deepinfra.com/v1/openai'
+  deepinfra: 'https://api.deepinfra.com/v1/openai',
+  vercel: 'https://ai-gateway.vercel.sh/v1'
 };
 
 const POPULAR_ORDER = ['anthropic', 'openai', 'google_gemini', 'openrouter', 'deepseek', 'groq', 'xai', 'mistral'];
+
+/** A public https base URL with no unresolved env placeholder. */
+function publicApiBaseUrl(provider) {
+  const api = provider.api;
+  if (typeof api !== 'string' || !api.startsWith('https://') || api.includes('${')) return null;
+  return api.replace(/\/$/, '');
+}
 
 function adapterFor(provider) {
   if (provider.id === 'anthropic') return { adapter: 'anthropic' };
@@ -51,8 +59,15 @@ function adapterFor(provider) {
   if (OPENAI_COMPATIBLE_ENDPOINTS[provider.id] !== undefined) {
     return { adapter: 'openai-compatible', baseUrl: OPENAI_COMPATIBLE_ENDPOINTS[provider.id] };
   }
-  if (provider.npm === '@ai-sdk/openai-compatible' && typeof provider.api === 'string' && provider.api.startsWith('https://')) {
-    return { adapter: 'openai-compatible', baseUrl: provider.api.replace(/\/$/, '') };
+  const baseUrl = publicApiBaseUrl(provider);
+  if (baseUrl === null) return null;
+  // Anything speaking the OpenAI or Anthropic wire format on a public endpoint
+  // is drivable by an adapter we already ship.
+  if (provider.npm === '@ai-sdk/openai-compatible' || provider.npm === '@ai-sdk/openai') {
+    return { adapter: 'openai-compatible', baseUrl };
+  }
+  if (provider.npm === '@ai-sdk/anthropic') {
+    return { adapter: 'anthropic', baseUrl };
   }
   return null;
 }

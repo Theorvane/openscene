@@ -302,7 +302,9 @@ function buildCloudCompletionRequest(
     }
     case 'anthropic':
       return {
-        url: 'https://api.anthropic.com/v1/messages',
+        // Anthropic-compatible gateways (MiniMax, Kimi, FreeModel…) expose the
+        // same messages API under their own base URL.
+        url: `${(provider.baseUrl ?? 'https://api.anthropic.com/v1').replace(/\/$/, '')}/messages`,
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,

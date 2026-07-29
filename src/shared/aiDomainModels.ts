@@ -278,9 +278,9 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
   },
   {
     id: 'minimax-hailuo-02',
-    providerId: 'minimax',
+    providerId: 'minimax_hailuo',
     label: 'Hailuo 02',
-    providerLabel: 'MiniMax',
+    providerLabel: 'MiniMax Hailuo',
     description: 'MiniMax Hailuo text/image-to-video.',
     executionPath: 'api',
     domains: ['video-generation'],
