@@ -7,7 +7,8 @@ const SOURCE_URLS = {
   dialog: new URL('../src/renderer/src/ProviderConnectDialog.tsx', import.meta.url),
   settings: new URL('../src/renderer/src/SettingsWorkspace.tsx', import.meta.url),
   chatContext: new URL('../src/renderer/src/AgentChatContext.tsx', import.meta.url),
-  picker: new URL('../src/renderer/src/AgentModelPicker.tsx', import.meta.url)
+  picker: new URL('../src/renderer/src/AgentModelPicker.tsx', import.meta.url),
+  pickerModel: new URL('../src/renderer/src/agentModelPickerModel.ts', import.meta.url)
 } as const;
 
 describe('unified OpenAI provider renderer contract', () => {
@@ -43,19 +44,22 @@ describe('unified OpenAI provider renderer contract', () => {
   });
 
   it('treats a ChatGPT sign-in as a connection for Codex models across chat surfaces', async () => {
-    const [settings, chatContext, picker] = await Promise.all([
+    const [settings, chatContext, picker, pickerModel] = await Promise.all([
       readFile(SOURCE_URLS.settings, 'utf8'),
       readFile(SOURCE_URLS.chatContext, 'utf8'),
-      readFile(SOURCE_URLS.picker, 'utf8')
+      readFile(SOURCE_URLS.picker, 'utf8'),
+      readFile(SOURCE_URLS.pickerModel, 'utf8')
     ]);
 
     expect(settings).toContain('isProviderLinked');
     expect(chatContext).toContain('resolveOpenAiAuthMode(selectedModel.id, chatGptAuth.isConnected)');
     expect(chatContext).toContain('openAiAuthMode,');
-    expect(picker).toContain('isOpenAiCodexModelKey');
-    expect(picker).toContain('isModelLinked');
+    // The picker's list rule lives in a pure, unit-tested module.
+    expect(picker).toContain('buildAgentModelGroups');
+    expect(picker).toContain('chatGptConnected: chatGptAuth.isConnected');
+    expect(pickerModel).toContain('isOpenAiCodexModelKey');
     // An OpenAI group carried only by a sign-in says so, so an empty-looking
     // model list is never a mystery.
-    expect(picker).toContain("? 'ChatGPT' : 'Not connected'");
+    expect(pickerModel).toContain("linkedBySignIn ? 'ChatGPT' : 'Not connected'");
   });
 });

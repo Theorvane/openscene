@@ -1,31 +1,10 @@
 import { useState, type ReactElement } from 'react';
 
-import { getDomainModels, type AiDomainModelConfig } from '../../shared/aiDomainModels';
-import { isProviderConnected } from '../../shared/llmProviders';
-import { isOpenAiCodexModelKey } from '../../shared/openAiAuth';
+import { agentModelGroupStatus, buildAgentModelGroups, isAgentModelLinked } from './agentModelPickerModel';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useChatGptAuth } from './ChatGptAuthContext';
 import { useLlmModel } from './LlmProviderContext';
 import { useModelVisibility } from './ModelVisibilityContext';
-
-type ProviderGroup = {
-  readonly providerId: string;
-  readonly providerLabel: string;
-  readonly models: readonly AiDomainModelConfig[];
-};
-
-function groupByProvider(models: readonly AiDomainModelConfig[]): readonly ProviderGroup[] {
-  const groups: ProviderGroup[] = [];
-  for (const model of models) {
-    const existing = groups.find((group) => group.providerId === model.providerId);
-    if (existing === undefined) {
-      groups.push({ providerId: model.providerId, providerLabel: model.providerLabel, models: [model] });
-    } else {
-      (existing.models as AiDomainModelConfig[]).push(model);
-    }
-  }
-  return groups;
-}
 
 /**
  * opencode-style model selector for the Edit Agent prompt bar: models grouped
@@ -37,32 +16,15 @@ export function AgentModelPicker(): ReactElement {
   const { credentialStatus } = useLlmModel();
   const { isModelVisible } = useModelVisibility();
   const chatGptAuth = useChatGptAuth();
-  // A ChatGPT sign-in connects the OpenAI provider for Codex-family models even
-  // when no API key is stored.
-  const isModelLinked = (providerId: string, modelId: string): boolean =>
-    isProviderConnected(providerId, credentialStatus) ||
-    (chatGptAuth.isConnected && isOpenAiCodexModelKey(modelId));
   const [isOpen, setIsOpen] = useState(false);
 
   const activeModel = selectedModel('edit-agent');
-  // opencode behavior: the picker lists the local engine plus models from
-  // connected providers only (the full catalog would be thousands of disabled
-  // rows). Settings → Models visibility switches filter further; the active
-  // model always stays listed so the current selection is never orphaned.
-  const models = getDomainModels('edit-agent').filter((model) => {
-    if (model.id === activeModel.id) return true;
-    if (model.executionPath !== 'local' && !isModelLinked(model.providerId, model.id)) return false;
-    return isModelVisible(model.providerId, model.id);
+  const groups = buildAgentModelGroups({
+    activeModelId: activeModel.id,
+    credentialStatus,
+    chatGptConnected: chatGptAuth.isConnected,
+    isModelVisible
   });
-  const groups = groupByProvider(models);
-
-  const providerStatusLabel = (group: ProviderGroup): string => {
-    if (group.models[0]?.executionPath === 'local') return 'Local';
-    if (isProviderConnected(group.providerId, credentialStatus)) return 'Connected';
-    // A ChatGPT sign-in connects OpenAI without a stored key — say which method
-    // is carrying the group so an empty-looking list is never a mystery.
-    return group.models.some((model) => isModelLinked(group.providerId, model.id)) ? 'ChatGPT' : 'Not connected';
-  };
 
   return (
     <div className="agent-model-picker">
@@ -87,7 +49,8 @@ export function AgentModelPicker(): ReactElement {
           aria-label="Edit Agent models by provider"
         >
           {groups.map((group) => {
-            const connected = group.models[0]?.executionPath === 'local' || group.models.some((model) => isModelLinked(group.providerId, model.id));
+            const status = agentModelGroupStatus(group, { credentialStatus, chatGptConnected: chatGptAuth.isConnected });
+            const connected = status !== 'Not connected';
             return (
               <div key={group.providerId} className="agent-model-picker__group">
                 <div className="agent-model-picker__group-header">
@@ -95,7 +58,7 @@ export function AgentModelPicker(): ReactElement {
                   <span
                     className={`agent-model-picker__group-status${connected ? ' agent-model-picker__group-status--connected' : ''}`}
                   >
-                    {providerStatusLabel(group)}
+                    {status}
                   </span>
                 </div>
                 {group.models.map((model) => {
