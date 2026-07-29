@@ -12,7 +12,7 @@ vi.mock('electron', () => ({
   }
 }));
 
-import { CHATGPT_CODEX_ENDPOINT_METADATA, ChatGptOAuthService } from '../src/main/chatGptOAuthService';
+import { CHATGPT_CODEX_ENDPOINT_METADATA, CHATGPT_OAUTH_REDIRECT_URI, ChatGptOAuthService } from '../src/main/chatGptOAuthService';
 import { ChatGptOAuthTokenStore } from '../src/main/chatGptOAuthTokenStore';
 import { CredentialStore } from '../src/main/credentialStore';
 
@@ -57,7 +57,7 @@ describe('ChatGptOAuthService', () => {
       if (state === null) {
         throw new Error('Authorization URL did not contain state.');
       }
-      const callback = new URL('http://127.0.0.1:19876/auth/callback');
+      const callback = new URL(CHATGPT_OAUTH_REDIRECT_URI);
       callback.searchParams.set('code', 'authorization-code');
       callback.searchParams.set('state', state);
       const response = await fetch(callback);
@@ -95,7 +95,7 @@ describe('ChatGptOAuthService', () => {
     expect(authorizationUrl?.origin).toBe('https://auth.openai.com');
     expect(authorizationUrl?.pathname).toBe('/oauth/authorize');
     expect(authorizationUrl?.searchParams.get('client_id')).toBe('app_EMoamEEZ73f0CkXaXp7hrann');
-    expect(authorizationUrl?.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:19876/auth/callback');
+    expect(authorizationUrl?.searchParams.get('redirect_uri')).toBe(CHATGPT_OAUTH_REDIRECT_URI);
     expect(authorizationUrl?.searchParams.get('code_challenge_method')).toBe('S256');
     expect(authorizationUrl?.searchParams.get('code_challenge')).toBe(
       createHash('sha256').update(verifierBytes.toString('base64url')).digest('base64url')
@@ -107,7 +107,7 @@ describe('ChatGptOAuthService', () => {
     });
     await expect(service.getStatus()).resolves.toEqual({ kind: 'connected' });
     await expect(service.acquireCredentials()).resolves.toEqual({ accessToken, accountId: 'account-123' });
-    const replay = new URL('http://127.0.0.1:19876/auth/callback');
+    const replay = new URL(CHATGPT_OAUTH_REDIRECT_URI);
     replay.searchParams.set('code', 'authorization-code');
     replay.searchParams.set('state', stateBytes.toString('base64url'));
     await expect(fetch(replay)).rejects.toThrow();
@@ -179,7 +179,7 @@ describe('ChatGptOAuthService', () => {
 
     // Then
     await expect(authorization).rejects.toMatchObject({ reason: 'cancelled' });
-    await expect(fetch('http://127.0.0.1:19876/auth/callback', {
+    await expect(fetch(CHATGPT_OAUTH_REDIRECT_URI, {
       signal: AbortSignal.timeout(250)
     })).rejects.toThrow();
   });
@@ -193,7 +193,7 @@ describe('ChatGptOAuthService', () => {
         throw new Error('Token exchange must not run for invalid state.');
       },
       openExternal: async () => {
-        const callback = new URL('http://127.0.0.1:19876/auth/callback');
+        const callback = new URL(CHATGPT_OAUTH_REDIRECT_URI);
         callback.searchParams.set('code', 'authorization-code');
         callback.searchParams.set('state', 'wrong-state');
         callbackStatus = (await fetch(callback)).status;
@@ -208,7 +208,7 @@ describe('ChatGptOAuthService', () => {
     await expect(authorization).rejects.toMatchObject({ reason: 'invalid_state' });
     await callbackHandled.promise;
     expect(callbackStatus).toBe(400);
-    await expect(fetch('http://127.0.0.1:19876/auth/callback')).rejects.toThrow();
+    await expect(fetch(CHATGPT_OAUTH_REDIRECT_URI)).rejects.toThrow();
   });
 
   it('times out authorization and closes the callback server', async () => {
@@ -229,7 +229,7 @@ describe('ChatGptOAuthService', () => {
     // Then
     await rejection;
     vi.useRealTimers();
-    await expect(fetch('http://127.0.0.1:19876/auth/callback')).rejects.toThrow();
+    await expect(fetch(CHATGPT_OAUTH_REDIRECT_URI)).rejects.toThrow();
   });
 
   it('handles browser cancellation and closes the callback server', async () => {
@@ -240,7 +240,7 @@ describe('ChatGptOAuthService', () => {
     const service = new ChatGptOAuthService(tempDir, {
       authorizationTimeoutMs: 10,
       openExternal: async () => {
-        cancelStatus = (await fetch('http://127.0.0.1:19876/cancel')).status;
+        cancelStatus = (await fetch(new URL('/cancel', CHATGPT_OAUTH_REDIRECT_URI).toString())).status;
         cancelHandled.resolve();
       }
     });
@@ -255,6 +255,6 @@ describe('ChatGptOAuthService', () => {
     await rejection;
     expect(cancelStatus).toBe(200);
     vi.useRealTimers();
-    await expect(fetch('http://127.0.0.1:19876/auth/callback')).rejects.toThrow();
+    await expect(fetch(CHATGPT_OAUTH_REDIRECT_URI)).rejects.toThrow();
   });
 });

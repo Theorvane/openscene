@@ -5,10 +5,16 @@ import { receiveAuthorizationCode } from './chatGptOAuthCallback';
 import { exchangeAuthorizationCode, refreshTokens } from './chatGptOAuthProtocol';
 import type { ChatGptOAuthStatus } from '../shared/openAiAuth';
 
+/**
+ * The authorization server only accepts the loopback callback registered for
+ * this client, so the port and host are fixed rather than freely chosen.
+ */
+export const CHATGPT_OAUTH_REDIRECT_URI = 'http://localhost:1455/auth/callback';
+
 const CHATGPT_OAUTH = {
   clientId: 'app_EMoamEEZ73f0CkXaXp7hrann',
   issuer: 'https://auth.openai.com',
-  redirectUri: 'http://127.0.0.1:19876/auth/callback',
+  redirectUri: CHATGPT_OAUTH_REDIRECT_URI,
   scope: 'openid profile email offline_access'
 } as const;
 
