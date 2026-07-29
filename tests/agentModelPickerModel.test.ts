@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { agentModelGroupStatus, buildAgentModelGroups } from '../src/renderer/src/agentModelPickerModel';
 
 const LOCAL_MODEL_ID = 'qwen2.5-coder';
-const CODEX_MODEL_ID = 'openai/gpt-5.3-codex';
+const CODEX_MODEL_ID = 'openai/gpt-5.3-codex-spark';
 const allVisible = (): boolean => true;
 
 describe('Edit Agent model picker groups', () => {
@@ -34,8 +34,8 @@ describe('Edit Agent model picker groups', () => {
     const openai = groups.find((group) => group.providerId === 'openai');
     expect(openai).toBeDefined();
     expect(openai!.models.map((model) => model.id)).toContain(CODEX_MODEL_ID);
-    // Only Codex models ride the sign-in; the rest still need an API key.
-    expect(openai!.models.every((model) => model.id.includes('codex'))).toBe(true);
+    // Only backend-served models ride the sign-in; the rest need an API key.
+    expect(openai!.models.every((model) => model.id !== 'openai/gpt-5.3-codex')).toBe(true);
     expect(agentModelGroupStatus(openai!, { credentialStatus: {}, chatGptConnected: true })).toBe('ChatGPT');
   });
 

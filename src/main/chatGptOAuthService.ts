@@ -24,6 +24,19 @@ export const CHATGPT_CODEX_ENDPOINT_METADATA = {
   accountIdHeader: 'ChatGPT-Account-Id'
 } as const;
 
+/**
+ * The Codex backend rejects requests that do not identify the calling client
+ * the way the Codex CLI does — a bare 400 with no body. These headers accompany
+ * every Codex request.
+ */
+export function chatGptCodexClientHeaders(sessionId: string): Readonly<Record<string, string>> {
+  return {
+    originator: 'opencode',
+    'User-Agent': 'opencode/0.0.0 (openvideo)',
+    'session-id': sessionId
+  };
+}
+
 const AUTHORIZATION_TIMEOUT_MS = 5 * 60 * 1_000;
 const REFRESH_WINDOW_MS = 5 * 60 * 1_000;
 

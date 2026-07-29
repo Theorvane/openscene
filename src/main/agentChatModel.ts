@@ -1,13 +1,15 @@
+import { randomUUID } from 'node:crypto';
+
 import { ChatOllama } from '@langchain/ollama';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { getLlmModel, parseLlmModelKey } from '../shared/llmModels';
 import { getLlmProvider } from '../shared/llmProviders';
-import type { ReasoningEffort } from '../shared/openAiAuth';
+import { isOpenAiCodexModelKey, type ReasoningEffort } from '../shared/openAiAuth';
 import type { OpenAiAuthMode } from '../shared/openAiAuth';
 import type { AgentChatModelFactory } from './agentChatGraph';
 import type { CredentialStore } from './credentialStore';
-import { CHATGPT_CODEX_ENDPOINT_METADATA } from './chatGptOAuthService';
+import { CHATGPT_CODEX_ENDPOINT_METADATA, chatGptCodexClientHeaders } from './chatGptOAuthService';
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
@@ -65,9 +67,9 @@ export function resolveAgentChatModelSpec(
         'ChatGPT authentication supports only canonical OpenAI Codex-family models for Edit Agent.'
       );
     }
-    if (!parsedModel.modelId.includes('codex')) {
+    if (!isOpenAiCodexModelKey(modelId)) {
       throw new AgentChatModelConfigurationError(
-        `ChatGPT authentication cannot run Edit Agent model "${modelId}" because it is not a Codex-family model.`
+        `ChatGPT authentication cannot run Edit Agent model "${modelId}" because the ChatGPT backend does not serve it.`
       );
     }
     return {
@@ -109,7 +111,8 @@ export function resolveAgentChatModelSpec(
 
 export function resolveChatGptCodexClientConfig(
   spec: Extract<AgentChatModelSpec, { kind: 'chatgpt-codex' }>,
-  credentials: ChatGptCodexCredentials
+  credentials: ChatGptCodexCredentials,
+  sessionId: string
 ) {
   return {
     model: spec.rawModelId,
@@ -119,7 +122,8 @@ export function resolveChatGptCodexClientConfig(
       baseURL: spec.baseUrl,
       defaultHeaders: {
         Authorization: `Bearer ${credentials.accessToken}`,
-        [spec.accountIdHeader]: credentials.accountId
+        [spec.accountIdHeader]: credentials.accountId,
+        ...chatGptCodexClientHeaders(sessionId)
       }
     }
   };
@@ -180,7 +184,7 @@ export function createAgentChatModel(
           }
           const credentials = await chatGptOAuthService.acquireCredentials();
           const { ChatOpenAI } = await import('@langchain/openai');
-          const cloudModel = new ChatOpenAI(resolveChatGptCodexClientConfig(spec, credentials));
+          const cloudModel = new ChatOpenAI(resolveChatGptCodexClientConfig(spec, credentials, randomUUID()));
           const model = cloudModel.bindTools([...tools]);
           return model.invoke([...messages]);
         }

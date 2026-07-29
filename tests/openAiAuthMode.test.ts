@@ -3,22 +3,34 @@ import { describe, expect, it } from 'vitest';
 import { isOpenAiAuthMode, isOpenAiCodexModelKey, resolveOpenAiAuthMode } from '../src/shared/openAiAuth';
 
 describe('unified OpenAI auth mode selection', () => {
-  it('recognises only canonical OpenAI Codex-family model keys', () => {
-    expect(isOpenAiCodexModelKey('openai/gpt-5.3-codex')).toBe(true);
-    expect(isOpenAiCodexModelKey('openai/gpt-5-codex')).toBe(true);
+  it('recognises only the models the ChatGPT backend actually serves', () => {
+    // opencode's allow list, verbatim.
+    expect(isOpenAiCodexModelKey('openai/gpt-5.3-codex-spark')).toBe(true);
+    expect(isOpenAiCodexModelKey('openai/gpt-5.4')).toBe(true);
+    expect(isOpenAiCodexModelKey('openai/gpt-5.4-mini')).toBe(true);
+    expect(isOpenAiCodexModelKey('openai/gpt-5.5')).toBe(true);
+    // Newer than 5.4 passes the version rule.
+    expect(isOpenAiCodexModelKey('openai/gpt-5.6-luna')).toBe(true);
+
+    // Older Codex builds and Pro tiers are rejected by the backend with a bare
+    // 400, so they must never route through the sign-in.
+    expect(isOpenAiCodexModelKey('openai/gpt-5.3-codex')).toBe(false);
+    expect(isOpenAiCodexModelKey('openai/gpt-5.5-pro')).toBe(false);
+    expect(isOpenAiCodexModelKey('openai/gpt-5.6')).toBe(false);
     expect(isOpenAiCodexModelKey('openai/gpt-5')).toBe(false);
-    // Codex models re-listed by aggregators are not ChatGPT-eligible.
-    expect(isOpenAiCodexModelKey('openrouter/openai/gpt-5.3-codex')).toBe(false);
+    // Models re-listed by aggregators are not ChatGPT-eligible.
+    expect(isOpenAiCodexModelKey('openrouter/openai/gpt-5.4')).toBe(false);
     expect(isOpenAiCodexModelKey('qwen2.5-coder')).toBe(false);
     expect(isOpenAiCodexModelKey('')).toBe(false);
   });
 
-  it('uses ChatGPT only for Codex models while a sign-in is connected', () => {
-    expect(resolveOpenAiAuthMode('openai/gpt-5.3-codex', true)).toBe('chatgpt');
+  it('uses ChatGPT only for served models while a sign-in is connected', () => {
+    expect(resolveOpenAiAuthMode('openai/gpt-5.3-codex-spark', true)).toBe('chatgpt');
     // Without a sign-in the same model falls back to the API key.
-    expect(resolveOpenAiAuthMode('openai/gpt-5.3-codex', false)).toBe('api-key');
-    // Non-Codex OpenAI models always use the API key, matching the main-process
+    expect(resolveOpenAiAuthMode('openai/gpt-5.3-codex-spark', false)).toBe('api-key');
+    // Unserved OpenAI models always use the API key, matching the main-process
     // rule that rejects them in chatgpt mode.
+    expect(resolveOpenAiAuthMode('openai/gpt-5.3-codex', true)).toBe('api-key');
     expect(resolveOpenAiAuthMode('openai/gpt-5', true)).toBe('api-key');
     expect(resolveOpenAiAuthMode('anthropic/claude-sonnet-5', true)).toBe('api-key');
     expect(resolveOpenAiAuthMode('qwen2.5-coder', true)).toBe('api-key');

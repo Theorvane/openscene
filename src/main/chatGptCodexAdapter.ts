@@ -1,4 +1,6 @@
-import { CHATGPT_CODEX_ENDPOINT_METADATA } from './chatGptOAuthService';
+import { randomUUID } from 'node:crypto';
+
+import { CHATGPT_CODEX_ENDPOINT_METADATA, chatGptCodexClientHeaders } from './chatGptOAuthService';
 import type { LlmCompletionRequest, LlmCompletionResponse } from './llmAdapter';
 import { getLlmModel, parseLlmModelKey } from '../shared/llmModels';
 
@@ -51,7 +53,8 @@ export class ChatGptCodexAdapter {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${credentials.accessToken}`,
-          [CHATGPT_CODEX_ENDPOINT_METADATA.accountIdHeader]: credentials.accountId
+          [CHATGPT_CODEX_ENDPOINT_METADATA.accountIdHeader]: credentials.accountId,
+          ...chatGptCodexClientHeaders(randomUUID())
         },
         signal: controller.signal,
         body: JSON.stringify({

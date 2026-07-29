@@ -50,7 +50,7 @@ describe('agent chat model provider resolution', () => {
 
   it('resolves explicit ChatGPT authentication to a private Responses API Codex client spec', () => {
     // Given
-    const modelId = 'openai/gpt-5.3-codex';
+    const modelId = 'openai/gpt-5.3-codex-spark';
 
     // When
     const spec = resolveAgentChatModelSpec(modelId, 'chatgpt');
@@ -60,7 +60,7 @@ describe('agent chat model provider resolution', () => {
       kind: 'chatgpt-codex',
       providerId: 'openai',
       providerLabel: 'OpenAI',
-      rawModelId: 'gpt-5.3-codex',
+      rawModelId: 'gpt-5.3-codex-spark',
       baseUrl: 'https://chatgpt.com/backend-api/codex',
       accountIdHeader: 'ChatGPT-Account-Id',
       useResponsesApi: true
@@ -69,7 +69,7 @@ describe('agent chat model provider resolution', () => {
 
   it('builds the ChatOpenAI client configuration with OAuth bearer and account headers', () => {
     // Given
-    const spec = resolveAgentChatModelSpec('openai/gpt-5.3-codex', 'chatgpt');
+    const spec = resolveAgentChatModelSpec('openai/gpt-5.3-codex-spark', 'chatgpt');
     if (spec.kind !== 'chatgpt-codex') {
       throw new Error('Expected a ChatGPT Codex model spec.');
     }
@@ -78,18 +78,22 @@ describe('agent chat model provider resolution', () => {
     const config = resolveChatGptCodexClientConfig(spec, {
       accessToken: 'oauth-access-token',
       accountId: 'account-123'
-    });
+    }, 'session-abc');
 
     // Then
     expect(config).toEqual({
-      model: 'gpt-5.3-codex',
+      model: 'gpt-5.3-codex-spark',
       apiKey: 'oauth-access-token',
       useResponsesApi: true,
       configuration: {
         baseURL: 'https://chatgpt.com/backend-api/codex',
         defaultHeaders: {
           Authorization: 'Bearer oauth-access-token',
-          'ChatGPT-Account-Id': 'account-123'
+          'ChatGPT-Account-Id': 'account-123',
+          // The Codex backend 400s without a client identity, matching the CLI.
+          originator: 'opencode',
+          'User-Agent': 'opencode/0.0.0 (openvideo)',
+          'session-id': 'session-abc'
         }
       }
     });
@@ -102,7 +106,7 @@ describe('agent chat model provider resolution', () => {
     };
 
     // When / Then
-    expect(resolve).toThrow('not a Codex-family model');
+    expect(resolve).toThrow('does not serve it');
   });
 
   it('rejects a non-OpenAI model when Edit Agent explicitly uses ChatGPT authentication', () => {
