@@ -41,7 +41,7 @@ function makeProject(overrides: Partial<LocalProjectSnapshot> = {}): LocalProjec
 }
 
 describe('editor dock tabs', () => {
-  it('returns stable left project/media and inspector selection/asset/project defaults', () => {
+  it('returns stable left project/media and inspector selection/asset defaults', () => {
     // Given
     const project = makeProject();
 
@@ -51,8 +51,9 @@ describe('editor dock tabs', () => {
     // Then
     expect(dockTabs.left.map((tab) => tab.id)).toEqual(['project', 'media']);
     expect(dockTabs.left.map((tab) => tab.label)).toEqual(['Project', 'Media']);
-    expect(dockTabs.inspector.map((tab) => tab.id)).toEqual(['selection', 'asset', 'project']);
-    expect(dockTabs.inspector.map((tab) => tab.label)).toEqual(['Selection', 'Asset', 'Project']);
+    // Project settings live on the workspace tab line, not in the inspector.
+    expect(dockTabs.inspector.map((tab) => tab.id)).toEqual(['selection', 'asset']);
+    expect(dockTabs.inspector.map((tab) => tab.label)).toEqual(['Selection', 'Asset']);
   });
 
   it('moves focus across enabled tabs with wrap, Home, and End while skipping disabled tabs', () => {
@@ -65,12 +66,13 @@ describe('editor dock tabs', () => {
     ] as const;
 
     // When / Then
+    // This project's asset still lacks metadata, so the Asset tab is disabled;
+    // enabled tabs are project, media, selection.
     expect(getNextEditorDockTabId({ currentTabId: 'project', key: 'ArrowRight', tabs })).toBe('media');
     expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'ArrowRight', tabs })).toBe('selection');
     expect(getNextEditorDockTabId({ currentTabId: 'selection', key: 'ArrowRight', tabs })).toBe('project');
-    expect(getNextEditorDockTabId({ currentTabId: 'project', key: 'ArrowLeft', tabs })).toBe('selection');
     expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'Home', tabs })).toBe('project');
-    expect(getNextEditorDockTabId({ currentTabId: 'project', key: 'End', tabs })).toBe('project');
+    expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'End', tabs })).toBe('selection');
     expect(getNextEditorDockTabId({ currentTabId: 'selection', key: 'ArrowLeft', tabs })).toBe('media');
     expect(getNextEditorDockTabId({ currentTabId: 'inspector', key: 'ArrowRight', tabs })).toBe('selection');
   });

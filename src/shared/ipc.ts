@@ -15,6 +15,7 @@ export const IPC_CHANNELS = {
   projectsOpen: 'projects:open',
   projectsOpenFolder: 'projects:open-folder',
   projectsDelete: 'projects:delete',
+  projectsRename: 'projects:rename',
   projectAssetsImport: 'project-assets:import',
   projectRecordingResultImport: 'project-assets:import-recording-result',
   projectAssetMetadataUpdate: 'project-assets:update-metadata',

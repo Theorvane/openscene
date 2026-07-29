@@ -389,6 +389,20 @@ export function useTimelineEditor() {
     });
   }, [hasUnsavedTimeline, playback, project?.id, setLoadedProject]);
 
+  const renameProject = useCallback(async (name: string): Promise<boolean> => {
+    if (project === null) return false;
+    const response = await window.videoTool.renameProject({ projectId: project.id, name });
+    if (!response.ok) {
+      setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
+      return false;
+    }
+    // Only the label changes; the timeline and history in memory stay as they are.
+    setProject((current) => current === null ? current : { ...current, name: response.value.name, updatedAt: response.value.updatedAt });
+    await refreshProjects();
+    setStatusMessage({ tone: 'success', text: `Renamed to ${response.value.name}.` });
+    return true;
+  }, [project, refreshProjects]);
+
   const saveTimeline = useCallback(async () => {
     if (project === null) return;
     setIsBusy(true);
@@ -406,7 +420,7 @@ export function useTimelineEditor() {
   return {
     addTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
-    openProject, openProjectFolder, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
+    openProject, openProjectFolder, renameProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
     clearSelection, goToTimelineEnd, goToTimelineStart, selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,
     setNewProjectName, setSelectedAssetId, setSelectedClipId: selectClip,
     splitSelectedClip, statusMessage, trimSelectedClip, updateAssetMetadata, updateSelectedClipEffects,

@@ -8,6 +8,7 @@ import { FirstRunOnboarding } from './FirstRunOnboarding';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
 import { Tabs } from './ui';
 import { closeProjectTab, openProjectTab, pruneProjectTabs, type ProjectTab } from './projectTabs';
+import { ProjectSettingsDialog } from './ProjectSettingsDialog';
 import { NarrationPanel } from './NarrationPanel';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
 import {
@@ -35,6 +36,15 @@ const APP_WORKSPACE_PANEL_STYLE = {
   minHeight: 0,
   overflow: 'hidden'
 } as const satisfies CSSProperties;
+
+function SettingsGlyph(): ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M19.4 15a1.7 1.7 0 00.34 1.88l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.88-.34 1.7 1.7 0 00-1 1.56V21a2 2 0 11-4 0v-.09A1.7 1.7 0 008 19.4a1.7 1.7 0 00-1.88.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.88 1.7 1.7 0 00-1.56-1H2a2 2 0 110-4h.09A1.7 1.7 0 004.6 8a1.7 1.7 0 00-.34-1.88l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 3.63 1.7 1.7 0 0010 2.07V2a2 2 0 114 0v.09a1.7 1.7 0 001 1.56 1.7 1.7 0 001.88-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 8v0a1.7 1.7 0 001.56 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.56 1z" />
+    </svg>
+  );
+}
 
 export function App(): ReactElement {
   const editor = useTimelineEditor();
@@ -240,6 +250,7 @@ export function App(): ReactElement {
     }
     await editor.openProject(next.activeId);
   }, [editor, navigateToPage, projectTabs]);
+  const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   // Which workspace surface is showing; remembered across launches.
   const [workspaceTabId, setWorkspaceTabId] = useState<WorkspaceTabId>(() =>
     typeof window === 'undefined' ? 'edit' : parseWorkspaceTabId(window.localStorage.getItem(WORKSPACE_TAB_STORAGE_KEY))
@@ -305,14 +316,26 @@ export function App(): ReactElement {
             {/* Workspace switcher: the editor and the two generation studios
                 share the area, so a generated clip lands on the timeline
                 without leaving the workspace or the agent chat beside it. */}
-            <Tabs
-              activeTabId={workspaceTabId}
-              idBase="workspace"
-              tabs={WORKSPACE_TAB_IDS.map((id) => ({ id, label: WORKSPACE_TAB_LABELS[id] }))}
-              onActiveTabChange={selectWorkspaceTab}
-              className="workspace-tabs"
-              aria-label="Workspace sections"
-            />
+            <div className="workspace-tab-line">
+              <Tabs
+                activeTabId={workspaceTabId}
+                idBase="workspace"
+                tabs={WORKSPACE_TAB_IDS.map((id) => ({ id, label: WORKSPACE_TAB_LABELS[id] }))}
+                onActiveTabChange={selectWorkspaceTab}
+                className="workspace-tabs"
+                aria-label="Workspace sections"
+              />
+              <button
+                type="button"
+                className="workspace-settings-button"
+                aria-label="Project settings"
+                title="Project settings"
+                disabled={editor.project === null}
+                onClick={() => setProjectSettingsOpen(true)}
+              >
+                <SettingsGlyph />
+              </button>
+            </div>
             <div className="app-workspace-panel-stack">
               <section
                 aria-labelledby={EDIT_WORKSPACE.navId}
@@ -360,6 +383,19 @@ export function App(): ReactElement {
             <SettingsWorkspace onReplayFirstRunOnboarding={replayFirstRunOnboarding} />
           </section>
       </div>
+      {projectSettingsOpen && editor.project !== null && (
+        <ProjectSettingsDialog
+          project={editor.project}
+          summary={editor.projects.find((item) => item.id === editor.project?.id)}
+          isBusy={editor.isBusy}
+          onRename={editor.renameProject}
+          onRemove={async () => {
+            setProjectSettingsOpen(false);
+            await removeProject(editor.project!.id);
+          }}
+          onClose={() => setProjectSettingsOpen(false)}
+        />
+      )}
       {showFirstRunOnboarding && <FirstRunOnboarding onComplete={completeFirstRunOnboarding} />}
       </AppShell>
     </ProjectResultImportProvider>

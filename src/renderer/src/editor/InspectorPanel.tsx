@@ -225,29 +225,6 @@ function AssetInspector({ editor }: InspectorContentProps): ReactElement {
   );
 }
 
-function ProjectInspector({ editor }: InspectorContentProps): ReactElement {
-  const project = editor.project;
-
-  if (project === null) {
-    return <div className="empty-slate">Create or open a project to see project controls.</div>;
-  }
-
-  return (
-    <section className="clip-controls inspector-section" aria-label="Current project controls">
-      <h3 className="inspector-section__title">{project.name}</h3>
-      <PropertyGroup title="Details">
-        <PropertyRow label="Created"><span className="property-value-chip">{formatTimestamp(project.createdAt)}</span></PropertyRow>
-        <PropertyRow label="Updated"><span className="property-value-chip">{formatTimestamp(project.updatedAt)}</span></PropertyRow>
-        <PropertyRow label="Assets"><span className="property-value-chip">{project.assets.length}</span></PropertyRow>
-        <PropertyRow label="Tracks"><span className="property-value-chip">{project.timeline.tracks.length}</span></PropertyRow>
-      </PropertyGroup>
-      <Button className="inspector-danger-action" variant="ghost" onClick={() => void editor.deleteCurrentProject()} disabled={editor.isBusy}>
-        Delete project
-      </Button>
-    </section>
-  );
-}
-
 export function InspectorPanel({ activeTabId, editor, onActiveTabChange, tabs }: InspectorPanelProps): ReactElement {
   return (
     <aside className="inspector-panel" aria-labelledby="inspector-title">
@@ -266,9 +243,6 @@ export function InspectorPanel({ activeTabId, editor, onActiveTabChange, tabs }:
           <AssetInspector editor={editor} />
         </TabPanel>
 
-        <TabPanel activeTabId={activeTabId} idBase="inspector" tabId="project">
-          <ProjectInspector editor={editor} />
-        </TabPanel>
       </div>
     </aside>
   );

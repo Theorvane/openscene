@@ -1,7 +1,7 @@
 import type { LocalProjectSnapshot, MediaAsset } from '../../../shared/timelineTypes';
 
 const LEFT_DOCK_TAB_IDS = ['project', 'media'] as const;
-const INSPECTOR_DOCK_TAB_IDS = ['selection', 'asset', 'project'] as const;
+const INSPECTOR_DOCK_TAB_IDS = ['selection', 'asset'] as const;
 
 export const LEFT_EDITOR_DOCK_TAB_IDS = LEFT_DOCK_TAB_IDS;
 export const INSPECTOR_EDITOR_DOCK_TAB_IDS = INSPECTOR_DOCK_TAB_IDS;
@@ -73,8 +73,9 @@ export function getDefaultEditorDockTabs(project: LocalProjectSnapshot): EditorD
     ],
     inspector: [
       { id: 'selection', label: 'Selection' },
-      { id: 'asset', label: 'Asset', disabled: hasPendingAssetMetadata },
-      { id: 'project', label: 'Project' }
+      // Project settings moved to the workspace tab line; the inspector is for
+      // whatever is under the cursor.
+      { id: 'asset', label: 'Asset', disabled: hasPendingAssetMetadata }
     ]
   };
 }

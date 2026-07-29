@@ -256,6 +256,22 @@ export class ProjectStore {
     return readProjectSnapshotAtDirectory(await this.resolveDirectory(projectId), projectId);
   }
 
+  /**
+   * Renames a project. The folder on disk is untouched: an external project
+   * lives where the user put it, and renaming its directory would move their
+   * files out from under them.
+   */
+  async rename(projectId: string, name: string, now = new Date()): Promise<LocalProjectSnapshot> {
+    const parsed = parseCreateProjectInput({ name });
+    if (parsed === null) {
+      throw new ProjectStoreError('A project name is required.');
+    }
+    return this.mutateProject(projectId, async () => {
+      const current = await this.requireProject(projectId);
+      return this.persist({ ...current, name: parsed.name, updatedAt: now.toISOString() });
+    });
+  }
+
   async saveTimeline(projectId: string, timeline: TimelineDocument, now = new Date()): Promise<LocalProjectSnapshot> {
     const parsedTimeline = parseTimelineDocument(timeline);
     if (parsedTimeline === null) {

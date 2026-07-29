@@ -12,5 +12,6 @@ export function registerTimelineIpcHandlers(ipcMain: IpcMain, service: TimelineI
   ipcMain.handle(IPC_CHANNELS.projectAssetsImport, (_event, payload: unknown) => service.importProjectAssets(payload));
   ipcMain.handle(IPC_CHANNELS.projectAssetMetadataUpdate, (_event, payload: unknown) => service.updateAssetMetadata(payload));
   ipcMain.handle(IPC_CHANNELS.projectAssetPlaybackUrl, (_event, payload: unknown) => service.getAssetPlaybackUrl(payload));
+  ipcMain.handle(IPC_CHANNELS.projectsRename, (_event, payload: unknown) => service.renameProject(payload));
   ipcMain.handle(IPC_CHANNELS.projectTimelineSave, (_event, payload: unknown) => service.saveTimeline(payload));
 }

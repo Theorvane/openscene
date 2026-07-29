@@ -148,6 +148,18 @@ export class TimelineIpcService {
     }
   }
 
+  async renameProject(payload: unknown): Promise<ApiResponse<LocalProjectSnapshot>> {
+    const input = payload as { projectId?: unknown; name?: unknown } | undefined;
+    if (typeof input?.projectId !== 'string' || typeof input.name !== 'string') {
+      return fail('INVALID_INPUT', 'The project rename payload was not valid.');
+    }
+    try {
+      return ok(await this.dependencies.projects.rename(input.projectId, input.name));
+    } catch (error: unknown) {
+      return safeProjectError(error, 'UNKNOWN_ERROR', 'The project could not be renamed.');
+    }
+  }
+
   async importProjectAssets(payload: unknown): Promise<ApiResponse<ImportProjectAssetsResult>> {
     const input = parseImportProjectAssetsInput(payload);
     if (input === null) {

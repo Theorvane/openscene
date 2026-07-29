@@ -76,6 +76,7 @@ export interface VideoToolApi {
   openProject(input: OpenProjectInput): Promise<ApiResponse<LocalProjectSnapshot>>;
   openProjectFolder(): Promise<ApiResponse<OpenProjectFolderResult>>;
   deleteProject(input: DeleteProjectInput): Promise<ApiResponse<{ readonly deleted: boolean }>>;
+  renameProject(input: { readonly projectId: string; readonly name: string }): Promise<ApiResponse<LocalProjectSnapshot>>;
   importProjectAssets(input: ImportProjectAssetsInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
   importRecordingResultAsset(input: ImportRecordingResultAssetInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
   importAiResultAsset(input: { projectId: string; jobId: string }): Promise<ApiResponse<ImportProjectAssetsResult>>;
@@ -154,6 +155,7 @@ const videoTool: VideoToolApi = {
   openProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsOpen, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
   openProjectFolder: () => ipcRenderer.invoke(IPC_CHANNELS.projectsOpenFolder) as Promise<ApiResponse<OpenProjectFolderResult>>,
   deleteProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsDelete, input) as Promise<ApiResponse<{ readonly deleted: boolean }>>,
+  renameProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsRename, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
   importProjectAssets: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.projectAssetsImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,
   importRecordingResultAsset: (input) =>

@@ -45,7 +45,6 @@ type TimelineEditorProps = {
 
 const INSPECTOR_TAB_LABELS: Readonly<Record<InspectorTabId, string>> = {
   asset: 'Asset',
-  project: 'Project',
   selection: 'Selection'
 };
 
@@ -55,7 +54,8 @@ function getInspectorTabs(editor: TimelineEditorController): readonly TabDefinit
   return EDITOR_INSPECTOR_DOCK_TAB_IDS.map((tabId) => {
     const dockTab = dockTabs?.find((tab) => tab.id === tabId);
     const label = dockTab?.label ?? INSPECTOR_TAB_LABELS[tabId];
-    const disabled = editor.project === null ? tabId !== 'project' : dockTab?.disabled === true;
+    // Without a project there is nothing to inspect at all.
+    const disabled = editor.project === null ? true : dockTab?.disabled === true;
 
     return disabled ? { id: tabId, label, disabled: true } : { id: tabId, label };
   });
@@ -87,15 +87,14 @@ type FloatingPanelRenderInput = {
 };
 
 function getDefaultInspectorTabId({ selectedAssetId, selectedClipId }: InspectorIdentityInput): InspectorTabId {
-  if (selectedClipId.length > 0) return 'selection';
-  if (selectedAssetId.length > 0) return 'asset';
-  return 'project';
+  if (selectedAssetId.length > 0 && selectedClipId.length === 0) return 'asset';
+  return 'selection';
 }
 
 export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   const { isBusy: isAgentBusy } = useAgentChat();
   const [leftDockTabId, setLeftDockTabId] = useState<EditorLeftDockTabId>('project');
-  const [inspectorTabId, setInspectorTabId] = useState<InspectorTabId>('project');
+  const [inspectorTabId, setInspectorTabId] = useState<InspectorTabId>('selection');
   const { layoutPreference, updateLayoutPreference } = useEditorLayoutPreference();
   const { shortcutPreferences } = useEditorShortcutPreference();
   const inspectorTabs = getInspectorTabs(editor);

@@ -992,6 +992,156 @@ button {
   white-space: nowrap;
 }
 
+/* Tab line: workspace switcher on the left, project settings on the right. */
+.workspace-tab-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.workspace-settings-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-compact-min-height);
+  height: var(--control-compact-min-height);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-weak);
+  background: transparent;
+  cursor: pointer;
+}
+
+.workspace-settings-button:hover:not(:disabled) {
+  color: var(--foreground);
+  border-color: var(--border-strong);
+}
+
+.workspace-settings-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.project-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, #000 55%, transparent);
+}
+
+.project-settings {
+  display: grid;
+  gap: var(--space-4);
+  width: min(460px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow-panel);
+}
+
+.project-settings__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.project-settings__header h2 {
+  margin: 0;
+  font-size: var(--text-body);
+  letter-spacing: var(--tracking-tight);
+}
+
+.project-settings__section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.project-settings__field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.project-settings__label {
+  margin: 0;
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.project-settings__field input {
+  width: 100%;
+  min-height: var(--control-min-height);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--surface-inset);
+  font: inherit;
+  font-size: var(--text-small);
+}
+
+.project-settings__field input:focus-visible {
+  border-color: var(--ring);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-shadow);
+}
+
+.project-settings__details {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-subtle);
+}
+
+.project-settings__details > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.project-settings__details dt {
+  color: var(--text-weak);
+  font-size: var(--text-caption);
+}
+
+.project-settings__details dd {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+}
+
+.project-settings__danger {
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-subtle);
+}
+
+.project-settings__hint {
+  margin: var(--space-1) 0 0;
+  color: var(--text-weak);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.project-settings__confirm {
+  display: flex;
+  gap: var(--space-2);
+}
+
 /* Top-left switcher between the editor and the generation studios. */
 .workspace-tabs {
   justify-content: flex-start;
