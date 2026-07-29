@@ -7,6 +7,18 @@ import { getOpenVideoMcpDefinition, OpenVideoMcpServer } from '../src/main/openV
 import { ProjectStore } from '../src/main/projectStore';
 import type { MediaAsset } from '../src/shared/timelineTypes';
 
+const videoAsset = (): MediaAsset => ({
+  id: 'asset-placement-000000001',
+  displayName: 'clip.mp4',
+  projectRelativePath: 'assets/asset-placement-000000001/original.mp4',
+  kind: 'video',
+  mimeType: 'video/mp4',
+  byteLength: 2048,
+  createdAt: '2026-07-24T12:00:00.000Z',
+  updatedAt: '2026-07-24T12:00:00.000Z',
+  metadata: { durationMs: 10_000, width: 1920, height: 1080 }
+});
+
 describe('OpenVideo TypeMCP Server and Tool declarations', () => {
   let tempDir: string;
   let projectStore: ProjectStore;
@@ -218,28 +230,62 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     // Create a real project
     const project = await projectStore.create({ name: 'Test MCP Project' });
 
-    // 3. Missing track
-    const noTrackResult = await server.addClipToTimeline({
-      projectId: project.id,
-      trackId: 'track-invalid',
-      assetId: 'asset-123',
-      startOffsetSeconds: 0,
-      durationSeconds: 5
-    });
-    expect(noTrackResult.success).toBe(false);
-    expect(noTrackResult.error).toContain('Track track-invalid not found');
-
-    // 4. Missing asset
-    const validTrackId = project.timeline.tracks[0]!.id;
+    // 3. Missing asset — resolved before the track, because the track is chosen
+    //    from the asset kind when the caller does not name one.
     const noAssetResult = await server.addClipToTimeline({
       projectId: project.id,
-      trackId: validTrackId,
       assetId: 'asset-invalid',
       startOffsetSeconds: 0,
       durationSeconds: 5
     });
     expect(noAssetResult.success).toBe(false);
     expect(noAssetResult.error).toContain('Asset asset-invalid not found');
+
+    // 4. Missing track, named explicitly. The error names the tracks that exist
+    //    so the agent can retry instead of guessing again.
+    await projectStore.registerAsset(project.id, videoAsset());
+    const noTrackResult = await server.addClipToTimeline({
+      projectId: project.id,
+      trackId: 'track-invalid',
+      assetId: videoAsset().id,
+      startOffsetSeconds: 0,
+      durationSeconds: 5
+    });
+    expect(noTrackResult.success).toBe(false);
+    expect(noTrackResult.error).toContain('Track track-invalid not found');
+    expect(noTrackResult.error).toContain('video-track-1 (video)');
+  });
+
+  it('places an added clip without a track id or offset: first matching track, appended after the last clip', async () => {
+    const server = new OpenVideoMcpServer();
+    const changed: string[] = [];
+    server.setServices(projectStore);
+    server.setProjectTimelineChangeNotifier((projectId) => changed.push(projectId));
+
+    const project = await projectStore.create({ name: 'Placement Project' });
+    await projectStore.registerAsset(project.id, videoAsset());
+
+    // No trackId and no offset: the video asset lands at 0 on the video track.
+    const first = await server.addClipToTimeline({ projectId: project.id, assetId: videoAsset().id });
+    expect(first).toMatchObject({ success: true, trackId: 'video-track-1', startOffsetSeconds: 0 });
+    // The whole asset, not an arbitrary default length.
+    expect(first.durationSeconds).toBe(10);
+
+    // The next one appends after it rather than overlapping at 0.
+    const second = await server.addClipToTimeline({ projectId: project.id, assetId: videoAsset().id });
+    expect(second).toMatchObject({ success: true, startOffsetSeconds: 10 });
+
+    // An explicit overlapping offset is refused, matching the editor's rules.
+    const overlapping = await server.addClipToTimeline({
+      projectId: project.id,
+      assetId: videoAsset().id,
+      startOffsetSeconds: 5
+    });
+    expect(overlapping.success).toBe(false);
+    expect(overlapping.error).toContain('overlap');
+
+    // Every successful write tells open editors to reload.
+    expect(changed).toEqual([project.id, project.id]);
   });
 
   it('successfully adds clip to timeline and persists project when project, track, and asset exist', async () => {

@@ -57,6 +57,7 @@ type AssetPlaybackUrl = {
 
 export interface VideoToolApi {
   onTimelineMenuCommand(listener: (commandId: TimelineMenuCommandId) => void): () => void;
+  onProjectTimelineChanged(listener: (projectId: string) => void): () => void;
   updateTimelineMenuState(state: TimelineMenuState): void;
   getSettings(): Promise<ApiResponse<AppSettings>>;
   listSources(): Promise<ApiResponse<CaptureSource[]>>;
@@ -120,6 +121,14 @@ const videoTool: VideoToolApi = {
     };
     ipcRenderer.on(IPC_CHANNELS.timelineMenuCommand, subscription);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.timelineMenuCommand, subscription);
+  },
+  onProjectTimelineChanged: (listener) => {
+    const subscription = (_event: IpcRendererEvent, payload: unknown): void => {
+      const projectId = (payload as { projectId?: unknown } | null)?.projectId;
+      if (typeof projectId === 'string' && projectId.length > 0) listener(projectId);
+    };
+    ipcRenderer.on(IPC_CHANNELS.projectTimelineChanged, subscription);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.projectTimelineChanged, subscription);
   },
   updateTimelineMenuState: (state) => ipcRenderer.send(IPC_CHANNELS.timelineMenuState, state),
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getSettings) as Promise<ApiResponse<AppSettings>>,

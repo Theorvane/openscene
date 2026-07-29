@@ -295,6 +295,13 @@ async function installIpcHandlers(): Promise<void> {
 
   const mcpServerInstance = new OpenVideoMcpServer();
   mcpServerInstance.setServices(projectStore, exportIpcService);
+  // Agent tools write the project straight to disk; tell open editors to reload
+  // so the change shows up on the timeline instead of being silently shadowed.
+  mcpServerInstance.setProjectTimelineChangeNotifier((projectId) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(IPC_CHANNELS.projectTimelineChanged, { projectId });
+    }
+  });
 
   ipcMain.handle(IPC_CHANNELS.mcpGetTools, async () => {
     try {

@@ -3,6 +3,8 @@ import { resolve as resolvePath, sep } from 'node:path';
 import { getMcpServerDefinition, McpResource, McpServer, McpTool } from '@theorvane/type-mcp';
 import { z } from 'zod';
 import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, type ClipEffects, type TimelineTrack } from '../shared/timelineTypes';
+import { placeClip } from '../shared/timelineClipLogic';
+import { resolveTimelineTrackForAsset, trackAppendStartMs } from '../shared/timelineClipPlacement';
 import type { ExportIpcService } from './exportIpcService';
 import type { ProjectStore } from './projectStore';
 import { discoverFfmpeg } from './ffmpegDiscovery';
@@ -19,6 +21,9 @@ import {
   getSpeechGenerationJob,
   getVideoGenerationJob
 } from './aiJobManager';
+
+/** Clip length used only when an asset has no probed duration yet. */
+const FALLBACK_CLIP_DURATION_MS = 5_000;
 
 /** Injectable frame extractor so tests never need a real FFmpeg runtime. */
 export type WatchFrameExtractor = (input: {
@@ -42,6 +47,16 @@ export class OpenVideoMcpServer {
   private projectStore: ProjectStore | undefined;
   private exportIpcService: ExportIpcService | undefined;
   private watchFrameExtractor: WatchFrameExtractor = defaultWatchFrameExtractor;
+  private notifyProjectTimelineChanged: ((projectId: string) => void) | undefined;
+
+  /**
+   * Agent tools write straight to the project store, so an editor that already
+   * has the project open would keep showing — and later save over — its stale
+   * copy. The host passes a notifier that tells open windows to reload.
+   */
+  public setProjectTimelineChangeNotifier(notify: (projectId: string) => void): void {
+    this.notifyProjectTimelineChanged = notify;
+  }
 
   public setServices(
     projectStore?: ProjectStore | undefined,
@@ -345,6 +360,7 @@ export class OpenVideoMcpServer {
       }
 
       await this.projectStore.saveTimeline(params.projectId, { ...project.timeline, tracks });
+      this.notifyProjectTimelineChanged?.(params.projectId);
       return {
         success: true,
         projectId: params.projectId,
@@ -400,6 +416,7 @@ export class OpenVideoMcpServer {
       }));
       if (!found) return { success: false, error: `Clip ${params.clipId} not found in project ${params.projectId}.` };
       await this.projectStore.saveTimeline(params.projectId, { ...project.timeline, tracks });
+      this.notifyProjectTimelineChanged?.(params.projectId);
       return { success: true, projectId: params.projectId, clipId: params.clipId, effects: params.effects };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : `Failed to update effects for clip ${params.clipId}` };
@@ -407,21 +424,24 @@ export class OpenVideoMcpServer {
   }
 
   @McpTool({
-    description: 'Add a video or audio clip to a specific project timeline track.',
+    description:
+      'Add a project asset to the timeline as a clip. Omit trackId to place it on the first track ' +
+      'matching the asset kind, omit startOffsetSeconds to append after the last clip on that track, ' +
+      'and omit durationSeconds to use the whole asset.',
     input: z.object({
       projectId: z.string().min(1),
-      trackId: z.string().min(1).default('video-1'),
       assetId: z.string().min(1),
-      startOffsetSeconds: z.number().min(0).default(0),
-      durationSeconds: z.number().min(1).default(5)
+      trackId: z.string().min(1).optional(),
+      startOffsetSeconds: z.number().min(0).optional(),
+      durationSeconds: z.number().min(0.1).optional()
     })
   })
   async addClipToTimeline(params: {
     projectId: string;
-    trackId: string;
     assetId: string;
-    startOffsetSeconds: number;
-    durationSeconds: number;
+    trackId?: string | undefined;
+    startOffsetSeconds?: number | undefined;
+    durationSeconds?: number | undefined;
   }) {
     if (!this.projectStore) {
       return { success: false, error: 'ProjectStore service is not available.' };
@@ -433,49 +453,59 @@ export class OpenVideoMcpServer {
         return { success: false, error: `Project ${params.projectId} not found.` };
       }
 
-      const targetTrack = project.timeline.tracks.find((t) => t.id === params.trackId);
-      if (!targetTrack) {
-        return { success: false, error: `Track ${params.trackId} not found in project ${params.projectId}.` };
-      }
-
       const asset = project.assets.find((a) => a.id === params.assetId);
       if (!asset) {
         return { success: false, error: `Asset ${params.assetId} not found in project ${params.projectId}.` };
       }
 
+      const target = resolveTimelineTrackForAsset(project.timeline, asset, params.trackId);
+      if (!target.ok) {
+        return { success: false, error: target.error };
+      }
+      const targetTrack = target.track;
+
       const clipId = `clip-${randomUUID()}`;
-      const durationMs = params.durationSeconds * 1000;
-      const assetDurationMs = asset.metadata?.durationMs ?? durationMs;
+      const assetDurationMs = asset.metadata?.durationMs;
+      const durationMs = params.durationSeconds !== undefined
+        ? params.durationSeconds * 1000
+        : assetDurationMs ?? FALLBACK_CLIP_DURATION_MS;
+      const timelineStartMs = params.startOffsetSeconds !== undefined
+        ? params.startOffsetSeconds * 1000
+        : trackAppendStartMs(targetTrack);
 
       const newClip = {
         id: clipId,
         assetId: params.assetId,
-        timelineStartMs: params.startOffsetSeconds * 1000,
+        timelineStartMs,
         sourceStartMs: 0,
-        sourceEndMs: Math.min(durationMs, assetDurationMs),
-        sourceDurationMs: assetDurationMs,
+        sourceEndMs: assetDurationMs === undefined ? durationMs : Math.min(durationMs, assetDurationMs),
+        sourceDurationMs: assetDurationMs ?? durationMs,
         effects: DEFAULT_CLIP_EFFECTS,
         keyframes: []
       };
 
-      const updatedTracks: TimelineTrack[] = project.timeline.tracks.map((t) =>
-        t.id === params.trackId ? { ...t, clips: [...t.clips, newClip] } : t
-      );
+      // The same placement rules the editor uses, so an agent edit can never
+      // write a clip the UI would reject (overlaps, out-of-range source range).
+      const nextTimeline = placeClip(project.timeline, { trackId: targetTrack.id, clip: newClip });
+      if (nextTimeline === null) {
+        return {
+          success: false,
+          error: `Could not place the clip at ${timelineStartMs / 1000}s on track ${targetTrack.id} — it would overlap an existing clip or fall outside the asset. Read the timeline first and pick a free range.`
+        };
+      }
 
-      await this.projectStore.saveTimeline(params.projectId, {
-        ...project.timeline,
-        tracks: updatedTracks
-      });
+      await this.projectStore.saveTimeline(params.projectId, nextTimeline);
+      this.notifyProjectTimelineChanged?.(params.projectId);
 
       return {
         success: true,
         clipId,
         projectId: params.projectId,
-        trackId: params.trackId,
+        trackId: targetTrack.id,
         assetId: params.assetId,
-        startOffsetSeconds: params.startOffsetSeconds,
-        durationSeconds: params.durationSeconds,
-        message: `Added clip ${clipId} to track ${params.trackId} in project ${params.projectId}`
+        startOffsetSeconds: timelineStartMs / 1000,
+        durationSeconds: (newClip.sourceEndMs - newClip.sourceStartMs) / 1000,
+        message: `Added clip ${clipId} to track ${targetTrack.id} in project ${params.projectId}`
       };
     } catch (err) {
       return {

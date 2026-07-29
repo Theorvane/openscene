@@ -311,6 +311,34 @@ export function useTimelineEditor() {
     return false;
   }, [clearMetadataProbeFailure, project]);
 
+  // The Edit Agent writes the project on disk from the main process, so an open
+  // editor must reload — otherwise the change is invisible and the next local
+  // save silently overwrites it. Unsaved local edits win: we warn instead of
+  // discarding them.
+  useEffect(() => {
+    const openProjectId = project?.id;
+    if (openProjectId === undefined) return;
+    return window.videoTool.onProjectTimelineChanged((changedProjectId) => {
+      if (changedProjectId !== openProjectId) return;
+      if (hasUnsavedTimeline) {
+        setStatusMessage({
+          tone: 'warning',
+          text: 'The Edit Agent changed this project on disk. Save or undo your local edits to load it.'
+        });
+        return;
+      }
+      void (async () => {
+        const response = await window.videoTool.openProject({ projectId: openProjectId });
+        if (!response.ok) {
+          setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
+          return;
+        }
+        setLoadedProject(response.value);
+        setStatusMessage({ tone: 'success', text: 'Timeline updated by the Edit Agent.' });
+      })();
+    });
+  }, [hasUnsavedTimeline, project?.id, setLoadedProject]);
+
   const saveTimeline = useCallback(async () => {
     if (project === null) return;
     setIsBusy(true);
