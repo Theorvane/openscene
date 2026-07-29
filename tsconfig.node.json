@@ -34,7 +34,7 @@
     "src/renderer/src/editor/exportUiState.ts",
     "src/renderer/src/agentChatHistoryView.ts",
     "src/renderer/src/agentChatSessions.ts",
-    "src/renderer/src/rightPanelTabs.ts",
+    "src/renderer/src/workspaceTabs.ts",
     "src/renderer/src/agentChatTranscript.ts",
     "src/renderer/src/agentModelPickerModel.ts",
     "src/renderer/src/appNavigationHistory.ts",

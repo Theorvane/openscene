@@ -7,6 +7,16 @@ import type { AgentChatRestoreRequest } from './AgentChatContext';
 import { FirstRunOnboarding } from './FirstRunOnboarding';
 import { HomePage } from './HomePage';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
+import { Tabs } from './ui';
+import { NarrationPanel } from './NarrationPanel';
+import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
+import {
+  WORKSPACE_TAB_IDS,
+  WORKSPACE_TAB_LABELS,
+  WORKSPACE_TAB_STORAGE_KEY,
+  parseWorkspaceTabId,
+  type WorkspaceTabId
+} from './workspaceTabs';
 import { ProjectsPage } from './ProjectsPage';
 import { SettingsWorkspace } from './SettingsWorkspace';
 import { APP_PAGE_BY_ID, getDefaultAppPageId, isProjectRequiredPageId, isWorkspacePageId } from './appPages';
@@ -186,6 +196,19 @@ export function App(): ReactElement {
   }, []);
 
   const workspaceIsVisible = isWorkspacePageId(activePageId);
+  // Which workspace surface is showing; remembered across launches.
+  const [workspaceTabId, setWorkspaceTabId] = useState<WorkspaceTabId>(() =>
+    typeof window === 'undefined' ? 'edit' : parseWorkspaceTabId(window.localStorage.getItem(WORKSPACE_TAB_STORAGE_KEY))
+  );
+
+  const selectWorkspaceTab = (tabId: WorkspaceTabId): void => {
+    setWorkspaceTabId(tabId);
+    try {
+      window.localStorage.setItem(WORKSPACE_TAB_STORAGE_KEY, tabId);
+    } catch {
+      // The in-memory choice stays usable when local storage is unavailable.
+    }
+  };
 
   return (
     // The result-import provider wraps the shell, not just the page stack: the
@@ -245,10 +268,21 @@ export function App(): ReactElement {
             />
           </section>
           <div className="app-stack local-edit-bay" hidden={!workspaceIsVisible}>
+            {/* Workspace switcher: the editor and the two generation studios
+                share the area, so a generated clip lands on the timeline
+                without leaving the workspace or the agent chat beside it. */}
+            <Tabs
+              activeTabId={workspaceTabId}
+              idBase="workspace"
+              tabs={WORKSPACE_TAB_IDS.map((id) => ({ id, label: WORKSPACE_TAB_LABELS[id] }))}
+              onActiveTabChange={selectWorkspaceTab}
+              className="workspace-tabs"
+              aria-label="Workspace sections"
+            />
             <div className="app-workspace-panel-stack">
               <section
                 aria-labelledby={EDIT_WORKSPACE.navId}
-                hidden={activeWorkspaceId !== EDIT_WORKSPACE.id || !workspaceIsVisible}
+                hidden={workspaceTabId !== 'edit' || activeWorkspaceId !== EDIT_WORKSPACE.id || !workspaceIsVisible}
                 id={EDIT_WORKSPACE.panelId}
                 ref={setPagePanelRef(EDIT_WORKSPACE.id)}
                 role="region"
@@ -257,6 +291,26 @@ export function App(): ReactElement {
               >
                 <h2 className="visually-hidden" id={EDIT_WORKSPACE.navId}>{EDIT_WORKSPACE.label}</h2>
                 <TimelineEditor editor={editor} />
+              </section>
+              <section
+                aria-label={WORKSPACE_TAB_LABELS.voice}
+                className="workspace-studio-panel"
+                hidden={workspaceTabId !== 'voice' || !workspaceIsVisible}
+                role="region"
+                style={APP_WORKSPACE_PANEL_STYLE}
+                tabIndex={-1}
+              >
+                <NarrationPanel />
+              </section>
+              <section
+                aria-label={WORKSPACE_TAB_LABELS.video}
+                className="workspace-studio-panel"
+                hidden={workspaceTabId !== 'video' || !workspaceIsVisible}
+                role="region"
+                style={APP_WORKSPACE_PANEL_STYLE}
+                tabIndex={-1}
+              >
+                <VideoGenerationWorkspace />
               </section>
             </div>
           </div>

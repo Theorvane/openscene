@@ -91,7 +91,7 @@ describe('app page shell source contract', () => {
 
     expect(design).toContain('do not reintroduce a left workspace sidebar');
     expect(design).toContain('Home entry cards are the workspace navigation');
-    expect(design).toContain('voice and video generation are surfaces of the workspace side panel');
+    expect(design).toContain('voice and video generation are tabs within it');
     expect(design).not.toContain('a left sidebar for workspace navigation');
     expect(design).not.toContain('Application workspace switching belongs to `AppWorkspaceNavigation`');
   });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
 
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import {
@@ -9,8 +9,7 @@ import {
   getNextAgentChatPanelWidthFromKey
 } from './agentChatLayoutPreferences';
 import { isWorkspacePageId, type AppPage, type AppPageId } from './appPages';
-import { WorkspaceSidePanel } from './WorkspaceSidePanel';
-import { parseRightPanelTabId, RIGHT_PANEL_TAB_STORAGE_KEY, type RightPanelTabId } from './rightPanelTabs';
+import { AgentChatPanel } from './AgentChatPanel';
 import { AgentChatProvider, useAgentChat, type AgentChatRestoreRequest } from './AgentChatContext';
 import { Button } from './ui';
 import { useAgentChatLayoutPreference } from './useAgentChatLayoutPreference';
@@ -82,19 +81,6 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
   const shellBodyRef = useRef<HTMLDivElement | null>(null);
   const dragOriginRef = useRef<ChatPanelDragOrigin | null>(null);
-  // Which surface the side panel shows; remembered across launches.
-  const [sidePanelTabId, setSidePanelTabId] = useState<RightPanelTabId>(() =>
-    typeof window === 'undefined' ? 'chat' : parseRightPanelTabId(window.localStorage.getItem(RIGHT_PANEL_TAB_STORAGE_KEY))
-  );
-
-  const selectSidePanelTab = (tabId: RightPanelTabId): void => {
-    setSidePanelTabId(tabId);
-    try {
-      window.localStorage.setItem(RIGHT_PANEL_TAB_STORAGE_KEY, tabId);
-    } catch {
-      // The in-memory choice stays usable when local storage is unavailable.
-    }
-  };
   const chatPanelWidth = layoutPreference.chatPanelWidth;
   const chatPanelCollapsed = layoutPreference.chatPanelCollapsed;
   const homeIsActive = activePage.id === 'home';
@@ -262,12 +248,7 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
               tabIndex={0}
               title="Drag to resize Edit Agent chat panel"
             />
-            <WorkspaceSidePanel
-              width={chatPanelWidth}
-              tabId={sidePanelTabId}
-              onTabChange={selectSidePanelTab}
-              onCollapse={() => setChatPanelCollapsed(true)}
-            />
+            <AgentChatPanel width={chatPanelWidth} onCollapse={() => setChatPanelCollapsed(true)} />
           </>
         )}
       </div>
