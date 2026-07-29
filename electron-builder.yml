@@ -24,3 +24,22 @@ mac:
   # No Apple Developer credentials exist for this repository, so the build is
   # unsigned; forcing discovery off keeps CI from failing on a missing identity.
   identity: null
+win:
+  icon: build/icon.png
+  # No code-signing certificate either, so Windows SmartScreen warns on first run.
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  icon: build/icon.png
+  category: AudioVideo
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]

@@ -11,7 +11,7 @@
     "test": "vitest run",
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
-    "package": "npm run build && electron-builder --mac --publish never"
+    "package": "npm run build && electron-builder --publish never"
   },
   "dependencies": {
     "@langchain/anthropic": "^1.5.2",

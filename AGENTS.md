@@ -73,4 +73,4 @@ Every change after the initial repository bootstrap follows this sequence. Never
 6. Run and report fresh verification evidence. Obtain specification and code-quality review before merging.
 7. Squash merge only after CI and review pass. Verify the issue closes and `dev` contains the merged commit.
 8. Promote vetted `dev` to release-only `main` through a separate reviewed release pull request. Verify `main` contains the release commit before publication.
-9. The version in `package.json` is the release decision. Bump it on `dev` before promoting: the push to `main` tags `v<version>`, creates a `release/v<version>` branch, packages the macOS app, and publishes the release. Promoting without a bump republishes nothing, by design.
+9. The version in `package.json` is the release decision. Bump it on `dev` before promoting: the push to `main` tags `v<version>`, creates a `release/v<version>` branch, packages macOS, Windows, and Linux on their own runners, and publishes the release with every artifact attached. Promoting without a bump republishes nothing, by design.

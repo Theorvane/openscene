@@ -17,17 +17,29 @@ describe('release workflow', () => {
     // publish again, so every later step is gated on the tag being absent.
     expect(workflow).toContain('if git rev-parse -q --verify "refs/tags/${TAG}"');
     expect(workflow).toContain("already-released=true");
-    const gates = workflow.match(/if: steps\.version\.outputs\.already-released == 'false'/g) ?? [];
-    expect(gates.length).toBeGreaterThanOrEqual(6);
+    // Packaging and publishing are separate jobs, so each has to be gated too;
+    // a job without the guard would run on any push to main.
+    expect(workflow).toContain("if: needs.check.outputs.already-released == 'false'");
+    const jobGates = workflow.match(/if: needs\.check\.outputs\.already-released == 'false'/g) ?? [];
+    expect(jobGates.length).toBe(2);
   });
 
   it('verifies the exact commit it packages', () => {
     expect(workflow).toContain('npm run typecheck');
     expect(workflow).toContain('npm test');
     expect(workflow).toContain('npm run build');
-    // Packaging happens on macOS because that is the only target it builds.
-    expect(workflow).toContain('runs-on: macos-latest');
-    expect(workflow).toContain('electron-builder --mac --publish never');
+  });
+
+  it('packages each platform on its own runner', () => {
+    for (const os of ['macos-latest', 'windows-latest', 'ubuntu-latest']) {
+      expect(workflow).toContain(`os: ${os}`);
+    }
+    expect(workflow).toContain('npx electron-builder --${{ matrix.platform }} --publish never');
+    // One platform failing must not silently drop its artifacts from a release
+    // that still publishes; the release job depends on the whole matrix.
+    expect(workflow).toContain('fail-fast: false');
+    expect(workflow).toContain('needs: [check, build]');
+    expect(workflow).toContain('if-no-files-found: error');
   });
 
   it('tags, branches, and publishes the artifacts it built', () => {
@@ -36,12 +48,14 @@ describe('release workflow', () => {
     expect(workflow).toContain('git push origin "HEAD:refs/heads/release/$TAG"');
     expect(workflow).toContain('gh release create "$TAG"');
     expect(workflow).toContain('--generate-notes');
-    expect(workflow).toContain('dist/*.dmg dist/*.zip');
+    expect(workflow).toContain('artifacts/*');
   });
 
-  it('states plainly that the build is unsigned instead of leaving it to be discovered', () => {
+  it('states plainly that the builds are unsigned instead of leaving it to be discovered', () => {
     expect(workflow).toContain('CSC_IDENTITY_AUTO_DISCOVERY: false');
-    expect(workflow).toMatch(/unsigned and not notarized/);
+    expect(workflow).toMatch(/builds are unsigned/);
+    expect(workflow).toMatch(/unidentified developer/);
+    expect(workflow).toMatch(/SmartScreen/);
     expect(builderConfig).toContain('identity: null');
   });
 
@@ -54,11 +68,20 @@ describe('release workflow', () => {
   });
 
   it('keeps packaging able to run locally with the same inputs', () => {
-    expect(packageJson.scripts.package).toBe('npm run build && electron-builder --mac --publish never');
+    expect(packageJson.scripts.package).toBe('npm run build && electron-builder --publish never');
     expect(packageJson.devDependencies['electron-builder']).toBeDefined();
     expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+$/);
     // electron-vite writes the app into out/; the package must carry it.
     expect(builderConfig).toContain('out/**');
     expect(builderConfig).toContain('productName: OpenVideo');
+  });
+
+  it('declares a target for every platform the workflow builds', () => {
+    for (const platform of ['mac:', 'win:', 'linux:']) {
+      expect(builderConfig).toContain(platform);
+    }
+    for (const target of ['dmg', 'nsis', 'AppImage', 'deb']) {
+      expect(builderConfig).toContain(`target: ${target}`);
+    }
   });
 });
