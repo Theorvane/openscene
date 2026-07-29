@@ -154,7 +154,6 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
               {activeProjectContext && (
                 <span className="product-chrome__project-pill">📁 Project: {activeProjectContext.name}</span>
               )}
-              <span className="local-pill">● Local</span>
             </div>
             <div className="product-chrome__actions">
               <Button

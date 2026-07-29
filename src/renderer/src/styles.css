@@ -493,14 +493,6 @@ button {
   -webkit-app-region: no-drag;
 }
 
-.local-pill {
-  color: var(--color-primary);
-  font-family: var(--font-mono);
-  font-size: var(--text-caption);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 .product-chrome__context {
   display: flex;
   align-items: center;
@@ -519,16 +511,6 @@ button {
   letter-spacing: var(--tracking-tight);
   line-height: 1.2;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.local-pill {
-  padding: 2px var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  color: var(--text-weak);
-  background: transparent;
-  letter-spacing: 0.08em;
   white-space: nowrap;
 }
 
@@ -2734,7 +2716,7 @@ button {
 .timeline-track {
   display: grid;
   grid-template-columns: minmax(106px, 0.13fr) minmax(0, 1fr);
-  min-height: 54px;
+  min-height: 72px;
   overflow: hidden;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -2760,7 +2742,7 @@ button {
 
 .timeline-track__lane {
   position: relative;
-  min-height: 54px;
+  min-height: 72px;
   overflow: hidden;
   border-radius: var(--radius-sm);
   background: var(--surface-inset);

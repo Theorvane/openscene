@@ -1,5 +1,5 @@
-export const EDITOR_LAYOUT_SCHEMA_VERSION = 3 as const;
-export const EDITOR_LAYOUT_MIN_PROGRAM_PERCENT = 35;
+export const EDITOR_LAYOUT_SCHEMA_VERSION = 4 as const;
+export const EDITOR_LAYOUT_MIN_PROGRAM_PERCENT = 25;
 export const EDITOR_LAYOUT_MAX_PROGRAM_PERCENT = 75;
 export const EDITOR_LAYOUT_ARROW_STEP_PERCENT = 2;
 export const EDITOR_LAYOUT_SHIFT_STEP_PERCENT = 10;
@@ -141,7 +141,8 @@ export const EDITOR_LAYOUT_DEFAULT_PREFERENCE: EditorLayoutPreference = {
   inspectorPlacement: 'right',
   leftDockWidth: EDITOR_LAYOUT_DEFAULT_LEFT_DOCK_WIDTH,
   inspectorWidth: EDITOR_LAYOUT_DEFAULT_INSPECTOR_WIDTH,
-  programPercent: 58,
+  // The timeline is the working surface, so it gets the larger half.
+  programPercent: 45,
   floatingPanels: EDITOR_LAYOUT_FLOATING_PANEL_DEFAULTS
 };
 
@@ -302,7 +303,18 @@ function parseEditorPanelV2Layout(parsedLayout: PlainRecord): EditorPanelLayout 
   };
 }
 
+/**
+ * v3 stored a program split sized for a smaller timeline. Migrating carries the
+ * user's docks and floating panels across but adopts the new default split, so
+ * the taller timeline actually shows up instead of being masked by the old
+ * stored value.
+ */
 function parseEditorPanelV3Layout(parsedLayout: PlainRecord): EditorPanelLayout | null {
+  const migrated = parseEditorPanelV4Layout(parsedLayout);
+  return migrated === null ? null : { ...migrated, program: { percent: EDITOR_PANEL_LAYOUT_DEFAULT.program.percent } };
+}
+
+function parseEditorPanelV4Layout(parsedLayout: PlainRecord): EditorPanelLayout | null {
   if (!hasAllowedKeys(parsedLayout, ['schemaVersion', 'leftDock', 'inspector', 'program', 'floatingPanels'])) return null;
   if (!isRecord(parsedLayout.leftDock) || !isRecord(parsedLayout.inspector) || !isRecord(parsedLayout.program)) return null;
   if (typeof parsedLayout.leftDock.visible !== 'boolean') return null;
@@ -342,6 +354,8 @@ export function parseEditorPanelLayout(storedLayout: string | null | undefined):
         return parseEditorPanelV2Layout(parsedLayout) ?? EDITOR_PANEL_LAYOUT_DEFAULT;
       case 3:
         return parseEditorPanelV3Layout(parsedLayout) ?? EDITOR_PANEL_LAYOUT_DEFAULT;
+      case 4:
+        return parseEditorPanelV4Layout(parsedLayout) ?? EDITOR_PANEL_LAYOUT_DEFAULT;
       default:
         return EDITOR_PANEL_LAYOUT_DEFAULT;
     }

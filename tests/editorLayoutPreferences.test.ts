@@ -33,7 +33,7 @@ describe('editor layout preferences', () => {
   it('Given missing or malformed storage, When parsed, Then defaults keep sidebars visible with the v3 dimensions', () => {
     expect(parseEditorLayoutPreference(null)).toEqual(EDITOR_LAYOUT_DEFAULT_PREFERENCE);
     expect(parseEditorLayoutPreference('{')).toEqual(EDITOR_LAYOUT_DEFAULT_PREFERENCE);
-    expect(parseEditorLayoutPreference(JSON.stringify({ schemaVersion: 3, leftDock: { visible: false } }))).toEqual(EDITOR_LAYOUT_DEFAULT_PREFERENCE);
+    expect(parseEditorLayoutPreference(JSON.stringify({ schemaVersion: 4, leftDock: { visible: false } }))).toEqual(EDITOR_LAYOUT_DEFAULT_PREFERENCE);
   });
 
   it('Given a v1 stored layout, When parsed, Then visibility and program split migrate into the v3 defaults', () => {
@@ -60,7 +60,7 @@ describe('editor layout preferences', () => {
       inspectorWidth: 900,
       programPercent: 92
     }))).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDockVisible: true,
       inspectorVisible: false,
 		inspectorPlacement: 'left',
@@ -73,7 +73,7 @@ describe('editor layout preferences', () => {
 
   it('Given a normalized v3 preference, When serialized, Then storage upgrades to the v3 panel model', () => {
     expect(JSON.parse(serializeEditorLayoutPreference(EDITOR_LAYOUT_DEFAULT_PREFERENCE))).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDock: {
         visible: true,
         width: EDITOR_LAYOUT_DEFAULT_LEFT_DOCK_WIDTH
@@ -122,7 +122,8 @@ describe('editor layout preferences', () => {
     expect(getNextEditorProgramPercentFromKey({ currentPercent: 58, key: 'ArrowDown', shiftKey: true })).toBe(68);
     expect(getNextEditorProgramPercentFromKey({ currentPercent: 58, key: 'Home', shiftKey: false })).toBe(EDITOR_LAYOUT_MIN_PROGRAM_PERCENT);
     expect(getNextEditorProgramPercentFromKey({ currentPercent: 58, key: 'End', shiftKey: false })).toBe(EDITOR_LAYOUT_MAX_PROGRAM_PERCENT);
-    expect(getNextEditorProgramPercentFromKey({ currentPercent: 47, key: 'Enter', shiftKey: false })).toBe(58);
+    // Enter resets to the default split, which now favours the timeline.
+    expect(getNextEditorProgramPercentFromKey({ currentPercent: 47, key: 'Enter', shiftKey: false })).toBe(45);
     expect(getNextEditorProgramPercentFromKey({ currentPercent: 47, key: 'Escape', shiftKey: false })).toBeNull();
   });
 

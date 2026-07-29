@@ -12,6 +12,7 @@ import {
   EDITOR_LAYOUT_MIN_INSPECTOR_WIDTH,
   EDITOR_LAYOUT_MIN_LEFT_DOCK_WIDTH,
   EDITOR_LAYOUT_MIN_PROGRAM_PERCENT,
+  EDITOR_PANEL_LAYOUT_DEFAULT,
   expandEditorLayoutPreference,
   flattenEditorPanelLayout,
   getEditorFloatingPanelAfterKeyboardMove,
@@ -28,7 +29,7 @@ describe('editor panel layout v3 model', () => {
       inspectorVisible: true,
       programPercent: 12
     }))).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDock: {
         visible: false,
         width: EDITOR_LAYOUT_DEFAULT_LEFT_DOCK_WIDTH
@@ -47,7 +48,7 @@ describe('editor panel layout v3 model', () => {
 
   it('Given a v3 layout without floating panels, When parsed, Then it upgrades to docked floating defaults', () => {
     expect(parseEditorPanelLayout(JSON.stringify({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDock: {
         visible: true,
         width: EDITOR_LAYOUT_DEFAULT_LEFT_DOCK_WIDTH
@@ -61,7 +62,7 @@ describe('editor panel layout v3 model', () => {
         percent: 62
       }
     }))).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDock: {
         visible: true,
         width: EDITOR_LAYOUT_DEFAULT_LEFT_DOCK_WIDTH
@@ -88,7 +89,7 @@ describe('editor panel layout v3 model', () => {
       inspectorWidth: 900,
       programPercent: 92
     }))).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDock: {
         visible: true,
         width: EDITOR_LAYOUT_MIN_LEFT_DOCK_WIDTH
@@ -107,7 +108,7 @@ describe('editor panel layout v3 model', () => {
 
   it('Given stored floating panels, When parsed, Then panel rectangles are clamped and unknown panel state is rejected', () => {
     expect(parseEditorPanelLayout(JSON.stringify({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDock: {
         visible: true,
         width: EDITOR_LAYOUT_DEFAULT_LEFT_DOCK_WIDTH
@@ -132,7 +133,7 @@ describe('editor panel layout v3 model', () => {
         }
       }
     }))).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDock: {
         visible: true,
         width: EDITOR_LAYOUT_DEFAULT_LEFT_DOCK_WIDTH
@@ -159,9 +160,26 @@ describe('editor panel layout v3 model', () => {
     });
   });
 
+  it('Given a v3 stored layout, When parsed, Then docks carry over but the program split adopts the taller-timeline default', () => {
+    const stored = parseEditorPanelLayout(JSON.stringify({
+      schemaVersion: 3,
+      leftDock: { visible: false, width: EDITOR_LAYOUT_MAX_LEFT_DOCK_WIDTH },
+      inspector: { visible: true, placement: 'left', width: EDITOR_LAYOUT_MIN_INSPECTOR_WIDTH },
+      program: { percent: 58 },
+      floatingPanels: EDITOR_LAYOUT_FLOATING_PANEL_DEFAULTS
+    }));
+
+    // The user's own dock choices survive the migration...
+    expect(stored.leftDock).toEqual({ visible: false, width: EDITOR_LAYOUT_MAX_LEFT_DOCK_WIDTH });
+    expect(stored.inspector.placement).toBe('left');
+    // ...but a stored v3 split would otherwise mask the new timeline size.
+    expect(stored.program.percent).toBe(EDITOR_PANEL_LAYOUT_DEFAULT.program.percent);
+    expect(stored.schemaVersion).toBe(4);
+  });
+
   it('Given a v3 panel layout, When flattened and expanded, Then the editor preference round trips without drift', () => {
     const panelLayout: EditorPanelLayout = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDock: {
         visible: false,
         width: EDITOR_LAYOUT_MAX_LEFT_DOCK_WIDTH
@@ -187,7 +205,7 @@ describe('editor panel layout v3 model', () => {
     const preference = flattenEditorPanelLayout(panelLayout);
 
     expect(preference).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDockVisible: false,
       inspectorVisible: true,
       inspectorPlacement: 'floating',
@@ -223,7 +241,7 @@ describe('editor panel layout v3 model', () => {
 
   it('Given missing or malformed storage, When parsed, Then the default v3 panel layout is returned', () => {
     expect(parseEditorPanelLayout(null)).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       leftDock: {
         visible: EDITOR_LAYOUT_DEFAULT_PREFERENCE.leftDockVisible,
         width: EDITOR_LAYOUT_DEFAULT_LEFT_DOCK_WIDTH
