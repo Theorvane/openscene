@@ -1,0 +1,55 @@
+import { readFile } from 'node:fs/promises';
+
+import { describe, expect, it } from 'vitest';
+
+const SOURCE_URLS = {
+  authContext: new URL('../src/renderer/src/ChatGptAuthContext.tsx', import.meta.url),
+  dialog: new URL('../src/renderer/src/ProviderConnectDialog.tsx', import.meta.url),
+  settings: new URL('../src/renderer/src/SettingsWorkspace.tsx', import.meta.url),
+  chatContext: new URL('../src/renderer/src/AgentChatContext.tsx', import.meta.url),
+  picker: new URL('../src/renderer/src/AgentModelPicker.tsx', import.meta.url)
+} as const;
+
+describe('unified OpenAI provider renderer contract', () => {
+  it('drives ChatGPT sign-in through IPC without ever holding tokens in the renderer', async () => {
+    const source = await readFile(SOURCE_URLS.authContext, 'utf8');
+
+    expect(source).toContain('window.videoTool.getChatGptOAuthStatus()');
+    expect(source).toContain('window.videoTool.startChatGptOAuth()');
+    expect(source).toContain('window.videoTool.cancelChatGptOAuth()');
+    expect(source).toContain('window.videoTool.logoutChatGptOAuth()');
+    // Only a connected/disconnected status may cross the bridge.
+    expect(source).not.toMatch(/accessToken|refreshToken|accountId|localStorage/);
+  });
+
+  it('offers the opencode-style login-method step for providers with a sign-in', async () => {
+    const [dialog, settings] = await Promise.all([
+      readFile(SOURCE_URLS.dialog, 'utf8'),
+      readFile(SOURCE_URLS.settings, 'utf8')
+    ]);
+
+    expect(dialog).toContain('Select a login method for');
+    expect(dialog).toContain('provider-connect-dialog__method');
+    expect(dialog).toContain("type=\"password\"");
+    // OpenAI is one unified provider entry that carries the ChatGPT method.
+    expect(settings).toContain('chatGptSignInMethod');
+    expect(settings).toContain("connectTarget.id === 'openai' ? { oauthMethod: chatGptSignInMethod } : {}");
+    expect(settings).toContain('ChatGPT Pro/Plus');
+    expect(settings).toContain('Sign out of ChatGPT');
+    expect(settings).not.toContain('OPENAI_CODEX_PROVIDER');
+  });
+
+  it('treats a ChatGPT sign-in as a connection for Codex models across chat surfaces', async () => {
+    const [settings, chatContext, picker] = await Promise.all([
+      readFile(SOURCE_URLS.settings, 'utf8'),
+      readFile(SOURCE_URLS.chatContext, 'utf8'),
+      readFile(SOURCE_URLS.picker, 'utf8')
+    ]);
+
+    expect(settings).toContain('isProviderLinked');
+    expect(chatContext).toContain('resolveOpenAiAuthMode(selectedModel.id, chatGptAuth.isConnected)');
+    expect(chatContext).toContain('openAiAuthMode,');
+    expect(picker).toContain('isOpenAiCodexModelKey');
+    expect(picker).toContain('isModelLinked');
+  });
+});

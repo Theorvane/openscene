@@ -36,6 +36,11 @@ import { AgentChatSessionManager } from './agentChatSession';
 import { createAgentChatModel } from './agentChatModel';
 import { registerAgentChatIpcHandlers } from './agentChatIpcHandlers';
 import { AgentChatHistoryStore } from './agentChatHistoryStore';
+import { ChatGptOAuthService } from './chatGptOAuthService';
+import { registerChatGptOAuthIpcHandlers } from './registerChatGptOAuthIpcHandlers';
+import { ChatGptCodexAdapter } from './chatGptCodexAdapter';
+import { LlmPromptRouter } from './llmPromptRouter';
+import { registerLlmPromptIpcHandler } from './registerLlmPromptIpcHandler';
 
 registerTimelineAssetScheme();
 
@@ -48,7 +53,14 @@ const voiceProfileStore = new VoiceProfileStore(join(app.getPath('userData'), 'v
 const ttsJobStore = new LocalTtsJobStore();
 const exportJobStore = new ExportJobStore();
 const credentialStore = new CredentialStore(app.getPath('userData'));
+const chatGptOAuthService = new ChatGptOAuthService(app.getPath('userData'), {
+  openExternal: (url) => shell.openExternal(url)
+});
 const llmExecutionAdapter = new LlmExecutionAdapter(credentialStore);
+const llmPromptRouter = new LlmPromptRouter({
+  apiKeyAdapter: llmExecutionAdapter,
+  chatGptAdapter: new ChatGptCodexAdapter({ oauthService: chatGptOAuthService })
+});
 setAiJobManagerCredentialStore(credentialStore);
 const timelineIpcService = new TimelineIpcService({
   projects: projectStore,
@@ -234,6 +246,14 @@ async function installIpcHandlers(): Promise<void> {
   registerTimelineIpcHandlers(ipcMain, timelineIpcService);
   registerResultAssetImportHandlers(ipcMain, resultAssetImportService);
   registerExportIpcHandlers(ipcMain, exportIpcService);
+  registerChatGptOAuthIpcHandlers({
+    service: chatGptOAuthService,
+    registerHandler: (channel, handler) => ipcMain.handle(channel, (_event, payload: unknown) => handler(payload))
+  });
+  registerLlmPromptIpcHandler({
+    router: llmPromptRouter,
+    registerHandler: (channel, handler) => ipcMain.handle(channel, (_event, payload: unknown) => handler(payload))
+  });
 
   ipcMain.handle(IPC_CHANNELS.aiGenerateVideo, async (_event, request) => {
     try {
@@ -287,18 +307,6 @@ async function installIpcHandlers(): Promise<void> {
     }
   });
 
-  ipcMain.handle(
-    IPC_CHANNELS.executeLlmPrompt,
-    async (_event, request: { modelId: string; prompt: string; systemPrompt?: string }) => {
-      try {
-        const result = await llmExecutionAdapter.executeCompletion(request);
-        return ok(result);
-      } catch (err) {
-        return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to execute LLM prompt');
-      }
-    }
-  );
-
   const mcpServerInstance = new OpenVideoMcpServer();
   mcpServerInstance.setServices(projectStore, exportIpcService);
 
@@ -343,7 +351,7 @@ async function installIpcHandlers(): Promise<void> {
   const agentChatGraphBundle = buildAgentChatGraph({
     tools: agentChatTools,
     mutatingToolNames: AGENT_CHAT_MUTATING_TOOL_NAMES,
-    createModel: createAgentChatModel(agentChatTools, credentialStore)
+    createModel: createAgentChatModel(agentChatTools, credentialStore, chatGptOAuthService)
   });
   const agentChatSessions = new AgentChatSessionManager(agentChatGraphBundle);
   registerAgentChatIpcHandlers(ipcMain, agentChatSessions, new AgentChatHistoryStore(projectStore));

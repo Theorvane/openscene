@@ -3,8 +3,10 @@ import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import type { LocalFfmpegRuntimeStatus } from '../../shared/exportTypes';
 import { DEFAULT_LLM_MODELS, type LlmProviderId } from '../../shared/llmModels';
 import { LLM_PROVIDERS, MEDIA_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, isProviderConnected, type LlmProviderInfo } from '../../shared/llmProviders';
+import { isOpenAiCodexModelKey, resolveOpenAiAuthMode } from '../../shared/openAiAuth';
+import { useChatGptAuth } from './ChatGptAuthContext';
 import { useModelVisibility } from './ModelVisibilityContext';
-import { ProviderConnectDialog } from './ProviderConnectDialog';
+import { ProviderConnectDialog, type ProviderOAuthMethod } from './ProviderConnectDialog';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { TimelineShortcutMap } from './editor/TimelineEditorLayoutControls';
 import { useEditorShortcutPreference } from './editor/useEditorShortcutPreference';
@@ -109,6 +111,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
   const [activeSectionId, setActiveSectionId] = useState<SettingsSectionId>('appearance');
   const { isModelVisible, setModelVisibility } = useModelVisibility();
   const [connectTarget, setConnectTarget] = useState<LlmProviderInfo | null>(null);
+  const chatGptAuth = useChatGptAuth();
   const [showAllProviders, setShowAllProviders] = useState(false);
   const [providerFilter, setProviderFilter] = useState('');
   const [disconnectingKey, setDisconnectingKey] = useState<string | null>(null);
@@ -140,6 +143,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
     try {
       const response = await window.videoTool.executeLlmPrompt({
         modelId: selectedModelId,
+        openAiAuthMode: resolveOpenAiAuthMode(selectedModelId, chatGptAuth.isConnected),
         prompt: 'Reply with a short one-sentence greeting to confirm you are online.',
         ...(providerConfig.ollamaBaseUrl ? { ollamaBaseUrl: providerConfig.ollamaBaseUrl } : {})
       });
@@ -162,6 +166,19 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
 
   const isProviderKeyStored = (provider: LlmProviderInfo): boolean =>
     provider.credentialKey !== undefined && credentialStatus[provider.credentialKey] === true;
+
+  /** OpenAI is one unified provider with two methods: API key and ChatGPT sign-in. */
+  const isProviderLinked = (provider: LlmProviderInfo): boolean =>
+    isProviderKeyStored(provider) || (provider.id === 'openai' && chatGptAuth.isConnected);
+
+  const chatGptSignInMethod: ProviderOAuthMethod = {
+    label: 'ChatGPT Pro/Plus',
+    description: 'Sign in with your ChatGPT account to run Codex-family models.',
+    isConnecting: chatGptAuth.state === 'connecting',
+    ...(chatGptAuth.error === undefined ? {} : { error: chatGptAuth.error }),
+    onSignIn: chatGptAuth.connect,
+    onCancel: chatGptAuth.cancel
+  };
 
   const renderActiveSection = (): ReactNode => {
     switch (activeSectionId) {
@@ -207,13 +224,13 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
           </>
         );
       case 'providers': {
-        const connectedProviders = CLOUD_PROVIDERS.filter((provider) => isProviderKeyStored(provider));
+        const connectedProviders = CLOUD_PROVIDERS.filter((provider) => isProviderLinked(provider));
         const popularProviders = CLOUD_PROVIDERS.filter(
-          (provider) => !isProviderKeyStored(provider) && POPULAR_LLM_PROVIDER_IDS.includes(provider.id)
+          (provider) => !isProviderLinked(provider) && POPULAR_LLM_PROVIDER_IDS.includes(provider.id)
         );
         const providerQuery = providerFilter.trim().toLowerCase();
         const otherProviders = CLOUD_PROVIDERS.filter(
-          (provider) => !isProviderKeyStored(provider) && !POPULAR_LLM_PROVIDER_IDS.includes(provider.id)
+          (provider) => !isProviderLinked(provider) && !POPULAR_LLM_PROVIDER_IDS.includes(provider.id)
         );
         const matchedOtherProviders = otherProviders.filter(
           (provider) => providerQuery.length === 0 || provider.label.toLowerCase().includes(providerQuery) || provider.id.toLowerCase().includes(providerQuery)
@@ -234,17 +251,32 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
                     <input id="ollama-base-url" type="text" value={providerConfig.ollamaBaseUrl ?? ''} placeholder="http://localhost:11434" onChange={(event) => updateProviderConfig({ ollamaBaseUrl: event.target.value })} />
                   </label>
                 </div>
-                {connectedProviders.map((provider) => (
-                  <div key={provider.id} className="settings-list__row">
-                    <div className="settings-list__main">
-                      <span className="settings-list__name">{provider.label}</span>
-                      <span className="settings-tag">API key</span>
+                {connectedProviders.map((provider) => {
+                  const keyStored = isProviderKeyStored(provider);
+                  const chatGptLinked = provider.id === 'openai' && chatGptAuth.isConnected;
+                  return (
+                    <div key={provider.id} className="settings-list__row">
+                      <div className="settings-list__main">
+                        <span className="settings-list__name">{provider.label}</span>
+                        {keyStored && <span className="settings-tag">API key</span>}
+                        {chatGptLinked && <span className="settings-tag">ChatGPT</span>}
+                      </div>
+                      <div className="settings-list__actions">
+                        {provider.id === 'openai' && !chatGptLinked && (
+                          <Button variant="default" onClick={() => setConnectTarget(provider)}>+ Add ChatGPT</Button>
+                        )}
+                        {chatGptLinked && (
+                          <Button variant="ghost" onClick={() => void chatGptAuth.disconnect()}>Sign out of ChatGPT</Button>
+                        )}
+                        {keyStored && (
+                          <Button variant="ghost" onClick={() => void disconnectProvider(provider)} disabled={disconnectingKey === provider.credentialKey}>
+                            {disconnectingKey === provider.credentialKey ? 'Disconnecting…' : 'Disconnect key'}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <Button variant="ghost" onClick={() => void disconnectProvider(provider)} disabled={disconnectingKey === provider.credentialKey}>
-                      {disconnectingKey === provider.credentialKey ? 'Disconnecting…' : 'Disconnect'}
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -260,7 +292,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
                         <span className="settings-list__name">{provider.label}</span>
                         <span className="settings-list__note">
                           {provider.id === 'openai'
-                            ? 'One OpenAI API key enables regular OpenAI text models and Codex-family models through the public Responses API.'
+                            ? 'Connect with an API key for the public API, or sign in with ChatGPT Pro/Plus to run Codex-family models.'
                             : provider.description}
                         </span>
                       </div>
@@ -342,6 +374,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
                 provider={connectTarget}
                 onConnect={(apiKey) => saveProviderCredential(connectTarget.credentialKey as LlmCredentialKey, apiKey)}
                 onClose={() => setConnectTarget(null)}
+                {...(connectTarget.id === 'openai' ? { oauthMethod: chatGptSignInMethod } : {})}
               />
             )}
           </>
@@ -422,7 +455,9 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
               {DEFAULT_LLM_MODELS
                 .filter((model) =>
                   model.id === selectedModelId ||
-                  ((model.providerId === 'local_ollama' || isProviderConnected(model.providerId, credentialStatus)) &&
+                  ((model.providerId === 'local_ollama' ||
+                    isProviderConnected(model.providerId, credentialStatus) ||
+                    (chatGptAuth.isConnected && isOpenAiCodexModelKey(model.id))) &&
                     isModelVisible(model.providerId, model.id)))
                 .map((model) => <option key={model.id} value={model.id}>{model.label} ({model.providerLabel}) - [{model.badge}]</option>)}
             </select>

@@ -3,13 +3,24 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { getLlmModel, parseLlmModelKey } from '../shared/llmModels';
 import { getLlmProvider } from '../shared/llmProviders';
+import type { OpenAiAuthMode } from '../shared/openAiAuth';
 import type { AgentChatModelFactory } from './agentChatGraph';
 import type { CredentialStore } from './credentialStore';
+import { CHATGPT_CODEX_ENDPOINT_METADATA } from './chatGptOAuthService';
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
 export type AgentChatModelSpec =
   | { readonly kind: 'ollama' }
+  | {
+      readonly kind: 'chatgpt-codex';
+      readonly providerId: 'openai';
+      readonly providerLabel: 'OpenAI';
+      readonly rawModelId: string;
+      readonly baseUrl: string;
+      readonly accountIdHeader: string;
+      readonly useResponsesApi: true;
+    }
   | {
       readonly kind: 'cloud';
       readonly providerId: string;
@@ -23,13 +34,51 @@ export type AgentChatModelSpec =
       readonly useResponsesApi?: boolean;
     };
 
+type ChatGptCodexCredentials = {
+  readonly accessToken: string;
+  readonly accountId: string;
+};
+
+type ChatGptOAuthCredentialsService = {
+  readonly acquireCredentials: () => Promise<ChatGptCodexCredentials>;
+};
+
+export class AgentChatModelConfigurationError extends Error {
+  override readonly name = 'AgentChatModelConfigurationError';
+}
+
 /**
  * Resolve which chat-model client serves a canonical model key. Unknown keys
  * fall back to Ollama so custom locally pulled models keep working, matching
  * the pre-catalog behavior.
  */
-export function resolveAgentChatModelSpec(modelId: string): AgentChatModelSpec {
+export function resolveAgentChatModelSpec(
+  modelId: string,
+  openAiAuthMode: OpenAiAuthMode = 'api-key'
+): AgentChatModelSpec {
   const model = getLlmModel(modelId);
+  const parsedModel = parseLlmModelKey(modelId);
+  if (openAiAuthMode === 'chatgpt') {
+    if (model === undefined || parsedModel === null || model.providerId !== 'openai' || parsedModel.providerId !== 'openai') {
+      throw new AgentChatModelConfigurationError(
+        'ChatGPT authentication supports only canonical OpenAI Codex-family models for Edit Agent.'
+      );
+    }
+    if (!parsedModel.modelId.includes('codex')) {
+      throw new AgentChatModelConfigurationError(
+        `ChatGPT authentication cannot run Edit Agent model "${modelId}" because it is not a Codex-family model.`
+      );
+    }
+    return {
+      kind: 'chatgpt-codex',
+      providerId: 'openai',
+      providerLabel: 'OpenAI',
+      rawModelId: parsedModel.modelId,
+      baseUrl: CHATGPT_CODEX_ENDPOINT_METADATA.baseUrl,
+      accountIdHeader: CHATGPT_CODEX_ENDPOINT_METADATA.accountIdHeader,
+      useResponsesApi: true
+    };
+  }
   if (model === undefined || model.providerId === 'local_ollama') {
     return { kind: 'ollama' };
   }
@@ -54,6 +103,24 @@ export function resolveAgentChatModelSpec(modelId: string): AgentChatModelSpec {
     rawModelId,
     ...(provider.baseUrl === undefined ? {} : { baseUrl: provider.baseUrl }),
     ...(useResponsesApi ? { useResponsesApi: true } : {})
+  };
+}
+
+export function resolveChatGptCodexClientConfig(
+  spec: Extract<AgentChatModelSpec, { kind: 'chatgpt-codex' }>,
+  credentials: ChatGptCodexCredentials
+) {
+  return {
+    model: spec.rawModelId,
+    apiKey: credentials.accessToken,
+    useResponsesApi: spec.useResponsesApi,
+    configuration: {
+      baseURL: spec.baseUrl,
+      defaultHeaders: {
+        Authorization: `Bearer ${credentials.accessToken}`,
+        [spec.accountIdHeader]: credentials.accountId
+      }
+    }
   };
 }
 
@@ -88,15 +155,31 @@ async function createCloudChatModel(
  */
 export function createAgentChatModel(
   tools: readonly DynamicStructuredTool[],
-  credentialStore: CredentialStore | null = null
+  credentialStore: CredentialStore | null = null,
+  chatGptOAuthService: ChatGptOAuthCredentialsService | null = null
 ): AgentChatModelFactory {
-  return ({ modelId, ollamaBaseUrl }) => {
-    const spec = resolveAgentChatModelSpec(modelId);
+  return ({ modelId, ollamaBaseUrl, openAiAuthMode }) => {
+    const spec = resolveAgentChatModelSpec(modelId, openAiAuthMode);
 
     if (spec.kind === 'ollama') {
       const baseUrl = (ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL).replace(/\/$/, '');
       const model = new ChatOllama({ model: modelId, baseUrl }).bindTools([...tools]);
       return { invoke: (messages) => model.invoke([...messages]) };
+    }
+
+    if (spec.kind === 'chatgpt-codex') {
+      return {
+        invoke: async (messages) => {
+          if (chatGptOAuthService === null) {
+            throw new AgentChatModelConfigurationError('ChatGPT authentication is unavailable for Edit Agent.');
+          }
+          const credentials = await chatGptOAuthService.acquireCredentials();
+          const { ChatOpenAI } = await import('@langchain/openai');
+          const cloudModel = new ChatOpenAI(resolveChatGptCodexClientConfig(spec, credentials));
+          const model = cloudModel.bindTools([...tools]);
+          return model.invoke([...messages]);
+        }
+      };
     }
 
     return {

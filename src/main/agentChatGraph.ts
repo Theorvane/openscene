@@ -13,6 +13,7 @@ import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { Annotation, END, MemorySaver, START, StateGraph, interrupt } from '@langchain/langgraph';
 import type { AgentToolCallProposal, AgentToolApprovalDecision } from '../shared/agentChat';
 import { parseEditAgentProjectContext, type EditAgentContextAsset, type EditAgentProjectContext } from '../shared/editAgentContext';
+import type { OpenAiAuthMode } from '../shared/openAiAuth';
 
 const AGENT_CHAT_SYSTEM_PROMPT =
   'You are the OpenVideo in-app agent. You can call the provided tools to check AI job status, ' +
@@ -127,7 +128,11 @@ export interface AgentChatModelHandle {
   invoke(messages: BaseMessage[]): Promise<AIMessage>;
 }
 
-export type AgentChatModelFactory = (config: { modelId: string; ollamaBaseUrl: string | undefined }) => AgentChatModelHandle;
+export type AgentChatModelFactory = (config: {
+  readonly modelId: string;
+  readonly openAiAuthMode: OpenAiAuthMode | undefined;
+  readonly ollamaBaseUrl: string | undefined;
+}) => AgentChatModelHandle;
 
 const AgentChatState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
@@ -151,12 +156,16 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
 
   const builder = new StateGraph(AgentChatState)
     .addNode('agent', async (state, config) => {
-      const configurable = (config?.configurable ?? {}) as { modelId?: string; ollamaBaseUrl?: string; editAssetContext?: string; editProjectContext?: string };
+      const configurable = (config?.configurable ?? {}) as { modelId?: string; openAiAuthMode?: OpenAiAuthMode; ollamaBaseUrl?: string; editAssetContext?: string; editProjectContext?: string };
       if (!configurable.modelId) {
         throw new Error('agentChatGraph: a modelId must be provided via config.configurable.');
       }
 
-      const model = options.createModel({ modelId: configurable.modelId, ollamaBaseUrl: configurable.ollamaBaseUrl });
+      const model = options.createModel({
+        modelId: configurable.modelId,
+        openAiAuthMode: configurable.openAiAuthMode,
+        ollamaBaseUrl: configurable.ollamaBaseUrl
+      });
       const hasSystemPrompt = state.messages.length > 0 && isSystemMessage(state.messages[0]!);
       const messages = hasSystemPrompt
         ? state.messages

@@ -2,7 +2,9 @@ import { useState, type ReactElement } from 'react';
 
 import { getDomainModels, type AiDomainModelConfig } from '../../shared/aiDomainModels';
 import { isProviderConnected } from '../../shared/llmProviders';
+import { isOpenAiCodexModelKey } from '../../shared/openAiAuth';
 import { useAiDomainModel } from './AiDomainModelContext';
+import { useChatGptAuth } from './ChatGptAuthContext';
 import { useLlmModel } from './LlmProviderContext';
 import { useModelVisibility } from './ModelVisibilityContext';
 
@@ -34,6 +36,12 @@ export function AgentModelPicker(): ReactElement {
   const { selectedModel, setSelectedModelId } = useAiDomainModel();
   const { credentialStatus } = useLlmModel();
   const { isModelVisible } = useModelVisibility();
+  const chatGptAuth = useChatGptAuth();
+  // A ChatGPT sign-in connects the OpenAI provider for Codex-family models even
+  // when no API key is stored.
+  const isModelLinked = (providerId: string, modelId: string): boolean =>
+    isProviderConnected(providerId, credentialStatus) ||
+    (chatGptAuth.isConnected && isOpenAiCodexModelKey(modelId));
   const [isOpen, setIsOpen] = useState(false);
 
   const activeModel = selectedModel('edit-agent');
@@ -43,14 +51,14 @@ export function AgentModelPicker(): ReactElement {
   // model always stays listed so the current selection is never orphaned.
   const models = getDomainModels('edit-agent').filter((model) => {
     if (model.id === activeModel.id) return true;
-    if (model.executionPath !== 'local' && !isProviderConnected(model.providerId, credentialStatus)) return false;
+    if (model.executionPath !== 'local' && !isModelLinked(model.providerId, model.id)) return false;
     return isModelVisible(model.providerId, model.id);
   });
   const groups = groupByProvider(models);
 
   const providerStatusLabel = (group: ProviderGroup): string => {
     if (group.models[0]?.executionPath === 'local') return 'Local';
-    return isProviderConnected(group.providerId, credentialStatus) ? 'Connected' : 'Not connected';
+    return group.models.some((model) => isModelLinked(group.providerId, model.id)) ? 'Connected' : 'Not connected';
   };
 
   return (
@@ -76,7 +84,7 @@ export function AgentModelPicker(): ReactElement {
           aria-label="Edit Agent models by provider"
         >
           {groups.map((group) => {
-            const connected = group.models[0]?.executionPath === 'local' || isProviderConnected(group.providerId, credentialStatus);
+            const connected = group.models[0]?.executionPath === 'local' || group.models.some((model) => isModelLinked(group.providerId, model.id));
             return (
               <div key={group.providerId} className="agent-model-picker__group">
                 <div className="agent-model-picker__group-header">

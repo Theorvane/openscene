@@ -6,6 +6,7 @@ import { bootstrapRendererTheme, ThemeProvider } from './ThemeProvider';
 import { LlmProvider } from './LlmProviderContext';
 import { AiDomainModelProvider } from './AiDomainModelContext';
 import { ModelVisibilityProvider } from './ModelVisibilityContext';
+import { ChatGptAuthProvider } from './ChatGptAuthContext';
 import './styles.css';
 
 const rootElement = document.getElementById('root');
@@ -24,11 +25,13 @@ createRoot(rootElement).render(
   <React.StrictMode>
     <ThemeProvider>
       <LlmProvider>
-        <AiDomainModelProvider>
-          <ModelVisibilityProvider>
-            <App />
-          </ModelVisibilityProvider>
-        </AiDomainModelProvider>
+        <ChatGptAuthProvider>
+          <AiDomainModelProvider>
+            <ModelVisibilityProvider>
+              <App />
+            </ModelVisibilityProvider>
+          </AiDomainModelProvider>
+        </ChatGptAuthProvider>
       </LlmProvider>
     </ThemeProvider>
   </React.StrictMode>

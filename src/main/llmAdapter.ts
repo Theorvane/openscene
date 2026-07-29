@@ -1,12 +1,14 @@
 import type { CredentialStore } from './credentialStore';
 import { getLlmModel, parseLlmModelKey } from '../shared/llmModels';
 import { getLlmProvider, type LlmProviderInfo } from '../shared/llmProviders';
+import type { OpenAiAuthMode } from '../shared/openAiAuth';
 
 export interface LlmCompletionRequest {
   modelId: string;
   prompt: string;
   systemPrompt?: string;
   ollamaBaseUrl?: string;
+  openAiAuthMode?: OpenAiAuthMode;
 }
 
 export interface LlmCompletionResponse {

@@ -51,7 +51,8 @@ describe('Settings workspace source contract', () => {
     expect(source).toContain('id="ollama-base-url"');
     expect(source).toContain('Media providers');
     expect(source).toContain('MEDIA_PROVIDERS.map');
-    expect(source).toContain('One OpenAI API key enables regular OpenAI text models and Codex-family models through the public Responses API.');
+    // OpenAI stays one unified entry, now advertising both login methods.
+    expect(source).toContain('Connect with an API key for the public API, or sign in with ChatGPT Pro/Plus to run Codex-family models.');
     expect(source).not.toContain('OPENAI_CODEX_PROVIDER');
     expect(source).not.toContain('Sign in — not supported yet');
   });

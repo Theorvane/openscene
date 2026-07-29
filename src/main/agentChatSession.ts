@@ -10,10 +10,12 @@ import type {
   AgentToolCallProposal
 } from '../shared/agentChat';
 import type { EditAgentContextAsset, EditAgentProjectContext } from '../shared/editAgentContext';
+import type { OpenAiAuthMode } from '../shared/openAiAuth';
 import { isAiLike, isHumanMessage, isToolMessage, type AgentChatGraphBundle } from './agentChatGraph';
 
 interface ConversationConfig {
   readonly modelId: string;
+  readonly openAiAuthMode: OpenAiAuthMode | undefined;
   readonly ollamaBaseUrl: string | undefined;
   readonly contextAssets: readonly EditAgentContextAsset[];
   readonly activeProject: EditAgentProjectContext | null;
@@ -32,6 +34,7 @@ export class AgentChatSessionManager {
   async sendMessage(input: AgentChatSendInput): Promise<AgentChatTurnState> {
     this.conversationConfigs.set(input.conversationId, {
       modelId: input.modelId,
+      openAiAuthMode: input.openAiAuthMode,
       ollamaBaseUrl: input.ollamaBaseUrl,
       contextAssets: input.contextAssets ?? [],
       activeProject: input.activeProject ?? null
@@ -112,6 +115,7 @@ export class AgentChatSessionManager {
       configurable: {
         thread_id: conversationId,
         modelId: stored?.modelId,
+        openAiAuthMode: stored?.openAiAuthMode,
         ollamaBaseUrl: stored?.ollamaBaseUrl,
         editAssetContext: JSON.stringify(stored?.contextAssets ?? []),
         editProjectContext: JSON.stringify(stored?.activeProject ?? null)

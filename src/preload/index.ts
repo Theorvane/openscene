@@ -58,6 +58,7 @@ import type {
   AgentChatStoredConversation,
   AgentChatTurnState
 } from '../shared/agentChat';
+import type { ChatGptOAuthStatus, OpenAiAuthMode } from '../shared/openAiAuth';
 
 type ImportProjectAssetsResult = {
   readonly assets: readonly MediaAsset[];
@@ -116,11 +117,16 @@ export interface VideoToolApi {
   aiGetSpeechJob(jobId: string): Promise<ApiResponse<TextToSpeechJob>>;
   getProviderCredentialStatus(): Promise<ApiResponse<Record<string, boolean>>>;
   setProviderCredential(provider: string, apiKey: string): Promise<ApiResponse<{ readonly updated: boolean }>>;
+  getChatGptOAuthStatus(): Promise<ApiResponse<ChatGptOAuthStatus>>;
+  startChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
+  cancelChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
+  logoutChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
   executeLlmPrompt(request: {
     modelId: string;
     prompt: string;
     systemPrompt?: string;
     ollamaBaseUrl?: string;
+    openAiAuthMode?: OpenAiAuthMode;
   }): Promise<ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>>;
   mcpGetTools(): Promise<ApiResponse<unknown>>;
   mcpExecuteTool(toolName: string, params: unknown): Promise<ApiResponse<unknown>>;
@@ -207,6 +213,14 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.getProviderCredentials) as Promise<ApiResponse<Record<string, boolean>>>,
   setProviderCredential: (provider, apiKey) =>
     ipcRenderer.invoke(IPC_CHANNELS.setProviderCredential, provider, apiKey) as Promise<ApiResponse<{ readonly updated: boolean }>>,
+  getChatGptOAuthStatus: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.getChatGptOAuthStatus) as Promise<ApiResponse<ChatGptOAuthStatus>>,
+  startChatGptOAuth: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.startChatGptOAuth) as Promise<ApiResponse<ChatGptOAuthStatus>>,
+  cancelChatGptOAuth: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.cancelChatGptOAuth) as Promise<ApiResponse<ChatGptOAuthStatus>>,
+  logoutChatGptOAuth: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.logoutChatGptOAuth) as Promise<ApiResponse<ChatGptOAuthStatus>>,
   executeLlmPrompt: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.executeLlmPrompt, request) as Promise<
       ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>

@@ -3,6 +3,8 @@ import type { AgentChatDisplayMessage, AgentChatStatus, AgentToolCallProposal } 
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import type { AiDomainModelConfig } from '../../shared/aiDomainModels';
 import { isProviderConnected } from '../../shared/llmProviders';
+import { resolveOpenAiAuthMode } from '../../shared/openAiAuth';
+import { useChatGptAuth } from './ChatGptAuthContext';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useLlmModel } from './LlmProviderContext';
 
@@ -48,6 +50,7 @@ type AgentChatProviderProps = {
 
 export function AgentChatProvider({ activeProject, restoreRequest = null, onRestoreHandled, children }: AgentChatProviderProps): ReactElement {
   const { providerConfig, credentialStatus } = useLlmModel();
+  const chatGptAuth = useChatGptAuth();
   const { selectedModel: getSelectedDomainModel } = useAiDomainModel();
   const selectedModel = getSelectedDomainModel('edit-agent');
   const conversationIdRef = useRef<string>(createConversationId());
@@ -63,7 +66,13 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   const restoredSeedRef = useRef<readonly AgentChatDisplayMessage[] | null>(null);
 
   const isLocalModel = selectedModel.executionPath === 'local';
-  const modelReady = isLocalModel || isProviderConnected(selectedModel.providerId, credentialStatus);
+  // OpenAI has two connection methods: a stored API key, or ChatGPT sign-in for
+  // Codex-family models. Either one makes the model runnable.
+  const openAiAuthMode = resolveOpenAiAuthMode(selectedModel.id, chatGptAuth.isConnected);
+  const modelReady =
+    isLocalModel ||
+    openAiAuthMode === 'chatgpt' ||
+    isProviderConnected(selectedModel.providerId, credentialStatus);
 
   useEffect(() => {
     if (restoreRequest === null) return;
@@ -92,6 +101,7 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
         modelId: selectedModel.id,
         ollamaBaseUrl: providerConfig.ollamaBaseUrl,
         activeProject: activeProject ?? undefined,
+        openAiAuthMode,
         restoredMessages: restoredSeedRef.current ?? undefined
       });
 

@@ -1,4 +1,5 @@
 import type { EditAgentContextAsset, EditAgentProjectContext } from './editAgentContext';
+import type { OpenAiAuthMode } from './openAiAuth';
 
 export type AgentChatMessageRole = 'user' | 'assistant' | 'tool';
 
@@ -29,6 +30,7 @@ export interface AgentChatSendInput {
   readonly conversationId: string;
   readonly text: string;
   readonly modelId: string;
+  readonly openAiAuthMode?: OpenAiAuthMode | undefined;
   readonly ollamaBaseUrl?: string | undefined;
   readonly contextAssets?: readonly EditAgentContextAsset[] | undefined;
   readonly activeProject?: EditAgentProjectContext | undefined;
