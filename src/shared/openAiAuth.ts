@@ -30,8 +30,25 @@ function isChatGptServedModelId(modelId: string): boolean {
   if (CHATGPT_ALLOWED_MODEL_IDS.has(modelId)) return true;
   if (CHATGPT_DENIED_MODEL_IDS.has(modelId)) return false;
   if (modelId.endsWith('-pro')) return false;
-  const version = /^gpt-(\d+\.\d+)/.exec(modelId)?.[1];
-  return version === undefined ? false : Number.parseFloat(version) > 5.4;
+  return isNewerThanGpt54(modelId);
+}
+
+/** Minimum served generation: anything after GPT-5.4 rides the sign-in. */
+const CHATGPT_MIN_EXCLUSIVE_VERSION: readonly [number, number] = [5, 4];
+
+/**
+ * Compares the version as a [major, minor] pair rather than a float, so a
+ * two-digit minor sorts correctly — `gpt-5.10` is newer than `gpt-5.4`, while
+ * parseFloat would read it as 5.1 and call it older.
+ */
+function isNewerThanGpt54(modelId: string): boolean {
+  const match = /^gpt-(\d+)\.(\d+)/.exec(modelId);
+  if (match === null) return false;
+  const major = Number.parseInt(match[1] ?? '', 10);
+  const minor = Number.parseInt(match[2] ?? '', 10);
+  if (!Number.isFinite(major) || !Number.isFinite(minor)) return false;
+  const [minMajor, minMinor] = CHATGPT_MIN_EXCLUSIVE_VERSION;
+  return major !== minMajor ? major > minMajor : minor > minMinor;
 }
 
 /**

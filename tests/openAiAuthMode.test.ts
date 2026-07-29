@@ -14,6 +14,11 @@ describe('unified OpenAI auth mode selection', () => {
     expect(isOpenAiCodexModelKey('openai/gpt-5.6-luna')).toBe(true);
     expect(isOpenAiCodexModelKey('openai/gpt-5.6-sol')).toBe(true);
     expect(isOpenAiCodexModelKey('openai/gpt-5.6-terra')).toBe(true);
+    // The version is compared as [major, minor], so a two-digit minor sorts
+    // correctly instead of parsing as 5.1 and reading as older than 5.4.
+    expect(isOpenAiCodexModelKey('openai/gpt-5.10')).toBe(true);
+    expect(isOpenAiCodexModelKey('openai/gpt-6.0')).toBe(true);
+    expect(isOpenAiCodexModelKey('openai/gpt-5.04')).toBe(false);
 
     // Older Codex builds and Pro tiers are rejected by the backend with a bare
     // 400, so they must never route through the sign-in.
