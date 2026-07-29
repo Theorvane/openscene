@@ -242,6 +242,32 @@ async function safeErrorDetail(response: Response): Promise<string> {
   return bodyText.slice(0, 300);
 }
 
+/** OpenAI codex-family models only speak the Responses API. */
+function openAiResponsesRequest(baseUrl: string, modelId: string, apiKey: string, request: LlmCompletionRequest): CloudCompletionRequest {
+  return {
+    url: `${baseUrl}/responses`,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: {
+      model: modelId,
+      ...(request.systemPrompt ? { instructions: request.systemPrompt } : {}),
+      input: request.prompt
+    },
+    extractCompletion: (payload) => {
+      const parsed = payload as {
+        output_text?: string;
+        output?: readonly { type?: string; content?: readonly { type?: string; text?: string }[] }[];
+      };
+      if (typeof parsed.output_text === 'string' && parsed.output_text.length > 0) return parsed.output_text;
+      return parsed.output
+        ?.filter((item) => item.type === 'message')
+        .flatMap((item) => item.content ?? [])
+        .filter((part) => part.type === 'output_text' && typeof part.text === 'string')
+        .map((part) => part.text)
+        .join('');
+    }
+  };
+}
+
 function openAiStyleRequest(baseUrl: string, modelId: string, apiKey: string, request: LlmCompletionRequest): CloudCompletionRequest {
   return {
     url: `${baseUrl}/chat/completions`,
@@ -265,10 +291,13 @@ function buildCloudCompletionRequest(
   request: LlmCompletionRequest
 ): CloudCompletionRequest | null {
   switch (provider.adapter) {
-    case 'openai-compatible':
-      return provider.baseUrl === undefined
-        ? null
-        : openAiStyleRequest(provider.baseUrl.replace(/\/$/, ''), modelId, apiKey, request);
+    case 'openai-compatible': {
+      if (provider.baseUrl === undefined) return null;
+      const baseUrl = provider.baseUrl.replace(/\/$/, '');
+      return provider.id === 'openai' && modelId.includes('codex')
+        ? openAiResponsesRequest(baseUrl, modelId, apiKey, request)
+        : openAiStyleRequest(baseUrl, modelId, apiKey, request);
+    }
     case 'anthropic':
       return {
         url: 'https://api.anthropic.com/v1/messages',

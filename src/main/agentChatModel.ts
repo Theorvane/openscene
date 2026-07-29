@@ -19,6 +19,8 @@ export type AgentChatModelSpec =
       /** Provider-native model id (the part after the provider prefix). */
       readonly rawModelId: string;
       readonly baseUrl?: string;
+      /** OpenAI codex-family models are served by the Responses API. */
+      readonly useResponsesApi?: boolean;
     };
 
 /**
@@ -41,14 +43,17 @@ export function resolveAgentChatModelSpec(modelId: string): AgentChatModelSpec {
   ) {
     return { kind: 'ollama' };
   }
+  const rawModelId = parseLlmModelKey(modelId)?.modelId ?? modelId;
+  const useResponsesApi = provider.id === 'openai' && rawModelId.includes('codex');
   return {
     kind: 'cloud',
     providerId: provider.id,
     providerLabel: provider.label,
     adapter: provider.adapter,
     credentialKey: provider.credentialKey,
-    rawModelId: parseLlmModelKey(modelId)?.modelId ?? modelId,
-    ...(provider.baseUrl === undefined ? {} : { baseUrl: provider.baseUrl })
+    rawModelId,
+    ...(provider.baseUrl === undefined ? {} : { baseUrl: provider.baseUrl }),
+    ...(useResponsesApi ? { useResponsesApi: true } : {})
   };
 }
 
@@ -68,6 +73,7 @@ async function createCloudChatModel(
   return new ChatOpenAI({
     model: spec.rawModelId,
     apiKey,
+    ...(spec.useResponsesApi === true ? { useResponsesApi: true } : {}),
     ...(spec.baseUrl === undefined ? {} : { configuration: { baseURL: spec.baseUrl } })
   });
 }

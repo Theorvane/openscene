@@ -18,6 +18,14 @@ describe('agent chat model provider resolution', () => {
       credentialKey: 'anthropicApiKey',
       rawModelId: 'claude-sonnet-5'
     });
+    // Codex-family OpenAI models are served by the Responses API.
+    expect(resolveAgentChatModelSpec('openai/gpt-5.3-codex')).toMatchObject({
+      kind: 'cloud',
+      providerId: 'openai',
+      useResponsesApi: true,
+      rawModelId: 'gpt-5.3-codex'
+    });
+    expect(resolveAgentChatModelSpec('openai/gpt-5')).not.toHaveProperty('useResponsesApi');
     expect(resolveAgentChatModelSpec('deepseek/deepseek-chat')).toMatchObject({
       kind: 'cloud',
       adapter: 'openai-compatible',

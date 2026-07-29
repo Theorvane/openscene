@@ -62,6 +62,11 @@ describe('LLM provider and model catalog configuration', () => {
     expect(getLlmProvider('google_gemini')?.credentialKey).toBe('geminiApiKey');
     expect(getLlmProvider('deepseek')?.credentialKey).toBe('deepseekApiKey');
     expect(isProviderConnected('unknown-provider', { anyKey: true })).toBe(false);
+
+    // Codex parity entry: OAuth sign-in is listed but not connectable yet.
+    const codex = getLlmProvider('openai-codex');
+    expect(codex?.auth).toBe('oauth');
+    expect(isProviderConnected('openai-codex', { openaiApiKey: true })).toBe(false);
   });
 
   it('parses canonical provider/model keys and keeps resolvable stored selections', () => {

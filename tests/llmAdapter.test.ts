@@ -185,6 +185,33 @@ describe('LlmExecutionAdapter (main process)', () => {
     }
   });
 
+  it('sends codex-family OpenAI models to the Responses API and joins output text', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'cred-test-codex-'));
+    try {
+      const credentialStore = new CredentialStore(tempDir);
+      await credentialStore.setCredential('openaiApiKey', 'sk-codex-key');
+      const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+        expect(url).toBe('https://api.openai.com/v1/responses');
+        expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-codex-key');
+        const body = JSON.parse(init.body as string);
+        expect(body.model).toBe('gpt-5.3-codex');
+        expect(body.instructions).toBe('You are terse.');
+        expect(body.input).toBe('Refactor this');
+        return new Response(
+          JSON.stringify({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'Done.' }] }] }),
+          { status: 200 }
+        );
+      });
+      const adapter = new LlmExecutionAdapter(credentialStore, { fetchImpl: fetchMock as unknown as typeof fetch });
+
+      const result = await adapter.executeCompletion({ modelId: 'openai/gpt-5.3-codex', prompt: 'Refactor this', systemPrompt: 'You are terse.' });
+
+      expect(result).toEqual({ ok: true, modelId: 'openai/gpt-5.3-codex', providerId: 'openai', completion: 'Done.' });
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('reports rejected keys with a reconnect hint and never echoes the key material', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'cred-test-reject-'));
     try {
