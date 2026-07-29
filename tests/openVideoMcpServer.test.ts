@@ -48,6 +48,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     expect(toolNames).toContain('updateClipEffects');
     expect(toolNames).toContain('addClipToTimeline');
     expect(toolNames).toContain('importGeneratedResult');
+    expect(toolNames).toContain('removeTimelineClip');
     expect(toolNames).toContain('exportProjectVideo');
   });
 
@@ -375,6 +376,38 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     expect(clip?.assetId).toBe(dummyAsset.id);
     expect(clip?.timelineStartMs).toBe(2000);
     expect((clip?.sourceEndMs ?? 0) - (clip?.sourceStartMs ?? 0)).toBe(4000);
+  });
+
+  it('removes a clip, drops its transitions, and tells open editors to reload', async () => {
+    const server = new OpenVideoMcpServer();
+    const changed: string[] = [];
+    server.setServices(projectStore);
+    server.setProjectTimelineChangeNotifier((projectId) => changed.push(projectId));
+
+    const project = await projectStore.create({ name: 'Remove Clip Project' });
+    await projectStore.registerAsset(project.id, videoAsset());
+    const added = await server.addClipToTimeline({ projectId: project.id, assetId: videoAsset().id });
+    expect(added.success).toBe(true);
+
+    const removed = await server.removeTimelineClip({ projectId: project.id, clipId: added.clipId! });
+
+    expect(removed).toMatchObject({ success: true, projectId: project.id, clipId: added.clipId });
+    const reloaded = await projectStore.open(project.id);
+    expect(reloaded?.timeline.tracks.flatMap((track) => track.clips)).toHaveLength(0);
+    expect(changed).toEqual([project.id, project.id]);
+  });
+
+  it('refuses to report success when the clip is not on the timeline', async () => {
+    const server = new OpenVideoMcpServer();
+    server.setServices(projectStore);
+    const project = await projectStore.create({ name: 'Remove Clip Project' });
+
+    // deleteClip is a no-op for an unknown id, so a naive call would look like
+    // it worked; the tool has to notice nothing changed.
+    const result = await server.removeTimelineClip({ projectId: project.id, clipId: 'clip-missing' });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('is not on the timeline');
   });
 
   it('validates exportProjectVideo error propagation when export service fails or succeeds', async () => {

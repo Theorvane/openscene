@@ -17,7 +17,7 @@ import type { OpenAiAuthMode, ReasoningEffort } from '../shared/openAiAuth';
 
 const AGENT_CHAT_SYSTEM_PROMPT =
   'You are the OpenVideo in-app agent. You drive the whole editor through the provided tools: read a ' +
-  'project timeline, add and trim clips, adjust clip effects, and start an FFmpeg export. ' +
+  'project timeline, add, trim, and remove clips, adjust clip effects, and start an FFmpeg export. ' +
   'You also own generation end to end. To add generated media: call createVideoJob or createSpeechJob, ' +
   'poll getJobStatus until it reports completed, call importGeneratedResult to bring the result into the ' +
   'project as an asset, then place that assetId with addClipToTimeline. Do not ask the user to do those ' +

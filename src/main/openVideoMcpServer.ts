@@ -3,7 +3,7 @@ import { resolve as resolvePath, sep } from 'node:path';
 import { getMcpServerDefinition, McpResource, McpServer, McpTool } from '@theorvane/type-mcp';
 import { z } from 'zod';
 import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, type ClipEffects, type TimelineTrack } from '../shared/timelineTypes';
-import { placeClip } from '../shared/timelineClipLogic';
+import { deleteClip, placeClip } from '../shared/timelineClipLogic';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '../shared/timelineClipPlacement';
 import type { ExportIpcService } from './exportIpcService';
 import type { ResultAssetImportService } from './resultAssetImportService';
@@ -385,6 +385,50 @@ export class OpenVideoMcpServer {
   }
 
   @McpTool({
+    description:
+      'Remove one clip from a project timeline. This changes a saved project and requires explicit user approval. ' +
+      'Transitions that referenced the clip are dropped with it.',
+    input: z.object({
+      projectId: z.string().min(1),
+      clipId: z.string().min(1)
+    })
+  })
+  async removeTimelineClip(params: { projectId: string; clipId: string }) {
+    if (!this.projectStore) {
+      return { success: false as const, error: 'ProjectStore service is not available.' };
+    }
+
+    try {
+      const project = await this.projectStore.open(params.projectId);
+      if (!project) {
+        return { success: false as const, error: `Project ${params.projectId} not found.` };
+      }
+
+      // deleteClip returns the timeline unchanged for an unknown id, so compare
+      // rather than reporting success for a no-op.
+      const nextTimeline = deleteClip(project.timeline, params.clipId);
+      if (nextTimeline === project.timeline) {
+        return { success: false as const, error: `Clip ${params.clipId} is not on the timeline of project ${params.projectId}.` };
+      }
+
+      await this.projectStore.saveTimeline(params.projectId, nextTimeline);
+      this.notifyProjectTimelineChanged?.(params.projectId);
+
+      return {
+        success: true as const,
+        projectId: params.projectId,
+        clipId: params.clipId,
+        message: `Removed clip ${params.clipId} from project ${params.projectId}`
+      };
+    } catch (err) {
+      return {
+        success: false as const,
+        error: err instanceof Error ? err.message : `Failed to remove clip ${params.clipId}`
+      };
+    }
+  }
+
+  @McpTool({
     description: 'Update validated basic effects on one timeline clip. This changes a saved project and requires explicit user approval.',
     input: z.object({
       projectId: z.string().min(1),
@@ -608,7 +652,7 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'exportProjectVideo']
+      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'removeTimelineClip', 'exportProjectVideo']
     };
   }
 }
