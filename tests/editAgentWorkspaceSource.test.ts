@@ -22,7 +22,9 @@ describe('Edit Agent workspace wiring', () => {
     expect(panel).toContain('<AgentModelPicker reasoningEffort={reasoningEffort} onReasoningEffortChange={setReasoningEffort} />');
     expect(panel).toContain('agent-chat-log');
     expect(panel).toContain('messages.map((message) => (');
-    expect(panel).toContain("message.role === 'tool' ? `Tool · ${message.toolName}` : message.role");
+    // Rendering lives in AgentChatMessageView: markdown for turns, a collapsed
+    // status row for tool payloads.
+    expect(panel).toContain('<AgentChatMessageView key={message.id} message={message} />');
     expect(panel).toContain('agent-chat-approval');
     expect(panel).toContain('Reset conversation');
     expect(panel).toContain('Tell OpenVideo what to do…');

@@ -4892,12 +4892,6 @@ button {
   padding-right: 0;
 }
 
-.agent-chat-message--tool {
-  padding: var(--space-2) var(--space-3);
-  background: var(--card);
-  border-color: var(--border);
-}
-
 .agent-chat-message__role {
   display: flex;
   align-items: center;
@@ -4918,10 +4912,6 @@ button {
   color: var(--text-weak);
 }
 
-.agent-chat-message--tool .agent-chat-message__role {
-  color: var(--color-success);
-}
-
 .agent-chat-message__text {
   margin: 0;
   overflow-wrap: break-word;
@@ -4931,10 +4921,104 @@ button {
   white-space: pre-wrap;
 }
 
-.agent-chat-message--tool .agent-chat-message__text {
+.agent-chat-message__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agent-chat-message__list {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--color-text);
+  font-size: var(--text-small);
+  line-height: 1.55;
+}
+
+.agent-chat-message__list li + li {
+  margin-top: var(--space-1);
+}
+
+.agent-chat-message__code {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+}
+
+/* Code blocks scroll on their own so a long line never widens the panel. */
+.agent-chat-message__pre {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+/* Tool calls collapse to one status row; the payload opens on demand instead
+   of dumping raw JSON into the conversation. */
+.agent-chat-tool {
+  margin: var(--space-1) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.agent-chat-tool__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+}
+
+.agent-chat-tool__summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-chat-tool__status {
+  flex: none;
+  color: var(--text-weak);
+}
+
+.agent-chat-tool--ok .agent-chat-tool__status {
+  color: var(--color-success);
+}
+
+.agent-chat-tool--failed .agent-chat-tool__status {
+  color: var(--color-danger);
+}
+
+.agent-chat-tool__name {
+  flex: none;
+  color: var(--color-text);
+}
+
+.agent-chat-tool__hint {
+  overflow: hidden;
+  color: var(--text-weak);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-chat-tool__payload {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-3);
+  max-height: 18rem;
+  overflow: auto;
   color: var(--text-weak);
   font-family: var(--font-mono);
   font-size: var(--text-caption);
+  line-height: 1.5;
 }
 
 .agent-chat-approval {

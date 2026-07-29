@@ -1,6 +1,7 @@
 import { useEffect, useRef, type CSSProperties, type FormEvent, type ReactElement } from 'react';
 
 import { useAgentChat } from './AgentChatContext';
+import { AgentChatMessageView } from './AgentChatMessageView';
 import { AgentModelPicker } from './AgentModelPicker';
 import { Button } from './ui';
 
@@ -109,12 +110,7 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
           )}
 
           {messages.map((message) => (
-            <div key={message.id} className={`agent-chat-message agent-chat-message--${message.role}`}>
-              <span className="agent-chat-message__role">
-                {message.role === 'tool' ? `Tool · ${message.toolName}` : message.role}
-              </span>
-              <p className="agent-chat-message__text">{message.text}</p>
-            </div>
+            <AgentChatMessageView key={message.id} message={message} />
           ))}
 
           {pendingApproval && (
