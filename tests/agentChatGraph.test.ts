@@ -206,4 +206,62 @@ describe('agent chat graph', () => {
 
     expect(seenSystemPrompts[0]).not.toContain('active project scope');
   });
+
+  it('turns watchProjectVideo frame output into a summary tool message plus a multimodal image message, never base64 text', async () => {
+    const jpegBase64 = 'ZmFrZS1qcGVnLWJ5dGVz';
+    const watchTool = tool(
+      async () =>
+        JSON.stringify({
+          success: true,
+          frameCount: 2,
+          summary: 'Sampled 2 frames from "take.mp4" at 0:02, 0:07. The frames are attached to the conversation as images in chronological order.',
+          frames: [
+            { timeMs: 2_000, timestamp: '0:02', jpegBase64 },
+            { timeMs: 7_000, timestamp: '0:07', jpegBase64 }
+          ]
+        }),
+      {
+        name: 'watchProjectVideo',
+        description: 'Watch a project video asset',
+        schema: z.object({ projectId: z.string(), assetId: z.string() })
+      }
+    );
+
+    const seenMessageContents: unknown[][] = [];
+    const bundle = buildAgentChatGraph({
+      tools: [watchTool],
+      mutatingToolNames: new Set(),
+      createModel: (() => {
+        let call = 0;
+        return () => ({
+          invoke: async (messages) => {
+            seenMessageContents.push(messages.map((message) => message.content as unknown));
+            call += 1;
+            return call === 1
+              ? new AIMessage({ content: '', tool_calls: [{ id: 'call-w', name: 'watchProjectVideo', args: { projectId: 'p', assetId: 'a' } }] })
+              : new AIMessage('The clip opens on a city skyline.');
+          }
+        });
+      })() as AgentChatModelFactory
+    });
+    const session = new AgentChatSessionManager(bundle);
+
+    const result = await session.sendMessage({ conversationId: 'cw', text: 'what is in take.mp4?', modelId: 'qwen2.5-coder' });
+
+    // The transcript shown to the user never contains raw base64 frames.
+    expect(JSON.stringify(result.messages)).not.toContain(jpegBase64);
+    const toolMessage = result.messages.find((m) => m.role === 'tool');
+    expect(toolMessage?.text).toContain('Sampled 2 frames');
+    expect(result.messages.at(-1)?.text).toBe('The clip opens on a city skyline.');
+
+    // The model's second invocation sees the frames as image_url content blocks.
+    const secondInvocation = seenMessageContents[1]!;
+    const multimodal = secondInvocation.find(
+      (content) => Array.isArray(content) && content.some((part) => (part as { type?: string }).type === 'image_url')
+    ) as readonly { type: string; image_url?: { url: string } }[] | undefined;
+    expect(multimodal).toBeDefined();
+    const imageParts = multimodal!.filter((part) => part.type === 'image_url');
+    expect(imageParts).toHaveLength(2);
+    expect(imageParts[0]!.image_url?.url).toBe(`data:image/jpeg;base64,${jpegBase64}`);
+  });
 });

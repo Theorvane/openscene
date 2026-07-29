@@ -1,4 +1,5 @@
 import {
+  HumanMessage,
   isAIMessage,
   isHumanMessage,
   isSystemMessage,
@@ -16,7 +17,10 @@ import { parseEditAgentProjectContext, type EditAgentContextAsset, type EditAgen
 const AGENT_CHAT_SYSTEM_PROMPT =
   'You are the OpenVideo in-app agent. You can call the provided tools to check AI job status, ' +
   'start local AI video/speech generation, add a clip to a project timeline, or start an FFmpeg export. ' +
-  'Only local mode is available in this build; never claim a cloud/API provider works. ' +
+  'You can also watch a project video with the watchProjectVideo tool: sampled frames arrive attached to ' +
+  'the conversation as images with timestamps — use them to describe or reason about the footage ' +
+  '(a vision-capable model is required to actually see them). ' +
+  'Only local generation runners are available in this build; never claim an unimplemented provider works. ' +
   'Keep replies short, and say what you are about to do before calling a tool.';
 
 // isAIMessage narrows on `_getType() === 'ai'`, which is also true for the AIMessageChunk that
@@ -65,6 +69,58 @@ function buildAgentSystemPrompt(
   }
 
   return prompt;
+}
+
+type WatchFramesPayload = {
+  readonly summary: string;
+  readonly frames: readonly { readonly timeMs: number; readonly timestamp?: string; readonly jpegBase64: string }[];
+};
+
+/**
+ * Detect a frame-carrying tool result (watchProjectVideo). Frames must never
+ * enter the transcript as base64 text — the tool message keeps only the
+ * summary, and the frames become a multimodal user message so vision-capable
+ * models can see them.
+ */
+function parseWatchFramesPayload(output: unknown): WatchFramesPayload | null {
+  let value: unknown = output;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value !== 'object' || value === null) return null;
+  const candidate = value as { success?: unknown; summary?: unknown; frames?: unknown };
+  if (candidate.success !== true || !Array.isArray(candidate.frames)) return null;
+  const frames = candidate.frames.filter(
+    (frame): frame is { timeMs: number; timestamp?: string; jpegBase64: string } =>
+      typeof frame === 'object' && frame !== null &&
+      typeof (frame as { jpegBase64?: unknown }).jpegBase64 === 'string' &&
+      typeof (frame as { timeMs?: unknown }).timeMs === 'number'
+  );
+  if (frames.length === 0) return null;
+  return {
+    summary: typeof candidate.summary === 'string' ? candidate.summary : `Extracted ${frames.length} video frames.`,
+    frames
+  };
+}
+
+function buildWatchFramesMessage(toolName: string, payload: WatchFramesPayload): HumanMessage {
+  const timestamps = payload.frames.map((frame) => frame.timestamp ?? `${Math.round(frame.timeMs / 1000)}s`).join(', ');
+  return new HumanMessage({
+    content: [
+      {
+        type: 'text',
+        text: `[OpenVideo] ${payload.frames.length} video frames from ${toolName}, chronological, at ${timestamps}.`
+      },
+      ...payload.frames.map((frame) => ({
+        type: 'image_url' as const,
+        image_url: { url: `data:image/jpeg;base64,${frame.jpegBase64}` }
+      }))
+    ]
+  });
 }
 
 export interface AgentChatModelHandle {
@@ -135,7 +191,7 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
         return { messages: [] };
       }
 
-      const results: ToolMessage[] = [];
+      const results: BaseMessage[] = [];
       for (const call of last.tool_calls) {
         if (!call.id) continue;
 
@@ -153,6 +209,12 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
 
         try {
           const output: unknown = await tool.invoke(call.args ?? {});
+          const framesPayload = parseWatchFramesPayload(output);
+          if (framesPayload !== null) {
+            results.push(new ToolMessage({ content: framesPayload.summary, tool_call_id: call.id, name: call.name }));
+            results.push(buildWatchFramesMessage(call.name, framesPayload));
+            continue;
+          }
           const content = typeof output === 'string' ? output : JSON.stringify(output);
           results.push(new ToolMessage({ content, tool_call_id: call.id, name: call.name }));
         } catch (err) {
