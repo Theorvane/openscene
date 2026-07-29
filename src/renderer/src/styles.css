@@ -5059,8 +5059,29 @@ button {
 
 /* opencode-style model picker in the prompt toolbar. */
 .agent-model-picker {
-  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   min-width: 0;
+}
+
+.agent-model-picker__effort {
+  flex: none;
+  min-height: 26px;
+  max-width: 110px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-weak);
+  font: inherit;
+  font-size: var(--text-micro);
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.agent-model-picker__effort:hover {
+  background: var(--surface-inset);
 }
 
 .agent-model-picker__trigger {
@@ -5100,10 +5121,9 @@ button {
 }
 
 .agent-model-picker__popover {
-  position: absolute;
-  bottom: calc(100% + var(--space-2));
-  left: 0;
-  z-index: 30;
+  /* Positioned by the picker and rendered in a body portal, because the chat
+     panel and prompt card both clip overflow. */
+  z-index: 200;
   display: grid;
   gap: var(--space-3);
   width: 300px;

@@ -40,6 +40,7 @@
     "src/renderer/src/appWorkspaces.ts",
     "src/renderer/src/firstRunOnboardingPreference.ts",
     "src/renderer/src/modelVisibilityPreferences.ts",
+    "src/renderer/src/reasoningEffortPreferences.ts",
     "src/renderer/src/theme.ts",
     "src/shared/**/*.ts",
     "tests/**/*.ts"

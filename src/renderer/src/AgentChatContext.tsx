@@ -3,7 +3,14 @@ import type { AgentChatDisplayMessage, AgentChatStatus, AgentToolCallProposal } 
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import type { AiDomainModelConfig } from '../../shared/aiDomainModels';
 import { isProviderConnected } from '../../shared/llmProviders';
-import { resolveOpenAiAuthMode } from '../../shared/openAiAuth';
+import { resolveOpenAiAuthMode, type ReasoningEffort } from '../../shared/openAiAuth';
+import {
+  REASONING_EFFORT_STORAGE_KEY,
+  parseReasoningEfforts,
+  resolveReasoningEffort,
+  serializeReasoningEfforts,
+  withReasoningEffort
+} from './reasoningEffortPreferences';
 import { useChatGptAuth } from './ChatGptAuthContext';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useLlmModel } from './LlmProviderContext';
@@ -20,6 +27,9 @@ interface AgentChatController {
   readonly isLocalModel: boolean;
   /** True when the selected model's provider is usable: local, or cloud with a stored key. */
   readonly modelReady: boolean;
+  /** Thinking effort chosen for the active model (undefined = provider default). */
+  readonly reasoningEffort: ReasoningEffort | undefined;
+  readonly setReasoningEffort: (effort: ReasoningEffort | undefined) => void;
   readonly input: string;
   readonly setInput: (value: string) => void;
   readonly messages: readonly AgentChatDisplayMessage[];
@@ -64,11 +74,35 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   // Transcript restored from history: sent along with the next message so the
   // main process can re-seed an empty (e.g. post-relaunch) conversation thread.
   const restoredSeedRef = useRef<readonly AgentChatDisplayMessage[] | null>(null);
+  // opencode stores the effort per model, so switching models keeps each choice.
+  const [reasoningEfforts, setReasoningEfforts] = useState<Readonly<Record<string, ReasoningEffort>>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      return parseReasoningEfforts(window.localStorage.getItem(REASONING_EFFORT_STORAGE_KEY));
+    } catch {
+      return {};
+    }
+  });
 
   const isLocalModel = selectedModel.executionPath === 'local';
   // OpenAI has two connection methods: a stored API key, or ChatGPT sign-in for
   // Codex-family models. Either one makes the model runnable.
   const openAiAuthMode = resolveOpenAiAuthMode(selectedModel.id, chatGptAuth.isConnected);
+  const reasoningEffort = resolveReasoningEffort(reasoningEfforts, selectedModel);
+
+  const setReasoningEffort = (effort: ReasoningEffort | undefined): void => {
+    setReasoningEfforts((current) => {
+      const next = withReasoningEffort(current, selectedModel.id, effort);
+      if (next !== current) {
+        try {
+          window.localStorage.setItem(REASONING_EFFORT_STORAGE_KEY, serializeReasoningEfforts(next));
+        } catch {
+          // The in-memory choice stays usable when local storage is unavailable.
+        }
+      }
+      return next;
+    });
+  };
   const modelReady =
     isLocalModel ||
     openAiAuthMode === 'chatgpt' ||
@@ -102,6 +136,7 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
         ollamaBaseUrl: providerConfig.ollamaBaseUrl,
         activeProject: activeProject ?? undefined,
         openAiAuthMode,
+        reasoningEffort,
         restoredMessages: restoredSeedRef.current ?? undefined
       });
 
@@ -179,6 +214,8 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     selectedModel,
     isLocalModel,
     modelReady,
+    reasoningEffort,
+    setReasoningEffort,
     input,
     setInput,
     messages,

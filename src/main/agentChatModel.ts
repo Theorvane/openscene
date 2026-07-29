@@ -3,6 +3,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { getLlmModel, parseLlmModelKey } from '../shared/llmModels';
 import { getLlmProvider } from '../shared/llmProviders';
+import type { ReasoningEffort } from '../shared/openAiAuth';
 import type { OpenAiAuthMode } from '../shared/openAiAuth';
 import type { AgentChatModelFactory } from './agentChatGraph';
 import type { CredentialStore } from './credentialStore';
@@ -126,7 +127,8 @@ export function resolveChatGptCodexClientConfig(
 
 async function createCloudChatModel(
   spec: Extract<AgentChatModelSpec, { kind: 'cloud' }>,
-  apiKey: string
+  apiKey: string,
+  reasoningEffort: ReasoningEffort | undefined
 ): Promise<BaseChatModel> {
   if (spec.adapter === 'anthropic') {
     const { ChatAnthropic } = await import('@langchain/anthropic');
@@ -141,6 +143,9 @@ async function createCloudChatModel(
     model: spec.rawModelId,
     apiKey,
     ...(spec.useResponsesApi === true ? { useResponsesApi: true } : {}),
+    // Only OpenAI-family reasoning models accept an effort setting; other
+    // OpenAI-compatible endpoints ignore an unknown field, so gate on provider.
+    ...(reasoningEffort !== undefined && spec.providerId === 'openai' ? { reasoningEffort } : {}),
     ...(spec.baseUrl === undefined ? {} : { configuration: { baseURL: spec.baseUrl } })
   });
 }
@@ -158,7 +163,7 @@ export function createAgentChatModel(
   credentialStore: CredentialStore | null = null,
   chatGptOAuthService: ChatGptOAuthCredentialsService | null = null
 ): AgentChatModelFactory {
-  return ({ modelId, ollamaBaseUrl, openAiAuthMode }) => {
+  return ({ modelId, ollamaBaseUrl, openAiAuthMode, reasoningEffort }) => {
     const spec = resolveAgentChatModelSpec(modelId, openAiAuthMode);
 
     if (spec.kind === 'ollama') {
@@ -188,7 +193,7 @@ export function createAgentChatModel(
         if (apiKey === undefined || apiKey.length === 0) {
           throw new Error(`API key for ${spec.providerLabel} is missing. Connect the provider in Settings first.`);
         }
-        const cloudModel = await createCloudChatModel(spec, apiKey);
+        const cloudModel = await createCloudChatModel(spec, apiKey, reasoningEffort);
         if (cloudModel.bindTools === undefined) {
           throw new Error(`${spec.providerLabel} client does not support tool calling in this build.`);
         }

@@ -4,6 +4,13 @@ export function isOpenAiAuthMode(value: unknown): value is OpenAiAuthMode {
   return value === 'api-key' || value === 'chatgpt';
 }
 
+/**
+ * Reasoning effort — opencode calls this a model "variant". The accepted values
+ * come from the model's own catalog entry (e.g. none/low/medium/high/xhigh), and
+ * `undefined` means the provider default.
+ */
+export type ReasoningEffort = string;
+
 export type ChatGptOAuthStatus =
   | { readonly kind: 'connected' }
   | { readonly kind: 'disconnected' };

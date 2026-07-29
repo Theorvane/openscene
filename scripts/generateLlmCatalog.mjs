@@ -59,11 +59,17 @@ function adapterFor(provider) {
 
 function compactModel(model) {
   const limit = model.limit && Number.isFinite(model.limit.context) ? Math.round(model.limit.context / 1000) : undefined;
+  // opencode calls these "variants": the effort levels a reasoning model accepts.
+  const effortOption = Array.isArray(model.reasoning_options)
+    ? model.reasoning_options.find((option) => option?.type === 'effort' && Array.isArray(option.values))
+    : undefined;
+  const efforts = effortOption?.values.filter((value) => typeof value === 'string');
   return {
     id: model.id,
     label: typeof model.name === 'string' && model.name.length > 0 ? model.name : model.id,
     ...(model.tool_call === true ? { toolCall: true } : {}),
     ...(model.reasoning === true ? { reasoning: true } : {}),
+    ...(efforts !== undefined && efforts.length > 0 ? { efforts } : {}),
     ...(model.attachment === true ? { vision: true } : {}),
     ...(limit !== undefined && limit > 0 ? { contextK: limit } : {})
   };
@@ -121,6 +127,8 @@ const body =
   `  readonly label: string;\n` +
   `  readonly toolCall?: boolean;\n` +
   `  readonly reasoning?: boolean;\n` +
+  `  /** Effort levels this model accepts (opencode's model \"variants\"). */\n` +
+  `  readonly efforts?: readonly string[];\n` +
   `  readonly vision?: boolean;\n` +
   `  readonly contextK?: number;\n` +
   `};\n\n` +

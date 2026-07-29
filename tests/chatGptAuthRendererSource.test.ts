@@ -63,6 +63,10 @@ describe('unified OpenAI provider renderer contract', () => {
     expect(pickerModel).toContain("linkedBySignIn ? 'ChatGPT' : 'Not connected'");
     // The hint distinguishes "nothing connected" from the impossible empty list,
     // so a stale build cannot masquerade as a missing connection.
+    // The popover escapes the chat panel's overflow clipping via a portal.
+    expect(picker).toContain('createPortal(popover, document.body)');
+    // Context size is not shown on model rows.
+    expect(picker).not.toContain('contextWindow');
     expect(picker).toContain('No models resolved — restart the app');
     expect(picker).toContain('Connect a provider in Settings → Providers to add its models here.');
   });

@@ -25,6 +25,8 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
     status,
     error,
     isBusy,
+    reasoningEffort,
+    setReasoningEffort,
     activeProject,
     sendMessage,
     respondToApproval,
@@ -162,7 +164,7 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
             />
             <div className="agent-chat-prompt-card__toolbar">
               <div className="agent-chat-prompt-card__meta">
-                <AgentModelPicker />
+                <AgentModelPicker reasoningEffort={reasoningEffort} onReasoningEffortChange={setReasoningEffort} />
               </div>
               <Button
                 type="submit"

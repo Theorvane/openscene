@@ -32,6 +32,10 @@ export type AiDomainModelConfig = {
   readonly availableContexts?: readonly string[];
   readonly precisionBit?: string;
   readonly availablePrecisions?: readonly string[];
+  /** Model supports a reasoning-effort setting. */
+  readonly reasoning?: boolean;
+  /** Effort levels this model accepts (opencode's model "variants"). */
+  readonly efforts?: readonly string[];
 };
 
 export type AiDomainModelPreferences = Record<AiDomain, string>;
@@ -308,6 +312,8 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
         description: `${provider.label} cloud tool-calling model for agentic timeline editing.`,
         executionPath: 'api',
         ...(model.contextK === undefined ? {} : { contextWindow: `${model.contextK}k` }),
+        ...(model.reasoning === true ? { reasoning: true } : {}),
+        ...(model.efforts === undefined ? {} : { efforts: model.efforts }),
         domains: ['edit-agent'],
         available: true
       }))

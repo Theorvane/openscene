@@ -13,7 +13,7 @@ import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { Annotation, END, MemorySaver, START, StateGraph, interrupt } from '@langchain/langgraph';
 import type { AgentToolCallProposal, AgentToolApprovalDecision } from '../shared/agentChat';
 import { parseEditAgentProjectContext, type EditAgentContextAsset, type EditAgentProjectContext } from '../shared/editAgentContext';
-import type { OpenAiAuthMode } from '../shared/openAiAuth';
+import type { OpenAiAuthMode, ReasoningEffort } from '../shared/openAiAuth';
 
 const AGENT_CHAT_SYSTEM_PROMPT =
   'You are the OpenVideo in-app agent. You can call the provided tools to check AI job status, ' +
@@ -131,6 +131,7 @@ export interface AgentChatModelHandle {
 export type AgentChatModelFactory = (config: {
   readonly modelId: string;
   readonly openAiAuthMode: OpenAiAuthMode | undefined;
+  readonly reasoningEffort: ReasoningEffort | undefined;
   readonly ollamaBaseUrl: string | undefined;
 }) => AgentChatModelHandle;
 
@@ -156,7 +157,7 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
 
   const builder = new StateGraph(AgentChatState)
     .addNode('agent', async (state, config) => {
-      const configurable = (config?.configurable ?? {}) as { modelId?: string; openAiAuthMode?: OpenAiAuthMode; ollamaBaseUrl?: string; editAssetContext?: string; editProjectContext?: string };
+      const configurable = (config?.configurable ?? {}) as { modelId?: string; openAiAuthMode?: OpenAiAuthMode; reasoningEffort?: ReasoningEffort; ollamaBaseUrl?: string; editAssetContext?: string; editProjectContext?: string };
       if (!configurable.modelId) {
         throw new Error('agentChatGraph: a modelId must be provided via config.configurable.');
       }
@@ -164,6 +165,7 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
       const model = options.createModel({
         modelId: configurable.modelId,
         openAiAuthMode: configurable.openAiAuthMode,
+        reasoningEffort: configurable.reasoningEffort,
         ollamaBaseUrl: configurable.ollamaBaseUrl
       });
       const hasSystemPrompt = state.messages.length > 0 && isSystemMessage(state.messages[0]!);
