@@ -16,7 +16,7 @@ describe('updater capability', () => {
     expect(capability.kind).toBe('none');
   });
 
-  it('lets unsigned macOS detect an update but never install one', () => {
+  it('lets an unsigned macOS build detect an update but never install one', () => {
     // Given / When
     // Squirrel.Mac verifies the running app before replacing it, so an unsigned
     // build would download an update that fails at the last step.

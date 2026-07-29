@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Electron runs V8, which compiles at runtime. Without these two the app
+       crashes on launch under the hardened runtime that Developer ID requires. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <!-- Electron loads helper frameworks and native modules that are signed
+       separately from the main binary. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <!-- Recording captures system and microphone audio. Screen capture itself is
+       granted through TCC at runtime, not through an entitlement. -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+</dict>
+</plist>

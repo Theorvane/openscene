@@ -94,11 +94,32 @@ jobs:
 
       - name: Package ${{ matrix.platform }}
         env:
-          # Unsigned on every platform: this repository holds no Apple Developer
-          # credentials and no Windows certificate, and auto-discovery would
-          # otherwise fail the macOS build looking for an identity.
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # macOS signs with the Developer ID certificate and notarizes. No
+          # Windows certificate exists, and auto-discovery there would only find
+          # nothing slowly.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.platform == 'mac' }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-builder --${{ matrix.platform }} --publish never
+
+      # electron-builder skips notarization *silently* when the credentials are
+      # missing — "skipped macOS notarization" is a log line, not a failure. That
+      # would publish a build Gatekeeper still rejects while the release notes
+      # say it opens normally. Assert the result instead of trusting the run.
+      - name: Verify the macOS build is signed, hardened, and notarized
+        if: matrix.platform == 'mac'
+        run: |
+          for app in dist/mac*/*.app; do
+            echo "checking $app"
+            codesign --verify --deep --strict --verbose=1 "$app"
+            codesign -dv --verbose=2 "$app" 2>&1 | grep -q 'flags=.*runtime' || {
+              echo "::error::$app is not built with the hardened runtime"; exit 1; }
+            xcrun stapler validate "$app"
+            spctl -a -vvv -t exec "$app"
+          done
 
       # latest*.yml and the blockmaps are what the in-app updater reads; shipping
       # only the installers leaves it unable to see that a release happened.
@@ -162,6 +183,6 @@ jobs:
             gh release create "$TAG" \
               --title "OpenVideo $TAG" \
               --generate-notes \
-              --notes "These builds are unsigned. macOS reports an unidentified developer and Windows SmartScreen warns on first run; open the app from the Finder context menu, or choose More info then Run anyway, or run OpenVideo from source." \
+              --notes "The macOS builds are signed with a Developer ID certificate and notarized by Apple, so they open normally. The Windows builds are unsigned, so SmartScreen warns on first run: choose More info, then Run anyway. The Linux builds are unsigned, which is normal for AppImage and deb." \
               artifacts/*
           fi

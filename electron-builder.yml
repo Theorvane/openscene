@@ -28,9 +28,15 @@ mac:
       arch: [arm64, x64]
     - target: zip
       arch: [arm64, x64]
-  # No Apple Developer credentials exist for this repository, so the build is
-  # unsigned; forcing discovery off keeps CI from failing on a missing identity.
-  identity: null
+  # Developer ID distribution requires the hardened runtime, and Electron will
+  # not launch under it without the JIT and library-validation entitlements.
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # A Developer ID signature alone still trips Gatekeeper with "Apple cannot
+  # check it for malicious software"; only notarization clears it. Driven by
+  # APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID in the release job.
+  notarize: true
 win:
   icon: build/icon.png
   # No code-signing certificate either, so Windows SmartScreen warns on first run.

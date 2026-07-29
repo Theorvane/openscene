@@ -20,10 +20,11 @@ export function resolveUpdaterCapability(): UpdaterCapability {
     platform: process.platform,
     packaged: app.isPackaged,
     appImagePath: process.env.APPIMAGE,
-    // No Apple Developer identity exists for this repository yet. When one
-    // does, and electron-builder signs the mac targets, this becomes true and
-    // macOS gets the same download-and-install path as Windows.
-    macSigned: false
+    // The mac targets are signed with a Developer ID certificate and notarized,
+    // so Squirrel.Mac can verify the running app and replace it. Builds from
+    // before signing landed carry false and stay on the notify path, which is
+    // correct: an unsigned running app cannot be updated in place either way.
+    macSigned: true
   });
 }
 
