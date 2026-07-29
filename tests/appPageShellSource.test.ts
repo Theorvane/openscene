@@ -72,18 +72,15 @@ describe('app page shell source contract', () => {
     expect(app).toContain('className="app-workspace-panel-stack"');
     expect(app).toContain('className="visually-hidden"');
     expect(app).toContain('id={EDIT_WORKSPACE.navId}');
-    expect(app).toContain('id={VOICE_GENERATION_WORKSPACE.navId}');
-    expect(app).toContain('id={VIDEO_GENERATION_WORKSPACE.navId}');
     expect(app).toContain('{EDIT_WORKSPACE.label}');
-    expect(app).toContain('{VOICE_GENERATION_WORKSPACE.label}');
-    expect(app).toContain('{VIDEO_GENERATION_WORKSPACE.label}');
+    // Voice and video generation are dock tabs inside the editor, not pages.
+    expect(app).not.toContain('VOICE_GENERATION_WORKSPACE');
+    expect(app).not.toContain('VIDEO_GENERATION_WORKSPACE');
   });
 
-  it('renders Home entry cards in the requested workspace order with accessible controls', async () => {
+  it('renders the Home entry card with accessible controls', async () => {
     const homePage = await readSource(HOME_PAGE_SOURCE_URL);
 
-    expect(homePage.indexOf("edit: {")).toBeLessThan(homePage.indexOf("'voice-generation': {"));
-    expect(homePage.indexOf("'voice-generation': {")).toBeLessThan(homePage.indexOf("'video-generation': {"));
     expect(homePage).toContain('className="home-card"');
     expect(homePage).toContain('aria-controls={workspace.panelId}');
     expect(homePage).toContain('onClick={() => onWorkspaceOpen(workspace.id)}');
@@ -94,6 +91,7 @@ describe('app page shell source contract', () => {
 
     expect(design).toContain('do not reintroduce a left workspace sidebar');
     expect(design).toContain('Home entry cards are the workspace navigation');
+    expect(design).toContain("voice and video generation are tabs in the editor's left dock");
     expect(design).not.toContain('a left sidebar for workspace navigation');
     expect(design).not.toContain('Application workspace switching belongs to `AppWorkspaceNavigation`');
   });

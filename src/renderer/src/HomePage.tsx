@@ -16,16 +16,6 @@ const WORKSPACE_COPY = {
     heading: 'Editing (영상 편집)',
     description: 'Open the timeline editor, manage media bin assets, cut clips, and export MP4 output with local FFmpeg.',
     action: 'Enter Timeline Editor ➔'
-  },
-  'voice-generation': {
-    heading: 'Voice Generation (음성 합성)',
-    description: 'Synthesize voice narration scripts, configure local Qwen TTS or cloud engines, and import voice tracks into your timeline.',
-    action: 'Enter Voice Studio ➔'
-  },
-  'video-generation': {
-    heading: 'Video Generation (비디오 생성)',
-    description: 'Generate video clips from AI prompt engines, monitor job completion, and add generated videos directly to project assets.',
-    action: 'Enter Video Studio ➔'
   }
 } as const satisfies Readonly<Record<AppWorkspaceId, { readonly heading: string; readonly description: string; readonly action: string }>>;
 
@@ -40,24 +30,6 @@ function CardIcon({ workspaceId }: { readonly workspaceId: AppWorkspaceId }): Re
           <path d="M8.5 5.5v13" />
           <path d="M13.5 9.75h3.75" />
           <path d="M6.75 14.25h5.25" />
-        </svg>
-      );
-    case 'voice-generation':
-      return (
-        <svg className="home-card__icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M4.5 13.25v-2.5" />
-          <path d="M8.25 16.5v-9" />
-          <path d="M12 18.25V5.75" />
-          <path d="M15.75 16.5v-9" />
-          <path d="M19.5 13.25v-2.5" />
-        </svg>
-      );
-    case 'video-generation':
-      return (
-        <svg className="home-card__icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14" />
-          <path d="M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          <path d="M7 10l1.5 3L10 10" />
         </svg>
       );
     default:
@@ -81,7 +53,7 @@ export function HomePage({
         <p className="section-kicker">Main Menu</p>
         <h1 id="home-page-title">Select Studio Workspace</h1>
         <p>
-          Choose a studio tool below for your active project folder. Entering a workspace opens the full toolset and activates the Edit Agent chat assistant.
+          Open the editor for your active project folder. Voice and video generation live in the editor's left dock, alongside the media bin.
         </p>
       </header>
 

@@ -31,7 +31,7 @@ OpenVideo is a compact local studio command desk for arranging recordings, impor
 
 ## Workspace Entry
 
-- Home entry cards are the workspace navigation. Each card uses a full native `Button`, original inline SVG icon, visible workspace label, static local status label, and `aria-controls` for its mounted panel.
+- Home entry cards are the workspace navigation. Each card uses a full native `Button`, original inline SVG icon, visible workspace label, static local status label, and `aria-controls` for its mounted panel. Editing is the only workspace page: voice and video generation are tabs in the editor's left dock (`Media` / `Voice` / `Video`) rather than pages of their own, so generating a clip and placing it on the timeline never changes screens. Both studios write their result into the open project, so their tabs stay disabled until one is open and the dock falls back to the media bin if the project goes away.
 - Status labels are fixed product labels, not live progress text. Live recording, sample, TTS, save, or error status stays inside the active workspace panel.
 - When users activate a workspace card, focus moves to the newly active region. Product chrome Home returns focus to the Home page region when it is already active.
 
