@@ -40,6 +40,7 @@
     "src/renderer/src/appNavigationHistory.ts",
     "src/renderer/src/agentChatLayoutPreferences.ts",
     "src/renderer/src/appPages.ts",
+    "src/renderer/src/projectTabs.ts",
     "src/renderer/src/appWorkspaces.ts",
     "src/renderer/src/firstRunOnboardingPreference.ts",
     "src/renderer/src/modelVisibilityPreferences.ts",

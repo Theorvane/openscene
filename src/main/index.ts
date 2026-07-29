@@ -1,4 +1,5 @@
 import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, session, shell, systemPreferences } from 'electron';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { AssetLibraryStore } from './assetLibraryStore';
@@ -115,13 +116,29 @@ function getScreenPermissionStatus(): string {
   return systemPreferences.getMediaAccessStatus('screen');
 }
 
+/**
+ * Application identity set in code rather than inferred from package metadata.
+ * macOS reads the application-menu title from the running bundle, so a dev run
+ * still shows Electron; this is what a packaged build and the About panel use.
+ */
+const APP_NAME = 'OpenVideo';
+
+/** Window icon for platforms that take one; macOS uses the bundle icon. */
+function appIconPath(): string | undefined {
+  const iconPath = app.isPackaged
+    ? join(process.resourcesPath, 'icon.png')
+    : join(__dirname, '../../resources/icon.png');
+  return existsSync(iconPath) ? iconPath : undefined;
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1220,
     height: 820,
     minWidth: 980,
     minHeight: 680,
-    title: 'OpenVideo',
+    title: APP_NAME,
+    ...(appIconPath() === undefined ? {} : { icon: appIconPath() as string }),
     backgroundColor: '#10100f',
     show: false,
     // macOS: hide the native titlebar so the renderer's product chrome acts as
@@ -359,6 +376,13 @@ async function installIpcHandlers(): Promise<void> {
   const agentChatSessions = new AgentChatSessionManager(agentChatGraphBundle);
   registerAgentChatIpcHandlers(ipcMain, agentChatSessions, new AgentChatHistoryStore(projectStore));
 }
+
+app.setName(APP_NAME);
+app.setAboutPanelOptions({
+  applicationName: APP_NAME,
+  applicationVersion: app.getVersion(),
+  copyright: 'Open source under the MIT License'
+});
 
 app.whenReady().then(async () => {
   installApplicationMenu();

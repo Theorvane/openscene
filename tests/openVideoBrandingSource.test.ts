@@ -31,7 +31,11 @@ describe('OpenVideo branding source contract', () => {
     expect(packageSource).toContain('"productName": "OpenVideo"');
     expect(packageSource).toContain('"description": "OpenVideo secure Electron MVP for selected-window preview and local WebM recording."');
     expect(indexHtmlSource).toContain('<title>OpenVideo</title>');
-    expect(mainIndexSource).toContain("title: 'OpenVideo'");
+    // The name is a constant now, so the window title and the About panel and
+    // app.setName() cannot drift apart.
+    expect(mainIndexSource).toContain("const APP_NAME = 'OpenVideo'");
+    expect(mainIndexSource).toContain('app.setName(APP_NAME)');
+    expect(mainIndexSource).toContain('title: APP_NAME');
     expect(timelineEditorSource).toContain('<h1 id="timeline-editor-title">OpenVideo</h1>');
     // The studio headings dropped the "AI" prefix with the chat-style redesign.
     expect(videoGenWorkspaceSource).toContain('id="video-generation-title">Video Generation<');

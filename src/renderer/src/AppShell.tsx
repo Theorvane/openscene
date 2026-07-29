@@ -10,6 +10,7 @@ import {
 } from './agentChatLayoutPreferences';
 import { isWorkspacePageId, type AppPage, type AppPageId } from './appPages';
 import { AgentChatPanel } from './AgentChatPanel';
+import type { ProjectTab } from './projectTabs';
 import { AgentChatProvider, useAgentChat, type AgentChatRestoreRequest } from './AgentChatContext';
 import { Button } from './ui';
 import { useAgentChatLayoutPreference } from './useAgentChatLayoutPreference';
@@ -35,6 +36,10 @@ type AppShellProps = {
   readonly hasActiveProject: boolean;
   readonly onPageChange: (pageId: AppPageId) => void;
   readonly activeProjectContext: EditAgentProjectContext | null;
+  readonly projectTabs?: readonly ProjectTab[];
+  readonly activeProjectId?: string | null;
+  readonly onSelectProjectTab?: (projectId: string) => void;
+  readonly onCloseProjectTab?: (projectId: string) => void;
   readonly chatRestoreRequest?: AgentChatRestoreRequest | null;
   readonly onChatRestoreHandled?: () => void;
   readonly canNavigateBack?: boolean;
@@ -66,7 +71,7 @@ function FolderIcon(): ReactElement {
   );
 }
 
-function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext, chatRestoreRequest = null, canNavigateBack = false, onNavigateBack }: AppShellProps): ReactElement {
+function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext, projectTabs = [], activeProjectId = null, onSelectProjectTab, onCloseProjectTab, chatRestoreRequest = null, canNavigateBack = false, onNavigateBack }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
   const shellBodyRef = useRef<HTMLDivElement | null>(null);
@@ -138,11 +143,35 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
       {/* Draggable window titlebar: the native frame is hidden on macOS, so this
           bar owns window dragging; interactive controls opt out via no-drag. */}
       <header className="product-chrome" aria-label="Application chrome" inert={isBusy}>
-            <div className="product-chrome__context" aria-label="Current page">
-              <span className="product-chrome__workspace">{activePage.chromeLabel}</span>
-              {activeProjectContext && (
-                <span className="product-chrome__project-pill">📁 Project: {activeProjectContext.name}</span>
-              )}
+            {/* Open projects instead of a page label: the tab strip is the
+                only thing the top bar needs to say about where you are. */}
+            <div className="product-chrome__context" role="tablist" aria-label="Open projects">
+              {projectTabs.map((tab) => {
+                const isActive = tab.id === activeProjectId;
+                return (
+                  <span key={tab.id} className={`project-tab${isActive ? ' project-tab--active' : ''}`}>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      className="project-tab__select"
+                      title={tab.name}
+                      onClick={() => onSelectProjectTab?.(tab.id)}
+                    >
+                      {tab.name}
+                    </button>
+                    <button
+                      type="button"
+                      className="project-tab__close"
+                      aria-label={`Close ${tab.name}`}
+                      onClick={() => onCloseProjectTab?.(tab.id)}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                );
+              })}
+              {projectTabs.length === 0 && <span className="product-chrome__empty">{activePage.chromeLabel}</span>}
             </div>
             <div className="product-chrome__actions">
               <Button

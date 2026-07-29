@@ -7,6 +7,7 @@ import type { AgentChatRestoreRequest } from './AgentChatContext';
 import { FirstRunOnboarding } from './FirstRunOnboarding';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
 import { Tabs } from './ui';
+import { closeProjectTab, openProjectTab, pruneProjectTabs, type ProjectTab } from './projectTabs';
 import { NarrationPanel } from './NarrationPanel';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
 import {
@@ -204,6 +205,41 @@ export function App(): ReactElement {
   }, []);
 
   const workspaceIsVisible = isWorkspacePageId(activePageId);
+  const [projectTabs, setProjectTabs] = useState<readonly ProjectTab[]>([]);
+
+  // A project deleted from the list must not linger as an unopenable tab.
+  useEffect(() => {
+    setProjectTabs((current) => pruneProjectTabs(current, editor.projects.map((project) => project.id)));
+  }, [editor.projects]);
+
+  useEffect(() => {
+    if (editor.project === null) return;
+    setProjectTabs((current) => openProjectTab(current, { id: editor.project!.id, name: editor.project!.name }));
+  }, [editor.project?.id, editor.project?.name]);
+
+  /**
+   * Tabs share one editor, so the timeline in memory belongs to whichever
+   * project is open. Persist unsaved work before loading the next one rather
+   * than dropping it on a tab click.
+   */
+  const selectProjectTab = useCallback(async (projectId: string): Promise<void> => {
+    if (editor.project?.id === projectId) return;
+    if (editor.hasUnsavedTimeline) await editor.saveTimeline();
+    const opened = await editor.openProject(projectId);
+    if (opened) navigateToPage('edit');
+  }, [editor, navigateToPage]);
+
+  const closeProjectTabById = useCallback(async (projectId: string): Promise<void> => {
+    const next = closeProjectTab(projectTabs, projectId, editor.project?.id ?? null);
+    setProjectTabs(next.tabs);
+    if (editor.project?.id !== projectId) return;
+    if (editor.hasUnsavedTimeline) await editor.saveTimeline();
+    if (next.activeId === null) {
+      navigateToPage('projects');
+      return;
+    }
+    await editor.openProject(next.activeId);
+  }, [editor, navigateToPage, projectTabs]);
   // Which workspace surface is showing; remembered across launches.
   const [workspaceTabId, setWorkspaceTabId] = useState<WorkspaceTabId>(() =>
     typeof window === 'undefined' ? 'edit' : parseWorkspaceTabId(window.localStorage.getItem(WORKSPACE_TAB_STORAGE_KEY))
@@ -227,6 +263,10 @@ export function App(): ReactElement {
         hasActiveProject={hasActiveProject}
         onPageChange={setActivePage}
         activeProjectContext={activeProjectContext}
+        projectTabs={projectTabs}
+        activeProjectId={editor.project?.id ?? null}
+        onSelectProjectTab={(projectId) => void selectProjectTab(projectId)}
+        onCloseProjectTab={(projectId) => void closeProjectTabById(projectId)}
         chatRestoreRequest={chatRestoreRequest}
         onChatRestoreHandled={clearChatRestoreRequest}
         canNavigateBack={pageHistory.length > 0}

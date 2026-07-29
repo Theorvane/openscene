@@ -57,7 +57,9 @@ function createCommandItemFactory(onCommand: SendTimelineMenuCommand) {
 export function createApplicationMenuTemplate(onCommand: SendTimelineMenuCommand): MenuItemConstructorOptions[] {
   const commandItem = createCommandItemFactory(onCommand);
   const template: MenuItemConstructorOptions[] = [];
-  if (process.platform === 'darwin') template.push({ role: 'appMenu' });
+  // macOS always titles the first menu with the running bundle's name, so the
+  // label is what a packaged OpenVideo build shows; a dev run reads Electron.
+  if (process.platform === 'darwin') template.push({ label: 'OpenVideo', role: 'appMenu' });
   template.push(
     { role: 'fileMenu' },
     { role: 'editMenu' },

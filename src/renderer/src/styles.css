@@ -493,6 +493,67 @@ button {
   -webkit-app-region: no-drag;
 }
 
+/* Open-project tabs: the top bar says which projects are open, not which page
+   you are on. */
+.project-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 220px;
+  padding: 2px 2px 2px var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-weak);
+}
+
+.project-tab--active {
+  border-color: var(--line-subtle);
+  color: var(--text-strong);
+  background: var(--surface-inset);
+}
+
+.project-tab__select {
+  overflow: hidden;
+  min-width: 0;
+  min-height: 26px;
+  border: none;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.project-tab__close {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-weaker);
+  background: transparent;
+  font-size: var(--text-micro);
+  cursor: pointer;
+  opacity: 0;
+}
+
+/* Reachable without a pointer, not only on hover. */
+.project-tab:hover .project-tab__close,
+.project-tab__close:focus-visible {
+  opacity: 1;
+}
+
+.project-tab__close:hover {
+  color: var(--color-danger);
+}
+
+.product-chrome__empty {
+  color: var(--text-weak);
+  font-size: var(--text-caption);
+}
+
 .product-chrome__context {
   display: flex;
   align-items: center;
