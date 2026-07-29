@@ -30,6 +30,9 @@ export function useTimelineEditor() {
   const [newProjectName, setNewProjectName] = useState('Untitled cutdown');
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [selectedClipId, setSelectedClipId] = useState('');
+  // Multi-selection for bulk actions (select all, delete). The single
+  // selectedClipId stays the primary selection that drives the Inspector.
+  const [selectedClipIds, setSelectedClipIds] = useState<readonly string[]>([]);
   const [timelineHistory, setTimelineHistory] = useState<TimelineHistory | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [hasUnsavedTimeline, setHasUnsavedTimeline] = useState(false);
@@ -49,6 +52,7 @@ export function useTimelineEditor() {
 
   const setLoadedProject = useCallback((snapshot: LocalProjectSnapshot | null) => {
     setProject(snapshot);
+    setSelectedClipIds([]);
     setTimelineHistory(snapshot === null ? null : createTimelineHistory(snapshot.timeline));
     playback.resetPlayback();
   }, [playback]);
@@ -212,11 +216,33 @@ export function useTimelineEditor() {
     replaceTimeline((timeline) => addTrack(timeline, { id: createOpaqueId(`${kind}-track`), kind, name: nextTrackName(timeline, kind) }), `Added a ${kind} track.`);
   }, [replaceTimeline]);
 
+  const selectClip = useCallback((clipId: string) => {
+    setSelectedClipId(clipId);
+    setSelectedClipIds(clipId.length === 0 ? [] : [clipId]);
+  }, []);
+
+  const selectAllClips = useCallback(() => {
+    if (project === null) return;
+    const clipIds = project.timeline.tracks.flatMap((track) => track.clips.map((clip) => clip.id));
+    setSelectedClipIds(clipIds);
+    // The Inspector needs one clip; keep the current one when it is still there.
+    setSelectedClipId((current) => (clipIds.includes(current) ? current : clipIds[0] ?? ''));
+    setStatusMessage({
+      tone: 'neutral',
+      text: clipIds.length === 0 ? 'No clips on the timeline to select.' : `Selected ${clipIds.length} clips.`
+    });
+  }, [project]);
+
   const deleteSelectedClip = useCallback(() => {
-    if (selectedClip === null) return;
-    replaceTimeline((timeline) => deleteClip(timeline, selectedClip.clip.id), 'Deleted selected clip.');
+    const clipIds = selectedClipIds.length > 0 ? selectedClipIds : selectedClip === null ? [] : [selectedClip.clip.id];
+    if (clipIds.length === 0) return;
+    replaceTimeline(
+      (timeline) => clipIds.reduce<TimelineDocument | null>((next, clipId) => next === null ? null : deleteClip(next, clipId), timeline),
+      clipIds.length === 1 ? 'Deleted selected clip.' : `Deleted ${clipIds.length} clips.`
+    );
     setSelectedClipId('');
-  }, [replaceTimeline, selectedClip]);
+    setSelectedClipIds([]);
+  }, [replaceTimeline, selectedClip, selectedClipIds]);
 
   const moveSelectedClip = useCallback((deltaMs: number) => {
     if (selectedClip === null) return;
@@ -357,7 +383,8 @@ export function useTimelineEditor() {
     addTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
     openProject, openProjectFolder, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
-    selectedAsset, selectedAssetId, selectedClip, selectedClipId, setNewProjectName, setSelectedAssetId, setSelectedClipId,
+    selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,
+    setNewProjectName, setSelectedAssetId, setSelectedClipId: selectClip,
     splitSelectedClip, statusMessage, trimSelectedClip, updateAssetMetadata, updateSelectedClipEffects,
     activePlaybackClip: playback.activePlaybackClip, canRedoTimeline: (timelineHistory?.future.length ?? 0) > 0,
     canUndoTimeline: (timelineHistory?.past.length ?? 0) > 0, isPlaying: playback.isPlaying, moveClipToTrack,

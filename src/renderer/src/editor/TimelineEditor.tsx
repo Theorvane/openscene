@@ -183,6 +183,7 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
     deleteSelectedClip: editor.deleteSelectedClip,
     redoTimeline: editor.redoTimeline,
     resetLayout,
+    selectAllClips: editor.selectAllClips,
     setIsPlaying: editor.setIsPlaying,
     shortcutPreferences,
     splitAtPlayhead: editor.splitAtPlayhead,

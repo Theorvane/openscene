@@ -12,6 +12,7 @@ import {
   formatEditorShortcutChordForAria,
   formatEditorShortcutChordForDisplay,
   getEditorShortcutBindings,
+  isEditorShortcutBindingMatch,
   isEditorShortcutEventMatch,
   isReservedEditorShortcutChord,
   parseEditorShortcutChord,
@@ -22,6 +23,40 @@ import {
 } from '../src/renderer/src/editor/editorShortcuts';
 
 describe('editor shortcuts', () => {
+  it('Given a Mac delete key, When pressed, Then the default Delete binding still fires', () => {
+    const bindings = getEditorShortcutBindings(EDITOR_SHORTCUT_DEFAULT_PREFERENCES);
+    const deleteBinding = bindings.find((binding) => binding.actionId === 'deleteSelection')!;
+    const backspace = { altKey: false, ctrlKey: false, key: 'Backspace', metaKey: false, shiftKey: false };
+
+    // Apple keyboards report the main delete key as Backspace.
+    expect(isEditorShortcutBindingMatch(backspace, deleteBinding)).toBe(true);
+    expect(isEditorShortcutBindingMatch({ ...backspace, key: 'Delete' }, deleteBinding)).toBe(true);
+
+    // A custom chord replaces the alternates rather than stacking with them.
+    const remapped = setEditorShortcutBindingPreference(EDITOR_SHORTCUT_DEFAULT_PREFERENCES, 'deleteSelection', { key: 'X', modifiers: ['Meta'] });
+    expect(remapped.ok).toBe(true);
+    const custom = getEditorShortcutBindings(remapped.ok ? remapped.preferences : EDITOR_SHORTCUT_DEFAULT_PREFERENCES)
+      .find((binding) => binding.actionId === 'deleteSelection')!;
+    expect(isEditorShortcutBindingMatch(backspace, custom)).toBe(false);
+  });
+
+  it('Given a disabled binding, When its chord is pressed, Then nothing matches', () => {
+    const preferences = disableEditorShortcutBindingPreference(EDITOR_SHORTCUT_DEFAULT_PREFERENCES, 'selectAll');
+    const binding = getEditorShortcutBindings(preferences).find((entry) => entry.actionId === 'selectAll')!;
+
+    expect(binding.isEnabled).toBe(false);
+    expect(isEditorShortcutBindingMatch({ altKey: false, ctrlKey: false, key: 'a', metaKey: true, shiftKey: false }, binding)).toBe(false);
+  });
+
+  it('Given the select-all default, When Meta+A is pressed, Then it matches', () => {
+    const binding = getEditorShortcutBindings(EDITOR_SHORTCUT_DEFAULT_PREFERENCES).find((entry) => entry.actionId === 'selectAll')!;
+
+    expect(binding.chord).toEqual({ key: 'A', modifiers: ['Meta'] });
+    expect(isEditorShortcutBindingMatch({ altKey: false, ctrlKey: false, key: 'a', metaKey: true, shiftKey: false }, binding)).toBe(true);
+    // Plain "a" must keep typing normally.
+    expect(isEditorShortcutBindingMatch({ altKey: false, ctrlKey: false, key: 'a', metaKey: false, shiftKey: false }, binding)).toBe(false);
+  });
+
   it('Given no stored shortcut preferences, When parsed, Then the defaults stay stable', () => {
     expect(parseEditorShortcutPreferences(null)).toEqual(EDITOR_SHORTCUT_DEFAULT_PREFERENCES);
     expect(parseEditorShortcutPreferences(undefined)).toEqual(EDITOR_SHORTCUT_DEFAULT_PREFERENCES);
@@ -31,6 +66,7 @@ describe('editor shortcuts', () => {
       'redo',
       'deleteSelection',
       'splitSelection',
+      'selectAll',
       'toggleLeftDock',
       'toggleInspector',
       'resetLayout',

@@ -688,7 +688,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                   {/* Track Clips */}
                   {(view.blocksByTrackId[track.id] ?? []).map((block) => (
                     <button
-                      className={`timeline-clip timeline-clip--${block.kind}${editor.selectedClipId === block.clip.id ? ' timeline-clip--selected' : ''}`}
+                      className={`timeline-clip timeline-clip--${block.kind}${editor.selectedClipIds.includes(block.clip.id) || editor.selectedClipId === block.clip.id ? ' timeline-clip--selected' : ''}`}
                       draggable={!lockedTracks[track.id] && activeTool === 'select'}
                       key={block.clip.id}
                       type="button"

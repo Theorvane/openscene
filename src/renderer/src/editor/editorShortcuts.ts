@@ -7,6 +7,7 @@ export const EDITOR_SHORTCUT_ACTION_IDS = [
   'redo',
   'deleteSelection',
   'splitSelection',
+  'selectAll',
   'toggleLeftDock',
   'toggleInspector',
   'resetLayout',
@@ -26,6 +27,12 @@ export type EditorShortcutDefinition = {
   readonly label: string;
   readonly ariaLabel: string;
   readonly defaultChord: EditorShortcutChord;
+  /**
+   * Extra chords the default binding also answers to, for keys that differ by
+   * keyboard. They apply only while the binding is at its default — a custom
+   * chord replaces them — and never take part in conflict detection.
+   */
+  readonly alternateChords?: readonly EditorShortcutChord[];
 };
 
 export type EditorShortcutPreferences = {
@@ -117,6 +124,9 @@ export const EDITOR_SHORTCUT_DEFINITIONS: readonly EditorShortcutDefinition[] = 
     actionId: 'deleteSelection',
     ariaLabel: 'Delete the current selection',
     defaultChord: { key: 'Delete', modifiers: [] },
+    // The main delete key on Apple keyboards reports Backspace, so binding only
+    // Delete left the shortcut dead on a Mac.
+    alternateChords: [{ key: 'Backspace', modifiers: [] }],
     label: 'Delete'
   },
   {
@@ -124,6 +134,12 @@ export const EDITOR_SHORTCUT_DEFINITIONS: readonly EditorShortcutDefinition[] = 
     ariaLabel: 'Split the selected clip',
     defaultChord: { key: 'S', modifiers: [] },
     label: 'Split'
+  },
+  {
+    actionId: 'selectAll',
+    ariaLabel: 'Select every clip on the timeline',
+    defaultChord: { key: 'A', modifiers: ['Meta'] },
+    label: 'Select all clips'
   },
   {
     actionId: 'toggleLeftDock',
@@ -320,6 +336,14 @@ export function resetEditorShortcutBindingPreference(preferences: EditorShortcut
     overrides: withoutEditorShortcutOverride(preferences, actionId),
     schemaVersion: EDITOR_SHORTCUT_SCHEMA_VERSION
   };
+}
+
+/** True when the event fires this binding, including its default alternates. */
+export function isEditorShortcutBindingMatch(event: EditorShortcutKeyboardEvent, binding: EditorShortcutBinding): boolean {
+  if (!binding.isEnabled || binding.chord === null) return false;
+  if (isEditorShortcutEventMatch(event, binding.chord)) return true;
+  if (!binding.isDefault) return false;
+  return (binding.alternateChords ?? []).some((chord) => isEditorShortcutEventMatch(event, chord));
 }
 
 export function isEditorShortcutEventMatch(event: EditorShortcutKeyboardEvent, chord: EditorShortcutChord): boolean {

@@ -163,7 +163,9 @@ describe('timeline editor layout source contract', () => {
     expect(source).not.toContain('Timeline commands');
     expect(source).not.toContain('Split at playhead</button>');
     expect(shortcutSource).toContain('EDITOR_SHORTCUT_STORAGE_KEY');
-    expect(shortcutSource).toContain('isEditorShortcutEventMatch');
+    // Matching goes through the binding, so a disabled binding stays disabled
+    // and the default's alternate chords (Backspace for Delete) also fire.
+    expect(shortcutSource).toContain('isEditorShortcutBindingMatch');
     expect(shortcutSource).toContain('getEditorShortcutBindings(input.shortcutPreferences)');
     expect(source).not.toContain('ipcRenderer');
     expect(shortcutSource).not.toContain('ipcRenderer');
