@@ -496,10 +496,6 @@ button {
 /* Open-project tabs, following opencode's titlebar tabs: no borders, a filled
    background only when active or hovered, dim titles that brighten on the
    active tab, and a hairline divider between adjacent inactive tabs. */
-.project-tab:hover {
-  color: var(--text-weak);
-}
-
 .project-tab {
   position: relative;
   display: inline-flex;
@@ -513,9 +509,9 @@ button {
   color: var(--text-weaker);
 }
 
-/* No fill behind the name: the active project is the bright one, nothing more. */
 .project-tab--active {
   color: var(--text-strong);
+  background: color-mix(in srgb, #000 26%, transparent);
 }
 
 /* Divider sits between two inactive tabs only, never beside the active one. */
@@ -530,9 +526,7 @@ button {
   background: var(--line-subtle);
 }
 
-.project-tab--active + .project-tab::before,
-.project-tab:hover::before,
-.project-tab:focus-within::before {
+.project-tab--active + .project-tab::before {
   display: none;
 }
 
