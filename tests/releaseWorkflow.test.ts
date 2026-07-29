@@ -118,7 +118,10 @@ describe('release workflow', () => {
     // path no CI run exercises.
     expect(builderConfig).toContain('publish:');
     expect(builderConfig).toContain('provider: github');
-    expect(workflow).toContain('dist/*.yml');
+    // Narrow on purpose: dist/*.yml also matches electron-builder's
+    // builder-debug.yml, which shipped as a public asset on v0.1.0.
+    expect(workflow).toContain('dist/latest*.yml');
+    expect(workflow).not.toContain('dist/*.yml');
     // Blockmaps are what make a Windows update a delta rather than a full
     // re-download; without them electron-updater falls back to the whole file.
     expect(workflow).toContain('dist/*.blockmap');
