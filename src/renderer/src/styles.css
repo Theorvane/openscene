@@ -545,6 +545,8 @@ button {
   cursor: pointer;
 }
 
+/* Always visible: the strip has no hover states, so a control that only
+   appeared under the pointer would be unreachable with a mouse. */
 .project-tab__close {
   display: grid;
   flex: none;
@@ -557,19 +559,6 @@ button {
   background: transparent;
   font-size: 10px;
   cursor: pointer;
-  opacity: 0;
-}
-
-/* Revealed on hover and on the active tab, and reachable by keyboard. */
-.project-tab:hover .project-tab__close,
-.project-tab--active .project-tab__close,
-.project-tab__close:focus-visible {
-  opacity: 1;
-}
-
-.project-tab__close:hover {
-  color: var(--color-danger);
-  background: var(--surface-hover);
 }
 
 .product-chrome__empty {
