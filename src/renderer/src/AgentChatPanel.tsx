@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties, type FormEvent, type ReactElement } from 'react';
+import { useEffect, useRef, type FormEvent, type ReactElement } from 'react';
 
 import { useAgentChat } from './AgentChatContext';
 import { AgentChatMessageView } from './AgentChatMessageView';
@@ -6,16 +6,12 @@ import { AgentChatSessionPicker } from './AgentChatSessionPicker';
 import { AgentModelPicker } from './AgentModelPicker';
 import { Button } from './ui';
 
-type AgentChatPanelProps = {
-  readonly width: number;
-  readonly onCollapse: () => void;
-};
-
-type AgentChatPanelStyle = CSSProperties & {
-  readonly '--agent-chat-panel-width': string;
-};
-
-export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): ReactElement {
+/**
+ * Chat body for the workspace side panel. The panel shell — width, collapse,
+ * and the tab strip that switches between chat and the generation studios —
+ * belongs to WorkspaceSidePanel.
+ */
+export function AgentChatPanel(): ReactElement {
   const {
     selectedModel,
     isLocalModel,
@@ -46,11 +42,8 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
     void sendMessage(input);
   };
 
-  const panelStyle: AgentChatPanelStyle = { '--agent-chat-panel-width': `${width}px` };
-
   return (
-    <aside id="app-shell-agent-chat" className="agent-chat-panel-shell" aria-label="OpenVideo agent chat" style={panelStyle}>
-      <div className="agent-chat-panel">
+    <div className="agent-chat-panel">
         <div className="agent-chat-panel__header">
           <div className="agent-chat-panel__title">
             <p className="agent-chat-panel__title-label">OpenVideo Edit Agent</p>
@@ -61,16 +54,6 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
           <div className="agent-chat-panel__actions">
             <Button variant="ghost" onClick={resetConversation} disabled={isBusy} title="Reset conversation" aria-label="Reset conversation">
               Reset
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={onCollapse}
-              title="Collapse agent chat"
-              aria-label="Collapse agent chat sidebar"
-              aria-controls="app-shell-agent-chat"
-              aria-expanded={true}
-            >
-              ⇥
             </Button>
           </div>
         </div>
@@ -179,7 +162,6 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
             </div>
           </div>
         </form>
-      </div>
-    </aside>
+    </div>
   );
 }

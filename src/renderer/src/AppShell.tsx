@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
 
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import {
@@ -9,10 +9,8 @@ import {
   getNextAgentChatPanelWidthFromKey
 } from './agentChatLayoutPreferences';
 import { isWorkspacePageId, type AppPage, type AppPageId } from './appPages';
-import { AgentChatPanel } from './AgentChatPanel';
-import { StudioPanel } from './StudioPanel';
-import { clampStudioPanelWidth, getNextStudioPanelWidthFromKey, STUDIO_PANEL_MAX_WIDTH, STUDIO_PANEL_MIN_WIDTH } from './studioPanelPreferences';
-import { useStudioPanelPreference } from './useStudioPanelPreference';
+import { WorkspaceSidePanel } from './WorkspaceSidePanel';
+import { parseRightPanelTabId, RIGHT_PANEL_TAB_STORAGE_KEY, type RightPanelTabId } from './rightPanelTabs';
 import { AgentChatProvider, useAgentChat, type AgentChatRestoreRequest } from './AgentChatContext';
 import { Button } from './ui';
 import { useAgentChatLayoutPreference } from './useAgentChatLayoutPreference';
@@ -82,58 +80,27 @@ function FolderIcon(): ReactElement {
 function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext, chatRestoreRequest = null, canNavigateBack = false, onNavigateBack }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
-  const { studioPreference, updateStudioPreference } = useStudioPanelPreference();
   const shellBodyRef = useRef<HTMLDivElement | null>(null);
   const dragOriginRef = useRef<ChatPanelDragOrigin | null>(null);
-  const studioDragOriginRef = useRef<ChatPanelDragOrigin | null>(null);
+  // Which surface the side panel shows; remembered across launches.
+  const [sidePanelTabId, setSidePanelTabId] = useState<RightPanelTabId>(() =>
+    typeof window === 'undefined' ? 'chat' : parseRightPanelTabId(window.localStorage.getItem(RIGHT_PANEL_TAB_STORAGE_KEY))
+  );
+
+  const selectSidePanelTab = (tabId: RightPanelTabId): void => {
+    setSidePanelTabId(tabId);
+    try {
+      window.localStorage.setItem(RIGHT_PANEL_TAB_STORAGE_KEY, tabId);
+    } catch {
+      // The in-memory choice stays usable when local storage is unavailable.
+    }
+  };
   const chatPanelWidth = layoutPreference.chatPanelWidth;
   const chatPanelCollapsed = layoutPreference.chatPanelCollapsed;
   const homeIsActive = activePage.id === 'home';
   const projectsIsActive = activePage.id === 'projects';
   const settingsIsActive = activePage.id === 'settings';
   const showChatPanel = isWorkspacePageId(activePage.id);
-  // The studios import into the open project, so they ride the same pages the
-  // editor does.
-  const showStudioPanel = showChatPanel;
-
-  const setStudioWidth = (width: number): void => {
-    const containerWidth = shellBodyRef.current?.getBoundingClientRect().width;
-    updateStudioPreference((current) => ({ ...current, width: clampStudioPanelWidth(width, containerWidth) }));
-  };
-
-  const setStudioCollapsed = (collapsed: boolean): void => {
-    updateStudioPreference((current) => ({ ...current, collapsed }));
-  };
-
-  const releaseStudioPointer = (event: PointerEvent<HTMLDivElement>): void => {
-    studioDragOriginRef.current = null;
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-  };
-
-  const onStudioSplitterKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape' && studioDragOriginRef.current !== null) {
-      event.preventDefault();
-      setStudioWidth(studioDragOriginRef.current.width);
-      studioDragOriginRef.current = null;
-      return;
-    }
-    const nextWidth = getNextStudioPanelWidthFromKey({ currentWidth: studioPreference.width, key: event.key, shiftKey: event.shiftKey });
-    if (nextWidth === null) return;
-    event.preventDefault();
-    setStudioWidth(nextWidth);
-  };
-
-  const onStudioSplitterPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
-    studioDragOriginRef.current = { width: studioPreference.width, clientX: event.clientX };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const onStudioSplitterPointerMove = (event: PointerEvent<HTMLDivElement>): void => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId) || studioDragOriginRef.current === null) return;
-    // Leading edge: dragging right widens it, the mirror of the chat splitter.
-    setStudioWidth(studioDragOriginRef.current.width + event.clientX - studioDragOriginRef.current.clientX);
-  };
 
   const setChatPanelWidth = (width: number): void => {
     const containerWidth = shellBodyRef.current?.getBoundingClientRect().width;
@@ -250,48 +217,6 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
         </div>
       </header>
       <div ref={shellBodyRef} className="app-shell__body">
-        {showStudioPanel && studioPreference.collapsed && (
-          <div className="studio-collapsed-rail">
-            <button
-              className="studio-collapsed-rail__button"
-              type="button"
-              aria-controls="app-shell-studio"
-              aria-expanded={false}
-              title="Expand generation studio sidebar"
-              onClick={() => setStudioCollapsed(false)}
-            >
-              <span aria-hidden="true" className="studio-collapsed-rail__glyph">⇥</span>
-              <span className="studio-collapsed-rail__label">Studio</span>
-            </button>
-          </div>
-        )}
-        {showStudioPanel && !studioPreference.collapsed && (
-          <>
-            <StudioPanel
-              width={studioPreference.width}
-              tabId={studioPreference.tabId}
-              onTabChange={(tabId) => updateStudioPreference((current) => ({ ...current, tabId }))}
-              onCollapse={() => setStudioCollapsed(true)}
-            />
-            <div
-              aria-controls="app-shell-studio app-shell-workspace"
-              aria-label="Resize generation studio panel"
-              aria-orientation="vertical"
-              aria-valuemax={STUDIO_PANEL_MAX_WIDTH}
-              aria-valuemin={STUDIO_PANEL_MIN_WIDTH}
-              aria-valuenow={studioPreference.width}
-              aria-valuetext={`Generation studio ${studioPreference.width} pixels`}
-              className="studio-resize-splitter"
-              onKeyDown={onStudioSplitterKeyDown}
-              onPointerDown={onStudioSplitterPointerDown}
-              onPointerMove={onStudioSplitterPointerMove}
-              onPointerUp={releaseStudioPointer}
-              role="separator"
-              tabIndex={0}
-              title="Drag to resize generation studio panel"
-            />
-          </>
-        )}
         <div id="app-shell-workspace" className="agent-workspace-lock" aria-busy={isBusy} inert={isBusy}>
           <div className="agent-workspace-lock__content">{children}</div>
           {isBusy && (
@@ -337,7 +262,12 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
               tabIndex={0}
               title="Drag to resize Edit Agent chat panel"
             />
-            <AgentChatPanel width={chatPanelWidth} onCollapse={() => setChatPanelCollapsed(true)} />
+            <WorkspaceSidePanel
+              width={chatPanelWidth}
+              tabId={sidePanelTabId}
+              onTabChange={selectSidePanelTab}
+              onCollapse={() => setChatPanelCollapsed(true)}
+            />
           </>
         )}
       </div>

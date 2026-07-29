@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 const APP_SHELL_SOURCE_URL = new URL('../src/renderer/src/AppShell.tsx', import.meta.url);
 const APP_SOURCE_URL = new URL('../src/renderer/src/App.tsx', import.meta.url);
 const AGENT_PANEL_SOURCE_URL = new URL('../src/renderer/src/AgentChatPanel.tsx', import.meta.url);
+const SIDE_PANEL_SOURCE_URL = new URL('../src/renderer/src/WorkspaceSidePanel.tsx', import.meta.url);
 const AGENT_CONTEXT_SOURCE_URL = new URL('../src/renderer/src/AgentChatContext.tsx', import.meta.url);
 const AGENT_LAYOUT_SOURCE_URL = new URL('../src/renderer/src/agentChatLayoutPreferences.ts', import.meta.url);
 const AGENT_LAYOUT_HOOK_SOURCE_URL = new URL('../src/renderer/src/useAgentChatLayoutPreference.ts', import.meta.url);
@@ -16,19 +17,25 @@ async function readSource(url: URL): Promise<string> {
 
 describe('persistent agent control surface', () => {
   it('renders the chat sidebar collapsible with a persisted rail while keeping conversation state in the provider', async () => {
-    const [appShell, panel, styles] = await Promise.all([
+    const [appShell, panel, sidePanel, styles] = await Promise.all([
       readSource(APP_SHELL_SOURCE_URL),
       readSource(AGENT_PANEL_SOURCE_URL),
+      readSource(SIDE_PANEL_SOURCE_URL),
       readSource(STYLES_SOURCE_URL)
     ]);
 
-    expect(appShell).toContain('<AgentChatPanel width={chatPanelWidth} onCollapse={() => setChatPanelCollapsed(true)} />');
+    // The chat shares one panel with the generation studios, switched by tabs.
+    expect(appShell).toContain('<WorkspaceSidePanel');
+    expect(appShell).toContain('width={chatPanelWidth}');
+    expect(appShell).toContain('onCollapse={() => setChatPanelCollapsed(true)}');
     expect(appShell).toContain('{showChatPanel && chatPanelCollapsed && (');
     expect(appShell).toContain('{showChatPanel && !chatPanelCollapsed && (');
     expect(appShell).toContain('className="agent-chat-collapsed-rail__button"');
     expect(appShell).toContain('onClick={() => setChatPanelCollapsed(false)}');
     expect(appShell).toContain('aria-controls="app-shell-agent-chat"');
-    expect(panel).toContain('aria-label="Collapse agent chat sidebar"');
+    // Collapse moved to the panel shell along with the width and the tab strip.
+    expect(sidePanel).toContain('aria-label="Collapse workspace side panel"');
+    expect(sidePanel).toContain('idBase="workspace-side-panel"');
     expect(panel).not.toContain('isOpen');
     expect(panel).not.toContain('closeOpen');
     expect(styles).toContain('.agent-chat-panel-shell {');
@@ -87,7 +94,8 @@ describe('persistent agent control surface', () => {
     expect(app).not.toContain('byteLength');
     expect(appShell).toContain('readonly activeProjectContext: EditAgentProjectContext | null;');
     expect(appShell).toContain('activeProject={props.activeProjectContext}');
-    expect(panel).toContain('readonly width: number;');
+    // Width and collapse belong to the panel shell, not the chat body.
+    expect(panel).not.toContain('readonly width: number;');
     expect(panel).toContain('agent-chat-project-scope');
     expect(panel).toContain('Open a project to give the agent project scope.');
     expect(panel).not.toContain('Active selection');
