@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import type { VideoGenerationJob } from '../../shared/providerSeams';
-import { AiDomainModelSelector } from './AiDomainModelSelector';
+import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
 import { Button, StatusCard } from './ui';
@@ -104,11 +104,10 @@ export function VideoGenerationWorkspace(): ReactElement {
       <header className="studio-surface__header">
         <div className="studio-surface__title">
           <h2 className="studio-surface__title-label" id="video-generation-title">Video Generation</h2>
-          <span className="studio-surface__title-meta">
-            {videoModel.label} · {videoModel.providerLabel} · Cloud API
-          </span>
+          {/* The picker beside it already names the model and provider. */}
+          <span className="studio-surface__title-meta">Cloud video generation</span>
         </div>
-        <AiDomainModelSelector domain="video-generation" label="Video model" />
+        <DomainModelPicker domain="video-generation" ariaLabel="Video model" />
       </header>
 
       <div className="studio-surface__body">

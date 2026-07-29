@@ -1,4 +1,4 @@
-import { getDomainModels, type AiDomainModelConfig } from '../../shared/aiDomainModels';
+import { getDomainModels, type AiDomain, type AiDomainModelConfig } from '../../shared/aiDomainModels';
 import { isProviderConnected } from '../../shared/llmProviders';
 import { isOpenAiCodexModelKey } from '../../shared/openAiAuth';
 
@@ -9,6 +9,8 @@ export type AgentModelGroup = {
 };
 
 export type AgentModelPickerInput = {
+  /** Defaults to the Edit Agent; the voice and video studios pass their own. */
+  readonly domain?: AiDomain;
   readonly activeModelId: string;
   readonly credentialStatus: Readonly<Record<string, boolean>>;
   readonly chatGptConnected: boolean;
@@ -39,7 +41,7 @@ export function isAgentModelLinked(input: {
  * is never empty).
  */
 export function buildAgentModelGroups(input: AgentModelPickerInput): readonly AgentModelGroup[] {
-  const models = getDomainModels('edit-agent').filter((model) => {
+  const models = getDomainModels(input.domain ?? 'edit-agent').filter((model) => {
     if (model.id === input.activeModelId) return true;
     if (
       model.executionPath !== 'local' &&

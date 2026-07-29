@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react';
 
 import type { StatusMessage } from './appTypes';
-import { AiDomainModelSelector } from './AiDomainModelSelector';
+import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
 import { Button, StatusCard } from './ui';
@@ -90,11 +90,10 @@ export function NarrationPanel(): ReactElement {
       <header className="studio-surface__header">
         <div className="studio-surface__title">
           <h2 className="studio-surface__title-label" id="narration-title">Voice Generation</h2>
-          <span className="studio-surface__title-meta">
-            {voiceModel.label} · {voiceModel.providerLabel} · Cloud API
-          </span>
+          {/* The picker beside it already names the model and provider. */}
+          <span className="studio-surface__title-meta">Cloud speech synthesis</span>
         </div>
-        <AiDomainModelSelector domain="voice-generation" label="Voice model" />
+        <DomainModelPicker domain="voice-generation" ariaLabel="Voice model" />
       </header>
 
       <div className="studio-surface__body">
