@@ -6,6 +6,7 @@ import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, type ClipEffects, type Timeli
 import { placeClip } from '../shared/timelineClipLogic';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '../shared/timelineClipPlacement';
 import type { ExportIpcService } from './exportIpcService';
+import type { ResultAssetImportService } from './resultAssetImportService';
 import type { ProjectStore } from './projectStore';
 import { discoverFfmpeg } from './ffmpegDiscovery';
 import {
@@ -47,6 +48,7 @@ export class OpenVideoMcpServer {
   private projectStore: ProjectStore | undefined;
   private exportIpcService: ExportIpcService | undefined;
   private watchFrameExtractor: WatchFrameExtractor = defaultWatchFrameExtractor;
+  private resultImports: ResultAssetImportService | undefined;
   private notifyProjectTimelineChanged: ((projectId: string) => void) | undefined;
 
   /**
@@ -66,6 +68,11 @@ export class OpenVideoMcpServer {
     this.projectStore = projectStore;
     this.exportIpcService = exportIpcService;
     this.watchFrameExtractor = watchFrameExtractor ?? defaultWatchFrameExtractor;
+  }
+
+  /** Lets the agent finish a generation by importing its result, as the UI does. */
+  public setResultImportService(resultImports: ResultAssetImportService): void {
+    this.resultImports = resultImports;
   }
 
   @McpTool({
@@ -516,6 +523,44 @@ export class OpenVideoMcpServer {
   }
 
   @McpTool({
+    description:
+      'Import a completed voice or video generation job into the project as an asset. ' +
+      'Call this after getJobStatus reports the job completed; the returned assetId can then ' +
+      'be placed with addClipToTimeline.',
+    input: z.object({
+      projectId: z.string().min(1),
+      jobId: z.string().min(1)
+    })
+  })
+  async importGeneratedResult(params: { projectId: string; jobId: string }) {
+    if (!this.resultImports) {
+      return { success: false as const, error: 'Result import service is not available.' };
+    }
+
+    const response = await this.resultImports.importAiResult({ projectId: params.projectId, jobId: params.jobId });
+    if (!response.ok) {
+      return { success: false as const, error: response.error.message };
+    }
+
+    const assets = response.value.assets.map((asset) => ({
+      id: asset.id,
+      displayName: asset.displayName,
+      kind: asset.kind,
+      durationMs: asset.metadata?.durationMs
+    }));
+    // The project gained an asset, so an open editor must reload to see it.
+    this.notifyProjectTimelineChanged?.(params.projectId);
+
+    return {
+      success: true as const,
+      projectId: params.projectId,
+      jobId: params.jobId,
+      assets,
+      message: `Imported ${assets.length} generated asset(s) into project ${params.projectId}.`
+    };
+  }
+
+  @McpTool({
     description: 'Start FFmpeg MP4 export for an OpenVideo project timeline.',
     input: z.object({
       projectId: z.string().min(1),
@@ -563,7 +608,7 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'exportProjectVideo']
+      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'exportProjectVideo']
     };
   }
 }

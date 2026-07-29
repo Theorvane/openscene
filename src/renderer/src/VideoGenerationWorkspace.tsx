@@ -100,138 +100,113 @@ export function VideoGenerationWorkspace(): ReactElement {
   };
 
   return (
-    <div className="ai-workspace" role="region" aria-label="AI Video Studio">
-      <div className="ai-workspace__header">
-        <div>
-          <p className="section-kicker">AI Studio</p>
-          <h2>AI Video Generation</h2>
-          <span className="ai-workspace__subtitle">Synthesize videos with {videoModel.providerLabel} ({videoModel.label})</span>
+    <section className="studio-surface" aria-labelledby="video-generation-title">
+      <header className="studio-surface__header">
+        <div className="studio-surface__title">
+          <h2 className="studio-surface__title-label" id="video-generation-title">Video Generation</h2>
+          <span className="studio-surface__title-meta">
+            {videoModel.label} · {videoModel.providerLabel} · Cloud API
+          </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '280px' }}>
-          <AiDomainModelSelector domain="video-generation" label="Video model" />
-        </div>
-      </div>
+        <AiDomainModelSelector domain="video-generation" label="Video model" />
+      </header>
 
-      <div className="ai-workspace__grid">
-        {/* Controls Column */}
-        <div className="ai-workspace__form-panel">
-          <div className="local-status-banner">
-            <span className="banner-title">☁️ {videoModel.providerLabel} Cloud Generation</span>
-            <p className="banner-desc">Your prompt is sent to the connected provider API; the finished video downloads back into local storage.</p>
+      <div className="studio-surface__body">
+        <div className="studio-field">
+          <span className="studio-field__label">Style</span>
+          <div className="studio-chips" role="group" aria-label="Style preset">
+            {STYLE_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                aria-pressed={selectedStyle === preset}
+                className={`studio-chip${selectedStyle === preset ? ' studio-chip--selected' : ''}`}
+                onClick={() => setSelectedStyle(preset)}
+              >
+                {preset}
+              </button>
+            ))}
           </div>
-
-          {/* Prompt Input */}
-          <label className="field-label">
-            Prompt Description
-            <textarea
-              rows={4}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the video scene (e.g. A serene cybernetic forest in neon rain, cinematic camera panning, 4k detail)..."
-            />
-          </label>
-
-          {/* Preset Chips */}
-          <div className="preset-group">
-            <span className="field-label-text">Style Preset</span>
-            <div className="chip-list">
-              {STYLE_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={`preset-chip ${selectedStyle === preset ? 'preset-chip--selected' : ''}`}
-                  onClick={() => setSelectedStyle(preset)}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Configuration Options */}
-          <div className="options-grid">
-            <div>
-              <span className="field-label-text">Aspect Ratio</span>
-              <div className="chip-list">
-                {ASPECT_RATIOS.map((ratio) => (
-                  <button
-                    key={ratio}
-                    type="button"
-                    className={`preset-chip ${aspectRatio === ratio ? 'preset-chip--selected' : ''}`}
-                    onClick={() => setAspectRatio(ratio)}
-                  >
-                    {ratio}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <span className="field-label-text">Duration</span>
-              <div className="chip-list">
-                {durationOptions.map((sec) => (
-                  <button
-                    key={sec}
-                    type="button"
-                    className={`preset-chip ${effectiveDuration === sec ? 'preset-chip--selected' : ''}`}
-                    onClick={() => setDurationSeconds(sec)}
-                  >
-                    {sec}s
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <Button
-            variant="primary"
-            onClick={() => void handleGenerate()}
-            disabled={isGenerating}
-            style={{ width: '100%', marginTop: 'var(--space-4)', padding: 'var(--space-3)' }}
-          >
-            {isGenerating ? '✨ Generating Video...' : `✨ Generate with ${videoModel.providerLabel}`}
-          </Button>
-
-          <StatusCard tone={statusMsg.tone} style={{ marginTop: 'var(--space-3)' }}>
-            {statusMsg.text}
-          </StatusCard>
         </div>
 
-        {/* Jobs / History Column */}
-        <div className="ai-workspace__results-panel">
-          <h3>Generated Video Assets</h3>
+        <div className="studio-field">
+          <span className="studio-field__label">Aspect ratio</span>
+          <div className="studio-chips" role="group" aria-label="Aspect ratio">
+            {ASPECT_RATIOS.map((ratio) => (
+              <button
+                key={ratio}
+                type="button"
+                aria-pressed={aspectRatio === ratio}
+                className={`studio-chip${aspectRatio === ratio ? ' studio-chip--selected' : ''}`}
+                onClick={() => setAspectRatio(ratio)}
+              >
+                {ratio}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="studio-field">
+          <span className="studio-field__label">Duration</span>
+          <div className="studio-chips" role="group" aria-label="Duration">
+            {durationOptions.map((sec) => (
+              <button
+                key={sec}
+                type="button"
+                aria-pressed={effectiveDuration === sec}
+                className={`studio-chip${effectiveDuration === sec ? ' studio-chip--selected' : ''}`}
+                onClick={() => setDurationSeconds(sec)}
+              >
+                {sec}s
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <StatusCard tone={statusMsg.tone}>{statusMsg.text}</StatusCard>
+
+        <div className="studio-field">
+          <span className="studio-field__label">Jobs</span>
           {jobs.length === 0 ? (
-            <div className="empty-slate">No video generation jobs yet. Write a prompt to begin.</div>
+            <p className="studio-empty">No generation jobs yet.</p>
           ) : (
-            <div className="job-list">
+            <ul className="studio-job-list">
               {jobs.map((job) => (
-                <div key={job.id} className="job-card">
-                  <div className="job-card__header">
-                    <span className="mode-badge mode-badge--api">CLOUD API</span>
-                    <span className="job-card__provider">{job.provider}</span>
-                    <span className={`job-status-pill job-status-pill--${job.status}`}>{job.status}</span>
+                <li key={job.id} className="studio-job">
+                  <div className="studio-job__row">
+                    <span className={`studio-job__status studio-job__status--${job.status}`}>{job.status}</span>
+                    <span className="studio-job__provider">{job.provider}</span>
                   </div>
-                  <p className="job-card__prompt">&quot;{job.prompt}&quot;</p>
-
-                  {job.status === 'completed' && job.outputFilePath && (
-                    <div className="job-card__actions">
-                      <Button variant="primary" onClick={() => void handleImportToProject(job)}>
-                        📥 Import to Project Timeline
-                      </Button>
-                    </div>
+                  <p className="studio-job__prompt">{job.prompt}</p>
+                  {job.status === 'completed' && job.outputFilePath !== undefined && (
+                    <Button variant="primary" onClick={() => void handleImportToProject(job)}>
+                      Import to project
+                    </Button>
                   )}
-
-                  {job.status === 'running' && (
-                    <div className="ai-progress-bar">
-                      <div className="ai-progress-bar__fill" />
-                    </div>
-                  )}
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       </div>
-    </div>
+
+      {/* Composer mirrors the chat prompt card: write, then act. */}
+      <div className="studio-composer">
+        <textarea
+          className="studio-composer__input"
+          rows={3}
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          placeholder="Describe the shot…"
+          aria-label="Video prompt"
+        />
+        <div className="studio-composer__toolbar">
+          <span className="studio-composer__hint">{effectiveDuration}s · {aspectRatio} · {selectedStyle}</span>
+          <Button variant="primary" onClick={() => void handleGenerate()} disabled={isGenerating || prompt.trim().length === 0}>
+            {isGenerating ? 'Generating…' : 'Generate'}
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }

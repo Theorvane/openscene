@@ -596,6 +596,221 @@ button {
   min-height: 0;
 }
 
+/* Generation studios read like the chat panel: a compact header, a quiet body,
+   and a composer pinned to the bottom where the action lives. */
+.studio-surface {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.studio-surface__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.studio-surface__title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.studio-surface__title-label {
+  margin: 0;
+  color: var(--text-strong);
+  font-family: var(--font-body);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+
+.studio-surface__title-meta {
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+.studio-surface__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+.studio-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.studio-field__label {
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.studio-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.studio-chip {
+  min-height: var(--control-compact-min-height);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-weak);
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+
+.studio-chip:hover {
+  color: var(--foreground);
+  border-color: var(--border-strong);
+}
+
+.studio-chip--selected {
+  color: var(--foreground);
+  border-color: var(--ring);
+  background: var(--surface-inset);
+}
+
+.studio-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.studio-result__label {
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+}
+
+.studio-empty {
+  margin: 0;
+  color: var(--text-weak);
+  font-size: var(--text-caption);
+}
+
+.studio-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.studio-job {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.studio-job__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.studio-job__status {
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.studio-job__status--completed {
+  color: var(--color-success);
+}
+
+.studio-job__status--failed {
+  color: var(--color-danger);
+}
+
+.studio-job__provider {
+  color: var(--text-weaker);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+}
+
+.studio-job__prompt {
+  margin: 0;
+  overflow-wrap: break-word;
+  color: var(--color-text);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.studio-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.studio-composer__input {
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-small);
+  resize: none;
+}
+
+.studio-composer__input:focus-visible {
+  outline: none;
+}
+
+.studio-composer__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.studio-composer__hint {
+  overflow: hidden;
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Top-left switcher between the editor and the generation studios. */
 .workspace-tabs {
   justify-content: flex-start;

@@ -4,6 +4,7 @@ import type { StatusMessage } from './appTypes';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
+import { Button, StatusCard } from './ui';
 
 const ELEVENLABS_VOICES = [
   { id: '21m00Tcm4TlvDq8ikWAM', label: 'Rachel (Calm & Professional)' },
@@ -85,84 +86,72 @@ export function NarrationPanel(): ReactElement {
   };
 
   return (
-    <section className="narration-panel" aria-labelledby="narration-title">
-      <div className="panel-heading">
-        <div>
-          <p className="section-kicker">AI Voice Studio</p>
-          <h2 id="narration-title">Voice Generation &amp; Synthesis</h2>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <AiDomainModelSelector domain="voice-generation" label="Voice model" />
-          <span className="mode-badge mode-badge--api" role="status" aria-label="Voice execution mode">
-            Cloud API · {voiceModel.providerLabel}
+    <section className="studio-surface" aria-labelledby="narration-title">
+      <header className="studio-surface__header">
+        <div className="studio-surface__title">
+          <h2 className="studio-surface__title-label" id="narration-title">Voice Generation</h2>
+          <span className="studio-surface__title-meta">
+            {voiceModel.label} · {voiceModel.providerLabel} · Cloud API
           </span>
         </div>
+        <AiDomainModelSelector domain="voice-generation" label="Voice model" />
+      </header>
+
+      <div className="studio-surface__body">
+        {isElevenLabs && (
+          <label className="studio-field">
+            <span className="studio-field__label">Voice</span>
+            <select value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
+              {ELEVENLABS_VOICES.map((voice) => (
+                <option key={voice.id} value={voice.id}>{voice.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <label className="studio-field">
+          <span className="studio-field__label">API key override</span>
+          <input
+            type="password"
+            value={apiKeyOverride}
+            onChange={(event) => setApiKeyOverride(event.target.value)}
+            placeholder="Optional — defaults to the key connected in Settings"
+            autoComplete="off"
+          />
+        </label>
+
+        {status !== null && <StatusCard tone={status.tone}>{status.text}</StatusCard>}
+
+        {completedJobId !== null && (
+          <div className="studio-result">
+            <span className="studio-result__label">Synthesis ready</span>
+            <Button
+              variant="primary"
+              onClick={() => void importToProject()}
+              disabled={projectImport.activeProject === null || projectImport.isImporting}
+            >
+              Import to project
+            </Button>
+          </div>
+        )}
       </div>
 
-      <div className="narration-grid">
-        <section className="narration-card" aria-labelledby="voice-synthesis-title">
-          <div>
-            <p className="section-kicker">{voiceModel.providerLabel} API</p>
-            <h3 id="voice-synthesis-title">Cloud Voice Synthesis · {voiceModel.label}</h3>
-          </div>
-
-          <label className="field-label">
-            API key override (optional)
-            <input
-              type="password"
-              value={apiKeyOverride}
-              onChange={(event) => setApiKeyOverride(event.target.value)}
-              placeholder="Leave empty to use the key connected in Settings → Providers"
-              autoComplete="off"
-            />
-          </label>
-
-          {isElevenLabs && (
-            <label className="field-label">
-              Voice
-              <select value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
-                {ELEVENLABS_VOICES.map((voice) => (
-                  <option key={voice.id} value={voice.id}>{voice.label}</option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          <label className="field-label">
-            Speech script
-            <textarea
-              rows={6}
-              value={script}
-              onChange={(event) => setScript(event.target.value)}
-              placeholder="Enter text to synthesize with the selected cloud voice model..."
-            />
-          </label>
-
-          <div className="transport-strip__buttons">
-            <button className="button button--primary" type="button" onClick={() => void generate()} disabled={isGenerating}>
-              {isGenerating ? '⚡ Synthesizing...' : `⚡ Synthesize with ${voiceModel.providerLabel}`}
-            </button>
-          </div>
-
-          {status !== null && (
-            <div className={`status-card status-card--${status.tone}`} role="status" style={{ marginTop: 'var(--space-3)' }}>
-              {status.text}
-            </div>
-          )}
-
-          {completedJobId !== null && (
-            <div className="transport-strip__buttons" style={{ marginTop: 'var(--space-3)' }}>
-              <button
-                className="button button--primary"
-                type="button"
-                onClick={() => void importToProject()}
-                disabled={projectImport.activeProject === null || projectImport.isImporting}
-              >
-                📥 Import to Project Timeline
-              </button>
-            </div>
-          )}
-        </section>
+      {/* Composer mirrors the chat prompt card: write, then act. */}
+      <div className="studio-composer">
+        <textarea
+          className="studio-composer__input"
+          rows={3}
+          value={script}
+          onChange={(event) => setScript(event.target.value)}
+          placeholder="Write the narration script…"
+          aria-label="Speech script"
+        />
+        <div className="studio-composer__toolbar">
+          <span className="studio-composer__hint">{voiceModel.providerLabel}</span>
+          <Button variant="primary" onClick={() => void generate()} disabled={isGenerating || script.trim().length === 0}>
+            {isGenerating ? 'Synthesizing…' : 'Generate'}
+          </Button>
+        </div>
       </div>
     </section>
   );

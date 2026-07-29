@@ -33,7 +33,8 @@ describe('OpenVideo branding source contract', () => {
     expect(indexHtmlSource).toContain('<title>OpenVideo</title>');
     expect(mainIndexSource).toContain("title: 'OpenVideo'");
     expect(timelineEditorSource).toContain('<h1 id="timeline-editor-title">OpenVideo</h1>');
-    expect(videoGenWorkspaceSource).toContain('AI Video Generation');
+    // The studio headings dropped the "AI" prefix with the chat-style redesign.
+    expect(videoGenWorkspaceSource).toContain('id="video-generation-title">Video Generation<');
     expect(designSource).toContain('# OpenVideo Design System');
     expect(designSource).toContain('The Edit workspace keeps `Local studio`, `OpenVideo`, and the `Timeline editor` subtitle as visually hidden region labels for accessibility;');
   });

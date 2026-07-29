@@ -14,6 +14,7 @@ export const AGENT_CHAT_MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
   'trimTimelineClip',
   'updateClipEffects',
   'addClipToTimeline',
+  'importGeneratedResult',
   'exportProjectVideo'
 ]);
 

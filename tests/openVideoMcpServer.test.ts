@@ -47,7 +47,54 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     expect(toolNames).toContain('trimTimelineClip');
     expect(toolNames).toContain('updateClipEffects');
     expect(toolNames).toContain('addClipToTimeline');
+    expect(toolNames).toContain('importGeneratedResult');
     expect(toolNames).toContain('exportProjectVideo');
+  });
+
+  it('imports a completed generation job as a project asset and tells open editors to reload', async () => {
+    const server = new OpenVideoMcpServer();
+    const changed: string[] = [];
+    server.setProjectTimelineChangeNotifier((projectId) => changed.push(projectId));
+
+    // Without the service the tool refuses instead of pretending to import.
+    expect(await server.importGeneratedResult({ projectId: 'p1', jobId: 'job-1' })).toMatchObject({
+      success: false,
+      error: 'Result import service is not available.'
+    });
+
+    server.setResultImportService({
+      importAiResult: async () => ok({
+        assets: [{
+          id: 'asset-generated',
+          displayName: 'narration.wav',
+          kind: 'audio',
+          mimeType: 'audio/wav',
+          projectRelativePath: 'assets/asset-generated/original.wav',
+          byteLength: 2048,
+          metadata: { durationMs: 4_000 },
+          createdAt: '2026-07-29T00:00:00.000Z',
+          updatedAt: '2026-07-29T00:00:00.000Z'
+        }]
+      })
+    } as unknown as Parameters<OpenVideoMcpServer['setResultImportService']>[0]);
+
+    const imported = await server.importGeneratedResult({ projectId: 'p1', jobId: 'job-1' });
+
+    expect(imported).toMatchObject({ success: true, projectId: 'p1', jobId: 'job-1' });
+    expect(imported.assets).toEqual([{ id: 'asset-generated', displayName: 'narration.wav', kind: 'audio', durationMs: 4_000 }]);
+    expect(changed).toEqual(['p1']);
+  });
+
+  it('reports an import failure instead of claiming the asset landed', async () => {
+    const server = new OpenVideoMcpServer();
+    server.setResultImportService({
+      importAiResult: async () => fail('TTS_RESULT_UNAVAILABLE', 'The completed AI generation result is not available.')
+    } as unknown as Parameters<OpenVideoMcpServer['setResultImportService']>[0]);
+
+    expect(await server.importGeneratedResult({ projectId: 'p1', jobId: 'missing' })).toEqual({
+      success: false,
+      error: 'The completed AI generation result is not available.'
+    });
   });
 
   it('executes createVideoJob MCP tool against the selected cloud model', async () => {
