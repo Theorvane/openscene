@@ -8,7 +8,7 @@ describe('Settings workspace source contract', () => {
   it('organizes settings into the requested local-first sections and reads only safe FFmpeg readiness', async () => {
     const source = await readFile(SETTINGS_SOURCE_URL, 'utf8');
 
-    for (const heading of ['Appearance', 'Local Tools', 'Voice', 'Video', 'Providers', 'Edit Agent', 'Data & Privacy']) {
+    for (const heading of ['Appearance', 'Local Tools', 'Voice', 'Video', 'Providers', 'Models', 'Edit Agent', 'Data & Privacy']) {
       expect(source).toContain(`title: '${heading}'`);
     }
     expect(source).toContain('window.videoTool.getFfmpegRuntimeStatus');
@@ -18,27 +18,43 @@ describe('Settings workspace source contract', () => {
     expect(source).not.toMatch(/executablePath|argv|args:/);
   });
 
-  it('keeps provider credentials write-only in renderer state and safe storage IPC', async () => {
-    const source = await readFile(SETTINGS_SOURCE_URL, 'utf8');
+  it('keeps provider credentials write-only through the connect dialog and safe storage IPC', async () => {
+    const [source, dialog] = await Promise.all([
+      readFile(SETTINGS_SOURCE_URL, 'utf8'),
+      readFile(new URL('../src/renderer/src/ProviderConnectDialog.tsx', import.meta.url), 'utf8')
+    ]);
 
     expect(source).toContain('saveProviderCredential');
-    expect(source).toContain('credentialDrafts');
-    expect(source).toContain('setCredentialDrafts');
-    expect(source).toContain('setCredentialDrafts((current) => ({ ...current, [field.keyName]: \'\' }))');
+    expect(source).toContain("saveProviderCredential(provider.credentialKey as LlmCredentialKey, '')");
     expect(source).not.toContain('value={providerConfig[field.keyName]');
     expect(source).not.toContain('updateProviderConfig({ [field.keyName]');
+    expect(dialog).toContain('type="password"');
+    expect(dialog).toContain('API key is required');
+    expect(dialog).toContain('never shown again');
+    expect(dialog).not.toContain('localStorage');
   });
 
-  it('renders opencode-style provider rows with connect, disconnect, and connection status', async () => {
+  it('splits providers into opencode-style Connected and Popular lists with a connect dialog', async () => {
     const source = await readFile(SETTINGS_SOURCE_URL, 'utf8');
 
     expect(source).toContain("from '../../shared/llmProviders'");
-    expect(source).toContain('settings-provider-row');
-    expect(source).toContain("'● Connected' : '○ Not connected'");
+    expect(source).toContain('Connected providers');
+    expect(source).toContain('Popular providers');
+    expect(source).toContain('settings-list__row');
     expect(source).toContain('disconnectProvider');
-    expect(source).toContain("saveProviderCredential(field.keyName, '')");
-    expect(source).toContain('● Local');
+    expect(source).toContain('ProviderConnectDialog');
+    expect(source).toContain('+ Connect');
     expect(source).toContain('id="ollama-base-url"');
+  });
+
+  it('renders an opencode-style Models section with search and per-model visibility switches', async () => {
+    const source = await readFile(SETTINGS_SOURCE_URL, 'utf8');
+
+    expect(source).toContain('settings-model-search');
+    expect(source).toContain('filteredModelGroups(modelFilter)');
+    expect(source).toContain('role="switch"');
+    expect(source).toContain('aria-checked={visible}');
+    expect(source).toContain('setModelVisibility(model.providerId, model.id, !visible)');
   });
 
   it('uses stateful section buttons with an active labeled content region', async () => {

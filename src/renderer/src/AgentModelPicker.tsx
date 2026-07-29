@@ -4,6 +4,7 @@ import { getDomainModels, type AiDomainModelConfig } from '../../shared/aiDomain
 import { isProviderConnected } from '../../shared/llmProviders';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useLlmModel } from './LlmProviderContext';
+import { useModelVisibility } from './ModelVisibilityContext';
 
 type ProviderGroup = {
   readonly providerId: string;
@@ -32,10 +33,15 @@ function groupByProvider(models: readonly AiDomainModelConfig[]): readonly Provi
 export function AgentModelPicker(): ReactElement {
   const { selectedModel, setSelectedModelId } = useAiDomainModel();
   const { credentialStatus } = useLlmModel();
+  const { isModelVisible } = useModelVisibility();
   const [isOpen, setIsOpen] = useState(false);
 
-  const models = getDomainModels('edit-agent');
   const activeModel = selectedModel('edit-agent');
+  // Settings → Models visibility switches filter the list; the active model
+  // always stays listed so the current selection is never orphaned.
+  const models = getDomainModels('edit-agent').filter(
+    (model) => model.id === activeModel.id || isModelVisible(model.providerId, model.id)
+  );
   const groups = groupByProvider(models);
 
   const providerStatusLabel = (group: ProviderGroup): string => {

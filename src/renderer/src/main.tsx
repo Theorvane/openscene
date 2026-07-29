@@ -5,6 +5,7 @@ import { App } from './App';
 import { bootstrapRendererTheme, ThemeProvider } from './ThemeProvider';
 import { LlmProvider } from './LlmProviderContext';
 import { AiDomainModelProvider } from './AiDomainModelContext';
+import { ModelVisibilityProvider } from './ModelVisibilityContext';
 import './styles.css';
 
 const rootElement = document.getElementById('root');
@@ -24,7 +25,9 @@ createRoot(rootElement).render(
     <ThemeProvider>
       <LlmProvider>
         <AiDomainModelProvider>
-          <App />
+          <ModelVisibilityProvider>
+            <App />
+          </ModelVisibilityProvider>
         </AiDomainModelProvider>
       </LlmProvider>
     </ThemeProvider>

@@ -2,7 +2,9 @@ import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 
 import type { LocalFfmpegRuntimeStatus } from '../../shared/exportTypes';
 import { DEFAULT_LLM_MODELS, type LlmProviderId } from '../../shared/llmModels';
-import { LLM_PROVIDERS } from '../../shared/llmProviders';
+import { LLM_PROVIDERS, type LlmProviderInfo } from '../../shared/llmProviders';
+import { useModelVisibility } from './ModelVisibilityContext';
+import { ProviderConnectDialog } from './ProviderConnectDialog';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { TimelineShortcutMap } from './editor/TimelineEditorLayoutControls';
 import { useEditorShortcutPreference } from './editor/useEditorShortcutPreference';
@@ -17,7 +19,8 @@ const SETTINGS_SECTIONS = [
   { id: 'local-tools', title: 'Local Tools', description: 'Local runtime readiness for desktop capture, narration, and final export.' },
   { id: 'voice', title: 'Voice', description: 'Voice model preference and consent-based local narration boundaries.' },
   { id: 'video', title: 'Video', description: 'Video model preference and local result import boundaries.' },
-  { id: 'providers', title: 'Providers', description: 'Connect model providers: the local engine plus cloud APIs with safe-storage keys.' },
+  { id: 'providers', title: 'Providers', description: 'Connected providers and popular providers to connect, opencode-style.' },
+  { id: 'models', title: 'Models', description: 'Search the model catalog and choose which models appear in pickers.' },
   { id: 'edit-agent', title: 'Edit Agent', description: 'Model preference for the persistent right-side agent.' },
   { id: 'shortcuts', title: 'Shortcuts', description: 'Timeline editor keyboard shortcut remapping.' },
   { id: 'data-privacy', title: 'Data & Privacy', description: 'Local storage, provider authorization, and deletion expectations.' }
@@ -37,45 +40,14 @@ type FfmpegStatusState =
   | { readonly status: 'ready'; readonly value: LocalFfmpegRuntimeStatus }
   | { readonly status: 'error'; readonly error: string };
 
-type CredentialField = {
-  readonly providerId: LlmProviderId;
-  readonly keyName: LlmCredentialKey;
-  readonly label: string;
-  readonly placeholder: string;
-};
-
-type CredentialDrafts = Record<LlmCredentialKey, string>;
-type CredentialSaveState = Record<LlmCredentialKey, 'idle' | 'saving' | 'saved' | 'error'>;
-
 type SettingsWorkspaceProps = {
   readonly onReplayFirstRunOnboarding: () => void;
 };
 
 // Cloud provider rows derive from the shared opencode-style provider registry.
-const CREDENTIAL_FIELDS: readonly CredentialField[] = LLM_PROVIDERS
-  .filter((provider) => provider.auth === 'api-key' && provider.credentialKey !== undefined)
-  .map((provider) => ({
-    providerId: provider.id,
-    keyName: provider.credentialKey as LlmCredentialKey,
-    label: provider.label,
-    placeholder: provider.keyPlaceholder ?? ''
-  }));
-
-const EMPTY_CREDENTIAL_DRAFTS: CredentialDrafts = {
-  openaiApiKey: '',
-  anthropicApiKey: '',
-  geminiApiKey: '',
-  deepseekApiKey: '',
-  elevenlabsApiKey: ''
-};
-
-const IDLE_CREDENTIAL_SAVE_STATE: CredentialSaveState = {
-  openaiApiKey: 'idle',
-  anthropicApiKey: 'idle',
-  geminiApiKey: 'idle',
-  deepseekApiKey: 'idle',
-  elevenlabsApiKey: 'idle'
-};
+const CLOUD_PROVIDERS: readonly LlmProviderInfo[] = LLM_PROVIDERS.filter(
+  (provider) => provider.auth === 'api-key' && provider.credentialKey !== undefined
+);
 
 function getSettingsSection(sectionId: SettingsSectionId): SettingsSection {
   return SETTINGS_SECTIONS.find((section) => section.id === sectionId) ?? SETTINGS_SECTIONS[0];
@@ -85,6 +57,24 @@ function modelLabelsForProvider(providerId: LlmProviderId): string {
   return DEFAULT_LLM_MODELS.filter((model) => model.providerId === providerId)
     .map((model) => model.label)
     .join(' & ');
+}
+
+/** Grouped catalog for the opencode-style Models section, filtered by search. */
+function filteredModelGroups(filter: string): readonly { readonly providerId: LlmProviderId; readonly providerLabel: string; readonly models: readonly (typeof DEFAULT_LLM_MODELS)[number][] }[] {
+  const query = filter.trim().toLowerCase();
+  const matches = DEFAULT_LLM_MODELS.filter((model) =>
+    query.length === 0 ||
+    model.label.toLowerCase().includes(query) ||
+    model.providerLabel.toLowerCase().includes(query) ||
+    model.id.toLowerCase().includes(query)
+  );
+  return LLM_PROVIDERS
+    .map((provider) => ({
+      providerId: provider.id,
+      providerLabel: provider.label,
+      models: matches.filter((model) => model.providerId === provider.id)
+    }))
+    .filter((group) => group.models.length > 0);
 }
 
 function ffmpegStatusText(state: FfmpegStatusState): { readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string } {
@@ -109,8 +99,10 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
   const { mode, preference, preset, setPreset, setPreference } = useTheme();
   const { credentialStatus, providerConfig, saveProviderCredential, selectedModel, selectedModelId, setSelectedModelId, updateProviderConfig } = useLlmModel();
   const [activeSectionId, setActiveSectionId] = useState<SettingsSectionId>('appearance');
-  const [credentialDrafts, setCredentialDrafts] = useState<CredentialDrafts>(EMPTY_CREDENTIAL_DRAFTS);
-  const [credentialSaveState, setCredentialSaveState] = useState<CredentialSaveState>(IDLE_CREDENTIAL_SAVE_STATE);
+  const { isModelVisible, setModelVisibility } = useModelVisibility();
+  const [connectTarget, setConnectTarget] = useState<LlmProviderInfo | null>(null);
+  const [disconnectingKey, setDisconnectingKey] = useState<string | null>(null);
+  const [modelFilter, setModelFilter] = useState('');
   const [testState, setTestState] = useState<ModelTestState>({ status: 'idle' });
   const [ffmpegState, setFfmpegState] = useState<FfmpegStatusState>({ status: 'loading' });
   const { shortcutPreferences, updateShortcutPreferences } = useEditorShortcutPreference();
@@ -151,20 +143,15 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
     }
   };
 
-  const saveCredentialDraft = async (field: CredentialField): Promise<void> => {
-    setCredentialSaveState((current) => ({ ...current, [field.keyName]: 'saving' }));
-    const saved = await saveProviderCredential(field.keyName, credentialDrafts[field.keyName]);
-    setCredentialSaveState((current) => ({ ...current, [field.keyName]: saved ? 'saved' : 'error' }));
-    if (saved) {
-      setCredentialDrafts((current) => ({ ...current, [field.keyName]: '' }));
-    }
+  const disconnectProvider = async (provider: LlmProviderInfo): Promise<void> => {
+    if (provider.credentialKey === undefined) return;
+    setDisconnectingKey(provider.credentialKey);
+    await saveProviderCredential(provider.credentialKey as LlmCredentialKey, '');
+    setDisconnectingKey(null);
   };
 
-  const disconnectProvider = async (field: CredentialField): Promise<void> => {
-    setCredentialSaveState((current) => ({ ...current, [field.keyName]: 'saving' }));
-    const cleared = await saveProviderCredential(field.keyName, '');
-    setCredentialSaveState((current) => ({ ...current, [field.keyName]: cleared ? 'idle' : 'error' }));
-  };
+  const isProviderKeyStored = (provider: LlmProviderInfo): boolean =>
+    provider.credentialKey !== undefined && credentialStatus[provider.credentialKey] === true;
 
   const renderActiveSection = (): ReactNode => {
     switch (activeSectionId) {
@@ -209,60 +196,132 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
             <StatusCard tone="warning">Provider seams are selectable preferences only; unsupported cloud adapters are not silently called.</StatusCard>
           </>
         );
-      case 'providers':
+      case 'providers': {
+        const connectedProviders = CLOUD_PROVIDERS.filter((provider) => isProviderKeyStored(provider));
+        const popularProviders = CLOUD_PROVIDERS.filter((provider) => !isProviderKeyStored(provider));
         return (
           <>
-            <div className="settings-provider-list">
-              <div className="settings-provider-row">
-                <div className="settings-provider-row__head">
-                  <strong className="settings-provider-row__name">Ollama</strong>
-                  <span className="settings-provider-row__status settings-provider-row__status--on">● Local</span>
-                </div>
-                <p className="settings-provider-row__description">Local engine over HTTP. No account or key; models run on this machine.</p>
-                <label className="field-label" htmlFor="ollama-base-url">
-                  Endpoint
-                  <input id="ollama-base-url" type="text" value={providerConfig.ollamaBaseUrl ?? ''} placeholder="http://localhost:11434" onChange={(event) => updateProviderConfig({ ollamaBaseUrl: event.target.value })} />
-                </label>
-              </div>
-              {CREDENTIAL_FIELDS.map((field) => {
-                const connected = credentialStatus[field.keyName] === true;
-                return (
-                  <div key={field.keyName} className="settings-provider-row">
-                    <div className="settings-provider-row__head">
-                      <strong className="settings-provider-row__name">{field.label}</strong>
-                      <span className={`settings-provider-row__status${connected ? ' settings-provider-row__status--on' : ''}`}>
-                        {connected ? '● Connected' : '○ Not connected'}
-                      </span>
-                    </div>
-                    <p className="settings-provider-row__description">Unlocks {modelLabelsForProvider(field.providerId)}.</p>
-                    <div className="settings-provider-row__controls">
-                      <label className="field-label" htmlFor={`credential-${field.keyName}`}>
-                        API key
-                        <input id={`credential-${field.keyName}`} type="password" placeholder={field.placeholder} value={credentialDrafts[field.keyName]} onChange={(event) => setCredentialDrafts((current) => ({ ...current, [field.keyName]: event.target.value }))} />
-                      </label>
-                      <Button variant="primary" onClick={() => void saveCredentialDraft(field)} disabled={credentialSaveState[field.keyName] === 'saving' || credentialDrafts[field.keyName].trim().length === 0}>
-                        {credentialSaveState[field.keyName] === 'saving' ? 'Working...' : connected ? 'Replace key' : 'Connect'}
-                      </Button>
-                      {connected && (
-                        <Button variant="default" onClick={() => void disconnectProvider(field)} disabled={credentialSaveState[field.keyName] === 'saving'}>Disconnect</Button>
-                      )}
-                    </div>
-                    {credentialSaveState[field.keyName] === 'saved' && <span role="status">Credential saved to main-process safe storage.</span>}
-                    {credentialSaveState[field.keyName] === 'error' && <span role="status">Credential could not be saved.</span>}
+            <div className="settings-group">
+              <h3 className="settings-subheading">Connected providers</h3>
+              <div className="settings-list">
+                <div className="settings-list__row">
+                  <div className="settings-list__main">
+                    <span className="settings-list__name">Ollama</span>
+                    <span className="settings-tag">Local</span>
                   </div>
-                );
-              })}
+                  <label className="field-label settings-list__inline-field" htmlFor="ollama-base-url">
+                    Endpoint
+                    <input id="ollama-base-url" type="text" value={providerConfig.ollamaBaseUrl ?? ''} placeholder="http://localhost:11434" onChange={(event) => updateProviderConfig({ ollamaBaseUrl: event.target.value })} />
+                  </label>
+                </div>
+                {connectedProviders.map((provider) => (
+                  <div key={provider.id} className="settings-list__row">
+                    <div className="settings-list__main">
+                      <span className="settings-list__name">{provider.label}</span>
+                      <span className="settings-tag">API key</span>
+                    </div>
+                    <Button variant="ghost" onClick={() => void disconnectProvider(provider)} disabled={disconnectingKey === provider.credentialKey}>
+                      {disconnectingKey === provider.credentialKey ? 'Disconnecting…' : 'Disconnect'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
+
+            <div className="settings-group">
+              <h3 className="settings-subheading">Popular providers</h3>
+              <div className="settings-list">
+                {popularProviders.length === 0 ? (
+                  <div className="settings-list__empty">All providers are connected.</div>
+                ) : (
+                  popularProviders.map((provider) => (
+                    <div key={provider.id} className="settings-list__row">
+                      <div className="settings-list__main settings-list__main--stacked">
+                        <span className="settings-list__name">{provider.label}</span>
+                        <span className="settings-list__note">Unlocks {modelLabelsForProvider(provider.id)}.</span>
+                      </div>
+                      <Button variant="default" onClick={() => setConnectTarget(provider)}>+ Connect</Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             <StatusCard tone="neutral">API keys live in main-process safe storage, are write-only from this screen, and are never rendered back.</StatusCard>
+            {connectTarget !== null && connectTarget.credentialKey !== undefined && (
+              <ProviderConnectDialog
+                provider={connectTarget}
+                onConnect={(apiKey) => saveProviderCredential(connectTarget.credentialKey as LlmCredentialKey, apiKey)}
+                onClose={() => setConnectTarget(null)}
+              />
+            )}
           </>
         );
+      }
+      case 'models': {
+        const groups = filteredModelGroups(modelFilter);
+        return (
+          <>
+            <div className="settings-model-search">
+              <input
+                type="search"
+                aria-label="Search models"
+                placeholder="Search models"
+                value={modelFilter}
+                onChange={(event) => setModelFilter(event.target.value)}
+                spellCheck={false}
+              />
+              {modelFilter.length > 0 && (
+                <Button variant="ghost" onClick={() => setModelFilter('')} aria-label="Clear model search">✕</Button>
+              )}
+            </div>
+            {groups.length === 0 ? (
+              <div className="settings-list__empty">
+                No models found{modelFilter.trim().length > 0 ? ` for “${modelFilter.trim()}”` : ''}.
+              </div>
+            ) : (
+              groups.map((group) => (
+                <div key={group.providerId} className="settings-group">
+                  <h3 className="settings-subheading">{group.providerLabel}</h3>
+                  <div className="settings-list">
+                    {group.models.map((model) => {
+                      const visible = isModelVisible(model.providerId, model.id);
+                      return (
+                        <div key={model.id} className="settings-list__row">
+                          <div className="settings-list__main settings-list__main--stacked">
+                            <span className="settings-list__name">{model.label}</span>
+                            <span className="settings-list__note">{model.contextWindow !== undefined ? `${model.contextWindow} context` : model.description}</span>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={visible}
+                            aria-label={`Show ${model.label} in model pickers`}
+                            className={`settings-switch${visible ? ' settings-switch--on' : ''}`}
+                            onClick={() => setModelVisibility(model.providerId, model.id, !visible)}
+                          >
+                            <span className="settings-switch__thumb" aria-hidden="true" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+            <StatusCard tone="neutral">Hidden models disappear from the Edit Agent picker and the primary model list; the active selection always stays listed.</StatusCard>
+          </>
+        );
+      }
       case 'edit-agent':
         return (
           <>
             <AiDomainModelSelector domain="edit-agent" label="Edit Agent model" description="Choose the model preference for the persistent right-side Edit Agent panel." />
             <label className="field-label" htmlFor="primary-model">Primary LLM model</label>
             <select id="primary-model" value={selectedModelId} onChange={(event) => setSelectedModelId(event.target.value)}>
-              {DEFAULT_LLM_MODELS.map((model) => <option key={model.id} value={model.id}>{model.label} ({model.providerLabel}) - [{model.badge}]</option>)}
+              {DEFAULT_LLM_MODELS
+                .filter((model) => model.id === selectedModelId || isModelVisible(model.providerId, model.id))
+                .map((model) => <option key={model.id} value={model.id}>{model.label} ({model.providerLabel}) - [{model.badge}]</option>)}
             </select>
             <StatusCard tone="neutral"><strong>{selectedModel.label}</strong>: {selectedModel.description}</StatusCard>
             <Button variant="default" onClick={() => void runModelTest()} disabled={testState.status === 'running'}>{testState.status === 'running' ? 'Testing...' : 'Test selected model'}</Button>
