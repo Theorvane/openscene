@@ -3420,21 +3420,6 @@ button {
   transform-origin: 50% 100%;
 }
 
-.tab-marker {
-  display: inline-block;
-  margin-left: var(--space-1);
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-
-[role="tab"][aria-selected="true"] .tab-marker {
-  opacity: 1;
-  font-weight: 700;
-}
-
 .editor-meta {
   grid-template-columns: 1fr;
 }

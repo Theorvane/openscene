@@ -133,7 +133,6 @@ export function Tabs<TabId extends string>({
             onClick={() => onActiveTabChange(tab.id)}
           >
             <span>{tab.label}</span>
-            <span className="tab-marker" aria-hidden="true">{selected ? 'active' : '-'}</span>
           </button>
         );
       })}
