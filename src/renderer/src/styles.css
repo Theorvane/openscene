@@ -2079,7 +2079,8 @@ button {
   padding: var(--space-2) var(--space-4);
   border: none;
   border-bottom: 2px solid transparent;
-  border-radius: 0;
+  /* Rounded so the selected fill reads as a cell, not a full-bleed block. */
+  border-radius: 6px;
   color: var(--color-muted);
   background: transparent;
   box-shadow: none;
