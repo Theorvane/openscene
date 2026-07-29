@@ -43,7 +43,39 @@ function buildSession(responses: readonly AIMessage[]): AgentChatSessionManager 
   return new AgentChatSessionManager(bundle);
 }
 
+/** A session whose model answers once and then fails, like a provider outage. */
+function buildFailingSession(firstReply: AIMessage, failure: Error): AgentChatSessionManager {
+  let call = 0;
+  const bundle = buildAgentChatGraph({
+    tools: fakeTools,
+    mutatingToolNames: MUTATING_TOOL_NAMES,
+    createModel: () => ({
+      invoke: async () => {
+        call += 1;
+        if (call > 1) throw failure;
+        return firstReply;
+      }
+    })
+  });
+  return new AgentChatSessionManager(bundle);
+}
+
 describe('agent chat graph', () => {
+  it('keeps the conversation visible when a turn fails instead of blanking it', async () => {
+    const session = buildFailingSession(new AIMessage('Sure thing.'), new Error('400 status code (no body)'));
+    await session.sendMessage({ conversationId: 'c-fail', text: 'hi', modelId: 'qwen2.5-coder' });
+
+    const failed = await session.sendMessage({ conversationId: 'c-fail', text: 'and now?', modelId: 'qwen2.5-coder' });
+
+    expect(failed.status).toBe('error');
+    expect(failed.error).toContain('400 status code');
+    // The earlier exchange survives the failure — an empty transcript here read
+    // as "the whole conversation was lost" — and so does the turn that failed.
+    expect(failed.messages.map((message) => message.role)).toEqual(['user', 'assistant', 'user']);
+    expect(failed.messages[0]!.text).toBe('hi');
+    expect(failed.messages[2]!.text).toBe('and now?');
+  });
+
   it('answers directly when the model makes no tool calls', async () => {
     const session = buildSession([new AIMessage('Hello! How can I help?')]);
 

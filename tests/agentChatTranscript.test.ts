@@ -2,11 +2,21 @@ import { describe, expect, it } from 'vitest';
 
 import {
   describeAgentChatToolResult,
+  mergePendingUserMessage,
   parseAgentChatInline,
   parseAgentChatMarkdown
 } from '../src/renderer/src/agentChatTranscript';
 
 describe('Edit Agent transcript formatting', () => {
+  it('keeps the just-sent turn on screen when the failed turn was never recorded', () => {
+    const pending = { id: 'pending-1', role: 'user', text: 'add the clip' } as const;
+    const recorded = [{ id: 'm0', role: 'user', text: 'hi' } as const];
+
+    expect(mergePendingUserMessage(recorded, pending)).toEqual([...recorded, pending]);
+    // Already recorded by the graph: no duplicate row.
+    expect(mergePendingUserMessage([...recorded, { id: 'm1', role: 'user', text: 'add the clip' }], pending)).toHaveLength(2);
+  });
+
   it('renders the agent markdown the model actually writes instead of literal asterisks', () => {
     const blocks = parseAgentChatMarkdown(
       [

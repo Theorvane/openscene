@@ -9,6 +9,21 @@
  * summary with the full payload kept for an expandable detail view.
  */
 
+import type { AgentChatDisplayMessage } from '../../shared/agentChat';
+
+/**
+ * Keeps the user's turn on screen when a turn fails. The main process records
+ * a message only once the graph accepts it, so a provider error can come back
+ * with a transcript that never contains what was just typed.
+ */
+export function mergePendingUserMessage(
+  serverMessages: readonly AgentChatDisplayMessage[],
+  pending: AgentChatDisplayMessage
+): readonly AgentChatDisplayMessage[] {
+  const lastUserMessage = [...serverMessages].reverse().find((message) => message.role === 'user');
+  return lastUserMessage?.text === pending.text ? serverMessages : [...serverMessages, pending];
+}
+
 export type AgentChatInline =
   | { readonly kind: 'text'; readonly value: string }
   | { readonly kind: 'strong'; readonly value: string }

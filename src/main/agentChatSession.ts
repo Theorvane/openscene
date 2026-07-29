@@ -148,10 +148,17 @@ export class AgentChatSessionManager {
     };
   }
 
-  private errorState(conversationId: string, err: unknown): AgentChatTurnState {
+  /**
+   * A failed turn reports the error over the conversation that already exists —
+   * returning an empty transcript here made the panel blank the whole chat, so
+   * a single provider error looked like the conversation was lost.
+   */
+  private async errorState(conversationId: string, err: unknown): Promise<AgentChatTurnState> {
+    const snapshot = await this.graph.getState(this.runnableConfig(conversationId)).catch(() => null);
+    const messages = ((snapshot?.values as { messages?: BaseMessage[] } | undefined)?.messages ?? []) as BaseMessage[];
     return {
       conversationId,
-      messages: [],
+      messages: toDisplayMessages(messages),
       pendingApproval: null,
       status: 'error',
       error: err instanceof Error ? err.message : 'Agent chat failed unexpectedly.'

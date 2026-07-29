@@ -11,6 +11,7 @@ import {
   serializeReasoningEfforts,
   withReasoningEffort
 } from './reasoningEffortPreferences';
+import { mergePendingUserMessage } from './agentChatTranscript';
 import { useChatGptAuth } from './ChatGptAuthContext';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useLlmModel } from './LlmProviderContext';
@@ -123,6 +124,15 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   const sendMessage = async (text: string): Promise<void> => {
     if (text.trim().length === 0 || isBusy || !modelReady) return;
 
+    // Echo the turn immediately. The main-process round trip takes as long as
+    // the model does, so waiting for it leaves the panel looking like the
+    // message was dropped.
+    const pendingUserMessage: AgentChatDisplayMessage = {
+      id: `pending-user-${createConversationId()}`,
+      role: 'user',
+      text
+    };
+    setMessages((current) => [...current, pendingUserMessage]);
     setIsBusy(true);
     setError(undefined);
     setStatus('thinking');
@@ -142,11 +152,16 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
 
       if (response.ok) {
         restoredSeedRef.current = null;
-        setMessages(response.value.messages);
+        setMessages(
+          response.value.status === 'error'
+            ? mergePendingUserMessage(response.value.messages, pendingUserMessage)
+            : response.value.messages
+        );
         setPendingApproval(response.value.pendingApproval);
         setStatus(response.value.status);
         setError(response.value.error);
       } else {
+        // The echoed turn stays on screen so the error reads as a reply to it.
         setStatus('error');
         setError(response.error.message);
       }
