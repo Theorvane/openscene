@@ -4,7 +4,7 @@ import { isOpenAiAuthMode, isOpenAiCodexModelKey, resolveOpenAiAuthMode } from '
 
 describe('unified OpenAI auth mode selection', () => {
   it('recognises only the models the ChatGPT backend actually serves', () => {
-    // opencode's allow list, verbatim.
+    // Explicitly allowed ids.
     expect(isOpenAiCodexModelKey('openai/gpt-5.3-codex-spark')).toBe(true);
     expect(isOpenAiCodexModelKey('openai/gpt-5.4')).toBe(true);
     expect(isOpenAiCodexModelKey('openai/gpt-5.4-mini')).toBe(true);

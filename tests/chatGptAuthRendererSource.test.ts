@@ -26,7 +26,7 @@ describe('unified OpenAI provider renderer contract', () => {
     expect(source).not.toMatch(/accessToken|refreshToken|accountId|localStorage/);
   });
 
-  it('offers the opencode-style login-method step for providers with a sign-in', async () => {
+  it('offers the login-method step for providers with a sign-in', async () => {
     const [dialog, settings] = await Promise.all([
       readFile(SOURCE_URLS.dialog, 'utf8'),
       readFile(SOURCE_URLS.settings, 'utf8')

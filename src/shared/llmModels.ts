@@ -7,7 +7,7 @@ export type LlmModelCategory = 'editor-assistant' | 'video-prompt' | 'voice-scri
 export type LlmModelBadge = 'LOCAL' | 'FAST' | 'SMART' | 'REASONING';
 
 export interface LlmModelConfig {
-  /** Canonical opencode-style key: `providerId/modelId` for cloud, bare id for local. */
+  /** Canonical key: `providerId/modelId` for cloud, bare id for local. */
   readonly id: string;
   readonly providerId: LlmProviderId;
   readonly label: string;
@@ -71,7 +71,7 @@ function describeCloudModel(providerLabel: string, flags: { toolCall?: boolean; 
   return traits.length > 0 ? `${providerLabel} model with ${traits.join(', ')}.` : `${providerLabel} model.`;
 }
 
-/** Full opencode/models.dev catalog flattened into canonical `providerId/modelId` entries. */
+/** Full models.dev catalog flattened into canonical `providerId/modelId` entries. */
 export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
   ...LOCAL_LLM_MODELS,
   ...LLM_CATALOG.flatMap((provider) =>

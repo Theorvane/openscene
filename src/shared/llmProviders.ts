@@ -1,7 +1,7 @@
 import { LLM_CATALOG, type LlmCatalogProvider } from './llmCatalog.generated';
 
 /**
- * opencode-style provider registry: a provider is a source of models with its
+ * Provider registry: a provider is a source of models with its
  * own connection method. The local Ollama engine is always usable; every cloud
  * provider from the generated models.dev catalog connects by storing an API
  * key in main-process safe storage and stays listed (but disabled) until
@@ -124,7 +124,7 @@ export const LLM_PROVIDERS: readonly LlmProviderInfo[] = [
   ...MEDIA_PROVIDERS
 ];
 
-/** opencode-style popular shortlist shown before "Show all providers". */
+/** Popular shortlist shown before "Show all providers". */
 export const POPULAR_LLM_PROVIDER_IDS: readonly string[] = [
   'anthropic',
   'openai',

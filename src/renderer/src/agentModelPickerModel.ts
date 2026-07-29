@@ -32,7 +32,7 @@ export function isAgentModelLinked(input: {
 }
 
 /**
- * opencode behavior: list the local engine plus models from connected
+ * Picker rule: list the local engine plus models from connected
  * providers only — the full catalog would be thousands of disabled rows.
  * Visibility switches filter further, and the active model always stays listed
  * so the current selection is never orphaned (which also guarantees the picker

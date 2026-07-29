@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Compile the models.dev catalog (the same source opencode uses) into the
+ * Compile the models.dev catalog into the
  * compact generated provider/model catalog at src/shared/llmCatalog.generated.ts.
  *
  * Usage:
@@ -74,7 +74,7 @@ function adapterFor(provider) {
 
 function compactModel(model) {
   const limit = model.limit && Number.isFinite(model.limit.context) ? Math.round(model.limit.context / 1000) : undefined;
-  // opencode calls these "variants": the effort levels a reasoning model accepts.
+  // Also called "variants": the effort levels a reasoning model accepts.
   const effortOption = Array.isArray(model.reasoning_options)
     ? model.reasoning_options.find((option) => option?.type === 'effort' && Array.isArray(option.values))
     : undefined;
@@ -130,7 +130,7 @@ providers.sort((a, b) => {
 
 const modelCount = providers.reduce((sum, provider) => sum + provider.models.length, 0);
 const banner =
-  `/* AUTO-GENERATED from the models.dev catalog (the source opencode uses).\n` +
+  `/* AUTO-GENERATED from the models.dev catalog.\n` +
   ` * Do not edit by hand — regenerate with: node scripts/generateLlmCatalog.mjs\n` +
   ` * Providers: ${providers.length} · Models: ${modelCount}\n` +
   ` */\n`;
@@ -142,7 +142,7 @@ const body =
   `  readonly label: string;\n` +
   `  readonly toolCall?: boolean;\n` +
   `  readonly reasoning?: boolean;\n` +
-  `  /** Effort levels this model accepts (opencode's model \"variants\"). */\n` +
+  `  /** Effort levels this model accepts (its \"variants\"). */\n` +
   `  readonly efforts?: readonly string[];\n` +
   `  readonly vision?: boolean;\n` +
   `  readonly contextK?: number;\n` +

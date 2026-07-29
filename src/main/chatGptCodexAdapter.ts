@@ -64,8 +64,8 @@ export class ChatGptCodexAdapter {
           ...(request.systemPrompt ? { instructions: request.systemPrompt } : {}),
           input: request.prompt,
           // The ChatGPT backend answers only server-sent events and refuses
-          // server-side response storage; codex CLI and opencode send both
-          // fields on every call, and omitting either returns a bare 400.
+          // server-side response storage; both fields go on every call, and
+          // omitting either returns a bare 400.
           stream: true,
           store: false
         })

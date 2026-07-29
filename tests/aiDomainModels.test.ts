@@ -22,7 +22,7 @@ describe('AI domain model catalog', () => {
     // The Edit Agent keeps the local engine.
     const editAgentModels = getAvailableDomainModels('edit-agent');
     expect(editAgentModels[0]?.id).toBe('qwen2.5-coder');
-    // The full opencode/models.dev catalog contributes every tool-calling model.
+    // The full models.dev catalog contributes every tool-calling model.
     expect(editAgentModels.length).toBeGreaterThan(500);
     const ids = editAgentModels.map((model) => model.id);
     expect(ids).toContain('openai/gpt-5');

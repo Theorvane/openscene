@@ -5,7 +5,7 @@ export function isOpenAiAuthMode(value: unknown): value is OpenAiAuthMode {
 }
 
 /**
- * Reasoning effort — opencode calls this a model "variant". The accepted values
+ * Reasoning effort, also called a model "variant". The accepted values
  * come from the model's own catalog entry (e.g. none/low/medium/high/xhigh), and
  * `undefined` means the provider default.
  */
@@ -16,14 +16,14 @@ export type ChatGptOAuthStatus =
   | { readonly kind: 'disconnected' };
 
 /**
- * Models the ChatGPT Codex backend actually serves, mirroring opencode's rule:
+ * Models the ChatGPT Codex backend actually serves:
  * an explicit allow list, an explicit deny list, and otherwise only OpenAI
  * models newer than gpt-5.4. Anything else is rejected by the backend with a
  * bare 400, so it must never be offered on the sign-in transport.
  */
 const CHATGPT_ALLOWED_MODEL_IDS = new Set(['gpt-5.5', 'gpt-5.3-codex-spark', 'gpt-5.4', 'gpt-5.4-mini']);
-// opencode's snapshot also excludes the bare `gpt-5.6` id while admitting its
-// variants; we admit the whole 5.6 family and let the backend be the authority.
+// The bare `gpt-5.6` id is admitted along with its variants; the backend is
+// the authority on what it will actually run.
 const CHATGPT_DENIED_MODEL_IDS = new Set(['gpt-5.5-pro']);
 
 function isChatGptServedModelId(modelId: string): boolean {

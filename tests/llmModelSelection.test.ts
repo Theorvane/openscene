@@ -11,7 +11,7 @@ import { LLM_CATALOG } from '../src/shared/llmCatalog.generated';
 import { LLM_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, getLlmProvider, isProviderConnected } from '../src/shared/llmProviders';
 
 describe('LLM provider and model catalog configuration', () => {
-  it('imports the full opencode/models.dev catalog with unique canonical model keys', () => {
+  it('imports the full models.dev catalog with unique canonical model keys', () => {
     expect(LLM_CATALOG.length).toBeGreaterThanOrEqual(100);
     expect(DEFAULT_LLM_MODELS.length).toBeGreaterThanOrEqual(3000);
 

@@ -1,7 +1,7 @@
 import type { ReasoningEffort } from '../../shared/openAiAuth';
 
 /**
- * opencode-style model "variant" storage: the chosen reasoning effort is kept
+ * Per-model "variant" storage: the chosen reasoning effort is kept
  * per model key, and an absent entry means the provider default.
  */
 export const REASONING_EFFORT_STORAGE_KEY = 'openvideo-reasoning-effort-v1';

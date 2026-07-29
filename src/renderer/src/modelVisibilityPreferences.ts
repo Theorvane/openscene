@@ -1,5 +1,5 @@
 /**
- * opencode-style per-model visibility: every model is visible by default and
+ * Per-model visibility: every model is visible by default and
  * the Settings → Models switches persist only the hidden set locally. Keys are
  * `providerId:modelId` so the same model id under two providers stays distinct.
  */

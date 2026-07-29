@@ -4,7 +4,7 @@ import type { LlmProviderInfo } from '../../shared/llmProviders';
 import { Button } from './ui';
 
 /**
- * Optional second sign-in method for a provider (opencode's "Select login
+ * Optional second sign-in method for a provider (the "Select login
  * method" step). Today only OpenAI has one: ChatGPT Pro/Plus sign-in, which
  * unlocks the Codex model family alongside the API key.
  */
@@ -28,7 +28,7 @@ type ConnectState = 'idle' | 'saving' | 'error' | 'required';
 type DialogStep = 'method' | 'api-key' | 'oauth';
 
 /**
- * opencode-style connect dialog. Providers with a single method go straight to
+ * Connect dialog. Providers with a single method go straight to
  * the API-key form; providers that also support a sign-in method first show the
  * method picker. The key is write-only — it goes straight to main-process safe
  * storage and is never rendered back.

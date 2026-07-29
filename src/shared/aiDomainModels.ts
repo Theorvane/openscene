@@ -34,7 +34,7 @@ export type AiDomainModelConfig = {
   readonly availablePrecisions?: readonly string[];
   /** Model supports a reasoning-effort setting. */
   readonly reasoning?: boolean;
-  /** Effort levels this model accepts (opencode's model "variants"). */
+  /** Effort levels this model accepts (its "variants"). */
   readonly efforts?: readonly string[];
 };
 
@@ -299,7 +299,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     domains: ['edit-agent'],
     available: true
   },
-  // Every tool-calling model from the generated opencode/models.dev catalog is
+  // Every tool-calling model from the generated models.dev catalog is
   // an edit-agent candidate; the picker gates them on provider connection.
   ...LLM_CATALOG.flatMap((provider) =>
     provider.models

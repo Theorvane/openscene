@@ -17,7 +17,7 @@ type AgentModelPickerProps = {
 const POPOVER_WIDTH_PX = 300;
 
 /**
- * opencode-style model selector for the Edit Agent prompt bar: models grouped
+ * Model selector for the Edit Agent prompt bar: models grouped
  * by provider, connection state per provider, and cloud models listed only once
  * their provider is connected in Settings. The popover renders through a portal
  * because the chat panel and the prompt card both clip overflow.
@@ -33,7 +33,7 @@ export function AgentModelPicker({ reasoningEffort, onReasoningEffortChange }: A
   const [anchorStyle, setAnchorStyle] = useState<CSSProperties>({});
 
   const activeModel = selectedModel('edit-agent');
-  // opencode shows the variant control only for models that list effort levels.
+  // The variant control is offered only for models that list effort levels.
   const efforts = activeModel.efforts ?? [];
   const groups = buildAgentModelGroups({
     activeModelId: activeModel.id,

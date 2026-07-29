@@ -84,7 +84,7 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   // Transcript restored from history: sent along with the next message so the
   // main process can re-seed an empty (e.g. post-relaunch) conversation thread.
   const restoredSeedRef = useRef<readonly AgentChatDisplayMessage[] | null>(null);
-  // opencode stores the effort per model, so switching models keeps each choice.
+  // Effort is stored per model, so switching models keeps each choice.
   const [reasoningEfforts, setReasoningEfforts] = useState<Readonly<Record<string, ReasoningEffort>>>(() => {
     if (typeof window === 'undefined') return {};
     try {

@@ -1,4 +1,4 @@
-/* AUTO-GENERATED from the models.dev catalog (the source opencode uses).
+/* AUTO-GENERATED from the models.dev catalog.
  * Do not edit by hand — regenerate with: node scripts/generateLlmCatalog.mjs
  * Providers: 153 · Models: 4954
  */
@@ -8,7 +8,7 @@ export type LlmCatalogModel = {
   readonly label: string;
   readonly toolCall?: boolean;
   readonly reasoning?: boolean;
-  /** Effort levels this model accepts (opencode's model "variants"). */
+  /** Effort levels this model accepts (its "variants"). */
   readonly efforts?: readonly string[];
   readonly vision?: boolean;
   readonly contextK?: number;

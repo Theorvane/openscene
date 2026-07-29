@@ -21,7 +21,7 @@ const SETTINGS_SECTIONS = [
   { id: 'local-tools', title: 'Local Tools', description: 'Local runtime readiness for desktop capture, narration, and final export.' },
   { id: 'voice', title: 'Voice', description: 'Cloud voice generation boundaries and where its models are managed.' },
   { id: 'video', title: 'Video', description: 'Video model preference and local result import boundaries.' },
-  { id: 'providers', title: 'Providers', description: 'Connected providers and popular providers to connect, opencode-style.' },
+  { id: 'providers', title: 'Providers', description: 'Connected providers, and popular providers to connect.' },
   { id: 'models', title: 'Models', description: 'Search the model catalog and choose which models appear in pickers.' },
   { id: 'edit-agent', title: 'Edit Agent', description: 'Model preference for the persistent right-side agent.' },
   { id: 'shortcuts', title: 'Shortcuts', description: 'Timeline editor keyboard shortcut remapping.' },
@@ -46,7 +46,7 @@ type SettingsWorkspaceProps = {
   readonly onReplayFirstRunOnboarding: () => void;
 };
 
-// Cloud LLM provider rows derive from the shared opencode-style provider
+// Cloud LLM provider rows derive from the shared provider
 // registry; media-generation providers get their own subsection.
 const CLOUD_PROVIDERS: readonly LlmProviderInfo[] = LLM_PROVIDERS.filter(
   (provider) => provider.auth === 'api-key' && provider.credentialKey !== undefined && provider.adapter !== 'media'
@@ -59,7 +59,7 @@ function getSettingsSection(sectionId: SettingsSectionId): SettingsSection {
 const MODEL_ROW_RENDER_CAP = 250;
 
 /**
- * Grouped catalog for the opencode-style Models section. Without a search the
+ * Grouped catalog for the Models section. Without a search the
  * full ~4300-model catalog would swamp the DOM, so the default view shows the
  * local engine plus the popular providers; searching sweeps everything, with
  * rendered rows capped and the overflow reported.
@@ -442,7 +442,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
             {truncatedCount > 0 && (
               <p className="settings-list__note">{truncatedCount} more matching models — refine your search.</p>
             )}
-            <StatusCard tone="neutral">Switches control picker visibility only — a model becomes usable once its provider is connected in Settings → Providers. Without a search the local engine and popular providers are shown; searching sweeps the full opencode/models.dev catalog. The active selection always stays listed.</StatusCard>
+            <StatusCard tone="neutral">Switches control picker visibility only — a model becomes usable once its provider is connected in Settings → Providers. Without a search the local engine and popular providers are shown; searching sweeps the full models.dev catalog. The active selection always stays listed.</StatusCard>
           </>
         );
       }
