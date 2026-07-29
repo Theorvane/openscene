@@ -1,19 +1,11 @@
 import type {
   AbortRecordingInput,
-  AppendVoiceProfileSampleChunkInput,
-  DeleteVoiceProfileInput,
-  DiscardVoiceProfileSampleInput,
   AppendRecordingChunkInput,
   FinishRecordingInput,
-  FinalizeVoiceProfileSampleInput,
-  GetTtsJobInput,
   ResultActionInput,
-  StartTtsJobInput,
-  StartVoiceProfileSampleInput,
   SelectSourceInput,
   SourceAvailabilityInput,
   StartRecordingInput,
-  TtsJobActionInput
 } from './models';
 import type { AllowedAudioMimeType } from './models';
 
@@ -131,135 +123,6 @@ export function parseAppendRecordingChunkInput(value: unknown): AppendRecordingC
   }
 
   return { sessionId, sequence, chunk };
-}
-
-export function parseStartVoiceProfileSampleInput(value: unknown): StartVoiceProfileSampleInput | null {
-  if (!isPlainRecord(value)) {
-    return null;
-  }
-
-  const displayName = getTrimmedString(value, 'displayName', MAX_DISPLAY_NAME_LENGTH);
-  const explicitConsent = value.explicitConsent === true ? true : null;
-  const consentTextVersion = getTrimmedString(value, 'consentTextVersion', MAX_CONSENT_TEXT_VERSION_LENGTH);
-  const language = getLanguageTag(value, 'language');
-  const narrationScript = getTrimmedString(value, 'narrationScript', MAX_NARRATION_SCRIPT_LENGTH);
-  const mimeType = getAllowedAudioMimeType(value, 'mimeType');
-  if (
-    displayName === null ||
-    explicitConsent === null ||
-    consentTextVersion === null ||
-    language === null ||
-    narrationScript === null ||
-    mimeType === null
-  ) {
-    return null;
-  }
-
-  return {
-    displayName,
-    explicitConsent,
-    consentTextVersion,
-    language,
-    narrationScript,
-    mimeType
-  };
-}
-
-export function parseAppendVoiceProfileSampleChunkInput(value: unknown): AppendVoiceProfileSampleChunkInput | null {
-  if (!isPlainRecord(value)) {
-    return null;
-  }
-
-  const sampleId = getOpaqueId(value, 'sampleId');
-  const sequence = getNonNegativeInteger(value, 'sequence');
-  const chunk = getBoundedArrayBuffer(value, 'chunk', MAX_SAMPLE_CHUNK_BYTES);
-  if (sampleId === null || sequence === null || chunk === null) {
-    return null;
-  }
-
-  return { sampleId, sequence, chunk };
-}
-
-export function parseFinalizeVoiceProfileSampleInput(value: unknown): FinalizeVoiceProfileSampleInput | null {
-  if (!isPlainRecord(value)) {
-    return null;
-  }
-
-  const sampleId = getOpaqueId(value, 'sampleId');
-  const durationMs = getNonNegativeInteger(value, 'durationMs');
-  if (sampleId === null || durationMs === null) {
-    return null;
-  }
-
-  return { sampleId, durationMs };
-}
-
-export function parseDiscardVoiceProfileSampleInput(value: unknown): DiscardVoiceProfileSampleInput | null {
-  if (!isPlainRecord(value)) {
-    return null;
-  }
-
-  const sampleId = getOpaqueId(value, 'sampleId');
-  if (sampleId === null) {
-    return null;
-  }
-
-  return { sampleId };
-}
-
-export function parseDeleteVoiceProfileInput(value: unknown): DeleteVoiceProfileInput | null {
-  if (!isPlainRecord(value)) {
-    return null;
-  }
-
-  const voiceProfileId = getOpaqueId(value, 'voiceProfileId');
-  if (voiceProfileId === null) {
-    return null;
-  }
-
-  return { voiceProfileId };
-}
-
-export function parseStartTtsJobInput(value: unknown): StartTtsJobInput | null {
-  if (!isPlainRecord(value)) {
-    return null;
-  }
-
-  const voiceProfileId = getOpaqueId(value, 'voiceProfileId');
-  const script = getTrimmedString(value, 'script', MAX_TTS_SCRIPT_LENGTH);
-  const language = getLanguageTag(value, 'language');
-  const mimeType = getAllowedAudioMimeType(value, 'mimeType');
-  const modelIdValue = value.modelId;
-  const modelId =
-    modelIdValue === undefined ? undefined : getTrimmedString(value, 'modelId', MAX_MODEL_ID_LENGTH);
-  if (voiceProfileId === null || script === null || language === null || mimeType === null || modelId === null) {
-    return null;
-  }
-
-  return {
-    voiceProfileId,
-    script,
-    language,
-    mimeType,
-    ...(modelId === undefined ? {} : { modelId })
-  };
-}
-
-export function parseGetTtsJobInput(value: unknown): GetTtsJobInput | null {
-  if (!isPlainRecord(value)) {
-    return null;
-  }
-
-  const jobId = getOpaqueId(value, 'jobId');
-  if (jobId === null) {
-    return null;
-  }
-
-  return { jobId };
-}
-
-export function parseTtsJobActionInput(value: unknown): TtsJobActionInput | null {
-  return parseGetTtsJobInput(value);
 }
 
 export function parseFinishRecordingInput(value: unknown): FinishRecordingInput | null {

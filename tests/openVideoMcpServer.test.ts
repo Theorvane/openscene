@@ -38,60 +38,45 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     expect(toolNames).toContain('exportProjectVideo');
   });
 
-  it('executes createVideoJob MCP tool and returns job metadata', async () => {
+  it('executes createVideoJob MCP tool against the selected cloud model', async () => {
     const server = new OpenVideoMcpServer();
     const result = await server.createVideoJob({
       prompt: 'Cinematic intro shot of Seoul skyline',
       aspectRatio: '16:9',
       durationSeconds: 5,
-      mode: 'local'
+      modelId: 'sora-2'
     });
 
     expect(result.success).toBe(true);
     const okResult = result as { success: true; jobId: string; mode: string; provider: string };
     expect(okResult.jobId.length).toBeGreaterThan(0);
-    expect(okResult.mode).toBe('local');
-    expect(okResult.provider).toBe('local_video');
+    // Media generation is cloud-only; Ollama is the app's only local engine.
+    expect(okResult.mode).toBe('api');
+    expect(okResult.provider).toBe('openai_sora');
   });
 
-  it('rejects createVideoJob with api mode and returns not-implemented error', async () => {
+  it('rejects a video model whose adapter is not implemented', async () => {
     const server = new OpenVideoMcpServer();
-    const result = await server.createVideoJob({
+
+    await expect(server.createVideoJob({
       prompt: 'Cinematic intro shot of Seoul skyline',
-      mode: 'api',
-      apiKey: 'sk-test-valid-key-12345'
-    });
-
-    expect(result.success).toBe(false);
-    const errResult = result as { success: false; error: string };
-    expect(errResult.error).toContain('not yet implemented');
+      modelId: 'gen4_turbo'
+    })).rejects.toThrow('is not available for video-generation');
   });
 
-  it('rejects createSpeechJob with api mode and returns not-implemented error', async () => {
-    const server = new OpenVideoMcpServer();
-    const result = await server.createSpeechJob({
-      script: 'Hello from cloud speech',
-      mode: 'api',
-      apiKey: 'el-test-key-12345'
-    });
-
-    expect(result.success).toBe(false);
-    const errResult = result as { success: false; error: string };
-    expect(errResult.error).toContain('not yet implemented');
-  });
-
-  it('executes createSpeechJob MCP tool and returns speech job metadata', async () => {
+  it('executes createSpeechJob MCP tool against the selected cloud model', async () => {
     const server = new OpenVideoMcpServer();
     const result = await server.createSpeechJob({
       script: 'Welcome to OpenVideo desktop suite',
-      voiceId: 'qwen-narrator',
-      mode: 'local'
+      voiceId: '',
+      modelId: 'eleven_multilingual_v2'
     });
 
     expect(result.success).toBe(true);
-    const okResult = result as { success: true; jobId: string; mode: string };
+    const okResult = result as { success: true; jobId: string; mode: string; provider: string };
     expect(okResult.jobId.length).toBeGreaterThan(0);
-    expect(okResult.mode).toBe('local');
+    expect(okResult.mode).toBe('api');
+    expect(okResult.provider).toBe('elevenlabs');
   });
 
   it('returns a path-free read-only timeline summary only for an existing project', async () => {
@@ -354,7 +339,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
       prompt: 'Cinematic intro shot',
       aspectRatio: '16:9',
       durationSeconds: 5,
-      mode: 'local'
+      modelId: 'sora-2'
     });
     expect(jobResult.success).toBe(true);
     const okJobResult = jobResult as { success: true; jobId: string };

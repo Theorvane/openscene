@@ -55,16 +55,15 @@ export class OpenVideoMcpServer {
 
   @McpTool({
     description:
-      'Create an AI video generation job using a locally configured runner. ' +
-      'Only mode="local" is supported; cloud API providers (Gemini Veo, OpenAI Sora, Runway, Kling, Luma) ' +
-      'are not yet implemented and will return an error.',
+      'Create an AI video generation job with the selected video-generation model. ' +
+      'Generation runs against the connected provider API (Google Veo or OpenAI Sora); ' +
+      'the provider must be connected in Settings or the job fails with an explicit error.',
     input: z.object({
       prompt: z.string().min(1, 'Prompt is required'),
       aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
       durationSeconds: z.number().min(1).max(10).default(5),
       stylePreset: z.string().optional().default('Cinematic'),
-      mode: z.enum(['local', 'api']).default('local'),
-      provider: z.enum(['local_video', 'gemini_veo', 'openai_sora', 'runway_gen4', 'kling_v3', 'luma_dream']).optional(),
+      modelId: z.string().optional(),
       apiKey: z.string().optional()
     })
   })
@@ -73,25 +72,15 @@ export class OpenVideoMcpServer {
     aspectRatio?: '16:9' | '9:16' | '1:1';
     durationSeconds?: number;
     stylePreset?: string;
-    mode?: 'local' | 'api';
-    provider?: 'local_video' | 'gemini_veo' | 'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream';
+    modelId?: string;
     apiKey?: string;
   }) {
-    if (params.mode === 'api') {
-      return {
-        success: false,
-        error:
-          'Cloud API video generation is not yet implemented. ' +
-          'Use mode="local" with a configured local runner (VIDEO_TOOL_LOCAL_VIDEO_RUNNER_PATH).'
-      };
-    }
-
     const job = await createVideoGenerationJob({
       prompt: params.prompt,
       aspectRatio: params.aspectRatio ?? '16:9',
       durationSeconds: params.durationSeconds ?? 5,
       stylePreset: params.stylePreset ?? 'Cinematic',
-      mode: 'local'
+      ...(params.modelId === undefined ? {} : { modelId: params.modelId })
     });
 
     return {
@@ -106,34 +95,26 @@ export class OpenVideoMcpServer {
 
   @McpTool({
     description:
-      'Create an AI voiceover/speech synthesis job using the local Qwen TTS runner. ' +
-      'Only mode="local" is supported; ElevenLabs cloud API speech synthesis is not yet implemented.',
+      'Create an AI voiceover/speech synthesis job with the selected voice-generation model. ' +
+      'Generation runs against the connected provider API (ElevenLabs or OpenAI); ' +
+      'the provider must be connected in Settings or the job fails with an explicit error.',
     input: z.object({
       script: z.string().min(1, 'Script is required'),
-      voiceId: z.string().default('qwen-neutral'),
-      mode: z.enum(['local', 'api']).default('local'),
+      voiceId: z.string().default(''),
+      modelId: z.string().optional(),
       apiKey: z.string().optional()
     })
   })
   async createSpeechJob(params: {
     script: string;
     voiceId?: string;
-    mode?: 'local' | 'api';
+    modelId?: string;
     apiKey?: string;
   }) {
-    if (params.mode === 'api') {
-      return {
-        success: false,
-        error:
-          'ElevenLabs cloud speech synthesis is not yet implemented. ' +
-          'Use mode="local" with a configured Qwen TTS runner (VIDEO_TOOL_LOCAL_TTS_RUNNER_PATH).'
-      };
-    }
-
     const job = await createSpeechGenerationJob({
       script: params.script,
-      voiceId: params.voiceId ?? 'qwen-neutral',
-      mode: 'local'
+      voiceId: params.voiceId ?? '',
+      ...(params.modelId === undefined ? {} : { modelId: params.modelId })
     });
 
     return {

@@ -8,9 +8,8 @@ import { Button, StatusCard } from './ui';
 const STYLE_PRESETS = ['Cinematic', 'Anime', '3D Render', 'Photorealistic', 'Cyberpunk', 'Film Noir'] as const;
 const ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const;
 
-/** Duration choices per engine: Sora accepts 4/8/12s, Veo 4–8s, local is free. */
-function durationOptionsFor(providerId: string, executionPath: 'local' | 'api'): readonly number[] {
-  if (executionPath === 'local') return [3, 5, 10];
+/** Duration choices per engine: Sora accepts 4/8/12s, Veo 4–8s. */
+function durationOptionsFor(providerId: string): readonly number[] {
   if (providerId === 'openai') return [4, 8, 12];
   if (providerId === 'google_gemini') return [4, 6, 8];
   return [4, 8];
@@ -19,12 +18,11 @@ function durationOptionsFor(providerId: string, executionPath: 'local' | 'api'):
 export function VideoGenerationWorkspace(): ReactElement {
   const { selectedModel } = useAiDomainModel();
   const videoModel = selectedModel('video-generation');
-  const isCloudModel = videoModel.executionPath === 'api';
   const { importAiResult } = useProjectResultImport();
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [durationSeconds, setDurationSeconds] = useState<number>(5);
-  const durationOptions = durationOptionsFor(videoModel.providerId, videoModel.executionPath);
+  const durationOptions = durationOptionsFor(videoModel.providerId);
   // Switching engines keeps the chosen length when valid, else the closest option.
   const effectiveDuration = durationOptions.includes(durationSeconds)
     ? durationSeconds
@@ -36,7 +34,7 @@ export function VideoGenerationWorkspace(): ReactElement {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ text: string; tone: 'neutral' | 'success' | 'warning' | 'danger' }>({
-    text: 'Ready to generate AI video. Configure your local runner to begin.',
+    text: 'Ready to generate AI video. Connect a video provider in Settings → Providers to begin.',
     tone: 'neutral'
   });
 
@@ -47,7 +45,7 @@ export function VideoGenerationWorkspace(): ReactElement {
     }
 
     setIsGenerating(true);
-    setStatusMsg({ text: isCloudModel ? `Submitting ${videoModel.providerLabel} cloud job...` : 'Submitting Local AI Engine job...', tone: 'neutral' });
+    setStatusMsg({ text: `Submitting ${videoModel.providerLabel} cloud job...`, tone: 'neutral' });
 
     try {
       const response = await window.videoTool.aiGenerateVideo({
@@ -55,7 +53,6 @@ export function VideoGenerationWorkspace(): ReactElement {
         aspectRatio,
         durationSeconds: effectiveDuration,
         stylePreset: selectedStyle,
-        mode: isCloudModel ? 'api' : 'local',
         modelId: videoModel.id
       });
 
@@ -108,7 +105,7 @@ export function VideoGenerationWorkspace(): ReactElement {
         <div>
           <p className="section-kicker">AI Studio</p>
           <h2>AI Video Generation</h2>
-          <span className="ai-workspace__subtitle">{isCloudModel ? `Synthesize videos with ${videoModel.providerLabel} (${videoModel.label})` : 'Synthesize videos using a locally configured AI runner'}</span>
+          <span className="ai-workspace__subtitle">Synthesize videos with {videoModel.providerLabel} ({videoModel.label})</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '280px' }}>
           <AiDomainModelSelector domain="video-generation" label="Video model" />
@@ -119,8 +116,8 @@ export function VideoGenerationWorkspace(): ReactElement {
         {/* Controls Column */}
         <div className="ai-workspace__form-panel">
           <div className="local-status-banner">
-            <span className="banner-title">{isCloudModel ? `☁️ ${videoModel.providerLabel} Cloud Generation` : '💻 Local AI Video Diffusion Pipeline'}</span>
-            <p className="banner-desc">{isCloudModel ? 'Your prompt is sent to the connected provider API; the finished video downloads back into local storage.' : 'Runs video synthesis model on your GPU/CPU. No cloud upload required.'}</p>
+            <span className="banner-title">☁️ {videoModel.providerLabel} Cloud Generation</span>
+            <p className="banner-desc">Your prompt is sent to the connected provider API; the finished video downloads back into local storage.</p>
           </div>
 
           {/* Prompt Input */}
@@ -192,7 +189,7 @@ export function VideoGenerationWorkspace(): ReactElement {
             disabled={isGenerating}
             style={{ width: '100%', marginTop: 'var(--space-4)', padding: 'var(--space-3)' }}
           >
-            {isGenerating ? '✨ Generating Video...' : isCloudModel ? `✨ Generate with ${videoModel.providerLabel}` : '✨ Generate Local Video'}
+            {isGenerating ? '✨ Generating Video...' : `✨ Generate with ${videoModel.providerLabel}`}
           </Button>
 
           <StatusCard tone={statusMsg.tone} style={{ marginTop: 'var(--space-3)' }}>
@@ -210,7 +207,7 @@ export function VideoGenerationWorkspace(): ReactElement {
               {jobs.map((job) => (
                 <div key={job.id} className="job-card">
                   <div className="job-card__header">
-                    <span className={`mode-badge mode-badge--${job.mode}`}>{job.mode === 'local' ? 'LOCAL' : 'CLOUD API'}</span>
+                    <span className="mode-badge mode-badge--api">CLOUD API</span>
                     <span className="job-card__provider">{job.provider}</span>
                     <span className={`job-status-pill job-status-pill--${job.status}`}>{job.status}</span>
                   </div>

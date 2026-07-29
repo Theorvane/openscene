@@ -16,8 +16,8 @@ export type CompletedResultAssetSource = {
 export type ResultAssetImportDependencies = {
   readonly assets: AssetLibraryStore;
   readonly resolveRecordingSource: (sessionId: string) => CompletedResultAssetSource | null;
-  readonly resolveTtsSource: (jobId: string) => CompletedResultAssetSource | null;
-  readonly resolveAiSource?: (jobId: string) => CompletedResultAssetSource | null;
+  /** Completed cloud voice/video generation jobs. */
+  readonly resolveAiSource: (jobId: string) => CompletedResultAssetSource | null;
 };
 
 function inputFromSource(projectId: string, source: CompletedResultAssetSource) {
@@ -45,28 +45,16 @@ export class ResultAssetImportService {
     return this.importResult(input, source, 'The completed recording result could not be imported.');
   }
 
-  async importTtsResult(payload: unknown): Promise<ApiResponse<ImportProjectAssetsResult>> {
-    const input = parseImportTtsResultAssetInput(payload);
-    if (input === null) {
-      return fail('INVALID_INPUT', 'The TTS result import payload was not valid.');
-    }
-    const source = this.dependencies.resolveTtsSource(input.jobId);
-    if (source === null) {
-      return fail('TTS_RESULT_UNAVAILABLE', 'The completed TTS result is not available.');
-    }
-    return this.importResult(input, source, 'The completed TTS result could not be imported.');
-  }
-
   async importAiResult(payload: unknown): Promise<ApiResponse<ImportProjectAssetsResult>> {
     const input = parseImportTtsResultAssetInput(payload);
     if (input === null) {
       return fail('INVALID_INPUT', 'The AI result import payload was not valid.');
     }
-    const source = (this.dependencies.resolveAiSource ? this.dependencies.resolveAiSource(input.jobId) : null) ?? this.dependencies.resolveTtsSource(input.jobId);
+    const source = this.dependencies.resolveAiSource(input.jobId);
     if (source === null) {
-      return fail('TTS_RESULT_UNAVAILABLE', 'The completed AI video result is not available.');
+      return fail('TTS_RESULT_UNAVAILABLE', 'The completed AI generation result is not available.');
     }
-    return this.importResult(input, source, 'The completed AI video result could not be imported.');
+    return this.importResult(input, source, 'The completed AI generation result could not be imported.');
   }
 
   private async importResult(

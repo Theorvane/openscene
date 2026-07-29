@@ -16,7 +16,8 @@ describe('domain generation studio wiring', () => {
     expect(voice).toContain('domain="voice-generation"');
     expect(voice).toContain("useAiDomainModel()");
     expect(voice).toContain("selectedModel('voice-generation')");
-    expect(voice).toContain('narration.startTtsJob(voiceModel.id)');
+    // Voice generation is cloud-only now; the selected model drives the job.
+    expect(voice).toContain('modelId: voiceModel.id');
     expect(video).toContain('modelId: videoModel.id');
     expect(video).not.toContain('LlmModelSelectorBar');
     expect(voice).not.toContain('LlmModelSelectorBar');

@@ -32,13 +32,13 @@ describe('completed result asset import service', () => {
         resolveRecordingSource: (sessionId) => sessionId === 'session_01'
           ? { sourcePath: recordingPath, displayName: 'recording.webm', kind: 'video', mimeType: 'video/webm' }
           : null,
-        resolveTtsSource: (jobId) => jobId === 'job_01'
+        resolveAiSource: (jobId: string) => jobId === 'job_01'
           ? { sourcePath: ttsPath, displayName: 'speech.wav', kind: 'audio', mimeType: 'audio/wav' }
           : null
       });
 
       const importedRecording = await service.importRecordingResult({ projectId: project.id, sessionId: 'session_01' });
-      const importedTts = await service.importTtsResult({ projectId: project.id, jobId: 'job_01' });
+      const importedTts = await service.importAiResult({ projectId: project.id, jobId: 'job_01' });
 
       if (!importedRecording.ok || !importedTts.ok) {
         throw new Error('Expected both result imports to succeed.');
@@ -64,16 +64,16 @@ describe('completed result asset import service', () => {
       const service = new ResultAssetImportService({
         assets: new AssetLibraryStore(root, projects),
         resolveRecordingSource: resolver,
-        resolveTtsSource: resolver
+        resolveAiSource: resolver
       });
 
       await expect(service.importRecordingResult({ projectId: project.id, sessionId: 'session_01', outputPath: '/tmp/take.webm' })).resolves.toEqual({
         ok: false,
         error: { code: 'INVALID_INPUT', message: 'The recording result import payload was not valid.' }
       });
-      await expect(service.importTtsResult({ projectId: project.id, jobId: 'job_01', sourcePath: '/tmp/speech.wav' })).resolves.toEqual({
+      await expect(service.importAiResult({ projectId: project.id, jobId: 'job_01', sourcePath: '/tmp/speech.wav' })).resolves.toEqual({
         ok: false,
-        error: { code: 'INVALID_INPUT', message: 'The TTS result import payload was not valid.' }
+        error: { code: 'INVALID_INPUT', message: 'The AI result import payload was not valid.' }
       });
       expect(resolverCalls).toBe(0);
     });
@@ -87,14 +87,14 @@ describe('completed result asset import service', () => {
       const service = new ResultAssetImportService({
         assets: new AssetLibraryStore(root, projects),
         resolveRecordingSource: () => null,
-        resolveTtsSource: () => ({ sourcePath: join(directory, 'missing.wav'), displayName: 'missing.wav', kind: 'audio', mimeType: 'audio/wav' })
+        resolveAiSource: () => ({ sourcePath: join(directory, 'missing.wav'), displayName: 'missing.wav', kind: 'audio', mimeType: 'audio/wav' })
       });
 
       const missingRecording = await service.importRecordingResult({ projectId: project.id, sessionId: 'missing_session' });
-      const missingTtsFile = await service.importTtsResult({ projectId: project.id, jobId: 'job_01' });
+      const missingTtsFile = await service.importAiResult({ projectId: project.id, jobId: 'job_01' });
 
       expect(missingRecording).toEqual({ ok: false, error: { code: 'SESSION_NOT_FOUND', message: 'The completed recording result is not available.' } });
-      expect(missingTtsFile).toEqual({ ok: false, error: { code: 'FILE_WRITE_FAILED', message: 'The completed TTS result could not be imported.' } });
+      expect(missingTtsFile).toEqual({ ok: false, error: { code: 'FILE_WRITE_FAILED', message: 'The completed AI generation result could not be imported.' } });
       expect((await projects.open(project.id))?.assets).toEqual([]);
     });
   });

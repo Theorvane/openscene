@@ -10,8 +10,6 @@ export type AiDomainProvider = {
 
 export const AI_DOMAIN_PROVIDERS: readonly AiDomainProvider[] = [
   { id: 'local_ollama', label: 'Ollama', executionPath: 'local' },
-  { id: 'local_qwen', label: 'Local Engine', executionPath: 'local' },
-  { id: 'local_video', label: 'Local Engine', executionPath: 'local' },
   { id: 'openai', label: 'OpenAI', executionPath: 'api' },
   { id: 'anthropic', label: 'Anthropic', executionPath: 'api' },
   { id: 'google_gemini', label: 'Google Gemini', executionPath: 'api' },
@@ -41,18 +39,6 @@ export type AiDomainModelPreferences = Record<AiDomain, string>;
 export const AI_DOMAIN_MODEL_STORAGE_KEY = 'openvideo-ai-domain-model-preferences-v1';
 
 const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
-  {
-    id: 'local-qwen-tts',
-    providerId: 'local_qwen',
-    label: 'Qwen Speech Synthesis',
-    providerLabel: 'Local Engine',
-    description: 'User-configured local Qwen speech synthesis runner.',
-    executionPath: 'local',
-    precisionBit: '16-bit',
-    availablePrecisions: ['8-bit', '16-bit', 'FP32'],
-    domains: ['voice-generation'],
-    available: true
-  },
   // ── Voice generation: cloud TTS models. ElevenLabs and OpenAI adapters are
   // implemented; the rest stay honestly unavailable until an adapter lands.
   {
@@ -157,18 +143,6 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     domains: ['voice-generation'],
     available: false,
     unavailableReason: 'Groq PlayAI TTS adapter is not implemented in this build.'
-  },
-  {
-    id: 'local-video-runner',
-    providerId: 'local_video',
-    label: 'Video Synthesis Runner',
-    providerLabel: 'Local Engine',
-    description: 'User-configured local video synthesis runner.',
-    executionPath: 'local',
-    precisionBit: 'FP16',
-    availablePrecisions: ['8-bit (Q8_0)', 'FP16', 'FP32'],
-    domains: ['video-generation'],
-    available: true
   },
   // ── Video generation: cloud models. Veo (Gemini API) and Sora (OpenAI API)
   // adapters are implemented; the rest stay honestly unavailable.
@@ -343,7 +317,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
 const AI_DOMAINS: readonly AiDomain[] = ['voice-generation', 'video-generation', 'edit-agent'];
 
 export function formatAiModelOptionLabel(model: AiDomainModelConfig): string {
-  const isZen = model.id === 'qwen2.5-coder' || model.id === 'local-video-runner' || model.id === 'local-qwen-tts';
+  const isZen = model.id === 'qwen2.5-coder';
   const prefix = isZen ? '★ ' : '';
   const statusSuffix = model.available ? '' : ' (Unavailable)';
   return `${prefix}${model.providerLabel} → ${model.label}${statusSuffix}`;

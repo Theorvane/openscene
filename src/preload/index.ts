@@ -8,28 +8,16 @@ import type {
   ApiResponse,
   AppSettings,
   AppendRecordingChunkInput,
-  AppendVoiceProfileSampleChunkInput,
   CaptureSource,
   ChunkAck,
-  DeleteVoiceProfileInput,
-  DiscardVoiceProfileSampleInput,
   FinishRecordingInput,
-  FinalizeVoiceProfileSampleInput,
-  GetTtsJobInput,
-  LocalTtsJob,
-  LocalTtsRuntimeStatus,
   RecordingResult,
   RecordingSession,
   ResultActionInput,
   SelectSourceInput,
   SourceAvailability,
   SourceAvailabilityInput,
-  StartRecordingInput,
-  StartTtsJobInput,
-  StartVoiceProfileSampleInput,
-  TtsJobActionInput,
-  VoiceProfile,
-  VoiceProfileSampleSession
+  StartRecordingInput
 } from '../shared/models';
 import type {
   CreateProjectInput,
@@ -38,7 +26,6 @@ import type {
   GetAssetPlaybackUrlInput,
   ImportProjectAssetsInput,
   ImportRecordingResultAssetInput,
-  ImportTtsResultAssetInput,
   LocalProjectSnapshot,
   LocalProjectSummary,
   MediaAsset,
@@ -82,17 +69,6 @@ export interface VideoToolApi {
   abortRecording(input: AbortRecordingInput): Promise<ApiResponse<{ aborted: boolean }>>;
   openResult(input: ResultActionInput): Promise<ApiResponse<{ opened: boolean }>>;
   revealResult(input: ResultActionInput): Promise<ApiResponse<{ revealed: boolean }>>;
-  listVoiceProfiles(): Promise<ApiResponse<VoiceProfile[]>>;
-  startVoiceProfile(input: StartVoiceProfileSampleInput): Promise<ApiResponse<VoiceProfileSampleSession>>;
-  appendVoiceProfile(input: AppendVoiceProfileSampleChunkInput): Promise<ApiResponse<ChunkAck>>;
-  finalizeVoiceProfile(input: FinalizeVoiceProfileSampleInput): Promise<ApiResponse<VoiceProfile>>;
-  discardVoiceProfile(input: DiscardVoiceProfileSampleInput): Promise<ApiResponse<{ discarded: boolean }>>;
-  deleteVoiceProfile(input: DeleteVoiceProfileInput): Promise<ApiResponse<{ deleted: boolean }>>;
-  getTtsRuntimeStatus(): Promise<ApiResponse<LocalTtsRuntimeStatus>>;
-  startTtsJob(input: StartTtsJobInput): Promise<ApiResponse<LocalTtsJob>>;
-  getTtsJob(input: GetTtsJobInput): Promise<ApiResponse<LocalTtsJob>>;
-  openTtsResult(input: TtsJobActionInput): Promise<ApiResponse<{ opened: boolean }>>;
-  revealTtsResult(input: TtsJobActionInput): Promise<ApiResponse<{ revealed: boolean }>>;
   listProjects(): Promise<ApiResponse<readonly LocalProjectSummary[]>>;
   createProject(input: CreateProjectInput): Promise<ApiResponse<CreateProjectResult>>;
   openProject(input: OpenProjectInput): Promise<ApiResponse<LocalProjectSnapshot>>;
@@ -100,7 +76,6 @@ export interface VideoToolApi {
   deleteProject(input: DeleteProjectInput): Promise<ApiResponse<{ readonly deleted: boolean }>>;
   importProjectAssets(input: ImportProjectAssetsInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
   importRecordingResultAsset(input: ImportRecordingResultAssetInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
-  importTtsResultAsset(input: ImportTtsResultAssetInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
   importAiResultAsset(input: { projectId: string; jobId: string }): Promise<ApiResponse<ImportProjectAssetsResult>>;
   updateAssetMetadata(input: UpdateAssetMetadataInput): Promise<ApiResponse<MediaAsset>>;
   getAssetPlaybackUrl(input: GetAssetPlaybackUrlInput): Promise<ApiResponse<AssetPlaybackUrl>>;
@@ -161,23 +136,6 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.abortRecording, input) as Promise<ApiResponse<{ aborted: boolean }>>,
   openResult: (input) => ipcRenderer.invoke(IPC_CHANNELS.openResult, input) as Promise<ApiResponse<{ opened: boolean }>>,
   revealResult: (input) => ipcRenderer.invoke(IPC_CHANNELS.revealResult, input) as Promise<ApiResponse<{ revealed: boolean }>>,
-  listVoiceProfiles: () => ipcRenderer.invoke(IPC_CHANNELS.voiceProfilesList) as Promise<ApiResponse<VoiceProfile[]>>,
-  startVoiceProfile: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.voiceProfilesStart, input) as Promise<ApiResponse<VoiceProfileSampleSession>>,
-  appendVoiceProfile: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.voiceProfilesAppend, input) as Promise<ApiResponse<ChunkAck>>,
-  finalizeVoiceProfile: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.voiceProfilesFinalize, input) as Promise<ApiResponse<VoiceProfile>>,
-  discardVoiceProfile: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.voiceProfilesDiscard, input) as Promise<ApiResponse<{ discarded: boolean }>>,
-  deleteVoiceProfile: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.voiceProfilesDelete, input) as Promise<ApiResponse<{ deleted: boolean }>>,
-  getTtsRuntimeStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getTtsRuntimeStatus) as Promise<ApiResponse<LocalTtsRuntimeStatus>>,
-  startTtsJob: (input) => ipcRenderer.invoke(IPC_CHANNELS.startTtsJob, input) as Promise<ApiResponse<LocalTtsJob>>,
-  getTtsJob: (input) => ipcRenderer.invoke(IPC_CHANNELS.getTtsJob, input) as Promise<ApiResponse<LocalTtsJob>>,
-  openTtsResult: (input) => ipcRenderer.invoke(IPC_CHANNELS.openTtsResult, input) as Promise<ApiResponse<{ opened: boolean }>>,
-  revealTtsResult: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.revealTtsResult, input) as Promise<ApiResponse<{ revealed: boolean }>>,
   listProjects: () => ipcRenderer.invoke(IPC_CHANNELS.projectsList) as Promise<ApiResponse<readonly LocalProjectSummary[]>>,
   createProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsCreate, input) as Promise<ApiResponse<CreateProjectResult>>,
   openProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsOpen, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
@@ -187,8 +145,6 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.projectAssetsImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,
   importRecordingResultAsset: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.projectRecordingResultImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,
-  importTtsResultAsset: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.projectTtsResultImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,
   importAiResultAsset: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.projectAiResultImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,
   updateAssetMetadata: (input) =>

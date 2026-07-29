@@ -19,7 +19,7 @@ import { classNames } from './ui/classNames';
 const SETTINGS_SECTIONS = [
   { id: 'appearance', title: 'Appearance', description: 'Theme mode and command desk presets.' },
   { id: 'local-tools', title: 'Local Tools', description: 'Local runtime readiness for desktop capture, narration, and final export.' },
-  { id: 'voice', title: 'Voice', description: 'Voice model preference and consent-based local narration boundaries.' },
+  { id: 'voice', title: 'Voice', description: 'Cloud voice generation boundaries and where its models are managed.' },
   { id: 'video', title: 'Video', description: 'Video model preference and local result import boundaries.' },
   { id: 'providers', title: 'Providers', description: 'Connected providers and popular providers to connect, opencode-style.' },
   { id: 'models', title: 'Models', description: 'Search the model catalog and choose which models appear in pickers.' },
@@ -206,14 +206,14 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
         return (
           <>
             <StatusCard tone={ffmpegView.tone}>{ffmpegView.text}</StatusCard>
-            <MetadataList items={[{ term: 'Screen permission', description: 'Checked by the recorder when capture starts.' }, { term: 'Local Qwen', description: 'User-configured runtime only; no model download is bundled.' }]} />
+            <MetadataList items={[{ term: 'Screen permission', description: 'Checked by the recorder when capture starts.' }, { term: 'Ollama', description: 'The only local engine; it serves the Edit Agent and needs no bundled download.' }]} />
           </>
         );
       case 'voice':
         return (
           <>
             <StatusCard tone="neutral">Voice generation models are managed inside the Voice Generation workspace; connect ElevenLabs or another media provider under Providers to unlock cloud synthesis.</StatusCard>
-            <StatusCard tone="neutral">Voice samples must be user-owned or authorized, stored locally, and deletable from local app storage.</StatusCard>
+            <StatusCard tone="neutral">Scripts are sent to the connected voice provider only when you generate; generated audio is written to local app storage.</StatusCard>
           </>
         );
       case 'video':

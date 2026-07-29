@@ -9,7 +9,6 @@ import { registerCaptureIpcHandlers } from './captureIpcHandlers';
 import { ExportIpcService } from './exportIpcService';
 import { registerExportIpcHandlers } from './exportIpcHandlers';
 import { ExportJobStore } from './exportJobStore';
-import { LocalTtsJobStore } from './localTtsJobStore';
 import { ProjectLocationRegistry } from './projectLocations';
 import { ProjectStore } from './projectStore';
 import { RecordingFileStore } from './recordingStore';
@@ -18,9 +17,6 @@ import { ResultAssetImportService } from './resultAssetImportService';
 import { registerTimelineAssetProtocol, registerTimelineAssetScheme } from './timelineAssetProtocol';
 import { registerTimelineIpcHandlers } from './timelineIpcHandlers';
 import { TimelineIpcService } from './timelineIpcService';
-import { registerVoiceTtsIpcHandlers } from './voiceTtsIpcHandlers';
-import { VoiceProfileStore } from './voiceProfileStore';
-import { VoiceTtsIpcService } from './voiceTtsIpcService';
 import { resolvePreloadScriptPath } from './preloadPath';
 import { fail, ok } from './ipcResponses';
 import { IPC_CHANNELS } from '../shared/ipc';
@@ -49,8 +45,6 @@ const recordingStore = new RecordingFileStore(resolveRecordingsDirectory());
 const projectLocations = new ProjectLocationRegistry(join(app.getPath('userData'), 'project-locations.json'));
 const projectStore = new ProjectStore(join(app.getPath('userData'), 'projects'), projectLocations);
 const assetLibraryStore = new AssetLibraryStore(join(app.getPath('userData'), 'projects'), projectStore);
-const voiceProfileStore = new VoiceProfileStore(join(app.getPath('userData'), 'voice-profiles'));
-const ttsJobStore = new LocalTtsJobStore();
 const exportJobStore = new ExportJobStore();
 const credentialStore = new CredentialStore(app.getPath('userData'));
 const chatGptOAuthService = new ChatGptOAuthService(app.getPath('userData'), {
@@ -74,13 +68,6 @@ const timelineIpcService = new TimelineIpcService({
     properties: ['openDirectory', 'createDirectory']
   })
 });
-const voiceTtsService = new VoiceTtsIpcService({
-  voiceProfiles: voiceProfileStore,
-  ttsJobs: ttsJobStore,
-  audioRoot: join(app.getPath('userData'), 'tts-audio'),
-  openPath: (path) => shell.openPath(path),
-  revealPath: (path) => shell.showItemInFolder(path)
-});
 const resultAssetImportService = new ResultAssetImportService({
   assets: assetLibraryStore,
   resolveRecordingSource: (sessionId) => {
@@ -89,7 +76,7 @@ const resultAssetImportService = new ResultAssetImportService({
       ? null
       : { sourcePath: result.outputPath, displayName: result.fileName, kind: 'video', mimeType: 'video/webm' };
   },
-  resolveTtsSource: (jobId) => voiceTtsService.getCompletedAudioSource(jobId) ?? getCompletedAiSource(jobId)
+  resolveAiSource: (jobId) => getCompletedAiSource(jobId)
 });
 const exportIpcService = new ExportIpcService({
   projects: projectStore,
@@ -242,7 +229,6 @@ async function installIpcHandlers(): Promise<void> {
     listWindowSources,
     isSourceStillAvailable
   });
-  registerVoiceTtsIpcHandlers(ipcMain, voiceTtsService);
   registerTimelineIpcHandlers(ipcMain, timelineIpcService);
   registerResultAssetImportHandlers(ipcMain, resultAssetImportService);
   registerExportIpcHandlers(ipcMain, exportIpcService);

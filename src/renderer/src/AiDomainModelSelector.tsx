@@ -34,7 +34,7 @@ export function AiDomainModelSelector({ domain, label, description }: AiDomainMo
   const activeModel = selectedModel(domain);
   const descriptionId = `${domain}-model-description`;
   const isLocal = activeModel.executionPath === 'local';
-  const isZenModel = activeModel.id === 'qwen2.5-coder' || activeModel.id === 'local-video-runner' || activeModel.id === 'local-qwen-tts';
+  const isZenModel = activeModel.id === 'qwen2.5-coder';
 
   const defaultSpecOptions = isLocal
     ? (activeModel.availablePrecisions ?? ['4-bit (Q4_K_M)', '8-bit (Q8_0)', '16-bit (FP16)'])

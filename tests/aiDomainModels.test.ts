@@ -9,14 +9,17 @@ import {
 
 describe('AI domain model catalog', () => {
   it('exposes an independent available local model for each AI domain', () => {
-    const voiceModels = getAvailableDomainModels('voice-generation').map((model) => model.id);
-    expect(voiceModels[0]).toBe('local-qwen-tts');
-    expect(voiceModels).toContain('eleven_multilingual_v2');
-    expect(voiceModels).toContain('gpt-4o-mini-tts');
-    const videoModels = getAvailableDomainModels('video-generation').map((model) => model.id);
-    expect(videoModels[0]).toBe('local-video-runner');
-    expect(videoModels).toContain('veo-3.0-generate-001');
-    expect(videoModels).toContain('sora-2');
+    // Media generation is cloud-only; Ollama is the app's only local engine and
+    // serves the Edit Agent.
+    const voiceModels = getAvailableDomainModels('voice-generation');
+    expect(voiceModels.every((model) => model.executionPath === 'api')).toBe(true);
+    expect(voiceModels.map((model) => model.id)).toContain('eleven_multilingual_v2');
+    expect(voiceModels.map((model) => model.id)).toContain('gpt-4o-mini-tts');
+    const videoModels = getAvailableDomainModels('video-generation');
+    expect(videoModels.every((model) => model.executionPath === 'api')).toBe(true);
+    expect(videoModels.map((model) => model.id)).toContain('veo-3.0-generate-001');
+    expect(videoModels.map((model) => model.id)).toContain('sora-2');
+    // The Edit Agent keeps the local engine.
     const editAgentModels = getAvailableDomainModels('edit-agent');
     expect(editAgentModels[0]?.id).toBe('qwen2.5-coder');
     // The full opencode/models.dev catalog contributes every tool-calling model.
@@ -32,20 +35,20 @@ describe('AI domain model catalog', () => {
   });
 
   it('never resolves a model from another domain', () => {
-    expect(getDomainModel('edit-agent', 'local-video-runner')).toBeUndefined();
+    expect(getDomainModel('edit-agent', 'sora-2')).toBeUndefined();
     expect(getDomainModel('voice-generation', 'qwen2.5-coder')).toBeUndefined();
   });
 
   it('normalizes stale, unavailable, and cross-domain selections to each domain default', () => {
     expect(
       parseAiDomainModelPreferences({
-        'voice-generation': 'gemini-veo',
-        'video-generation': 'local-qwen-tts',
+        'voice-generation': 'sora-2',
+        'video-generation': 'eleven_multilingual_v2',
         'edit-agent': 'unknown-model'
       })
     ).toEqual({
-      'voice-generation': 'local-qwen-tts',
-      'video-generation': 'local-video-runner',
+      'voice-generation': 'eleven_v3',
+      'video-generation': 'veo-3.1-generate-preview',
       'edit-agent': 'qwen2.5-coder'
     });
   });
@@ -61,9 +64,11 @@ describe('AI domain model catalog', () => {
   });
 
   it('uses independent default selections for every domain', () => {
+    // Media domains default to their first available cloud model; the Edit
+    // Agent keeps the local Ollama engine.
     expect(parseAiDomainModelPreferences(null)).toEqual({
-      'voice-generation': 'local-qwen-tts',
-      'video-generation': 'local-video-runner',
+      'voice-generation': 'eleven_v3',
+      'video-generation': 'veo-3.1-generate-preview',
       'edit-agent': 'qwen2.5-coder'
     });
   });
