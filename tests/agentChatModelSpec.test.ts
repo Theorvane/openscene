@@ -78,13 +78,18 @@ describe('agent chat model provider resolution', () => {
     const config = resolveChatGptCodexClientConfig(spec, {
       accessToken: 'oauth-access-token',
       accountId: 'account-123'
-    }, 'session-abc');
+    }, 'session-abc', 'high');
 
     // Then
     expect(config).toEqual({
       model: 'gpt-5.3-codex-spark',
       apiKey: 'oauth-access-token',
       useResponsesApi: true,
+      // The backend serves SSE only and rejects stored responses; zdrEnabled is
+      // LangChain's switch for `store: false`.
+      streaming: true,
+      zdrEnabled: true,
+      reasoningEffort: 'high',
       configuration: {
         baseURL: 'https://chatgpt.com/backend-api/codex',
         defaultHeaders: {

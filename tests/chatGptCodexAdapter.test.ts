@@ -11,13 +11,25 @@ describe('ChatGptCodexAdapter', () => {
       expect(headers.get('Authorization')).toBe('Bearer oauth-access-token');
       expect(headers.get('ChatGPT-Account-Id')).toBe('account-123');
       expect(JSON.parse(typeof init?.body === 'string' ? init.body : '')).toEqual({
-        model: 'gpt-5.3-codex',
+        model: 'gpt-5.3-codex-spark',
         instructions: 'Keep it short.',
-        input: 'Refactor this module.'
+        input: 'Refactor this module.',
+        // Both are mandatory: the backend answers SSE only and refuses storage.
+        stream: true,
+        store: false
       });
-      return new Response(JSON.stringify({
-        output: [{ type: 'message', content: [{ type: 'output_text', text: 'Refactored.' }] }]
-      }), { status: 200 });
+      return new Response(
+        [
+          'event: response.output_text.delta',
+          'data: {"type":"response.output_text.delta","delta":"Refac"}',
+          '',
+          'data: {"type":"response.output_text.delta","delta":"tored."}',
+          '',
+          'data: [DONE]',
+          ''
+        ].join('\n'),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
+      );
     });
     const adapter = new ChatGptCodexAdapter({
       oauthService: {
@@ -28,7 +40,7 @@ describe('ChatGptCodexAdapter', () => {
 
     // When
     const response = await adapter.executeCompletion({
-      modelId: 'openai/gpt-5.3-codex',
+      modelId: 'openai/gpt-5.3-codex-spark',
       prompt: 'Refactor this module.',
       systemPrompt: 'Keep it short.',
       openAiAuthMode: 'chatgpt'
@@ -37,7 +49,7 @@ describe('ChatGptCodexAdapter', () => {
     // Then
     expect(response).toEqual({
       ok: true,
-      modelId: 'openai/gpt-5.3-codex',
+      modelId: 'openai/gpt-5.3-codex-spark',
       providerId: 'openai',
       completion: 'Refactored.'
     });
@@ -59,7 +71,7 @@ describe('ChatGptCodexAdapter', () => {
 
     // Then
     expect(response).toMatchObject({ ok: false, providerId: 'openai' });
-    expect(response.error).toContain('not a Codex-family model');
+    expect(response.error).toContain('does not serve the selected OpenAI model');
     expect(acquireCredentials).not.toHaveBeenCalled();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -97,7 +109,7 @@ describe('ChatGptCodexAdapter', () => {
 
     // When
     const response = await adapter.executeCompletion({
-      modelId: 'openai/gpt-5.3-codex',
+      modelId: 'openai/gpt-5.3-codex-spark',
       prompt: 'Refactor this.',
       openAiAuthMode: 'chatgpt'
     });

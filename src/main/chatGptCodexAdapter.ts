@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { CHATGPT_CODEX_ENDPOINT_METADATA, chatGptCodexClientHeaders } from './chatGptOAuthService';
 import type { LlmCompletionRequest, LlmCompletionResponse } from './llmAdapter';
 import { getLlmModel, parseLlmModelKey } from '../shared/llmModels';
+import { isOpenAiCodexModelKey } from '../shared/openAiAuth';
 
 const REQUEST_TIMEOUT_MS = 120_000;
 
@@ -40,8 +41,8 @@ export class ChatGptCodexAdapter {
     if (model.providerId !== 'openai' || parsed.providerId !== 'openai') {
       return this.unsupported(request.modelId, model.providerId, 'The selected model is not provided by OpenAI.');
     }
-    if (!parsed.modelId.includes('codex')) {
-      return this.unsupported(request.modelId, model.providerId, 'The selected OpenAI model is not a Codex-family model.');
+    if (!isOpenAiCodexModelKey(request.modelId)) {
+      return this.unsupported(request.modelId, model.providerId, 'The ChatGPT backend does not serve the selected OpenAI model.');
     }
 
     const controller = new AbortController();
@@ -52,6 +53,7 @@ export class ChatGptCodexAdapter {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
           Authorization: `Bearer ${credentials.accessToken}`,
           [CHATGPT_CODEX_ENDPOINT_METADATA.accountIdHeader]: credentials.accountId,
           ...chatGptCodexClientHeaders(randomUUID())
@@ -60,7 +62,12 @@ export class ChatGptCodexAdapter {
         body: JSON.stringify({
           model: parsed.modelId,
           ...(request.systemPrompt ? { instructions: request.systemPrompt } : {}),
-          input: request.prompt
+          input: request.prompt,
+          // The ChatGPT backend answers only server-sent events and refuses
+          // server-side response storage; codex CLI and opencode send both
+          // fields on every call, and omitting either returns a bare 400.
+          stream: true,
+          store: false
         })
       });
       if (!response.ok) {
@@ -75,7 +82,7 @@ export class ChatGptCodexAdapter {
           error: `ChatGPT Codex request failed with status ${response.status}${detail.length > 0 ? `: ${detail}` : ''}.`
         };
       }
-      const completion = extractCompletion(await response.json());
+      const completion = await readCodexEventStream(response);
       if (completion === undefined || completion.trim().length === 0) {
         return {
           ok: false,
@@ -114,6 +121,52 @@ export class ChatGptCodexAdapter {
 
 function isPlainRecord(value: unknown): value is PlainRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Reads the Codex responses SSE stream: text arrives as `output_text` deltas,
+ * and the terminal `response.completed` event carries the full response as a
+ * fallback for backends that skip deltas.
+ */
+async function readCodexEventStream(response: Response): Promise<string | undefined> {
+  const body = response.body;
+  if (body === null) return undefined;
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let delta = '';
+  let completed: string | undefined;
+
+  const consumeLine = (line: string): void => {
+    if (!line.startsWith('data:')) return;
+    const payload = line.slice('data:'.length).trim();
+    if (payload.length === 0 || payload === '[DONE]') return;
+    let event: unknown;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      return;
+    }
+    if (!isPlainRecord(event)) return;
+    if (event['type'] === 'response.output_text.delta' && typeof event['delta'] === 'string') {
+      delta += event['delta'];
+      return;
+    }
+    if (event['type'] === 'response.completed') {
+      completed = extractCompletion(event['response']);
+    }
+  };
+
+  for await (const chunk of body as unknown as AsyncIterable<Uint8Array>) {
+    buffer += decoder.decode(chunk, { stream: true });
+    let newline = buffer.indexOf('\n');
+    while (newline !== -1) {
+      consumeLine(buffer.slice(0, newline).trim());
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf('\n');
+    }
+  }
+  consumeLine(buffer.trim());
+  return delta.length > 0 ? delta : completed;
 }
 
 function extractCompletion(payload: unknown): string | undefined {

@@ -112,12 +112,20 @@ export function resolveAgentChatModelSpec(
 export function resolveChatGptCodexClientConfig(
   spec: Extract<AgentChatModelSpec, { kind: 'chatgpt-codex' }>,
   credentials: ChatGptCodexCredentials,
-  sessionId: string
+  sessionId: string,
+  reasoningEffort?: ReasoningEffort | undefined
 ) {
   return {
     model: spec.rawModelId,
     apiKey: credentials.accessToken,
     useResponsesApi: spec.useResponsesApi,
+    // The ChatGPT backend answers only server-sent events, and it refuses
+    // server-side response storage. `streaming` makes invoke() stream and
+    // reassemble; `zdrEnabled` is LangChain's switch for `store: false`.
+    // Sending neither is what returns a bare "400 (no body)".
+    streaming: true,
+    zdrEnabled: true,
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
     configuration: {
       baseURL: spec.baseUrl,
       defaultHeaders: {
@@ -189,7 +197,9 @@ export function createAgentChatModel(
           }
           const credentials = await chatGptOAuthService.acquireCredentials();
           const { ChatOpenAI } = await import('@langchain/openai');
-          const cloudModel = new ChatOpenAI(resolveChatGptCodexClientConfig(spec, credentials, randomUUID()));
+          const cloudModel = new ChatOpenAI(
+            resolveChatGptCodexClientConfig(spec, credentials, randomUUID(), reasoningEffort)
+          );
           const model = cloudModel.bindTools([...tools]);
           return model.invoke([...messages]);
         }
