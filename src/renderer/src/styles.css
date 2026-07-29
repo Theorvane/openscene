@@ -511,12 +511,12 @@ button {
 
 .project-tab:hover,
 .project-tab:focus-within {
-  background: var(--surface-inset);
+  background: color-mix(in srgb, #000 14%, transparent);
 }
 
 .project-tab--active {
   color: var(--text-strong);
-  background: var(--surface-inset);
+  background: color-mix(in srgb, #000 26%, transparent);
 }
 
 /* Divider sits between two inactive tabs only, never beside the active one. */
@@ -1986,7 +1986,7 @@ button {
 [role="tablist"] > .button--primary,
 [role="tablist"] > .button--primary:hover:not(:disabled) {
   color: var(--text-strong);
-  background: var(--card);
+  background: color-mix(in srgb, #000 26%, transparent);
 }
 
 [role="tabpanel"] {
@@ -2096,10 +2096,11 @@ button {
 }
 
 [role="tab"][aria-selected="true"] {
+  /* Selected reads as a recessed well: darker than the strip, no accent rule
+     underneath it. */
   border: none;
-  border-bottom: 2px solid var(--ring);
   color: var(--foreground);
-  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  background: color-mix(in srgb, #000 26%, transparent);
   box-shadow: none;
   transform: none;
   font-weight: 600;
