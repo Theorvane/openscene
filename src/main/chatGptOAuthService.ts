@@ -25,14 +25,21 @@ export const CHATGPT_CODEX_ENDPOINT_METADATA = {
 } as const;
 
 /**
- * The Codex backend rejects requests that do not identify the calling client
- * the way the Codex CLI does — a bare 400 with no body. These headers accompany
- * every Codex request.
+ * How this app identifies itself to OpenAI. The Codex backend rejects requests
+ * that do not identify the calling client the way the Codex CLI does — a bare
+ * 400 with no body — and it is the same string the authorize URL carries, so
+ * both places read this one constant.
+ *
+ * Note the client id itself is still Codex's: ChatGPT-subscription OAuth has no
+ * public app registration, so the sign-in cannot present an OpenVideo client.
+ * Only the originator and User-Agent are ours.
  */
+export const CHATGPT_CLIENT_ORIGINATOR = 'openvideo';
+
 export function chatGptCodexClientHeaders(sessionId: string): Readonly<Record<string, string>> {
   return {
-    originator: 'opencode',
-    'User-Agent': 'opencode/0.0.0 (openvideo)',
+    originator: CHATGPT_CLIENT_ORIGINATOR,
+    'User-Agent': `${CHATGPT_CLIENT_ORIGINATOR}/0.0.0`,
     'session-id': sessionId
   };
 }
@@ -178,7 +185,7 @@ export class ChatGptOAuthService {
       state,
       id_token_add_organizations: 'true',
       codex_cli_simplified_flow: 'true',
-      originator: 'opencode'
+      originator: CHATGPT_CLIENT_ORIGINATOR
     }).toString();
     return { url: url.toString(), verifier, state };
   }

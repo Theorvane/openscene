@@ -95,9 +95,11 @@ describe('agent chat model provider resolution', () => {
         defaultHeaders: {
           Authorization: 'Bearer oauth-access-token',
           'ChatGPT-Account-Id': 'account-123',
-          // The Codex backend 400s without a client identity, matching the CLI.
-          originator: 'opencode',
-          'User-Agent': 'opencode/0.0.0 (openvideo)',
+          // The Codex backend 400s without a client identity. This app presents
+          // itself as OpenVideo; only the OAuth client id stays Codex's, since
+          // ChatGPT-subscription sign-in has no public app registration.
+          originator: 'openvideo',
+          'User-Agent': 'openvideo/0.0.0',
           'session-id': 'session-abc'
         }
       }
