@@ -58,16 +58,6 @@ function SettingsIcon(): ReactElement {
   );
 }
 
-function HomeIcon(): ReactElement {
-  return (
-    <svg className="product-chrome__button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M4.5 11.5L12 5l7.5 6.5" />
-      <path d="M6.75 10.25V19h10.5v-8.75" />
-      <path d="M10 19v-5h4v5" />
-    </svg>
-  );
-}
-
 function FolderIcon(): ReactElement {
   return (
     <svg className="product-chrome__button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -83,7 +73,6 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
   const dragOriginRef = useRef<ChatPanelDragOrigin | null>(null);
   const chatPanelWidth = layoutPreference.chatPanelWidth;
   const chatPanelCollapsed = layoutPreference.chatPanelCollapsed;
-  const homeIsActive = activePage.id === 'home';
   const projectsIsActive = activePage.id === 'projects';
   const settingsIsActive = activePage.id === 'settings';
   const showChatPanel = isWorkspacePageId(activePage.id);
@@ -176,18 +165,6 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
                 variant={projectsIsActive ? 'primary' : 'ghost'}
               >
                 <FolderIcon />
-              </Button>
-              <Button
-                aria-controls="app-page-panel-home"
-                aria-current={homeIsActive ? 'page' : undefined}
-                aria-label="Menu"
-                className="product-chrome__nav-button"
-                disabled={!hasActiveProject}
-                onClick={() => onPageChange('home')}
-                title={hasActiveProject ? 'Menu' : 'Open or create a project first'}
-                variant={homeIsActive ? 'primary' : 'ghost'}
-              >
-                <HomeIcon />
               </Button>
               <Button
                 aria-controls="app-page-panel-settings"

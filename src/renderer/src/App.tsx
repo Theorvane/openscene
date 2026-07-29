@@ -5,7 +5,6 @@ import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import { AppShell } from './AppShell';
 import type { AgentChatRestoreRequest } from './AgentChatContext';
 import { FirstRunOnboarding } from './FirstRunOnboarding';
-import { HomePage } from './HomePage';
 import { ProjectResultImportProvider } from './ProjectResultImportContext';
 import { Tabs } from './ui';
 import { NarrationPanel } from './NarrationPanel';
@@ -116,22 +115,6 @@ export function App(): ReactElement {
     navigateToPage(pageId);
   }, [hasActiveProject, navigateToPage]);
 
-  const setActiveWorkspace = useCallback((workspaceId: AppWorkspaceId): void => {
-    if (!hasActiveProject) {
-      navigateToPage('projects');
-      return;
-    }
-
-    if (workspaceId === activeWorkspaceId && activePageId === workspaceId) {
-      focusPagePanel(workspaceId);
-      return;
-    }
-
-    setPageHistory((current) => pushPageHistory(current, activePageId));
-    requestPageFocus(workspaceId);
-    setActiveWorkspaceId(workspaceId);
-    setActivePageId(workspaceId);
-  }, [activePageId, activeWorkspaceId, focusPagePanel, hasActiveProject, navigateToPage, requestPageFocus]);
 
   const completeFirstRunOnboarding = useCallback((): void => {
     writeFirstRunOnboardingCompletion(window.localStorage);
@@ -226,22 +209,6 @@ export function App(): ReactElement {
       >
       <div className="app-page-stack">
           <section
-            aria-labelledby="home-page-title"
-            className="app-page app-page--home"
-            hidden={activePageId !== 'home'}
-            id="app-page-panel-home"
-            ref={setPagePanelRef('home')}
-            role="region"
-            tabIndex={-1}
-          >
-            <HomePage
-              onWorkspaceOpen={setActiveWorkspace}
-              workspaces={APP_WORKSPACES}
-              project={editor.project}
-              onGoToProjects={() => setActivePage('projects')}
-            />
-          </section>
-          <section
             aria-labelledby="projects-page-title"
             className="app-page app-page--projects"
             hidden={activePageId !== 'projects'}
@@ -256,11 +223,11 @@ export function App(): ReactElement {
               chats={chatHistory}
               onOpenProject={async (projectId) => {
                 const opened = await editor.openProject(projectId);
-                if (opened) navigateToPage('home');
+                if (opened) navigateToPage('edit');
               }}
               onOpenProjectFolder={async () => {
                 const opened = await editor.openProjectFolder();
-                if (opened) navigateToPage('home');
+                if (opened) navigateToPage('edit');
               }}
               onOpenChat={openChatFromHistory}
               errorText={editor.statusMessage.tone === 'danger' ? editor.statusMessage.text : undefined}

@@ -943,42 +943,6 @@ button {
   box-shadow: inset 0 0 0 4px var(--focus-shadow);
 }
 
-.home-page {
-  display: grid;
-  align-content: start;
-  gap: var(--space-7);
-  min-height: 100%;
-  padding: clamp(var(--space-6), 4vw, var(--space-9));
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--card);
-  box-shadow: var(--shadow-control);
-}
-
-.home-page__hero {
-  display: grid;
-  gap: var(--space-3);
-  max-width: 760px;
-}
-
-.home-page__hero h1 {
-  margin: 0;
-  color: var(--text-strong);
-  font-family: var(--font-display);
-  font-size: var(--text-hero);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-}
-
-.home-page__hero p:not(.section-kicker) {
-  margin: 0;
-  max-width: 68ch;
-  color: var(--color-muted);
-  font-size: var(--text-subhead);
-  line-height: 1.55;
-}
-
 /* opencode-style home: projects rail on the left, chat history on the right. */
 .projects-home {
   display: grid;
@@ -1222,128 +1186,6 @@ button {
   }
 }
 
-.home-active-project-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--primary) 7%, var(--card));
-  box-shadow: var(--shadow-control);
-}
-
-.home-active-project-banner__info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.home-active-project-banner__kicker {
-  color: var(--color-primary);
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.home-active-project-banner__name {
-  color: var(--foreground);
-  font-family: var(--font-display);
-  font-size: var(--text-title);
-  font-weight: 600;
-}
-
-.home-card-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-
-.home-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  justify-content: stretch;
-  justify-items: stretch;
-  gap: var(--space-4);
-  width: 100%;
-  min-height: 220px;
-  padding: var(--space-5);
-  border-color: var(--editor-glass-border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-raised);
-  text-align: left;
-}
-
-.home-card:hover:not(:disabled),
-.home-card:focus-visible {
-  border-color: var(--ring);
-  background: var(--surface-control-hover);
-}
-
-.home-card__icon {
-  display: grid;
-  place-items: center;
-  width: var(--space-8);
-  height: var(--space-8);
-  border: 1px solid var(--line-selected);
-  border-radius: var(--radius-md);
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--primary) 10%, var(--card));
-}
-
-.home-card__icon-svg {
-  width: var(--space-6);
-  height: var(--space-6);
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.7;
-}
-
-.home-card__body {
-  display: grid;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.home-card__kicker {
-  color: var(--text-weak);
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.home-card__title {
-  color: var(--text-strong);
-  font-family: var(--font-display);
-  font-size: var(--text-title);
-  font-weight: 600;
-  letter-spacing: var(--tracking-tight);
-}
-
-.home-card__description {
-  color: var(--color-muted);
-  font-size: var(--text-small);
-  line-height: 1.5;
-}
-
-.home-card__action {
-  margin-top: var(--space-2);
-  color: var(--color-primary);
-  font-family: var(--font-mono);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
 .first-run-onboarding {
   position: fixed;
   inset: var(--space-3);
@@ -1466,14 +1308,6 @@ button {
 }
 
 @media (max-width: 1180px) {
-  .home-card-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .home-card {
-    min-height: 0;
-  }
-
   .first-run-onboarding__panel {
     grid-template-columns: 1fr;
   }

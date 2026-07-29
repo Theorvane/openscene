@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 const APP_SOURCE_URL = new URL('../src/renderer/src/App.tsx', import.meta.url);
 const APP_SHELL_SOURCE_URL = new URL('../src/renderer/src/AppShell.tsx', import.meta.url);
-const HOME_PAGE_SOURCE_URL = new URL('../src/renderer/src/HomePage.tsx', import.meta.url);
 const DESIGN_SOURCE_URL = new URL('../DESIGN.md', import.meta.url);
 
 async function readSource(url: URL): Promise<string> {
@@ -18,26 +17,26 @@ describe('app page shell source contract', () => {
     expect(app).toContain('const [activePageId, setActivePageId] = useState<AppPageId>(() => getDefaultAppPageId());');
     expect(app).toContain('const [activeWorkspaceId, setActiveWorkspaceId] = useState<AppWorkspaceId>(() => getDefaultAppWorkspaceId());');
     expect(app).toContain('const workspaceIsVisible = isWorkspacePageId(activePageId);');
-    expect(app).toContain('<HomePage');
-    expect(app).toContain('onWorkspaceOpen={setActiveWorkspace}');
-    expect(app).toContain('workspaces={APP_WORKSPACES}');
+    // The menu page is gone; workspace tabs switch the surfaces it used to list.
+    expect(app).not.toContain('<HomePage');
+    expect(app).toContain('idBase="workspace"');
     expect(app).toContain('<SettingsWorkspace onReplayFirstRunOnboarding={replayFirstRunOnboarding} />');
     expect(app).toContain('hidden={!workspaceIsVisible}');
   });
 
-  it('opens Home and Settings from product chrome instead of workspace navigation', async () => {
+  it('opens Projects and Settings from product chrome instead of workspace navigation', async () => {
     const [app, appShell] = await Promise.all([readSource(APP_SOURCE_URL), readSource(APP_SHELL_SOURCE_URL)]);
 
     expect(appShell).toContain('onPageChange: (pageId: AppPageId) => void;');
-    expect(appShell).toContain('aria-controls="app-page-panel-home"');
-    expect(appShell).toContain("onClick={() => onPageChange('home')}");
+    expect(appShell).not.toContain('app-page-panel-home');
+    expect(appShell).toContain('aria-controls="app-page-panel-projects"');
     expect(appShell).toContain('aria-controls="app-page-panel-settings"');
     expect(appShell).toContain("onClick={() => onPageChange('settings')}");
     expect(app).not.toContain('AppWorkspaceNavigation');
     expect(app).not.toContain('aria-label="Application workspaces"');
   });
 
-  it('gates Home and workspace navigation behind an active project (Projects → Menu → workspace)', async () => {
+  it('gates workspace navigation behind an active project (Projects → workspace)', async () => {
     const [app, appShell] = await Promise.all([readSource(APP_SOURCE_URL), readSource(APP_SHELL_SOURCE_URL)]);
 
     expect(app).toContain('const hasActiveProject = editor.project !== null;');
@@ -46,11 +45,9 @@ describe('app page shell source contract', () => {
     expect(app).toContain('if (hasActiveProject || !isProjectRequiredPageId(activePageId)) return;');
     expect(app).toContain('const opened = await editor.openProjectFolder();');
     expect(app).toContain('const opened = await editor.openProject(projectId);');
-    expect(app).toContain("if (opened) navigateToPage('home');");
+    expect(app).toContain("if (opened) navigateToPage('edit');");
     expect(app).toContain('hasActiveProject={hasActiveProject}');
     expect(appShell).toContain('readonly hasActiveProject: boolean;');
-    expect(appShell).toContain('disabled={!hasActiveProject}');
-    expect(appShell).toContain("title={hasActiveProject ? 'Menu' : 'Open or create a project first'}");
   });
 
   it('offers Back navigation over a bounded page-history stack with the same project guard', async () => {
@@ -78,19 +75,12 @@ describe('app page shell source contract', () => {
     expect(app).not.toContain('VIDEO_GENERATION_WORKSPACE');
   });
 
-  it('renders the Home entry card with accessible controls', async () => {
-    const homePage = await readSource(HOME_PAGE_SOURCE_URL);
 
-    expect(homePage).toContain('className="home-card"');
-    expect(homePage).toContain('aria-controls={workspace.panelId}');
-    expect(homePage).toContain('onClick={() => onWorkspaceOpen(workspace.id)}');
-  });
-
-  it('documents Home cards as the only workspace entry surface after sidebar removal', async () => {
+  it('documents the workspace tab strip as the only workspace entry surface', async () => {
     const design = await readSource(DESIGN_SOURCE_URL);
 
     expect(design).toContain('do not reintroduce a left workspace sidebar');
-    expect(design).toContain('Home entry cards are the workspace navigation');
+    expect(design).toContain('There is no menu page: the workspace tab strip switches between Editing, Voice Generation, and Video Generation');
     expect(design).toContain('voice and video generation are tabs within it');
     expect(design).not.toContain('a left sidebar for workspace navigation');
     expect(design).not.toContain('Application workspace switching belongs to `AppWorkspaceNavigation`');
