@@ -94,7 +94,7 @@ function getDefaultInspectorTabId({ selectedAssetId, selectedClipId }: Inspector
 
 export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   const { isBusy: isAgentBusy } = useAgentChat();
-  const [leftDockTabId, setLeftDockTabId] = useState<EditorLeftDockTabId>('media');
+  const [leftDockTabId, setLeftDockTabId] = useState<EditorLeftDockTabId>('project');
   const [inspectorTabId, setInspectorTabId] = useState<InspectorTabId>('project');
   const { layoutPreference, updateLayoutPreference } = useEditorLayoutPreference();
   const { shortcutPreferences } = useEditorShortcutPreference();
@@ -109,7 +109,7 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   }, [projectIdentity, selectedAssetIdentity, selectedClipIdentity]);
 
   useEffect(() => {
-    setLeftDockTabId(getDefaultEditorLeftDockTabId({ hasProject: projectIdentity.length > 0 }));
+    setLeftDockTabId(getDefaultEditorLeftDockTabId({ hasProject: projectIdentity.length > 0, selectedAssetId }));
   }, [projectIdentity, selectedAssetId]);
 
   const setProgramPercent = (programPercent: number): void => {
@@ -213,12 +213,7 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
 
   return (
     <section className={workspaceClassName} style={workspaceStyle} aria-labelledby="timeline-editor-title">
-      <TimelineEditorLeftDock
-        editor={editor}
-        leftDockVisible={layoutPreference.leftDockVisible}
-        tabId={leftDockTabId}
-        onTabChange={setLeftDockTabId}
-      />
+      <TimelineEditorLeftDock editor={editor} leftDockVisible={layoutPreference.leftDockVisible} />
 
       <EditorLeftDockSplitter leftDockVisible={layoutPreference.leftDockVisible} leftDockWidth={layoutPreference.leftDockWidth} onLeftDockWidthChange={setLeftDockWidth} />
 

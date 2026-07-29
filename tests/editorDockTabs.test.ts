@@ -41,7 +41,7 @@ function makeProject(overrides: Partial<LocalProjectSnapshot> = {}): LocalProjec
 }
 
 describe('editor dock tabs', () => {
-  it('returns the media bin plus the generation studios, and the inspector defaults', () => {
+  it('returns stable left project/media and inspector selection/asset/project defaults', () => {
     // Given
     const project = makeProject();
 
@@ -49,17 +49,10 @@ describe('editor dock tabs', () => {
     const dockTabs = getDefaultEditorDockTabs(project);
 
     // Then
-    expect(dockTabs.left.map((tab) => tab.id)).toEqual(['media', 'voice', 'video']);
-    expect(dockTabs.left.map((tab) => tab.label)).toEqual(['Media', 'Voice', 'Video']);
-    expect(dockTabs.left.every((tab) => tab.disabled !== true)).toBe(true);
+    expect(dockTabs.left.map((tab) => tab.id)).toEqual(['project', 'media']);
+    expect(dockTabs.left.map((tab) => tab.label)).toEqual(['Project', 'Media']);
     expect(dockTabs.inspector.map((tab) => tab.id)).toEqual(['selection', 'asset', 'project']);
     expect(dockTabs.inspector.map((tab) => tab.label)).toEqual(['Selection', 'Asset', 'Project']);
-  });
-
-  it('disables the generation studios until a project is open, since results import into one', () => {
-    const dockTabs = getDefaultEditorDockTabs(null);
-
-    expect(dockTabs.left.map((tab) => tab.disabled === true)).toEqual([false, true, true]);
   });
 
   it('moves focus across enabled tabs with wrap, Home, and End while skipping disabled tabs', () => {
@@ -72,13 +65,13 @@ describe('editor dock tabs', () => {
     ] as const;
 
     // When / Then
-    expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'ArrowRight', tabs })).toBe('voice');
-    expect(getNextEditorDockTabId({ currentTabId: 'video', key: 'ArrowRight', tabs })).toBe('selection');
     expect(getNextEditorDockTabId({ currentTabId: 'project', key: 'ArrowRight', tabs })).toBe('media');
-    expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'ArrowLeft', tabs })).toBe('project');
-    expect(getNextEditorDockTabId({ currentTabId: 'voice', key: 'Home', tabs })).toBe('media');
-    expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'End', tabs })).toBe('project');
-    expect(getNextEditorDockTabId({ currentTabId: 'selection', key: 'ArrowLeft', tabs })).toBe('video');
+    expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'ArrowRight', tabs })).toBe('selection');
+    expect(getNextEditorDockTabId({ currentTabId: 'selection', key: 'ArrowRight', tabs })).toBe('project');
+    expect(getNextEditorDockTabId({ currentTabId: 'project', key: 'ArrowLeft', tabs })).toBe('selection');
+    expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'Home', tabs })).toBe('project');
+    expect(getNextEditorDockTabId({ currentTabId: 'project', key: 'End', tabs })).toBe('project');
+    expect(getNextEditorDockTabId({ currentTabId: 'selection', key: 'ArrowLeft', tabs })).toBe('media');
     expect(getNextEditorDockTabId({ currentTabId: 'inspector', key: 'ArrowRight', tabs })).toBe('selection');
   });
 
@@ -94,9 +87,14 @@ describe('editor dock tabs', () => {
     expect(readyAssets[0]?.metadata).toEqual({ durationMs: 4_000, width: 1_920, height: 1_080 });
   });
 
-  it('returns the dock to the media bin whether or not a project is open', () => {
+  it('defaults the left dock to project before a project is loaded', () => {
     // Given / When / Then
-    expect(getDefaultEditorLeftDockTabId({ hasProject: false })).toBe('media');
-    expect(getDefaultEditorLeftDockTabId({ hasProject: true })).toBe('media');
+    expect(getDefaultEditorLeftDockTabId({ hasProject: false, selectedAssetId: '' })).toBe('project');
+  });
+
+  it('defaults the left dock to media after a project is loaded', () => {
+    // Given / When / Then
+    expect(getDefaultEditorLeftDockTabId({ hasProject: true, selectedAssetId: '' })).toBe('media');
+    expect(getDefaultEditorLeftDockTabId({ hasProject: true, selectedAssetId: 'asset-ready' })).toBe('media');
   });
 });

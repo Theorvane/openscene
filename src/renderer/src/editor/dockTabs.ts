@@ -1,6 +1,6 @@
 import type { LocalProjectSnapshot, MediaAsset } from '../../../shared/timelineTypes';
 
-const LEFT_DOCK_TAB_IDS = ['media', 'voice', 'video'] as const;
+const LEFT_DOCK_TAB_IDS = ['project', 'media'] as const;
 const INSPECTOR_DOCK_TAB_IDS = ['selection', 'asset', 'project'] as const;
 
 export const LEFT_EDITOR_DOCK_TAB_IDS = LEFT_DOCK_TAB_IDS;
@@ -13,6 +13,7 @@ export type EditorDockTabId = (typeof LEFT_DOCK_TAB_IDS)[number] | (typeof INSPE
 
 type EditorLeftDockIdentityInput = {
   readonly hasProject: boolean;
+  readonly selectedAssetId: string;
 };
 
 export type EditorDockTab = {
@@ -62,16 +63,13 @@ function findCurrentTabIndex(tabs: readonly EditorDockTab[], currentTabId: strin
   return -1;
 }
 
-export function getDefaultEditorDockTabs(project: LocalProjectSnapshot | null): EditorDockTabs {
-  const hasProject = project !== null;
-  const hasPendingAssetMetadata = project === null || project.assets.length === 0 || assetsNeedingMetadata(project.assets).length > 0;
+export function getDefaultEditorDockTabs(project: LocalProjectSnapshot): EditorDockTabs {
+  const hasPendingAssetMetadata = project.assets.length === 0 || assetsNeedingMetadata(project.assets).length > 0;
 
   return {
     left: [
-      { id: 'media', label: 'Media' },
-      // Generation writes its result into the open project, so both need one.
-      { id: 'voice', label: 'Voice', disabled: !hasProject },
-      { id: 'video', label: 'Video', disabled: !hasProject }
+      { id: 'project', label: 'Project' },
+      { id: 'media', label: 'Media' }
     ],
     inspector: [
       { id: 'selection', label: 'Selection' },
@@ -81,9 +79,9 @@ export function getDefaultEditorDockTabs(project: LocalProjectSnapshot | null): 
   };
 }
 
-/** Opening or switching a project returns the dock to the media bin. */
-export function getDefaultEditorLeftDockTabId(_input: EditorLeftDockIdentityInput): EditorLeftDockTabId {
-  return 'media';
+export function getDefaultEditorLeftDockTabId({ hasProject, selectedAssetId }: EditorLeftDockIdentityInput): EditorLeftDockTabId {
+  if (selectedAssetId.length > 0) return 'media';
+  return hasProject ? 'media' : 'project';
 }
 
 export function getNextEditorDockTabId({ currentTabId, key, tabs }: EditorDockNavigationInput): string {

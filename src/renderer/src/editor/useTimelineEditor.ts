@@ -357,31 +357,37 @@ export function useTimelineEditor() {
 
   // The Edit Agent writes the project on disk from the main process, so an open
   // editor must reload — otherwise the change is invisible and the next local
-  // save silently overwrites it. Unsaved local edits win: we warn instead of
-  // discarding them.
+  // save silently overwrites it. The edit always lands: it was asked for. Local
+  // unsaved work is not discarded but pushed onto the undo stack, because
+  // refusing to load left the agent's result invisible after any local edit.
   useEffect(() => {
     const openProjectId = project?.id;
     if (openProjectId === undefined) return;
     return window.videoTool.onProjectTimelineChanged((changedProjectId) => {
       if (changedProjectId !== openProjectId) return;
-      if (hasUnsavedTimeline) {
-        setStatusMessage({
-          tone: 'warning',
-          text: 'The Edit Agent changed this project on disk. Save or undo your local edits to load it.'
-        });
-        return;
-      }
       void (async () => {
         const response = await window.videoTool.openProject({ projectId: openProjectId });
         if (!response.ok) {
           setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
           return;
         }
-        setLoadedProject(response.value);
-        setStatusMessage({ tone: 'success', text: 'Timeline updated by the Edit Agent.' });
+        const snapshot = response.value;
+        if (!hasUnsavedTimeline) {
+          setLoadedProject(snapshot);
+          setStatusMessage({ tone: 'success', text: 'Timeline updated by the Edit Agent.' });
+          return;
+        }
+        setProject(snapshot);
+        setTimelineHistory((current) => current === null
+          ? createTimelineHistory(snapshot.timeline)
+          : pushTimelineHistory(current, snapshot.timeline));
+        playback.clampToTimeline(snapshot.timeline);
+        // In memory now matches disk; undo restores the local work.
+        setHasUnsavedTimeline(false);
+        setStatusMessage({ tone: 'warning', text: 'Loaded the Edit Agent timeline. Your unsaved edits are one undo away.' });
       })();
     });
-  }, [hasUnsavedTimeline, project?.id, setLoadedProject]);
+  }, [hasUnsavedTimeline, playback, project?.id, setLoadedProject]);
 
   const saveTimeline = useCallback(async () => {
     if (project === null) return;

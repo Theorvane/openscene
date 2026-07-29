@@ -188,18 +188,20 @@ export function App(): ReactElement {
   const workspaceIsVisible = isWorkspacePageId(activePageId);
 
   return (
-    <AppShell
-      activePage={activePage}
-      hasActiveProject={hasActiveProject}
-      onPageChange={setActivePage}
-      activeProjectContext={activeProjectContext}
-      chatRestoreRequest={chatRestoreRequest}
-      onChatRestoreHandled={clearChatRestoreRequest}
-      canNavigateBack={pageHistory.length > 0}
-      onNavigateBack={navigateBack}
-    >
-      <ProjectResultImportProvider editor={editor}>
-        <div className="app-page-stack">
+    // The result-import provider wraps the shell, not just the page stack: the
+    // Studio side panel lives in the shell and imports what it generates.
+    <ProjectResultImportProvider editor={editor}>
+      <AppShell
+        activePage={activePage}
+        hasActiveProject={hasActiveProject}
+        onPageChange={setActivePage}
+        activeProjectContext={activeProjectContext}
+        chatRestoreRequest={chatRestoreRequest}
+        onChatRestoreHandled={clearChatRestoreRequest}
+        canNavigateBack={pageHistory.length > 0}
+        onNavigateBack={navigateBack}
+      >
+      <div className="app-page-stack">
           <section
             aria-labelledby="home-page-title"
             className="app-page app-page--home"
@@ -269,9 +271,9 @@ export function App(): ReactElement {
           >
             <SettingsWorkspace onReplayFirstRunOnboarding={replayFirstRunOnboarding} />
           </section>
-        </div>
-      </ProjectResultImportProvider>
+      </div>
       {showFirstRunOnboarding && <FirstRunOnboarding onComplete={completeFirstRunOnboarding} />}
-    </AppShell>
+      </AppShell>
+    </ProjectResultImportProvider>
   );
 }
