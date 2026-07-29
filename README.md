@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/openvideo-hero.png" alt="OpenVideo concept artwork: a purple and pink play-mark beside a video editor with a preview, timeline, and local creator tools" width="100%" />
+  <img src="docs/assets/openvideo-hero.png" alt="OpenVideo: the wordmark beside a dark editor window showing a timeline and an agent chat that has trimmed a clip, added another, and is asking permission to export" width="100%" />
 </p>
 
 <h1 align="center">OpenVideo</h1>
@@ -24,7 +24,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Pre-release.** OpenVideo runs from source. There is no packaged installer or auto-update yet. The hero image above is concept artwork; the screenshots below are the real interface.
+> **Pre-release.** OpenVideo runs from source. There is no packaged installer or auto-update yet. The hero and screenshots below show the real interface.
 
 ## What is OpenVideo?
 
