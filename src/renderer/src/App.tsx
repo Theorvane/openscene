@@ -13,6 +13,7 @@ import { SettingsWorkspace } from './SettingsWorkspace';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
 import { APP_PAGE_BY_ID, getDefaultAppPageId, isProjectRequiredPageId, isWorkspacePageId } from './appPages';
 import type { AppPageId } from './appPages';
+import { popPageHistory, pushPageHistory } from './appNavigationHistory';
 import { APP_WORKSPACES, getDefaultAppWorkspaceId } from './appWorkspaces';
 import type { AppWorkspaceId } from './appWorkspaces';
 import { TimelineEditor } from './editor/TimelineEditor';
@@ -39,6 +40,7 @@ export function App(): ReactElement {
   const pendingFocusPageRef = useRef<AppPageId | null>(null);
   const [chatHistory, setChatHistory] = useState<readonly AgentChatHistoryEntry[]>([]);
   const [chatRestoreRequest, setChatRestoreRequest] = useState<AgentChatRestoreRequest | null>(null);
+  const [pageHistory, setPageHistory] = useState<readonly AppPageId[]>([]);
   const activePage = APP_PAGE_BY_ID[activePageId];
   const activeProjectContext = useMemo<EditAgentProjectContext | null>(() => {
     if (editor.project === null) return null;
@@ -78,9 +80,22 @@ export function App(): ReactElement {
       return;
     }
 
+    setPageHistory((current) => pushPageHistory(current, activePageId));
     requestPageFocus(pageId);
     setActivePageId(pageId);
   }, [activePageId, focusPagePanel, requestPageFocus]);
+
+  const navigateBack = useCallback((): void => {
+    const { target, rest } = popPageHistory(pageHistory);
+    if (target === null) return;
+    setPageHistory(rest);
+    // Same guard as forward navigation: a project-required page in history
+    // becomes Projects when the project is gone.
+    const resolved = isProjectRequiredPageId(target) && editor.project === null ? 'projects' : target;
+    requestPageFocus(resolved);
+    if (isWorkspacePageId(resolved)) setActiveWorkspaceId(resolved);
+    setActivePageId(resolved);
+  }, [editor.project, pageHistory, requestPageFocus]);
 
   const setActivePage = useCallback((pageId: AppPageId): void => {
     // Stage flow guard: Home (Menu) and workspaces need an active project,
@@ -104,6 +119,7 @@ export function App(): ReactElement {
       return;
     }
 
+    setPageHistory((current) => pushPageHistory(current, activePageId));
     requestPageFocus(workspaceId);
     setActiveWorkspaceId(workspaceId);
     setActivePageId(workspaceId);
@@ -161,10 +177,11 @@ export function App(): ReactElement {
     }
     // The project is open at this point, so enter the editor workspace
     // directly (the guarded setters still see the pre-open project state).
+    setPageHistory((current) => pushPageHistory(current, activePageId));
     requestPageFocus(EDIT_WORKSPACE.id);
     setActiveWorkspaceId(EDIT_WORKSPACE.id);
     setActivePageId(EDIT_WORKSPACE.id);
-  }, [editor, requestPageFocus]);
+  }, [activePageId, editor, requestPageFocus]);
 
   const clearChatRestoreRequest = useCallback((): void => {
     setChatRestoreRequest(null);
@@ -180,6 +197,8 @@ export function App(): ReactElement {
       activeProjectContext={activeProjectContext}
       chatRestoreRequest={chatRestoreRequest}
       onChatRestoreHandled={clearChatRestoreRequest}
+      canNavigateBack={pageHistory.length > 0}
+      onNavigateBack={navigateBack}
     >
       <ProjectResultImportProvider editor={editor}>
         <div className="app-page-stack">

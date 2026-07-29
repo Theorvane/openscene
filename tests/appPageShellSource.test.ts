@@ -53,6 +53,19 @@ describe('app page shell source contract', () => {
     expect(appShell).toContain("title={hasActiveProject ? 'Menu' : 'Open or create a project first'}");
   });
 
+  it('offers Back navigation over a bounded page-history stack with the same project guard', async () => {
+    const [app, appShell] = await Promise.all([readSource(APP_SOURCE_URL), readSource(APP_SHELL_SOURCE_URL)]);
+
+    expect(app).toContain('pushPageHistory(current, activePageId)');
+    expect(app).toContain('const navigateBack = useCallback');
+    expect(app).toContain("isProjectRequiredPageId(target) && editor.project === null ? 'projects' : target");
+    expect(app).toContain('if (isWorkspacePageId(resolved)) setActiveWorkspaceId(resolved);');
+    expect(app).toContain('canNavigateBack={pageHistory.length > 0}');
+    expect(app).toContain('onNavigateBack={navigateBack}');
+    expect(appShell).toContain('aria-label="Back"');
+    expect(appShell).toContain('disabled={!canNavigateBack}');
+  });
+
   it('keeps mounted workspace panels directly labeled after removing the sidebar', async () => {
     const app = await readSource(APP_SOURCE_URL);
 
