@@ -340,9 +340,16 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
                 No models found{modelFilter.trim().length > 0 ? ` for “${modelFilter.trim()}”` : ''}.
               </div>
             ) : (
-              groups.map((group) => (
+              groups.map((group) => {
+                const groupConnected = group.providerId === 'local_ollama' || isProviderConnected(group.providerId, credentialStatus);
+                return (
                 <div key={group.providerId} className="settings-group">
-                  <h3 className="settings-subheading">{group.providerLabel}</h3>
+                  <div className="settings-group__heading-row">
+                    <h3 className="settings-subheading">{group.providerLabel}</h3>
+                    <span className={`settings-provider-state${groupConnected ? ' settings-provider-state--on' : ''}`}>
+                      {group.providerId === 'local_ollama' ? '● Local' : groupConnected ? '● Connected' : '○ Not connected'}
+                    </span>
+                  </div>
                   <div className="settings-list">
                     {group.models.map((model) => {
                       const visible = isModelVisible(model.providerId, model.id);
@@ -367,12 +374,13 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
                     })}
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
             {truncatedCount > 0 && (
               <p className="settings-list__note">{truncatedCount} more matching models — refine your search.</p>
             )}
-            <StatusCard tone="neutral">Without a search the local engine and popular providers are shown; searching sweeps the full opencode/models.dev catalog. Hidden models disappear from the Edit Agent picker and the primary model list; the active selection always stays listed.</StatusCard>
+            <StatusCard tone="neutral">Switches control picker visibility only — a model becomes usable once its provider is connected in Settings → Providers. Without a search the local engine and popular providers are shown; searching sweeps the full opencode/models.dev catalog. The active selection always stays listed.</StatusCard>
           </>
         );
       }

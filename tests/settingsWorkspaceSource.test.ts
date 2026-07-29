@@ -55,6 +55,12 @@ describe('Settings workspace source contract', () => {
     expect(source).toContain('role="switch"');
     expect(source).toContain('aria-checked={visible}');
     expect(source).toContain('setModelVisibility(model.providerId, model.id, !visible)');
+    // Visibility switches must not read as usability: every model group names
+    // its provider's connection state, and the section says usage requires
+    // connecting the provider.
+    expect(source).toContain('settings-provider-state');
+    expect(source).toContain("groupConnected ? '● Connected' : '○ Not connected'");
+    expect(source).toContain('Switches control picker visibility only');
   });
 
   it('exposes the full catalog behind popular defaults, a Show all providers list, and render caps', async () => {

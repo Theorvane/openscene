@@ -4354,6 +4354,25 @@ button {
   gap: var(--space-2);
 }
 
+.settings-group__heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.settings-provider-state {
+  color: var(--text-weaker);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-provider-state--on {
+  color: var(--color-success);
+}
+
 .settings-subheading {
   margin: 0;
   color: var(--text-strong);
