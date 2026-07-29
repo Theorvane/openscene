@@ -37,11 +37,15 @@ export function AgentModelPicker(): ReactElement {
   const [isOpen, setIsOpen] = useState(false);
 
   const activeModel = selectedModel('edit-agent');
-  // Settings → Models visibility switches filter the list; the active model
-  // always stays listed so the current selection is never orphaned.
-  const models = getDomainModels('edit-agent').filter(
-    (model) => model.id === activeModel.id || isModelVisible(model.providerId, model.id)
-  );
+  // opencode behavior: the picker lists the local engine plus models from
+  // connected providers only (the full catalog would be thousands of disabled
+  // rows). Settings → Models visibility switches filter further; the active
+  // model always stays listed so the current selection is never orphaned.
+  const models = getDomainModels('edit-agent').filter((model) => {
+    if (model.id === activeModel.id) return true;
+    if (model.executionPath !== 'local' && !isProviderConnected(model.providerId, credentialStatus)) return false;
+    return isModelVisible(model.providerId, model.id);
+  });
   const groups = groupByProvider(models);
 
   const providerStatusLabel = (group: ProviderGroup): string => {
@@ -110,7 +114,7 @@ export function AgentModelPicker(): ReactElement {
               </div>
             );
           })}
-          <p className="agent-model-picker__hint">Cloud models unlock after connecting their provider in Settings → Providers.</p>
+          <p className="agent-model-picker__hint">Connect providers in Settings → Providers to add their models here.</p>
         </div>
       )}
     </div>

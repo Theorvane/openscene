@@ -11,15 +11,14 @@ describe('AI domain model catalog', () => {
   it('exposes an independent available local model for each AI domain', () => {
     expect(getAvailableDomainModels('voice-generation').map((model) => model.id)).toEqual(['local-qwen-tts']);
     expect(getAvailableDomainModels('video-generation').map((model) => model.id)).toEqual(['local-video-runner']);
-    expect(getAvailableDomainModels('edit-agent').map((model) => model.id)).toEqual([
-      'qwen2.5-coder',
-      'gpt-5-mini',
-      'gpt-5',
-      'claude-sonnet-5',
-      'claude-opus-4-8',
-      'gemini-3-pro',
-      'deepseek-v3.1'
-    ]);
+    const editAgentModels = getAvailableDomainModels('edit-agent');
+    expect(editAgentModels[0]?.id).toBe('qwen2.5-coder');
+    // The full opencode/models.dev catalog contributes every tool-calling model.
+    expect(editAgentModels.length).toBeGreaterThan(500);
+    const ids = editAgentModels.map((model) => model.id);
+    expect(ids).toContain('openai/gpt-5');
+    expect(ids).toContain('anthropic/claude-sonnet-5');
+    expect(ids).toContain('deepseek/deepseek-chat');
   });
 
   it('keeps the local model as the edit-agent default ahead of cloud providers', () => {

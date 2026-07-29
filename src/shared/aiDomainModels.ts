@@ -1,3 +1,5 @@
+import { LLM_CATALOG } from './llmCatalog.generated';
+
 export type AiDomain = 'voice-generation' | 'video-generation' | 'edit-agent';
 
 export type AiDomainProvider = {
@@ -114,79 +116,24 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     domains: ['edit-agent'],
     available: true
   },
-  {
-    id: 'gpt-5-mini',
-    providerId: 'openai',
-    label: 'GPT-5 Mini',
-    providerLabel: 'OpenAI',
-    description: 'Fast cloud tool-calling model for agentic timeline editing.',
-    executionPath: 'api',
-    contextWindow: '256k',
-    availableContexts: ['32k', '64k', '128k', '256k'],
-    domains: ['edit-agent'],
-    available: true
-  },
-  {
-    id: 'gpt-5',
-    providerId: 'openai',
-    label: 'GPT-5',
-    providerLabel: 'OpenAI',
-    description: 'Flagship cloud reasoning model for complex agentic edits.',
-    executionPath: 'api',
-    contextWindow: '256k',
-    availableContexts: ['64k', '128k', '256k'],
-    domains: ['edit-agent'],
-    available: true
-  },
-  {
-    id: 'claude-sonnet-5',
-    providerId: 'anthropic',
-    label: 'Claude Sonnet 5',
-    providerLabel: 'Anthropic',
-    description: 'Balanced cloud tool-calling model for timeline edits.',
-    executionPath: 'api',
-    contextWindow: '200k',
-    availableContexts: ['64k', '128k', '200k'],
-    domains: ['edit-agent'],
-    available: true
-  },
-  {
-    id: 'claude-opus-4-8',
-    providerId: 'anthropic',
-    label: 'Claude Opus 4.8',
-    providerLabel: 'Anthropic',
-    description: 'Most capable Claude model for complex editing logic.',
-    executionPath: 'api',
-    contextWindow: '200k',
-    availableContexts: ['64k', '128k', '200k'],
-    domains: ['edit-agent'],
-    available: true
-  },
-  {
-    id: 'gemini-3-pro',
-    providerId: 'google_gemini',
-    label: 'Gemini 3 Pro',
-    providerLabel: 'Google Gemini',
-    description: 'Long-context cloud model for full-timeline agentic edits.',
-    executionPath: 'api',
-    contextWindow: '1M',
-    availableContexts: ['128k', '512k', '1M'],
-    domains: ['edit-agent'],
-    available: true
-  },
-  {
-    id: 'deepseek-v3.1',
-    providerId: 'deepseek',
-    label: 'DeepSeek V3.1',
-    providerLabel: 'DeepSeek',
-    description: 'Open-weights cloud tool-calling model for scene sequencing.',
-    executionPath: 'api',
-    contextWindow: '128k',
-    availableContexts: ['32k', '64k', '128k'],
-    domains: ['edit-agent'],
-    available: true
-  }
-] as const;
+  // Every tool-calling model from the generated opencode/models.dev catalog is
+  // an edit-agent candidate; the picker gates them on provider connection.
+  ...LLM_CATALOG.flatMap((provider) =>
+    provider.models
+      .filter((model) => model.toolCall === true)
+      .map((model): AiDomainModelConfig => ({
+        id: `${provider.id}/${model.id}`,
+        providerId: provider.id,
+        label: model.label,
+        providerLabel: provider.label,
+        description: `${provider.label} cloud tool-calling model for agentic timeline editing.`,
+        executionPath: 'api',
+        ...(model.contextK === undefined ? {} : { contextWindow: `${model.contextK}k` }),
+        domains: ['edit-agent'],
+        available: true
+      }))
+  )
+];
 
 const AI_DOMAINS: readonly AiDomain[] = ['voice-generation', 'video-generation', 'edit-agent'];
 

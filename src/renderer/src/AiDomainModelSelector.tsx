@@ -7,6 +7,9 @@ import {
   type AiDomainModelConfig
 } from '../../shared/aiDomainModels';
 import { useAiDomainModel } from './AiDomainModelContext';
+import { isProviderConnected } from '../../shared/llmProviders';
+import { useLlmModel } from './LlmProviderContext';
+import { useModelVisibility } from './ModelVisibilityContext';
 
 type AiDomainModelSelectorProps = {
   readonly domain: AiDomain;
@@ -16,7 +19,18 @@ type AiDomainModelSelectorProps = {
 
 export function AiDomainModelSelector({ domain, label, description }: AiDomainModelSelectorProps): ReactElement {
   const { selectedModelId, selectedModel, setSelectedModelId } = useAiDomainModel();
-  const models = getDomainModels(domain);
+  const { credentialStatus } = useLlmModel();
+  const { isModelVisible } = useModelVisibility();
+  const activeId = selectedModelId(domain);
+  // Local models always list; unavailable seams keep their honest disabled
+  // hints; catalog cloud models appear once their provider is connected and
+  // the model is visible in Settings → Models. The active selection never drops.
+  const models = getDomainModels(domain).filter((model) =>
+    model.id === activeId ||
+    model.executionPath === 'local' ||
+    !model.available ||
+    (isProviderConnected(model.providerId, credentialStatus) && isModelVisible(model.providerId, model.id))
+  );
   const activeModel = selectedModel(domain);
   const descriptionId = `${domain}-model-description`;
   const isLocal = activeModel.executionPath === 'local';

@@ -8,7 +8,8 @@ import {
   type LlmProviderApiConfig
 } from '../../shared/llmModels';
 
-export type LlmCredentialKey = 'openaiApiKey' | 'anthropicApiKey' | 'geminiApiKey' | 'deepseekApiKey' | 'elevenlabsApiKey';
+/** Any provider credential slot: legacy named keys plus catalog provider ids. */
+export type LlmCredentialKey = string;
 
 type LlmContextValue = {
   readonly selectedModelId: string;

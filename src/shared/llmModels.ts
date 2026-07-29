@@ -1,10 +1,13 @@
-export type LlmProviderId = 'local_ollama' | 'openai' | 'anthropic' | 'google_gemini' | 'deepseek';
+import { LLM_CATALOG } from './llmCatalog.generated';
+
+export type LlmProviderId = string;
 
 export type LlmModelCategory = 'editor-assistant' | 'video-prompt' | 'voice-script';
 
 export type LlmModelBadge = 'LOCAL' | 'FAST' | 'SMART' | 'REASONING';
 
 export interface LlmModelConfig {
+  /** Canonical opencode-style key: `providerId/modelId` for cloud, bare id for local. */
   readonly id: string;
   readonly providerId: LlmProviderId;
   readonly label: string;
@@ -15,18 +18,22 @@ export interface LlmModelConfig {
   readonly defaultMode: 'local' | 'api';
   /** Whether this model's provider adapter is implemented in the current build. */
   readonly available: boolean;
-  /**
-   * Human-readable reason shown when available is false.
-   * Cloud provider adapter must be implemented before this model can be used.
-   */
   readonly unavailabilityReason?: string;
   /** Whether the model supports structured tool calling (Edit Agent requirement). */
   readonly toolCall?: boolean;
   readonly contextWindow?: string;
+  /** Whether the model accepts image input (needed to see watchProjectVideo frames). */
+  readonly vision?: boolean;
 }
 
-export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
-  // Local Models
+/** Split a canonical model key into its provider and provider-native model id. */
+export function parseLlmModelKey(key: string): { readonly providerId: string; readonly modelId: string } | null {
+  const slash = key.indexOf('/');
+  if (slash <= 0 || slash === key.length - 1) return null;
+  return { providerId: key.slice(0, slash), modelId: key.slice(slash + 1) };
+}
+
+const LOCAL_LLM_MODELS: readonly LlmModelConfig[] = [
   {
     id: 'qwen2.5-coder',
     providerId: 'local_ollama',
@@ -50,120 +57,42 @@ export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
     badge: 'LOCAL',
     defaultMode: 'local',
     available: true,
-    contextWindow: '128k'
-  },
-
-  // Cloud Models - OpenAI
-  {
-    id: 'gpt-5',
-    providerId: 'openai',
-    label: 'GPT-5',
-    providerLabel: 'OpenAI',
-    description: 'Flagship reasoning & multimodal model for cinematic scriptwriting and agentic timeline edits',
-    category: 'video-prompt',
-    badge: 'REASONING',
-    defaultMode: 'api',
-    available: true,
-    toolCall: true,
-    contextWindow: '256k'
-  },
-  {
-    id: 'gpt-5-mini',
-    providerId: 'openai',
-    label: 'GPT-5 Mini',
-    providerLabel: 'OpenAI',
-    description: 'Fast lightweight model for instant timeline edits',
-    category: 'editor-assistant',
-    badge: 'FAST',
-    defaultMode: 'api',
-    available: true,
-    toolCall: true,
-    contextWindow: '256k'
-  },
-
-  // Cloud Models - Anthropic
-  {
-    id: 'claude-opus-4-8',
-    providerId: 'anthropic',
-    label: 'Claude Opus 4.8',
-    providerLabel: 'Anthropic',
-    description: 'Most capable Claude model for storyboarding, scripts, and complex editing logic',
-    category: 'voice-script',
-    badge: 'REASONING',
-    defaultMode: 'api',
-    available: true,
-    toolCall: true,
-    contextWindow: '200k'
-  },
-  {
-    id: 'claude-sonnet-5',
-    providerId: 'anthropic',
-    label: 'Claude Sonnet 5',
-    providerLabel: 'Anthropic',
-    description: 'Balanced state-of-the-art model for narrative voiceovers & complex edits',
-    category: 'voice-script',
-    badge: 'SMART',
-    defaultMode: 'api',
-    available: true,
-    toolCall: true,
-    contextWindow: '200k'
-  },
-
-  // Cloud Models - Google Gemini
-  {
-    id: 'gemini-3-pro',
-    providerId: 'google_gemini',
-    label: 'Gemini 3 Pro',
-    providerLabel: 'Google Gemini',
-    description: 'Long-context multimodal model for full video timeline analysis',
-    category: 'editor-assistant',
-    badge: 'SMART',
-    defaultMode: 'api',
-    available: true,
-    toolCall: true,
-    contextWindow: '1M'
-  },
-  {
-    id: 'gemini-2.5-flash',
-    providerId: 'google_gemini',
-    label: 'Gemini 2.5 Flash',
-    providerLabel: 'Google Gemini',
-    description: 'Fast multimodal model integrated with Gemini Veo video generation',
-    category: 'video-prompt',
-    badge: 'FAST',
-    defaultMode: 'api',
-    available: true,
-    toolCall: true,
-    contextWindow: '1M'
-  },
-
-  // Cloud Models - DeepSeek
-  {
-    id: 'deepseek-v3.1',
-    providerId: 'deepseek',
-    label: 'DeepSeek V3.1',
-    providerLabel: 'DeepSeek',
-    description: 'Unified chat + reasoning open-weights model for scene sequencing & prompt optimization',
-    category: 'editor-assistant',
-    badge: 'REASONING',
-    defaultMode: 'api',
-    available: true,
-    toolCall: true,
-    contextWindow: '128k'
-  },
-  {
-    id: 'deepseek-r1',
-    providerId: 'deepseek',
-    label: 'DeepSeek R1',
-    providerLabel: 'DeepSeek',
-    description: 'Open-weights reasoning specialist for scene sequencing & AI prompt optimization',
-    category: 'editor-assistant',
-    badge: 'REASONING',
-    defaultMode: 'api',
-    available: true,
+    vision: true,
     contextWindow: '128k'
   }
-] as const;
+];
+
+function describeCloudModel(providerLabel: string, flags: { toolCall?: boolean; reasoning?: boolean; vision?: boolean }): string {
+  const traits = [
+    flags.reasoning === true ? 'reasoning' : null,
+    flags.toolCall === true ? 'tool calling' : null,
+    flags.vision === true ? 'vision' : null
+  ].filter((trait): trait is string => trait !== null);
+  return traits.length > 0 ? `${providerLabel} model with ${traits.join(', ')}.` : `${providerLabel} model.`;
+}
+
+/** Full opencode/models.dev catalog flattened into canonical `providerId/modelId` entries. */
+export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
+  ...LOCAL_LLM_MODELS,
+  ...LLM_CATALOG.flatMap((provider) =>
+    provider.models.map((model): LlmModelConfig => ({
+      id: `${provider.id}/${model.id}`,
+      providerId: provider.id,
+      label: model.label,
+      providerLabel: provider.label,
+      description: describeCloudModel(provider.label, model),
+      category: 'editor-assistant',
+      badge: model.reasoning === true ? 'REASONING' : 'SMART',
+      defaultMode: 'api',
+      available: true,
+      ...(model.toolCall === true ? { toolCall: true } : {}),
+      ...(model.vision === true ? { vision: true } : {}),
+      ...(model.contextK === undefined ? {} : { contextWindow: `${model.contextK}k` })
+    }))
+  )
+];
+
+const MODELS_BY_ID = new Map(DEFAULT_LLM_MODELS.map((model) => [model.id, model]));
 
 export const LLM_STORAGE_MODEL_KEY = 'openvideo-selected-llm-model';
 export const LLM_STORAGE_CONFIG_KEY = 'openvideo-llm-provider-config';
@@ -181,11 +110,13 @@ export interface LlmProviderApiConfig {
 }
 
 export function getLlmModel(modelId: string): LlmModelConfig | undefined {
-  return DEFAULT_LLM_MODELS.find((model) => model.id === modelId);
+  return MODELS_BY_ID.get(modelId);
 }
 
 export function parseSelectedLlmModelId(storedId: string | null | undefined): string {
   if (!storedId) return DEFAULT_LLM_MODELS.find((m) => m.available)?.id ?? DEFAULT_LLM_MODELS[0]!.id;
-  const match = DEFAULT_LLM_MODELS.find((m) => m.id === storedId && m.available);
-  return match !== undefined ? match.id : (DEFAULT_LLM_MODELS.find((m) => m.available)?.id ?? DEFAULT_LLM_MODELS[0]!.id);
+  const match = MODELS_BY_ID.get(storedId);
+  return match !== undefined && match.available
+    ? match.id
+    : (DEFAULT_LLM_MODELS.find((m) => m.available)?.id ?? DEFAULT_LLM_MODELS[0]!.id);
 }

@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 
 import type { LocalFfmpegRuntimeStatus } from '../../shared/exportTypes';
 import { DEFAULT_LLM_MODELS, type LlmProviderId } from '../../shared/llmModels';
-import { LLM_PROVIDERS, type LlmProviderInfo } from '../../shared/llmProviders';
+import { LLM_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, isProviderConnected, type LlmProviderInfo } from '../../shared/llmProviders';
 import { useModelVisibility } from './ModelVisibilityContext';
 import { ProviderConnectDialog } from './ProviderConnectDialog';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
@@ -53,28 +53,35 @@ function getSettingsSection(sectionId: SettingsSectionId): SettingsSection {
   return SETTINGS_SECTIONS.find((section) => section.id === sectionId) ?? SETTINGS_SECTIONS[0];
 }
 
-function modelLabelsForProvider(providerId: LlmProviderId): string {
-  return DEFAULT_LLM_MODELS.filter((model) => model.providerId === providerId)
-    .map((model) => model.label)
-    .join(' & ');
-}
+const MODEL_ROW_RENDER_CAP = 250;
 
-/** Grouped catalog for the opencode-style Models section, filtered by search. */
-function filteredModelGroups(filter: string): readonly { readonly providerId: LlmProviderId; readonly providerLabel: string; readonly models: readonly (typeof DEFAULT_LLM_MODELS)[number][] }[] {
+/**
+ * Grouped catalog for the opencode-style Models section. Without a search the
+ * full ~4300-model catalog would swamp the DOM, so the default view shows the
+ * local engine plus the popular providers; searching sweeps everything, with
+ * rendered rows capped and the overflow reported.
+ */
+function filteredModelGroups(filter: string): {
+  readonly groups: readonly { readonly providerId: LlmProviderId; readonly providerLabel: string; readonly models: readonly (typeof DEFAULT_LLM_MODELS)[number][] }[];
+  readonly truncatedCount: number;
+} {
   const query = filter.trim().toLowerCase();
   const matches = DEFAULT_LLM_MODELS.filter((model) =>
-    query.length === 0 ||
-    model.label.toLowerCase().includes(query) ||
-    model.providerLabel.toLowerCase().includes(query) ||
-    model.id.toLowerCase().includes(query)
+    query.length === 0
+      ? model.providerId === 'local_ollama' || POPULAR_LLM_PROVIDER_IDS.includes(model.providerId)
+      : model.label.toLowerCase().includes(query) ||
+        model.providerLabel.toLowerCase().includes(query) ||
+        model.id.toLowerCase().includes(query)
   );
-  return LLM_PROVIDERS
+  const visible = matches.slice(0, MODEL_ROW_RENDER_CAP);
+  const groups = LLM_PROVIDERS
     .map((provider) => ({
       providerId: provider.id,
       providerLabel: provider.label,
-      models: matches.filter((model) => model.providerId === provider.id)
+      models: visible.filter((model) => model.providerId === provider.id)
     }))
     .filter((group) => group.models.length > 0);
+  return { groups, truncatedCount: matches.length - visible.length };
 }
 
 function ffmpegStatusText(state: FfmpegStatusState): { readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string } {
@@ -101,6 +108,8 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
   const [activeSectionId, setActiveSectionId] = useState<SettingsSectionId>('appearance');
   const { isModelVisible, setModelVisibility } = useModelVisibility();
   const [connectTarget, setConnectTarget] = useState<LlmProviderInfo | null>(null);
+  const [showAllProviders, setShowAllProviders] = useState(false);
+  const [providerFilter, setProviderFilter] = useState('');
   const [disconnectingKey, setDisconnectingKey] = useState<string | null>(null);
   const [modelFilter, setModelFilter] = useState('');
   const [testState, setTestState] = useState<ModelTestState>({ status: 'idle' });
@@ -198,7 +207,17 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
         );
       case 'providers': {
         const connectedProviders = CLOUD_PROVIDERS.filter((provider) => isProviderKeyStored(provider));
-        const popularProviders = CLOUD_PROVIDERS.filter((provider) => !isProviderKeyStored(provider));
+        const popularProviders = CLOUD_PROVIDERS.filter(
+          (provider) => !isProviderKeyStored(provider) && POPULAR_LLM_PROVIDER_IDS.includes(provider.id)
+        );
+        const providerQuery = providerFilter.trim().toLowerCase();
+        const otherProviders = CLOUD_PROVIDERS.filter(
+          (provider) => !isProviderKeyStored(provider) && !POPULAR_LLM_PROVIDER_IDS.includes(provider.id)
+        );
+        const matchedOtherProviders = otherProviders.filter(
+          (provider) => providerQuery.length === 0 || provider.label.toLowerCase().includes(providerQuery) || provider.id.toLowerCase().includes(providerQuery)
+        );
+        const visibleOtherProviders = matchedOtherProviders.slice(0, 40);
         return (
           <>
             <div className="settings-group">
@@ -238,7 +257,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
                     <div key={provider.id} className="settings-list__row">
                       <div className="settings-list__main settings-list__main--stacked">
                         <span className="settings-list__name">{provider.label}</span>
-                        <span className="settings-list__note">Unlocks {modelLabelsForProvider(provider.id)}.</span>
+                        <span className="settings-list__note">{provider.description}</span>
                       </div>
                       <Button variant="default" onClick={() => setConnectTarget(provider)}>+ Connect</Button>
                     </div>
@@ -246,6 +265,47 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
                 )}
               </div>
             </div>
+
+            {!showAllProviders ? (
+              <Button variant="ghost" className="settings-show-all" onClick={() => setShowAllProviders(true)}>
+                Show all providers ({otherProviders.length} more)
+              </Button>
+            ) : (
+              <div className="settings-group">
+                <h3 className="settings-subheading">All providers</h3>
+                <div className="settings-model-search">
+                  <input
+                    type="search"
+                    aria-label="Search providers"
+                    placeholder="Search providers"
+                    value={providerFilter}
+                    onChange={(event) => setProviderFilter(event.target.value)}
+                    spellCheck={false}
+                  />
+                  {providerFilter.length > 0 && (
+                    <Button variant="ghost" onClick={() => setProviderFilter('')} aria-label="Clear provider search">✕</Button>
+                  )}
+                </div>
+                <div className="settings-list">
+                  {visibleOtherProviders.length === 0 ? (
+                    <div className="settings-list__empty">No providers found{providerQuery.length > 0 ? ` for “${providerFilter.trim()}”` : ''}.</div>
+                  ) : (
+                    visibleOtherProviders.map((provider) => (
+                      <div key={provider.id} className="settings-list__row">
+                        <div className="settings-list__main settings-list__main--stacked">
+                          <span className="settings-list__name">{provider.label}</span>
+                          <span className="settings-list__note">{provider.description}</span>
+                        </div>
+                        <Button variant="default" onClick={() => setConnectTarget(provider)}>+ Connect</Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {matchedOtherProviders.length > visibleOtherProviders.length && (
+                  <p className="settings-list__note">{matchedOtherProviders.length - visibleOtherProviders.length} more providers — refine your search.</p>
+                )}
+              </div>
+            )}
 
             <StatusCard tone="neutral">API keys live in main-process safe storage, are write-only from this screen, and are never rendered back.</StatusCard>
             {connectTarget !== null && connectTarget.credentialKey !== undefined && (
@@ -259,7 +319,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
         );
       }
       case 'models': {
-        const groups = filteredModelGroups(modelFilter);
+        const { groups, truncatedCount } = filteredModelGroups(modelFilter);
         return (
           <>
             <div className="settings-model-search">
@@ -309,7 +369,10 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
                 </div>
               ))
             )}
-            <StatusCard tone="neutral">Hidden models disappear from the Edit Agent picker and the primary model list; the active selection always stays listed.</StatusCard>
+            {truncatedCount > 0 && (
+              <p className="settings-list__note">{truncatedCount} more matching models — refine your search.</p>
+            )}
+            <StatusCard tone="neutral">Without a search the local engine and popular providers are shown; searching sweeps the full opencode/models.dev catalog. Hidden models disappear from the Edit Agent picker and the primary model list; the active selection always stays listed.</StatusCard>
           </>
         );
       }
@@ -320,7 +383,10 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
             <label className="field-label" htmlFor="primary-model">Primary LLM model</label>
             <select id="primary-model" value={selectedModelId} onChange={(event) => setSelectedModelId(event.target.value)}>
               {DEFAULT_LLM_MODELS
-                .filter((model) => model.id === selectedModelId || isModelVisible(model.providerId, model.id))
+                .filter((model) =>
+                  model.id === selectedModelId ||
+                  ((model.providerId === 'local_ollama' || isProviderConnected(model.providerId, credentialStatus)) &&
+                    isModelVisible(model.providerId, model.id)))
                 .map((model) => <option key={model.id} value={model.id}>{model.label} ({model.providerLabel}) - [{model.badge}]</option>)}
             </select>
             <StatusCard tone="neutral"><strong>{selectedModel.label}</strong>: {selectedModel.description}</StatusCard>

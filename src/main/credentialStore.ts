@@ -2,18 +2,26 @@ import { safeStorage } from 'electron';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export interface ProviderCredentials {
-  openaiApiKey?: string;
-  anthropicApiKey?: string;
-  geminiApiKey?: string;
-  deepseekApiKey?: string;
-  elevenlabsApiKey?: string;
-  runwayApiKey?: string;
-  klingApiKey?: string;
-  lumaApiKey?: string;
-}
+/**
+ * Per-provider API key slots. The four legacy LLM slots and the media-provider
+ * slots keep their names; every other catalog provider stores under its own
+ * provider id (e.g. `openrouter`, `groq`).
+ */
+export type ProviderCredentials = Record<string, string | undefined>;
 
-export type CredentialStatusMap = Record<keyof ProviderCredentials, boolean>;
+export type CredentialStatusMap = Record<string, boolean>;
+
+/** Slots that must always appear in the status map, even before anything is stored. */
+const ALWAYS_REPORTED_CREDENTIAL_KEYS = [
+  'openaiApiKey',
+  'anthropicApiKey',
+  'geminiApiKey',
+  'deepseekApiKey',
+  'elevenlabsApiKey',
+  'runwayApiKey',
+  'klingApiKey',
+  'lumaApiKey'
+] as const;
 
 export class CredentialStore {
   private readonly filePath: string;
@@ -46,16 +54,14 @@ export class CredentialStore {
 
   async getCredentialStatus(): Promise<CredentialStatusMap> {
     const creds = await this.getCredentials();
-    return {
-      openaiApiKey: Boolean(creds.openaiApiKey && creds.openaiApiKey.trim().length > 0),
-      anthropicApiKey: Boolean(creds.anthropicApiKey && creds.anthropicApiKey.trim().length > 0),
-      geminiApiKey: Boolean(creds.geminiApiKey && creds.geminiApiKey.trim().length > 0),
-      deepseekApiKey: Boolean(creds.deepseekApiKey && creds.deepseekApiKey.trim().length > 0),
-      elevenlabsApiKey: Boolean(creds.elevenlabsApiKey && creds.elevenlabsApiKey.trim().length > 0),
-      runwayApiKey: Boolean(creds.runwayApiKey && creds.runwayApiKey.trim().length > 0),
-      klingApiKey: Boolean(creds.klingApiKey && creds.klingApiKey.trim().length > 0),
-      lumaApiKey: Boolean(creds.lumaApiKey && creds.lumaApiKey.trim().length > 0)
-    };
+    const status: Record<string, boolean> = {};
+    for (const key of ALWAYS_REPORTED_CREDENTIAL_KEYS) {
+      status[key] = false;
+    }
+    for (const [key, value] of Object.entries(creds)) {
+      status[key] = typeof value === 'string' && value.trim().length > 0;
+    }
+    return status;
   }
 
   async getCredentialValue(provider: keyof ProviderCredentials): Promise<string | undefined> {

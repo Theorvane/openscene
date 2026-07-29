@@ -57,6 +57,16 @@ describe('Settings workspace source contract', () => {
     expect(source).toContain('setModelVisibility(model.providerId, model.id, !visible)');
   });
 
+  it('exposes the full catalog behind popular defaults, a Show all providers list, and render caps', async () => {
+    const source = await readFile(SETTINGS_SOURCE_URL, 'utf8');
+
+    expect(source).toContain('POPULAR_LLM_PROVIDER_IDS');
+    expect(source).toContain('Show all providers');
+    expect(source).toContain('Search providers');
+    expect(source).toContain('MODEL_ROW_RENDER_CAP');
+    expect(source).toContain('more matching models — refine your search.');
+  });
+
   it('uses stateful section buttons with an active labeled content region', async () => {
     const source = await readFile(SETTINGS_SOURCE_URL, 'utf8');
 

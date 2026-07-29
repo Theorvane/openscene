@@ -94,7 +94,7 @@ describe('LlmExecutionAdapter (main process)', () => {
       const credentialStore = new CredentialStore(tempDir);
       const adapter = new LlmExecutionAdapter(credentialStore);
 
-      const result = await adapter.executeCompletion({ modelId: 'gpt-5', prompt: 'Generate video script' });
+      const result = await adapter.executeCompletion({ modelId: 'openai/gpt-5', prompt: 'Generate video script' });
 
       expect(result.ok).toBe(false);
       expect(result.providerId).toBe('openai');
@@ -122,9 +122,9 @@ describe('LlmExecutionAdapter (main process)', () => {
       });
       const adapter = new LlmExecutionAdapter(credentialStore, { fetchImpl: fetchMock as unknown as typeof fetch });
 
-      const result = await adapter.executeCompletion({ modelId: 'gpt-5', prompt: 'Generate video script', systemPrompt: 'You are terse.' });
+      const result = await adapter.executeCompletion({ modelId: 'openai/gpt-5', prompt: 'Generate video script', systemPrompt: 'You are terse.' });
 
-      expect(result).toEqual({ ok: true, modelId: 'gpt-5', providerId: 'openai', completion: 'Scene one.' });
+      expect(result).toEqual({ ok: true, modelId: 'openai/gpt-5', providerId: 'openai', completion: 'Scene one.' });
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
@@ -148,9 +148,9 @@ describe('LlmExecutionAdapter (main process)', () => {
       });
       const adapter = new LlmExecutionAdapter(credentialStore, { fetchImpl: fetchMock as unknown as typeof fetch });
 
-      const result = await adapter.executeCompletion({ modelId: 'claude-sonnet-5', prompt: 'Hi', systemPrompt: 'You are terse.' });
+      const result = await adapter.executeCompletion({ modelId: 'anthropic/claude-sonnet-5', prompt: 'Hi', systemPrompt: 'You are terse.' });
 
-      expect(result).toEqual({ ok: true, modelId: 'claude-sonnet-5', providerId: 'anthropic', completion: 'Hello there.' });
+      expect(result).toEqual({ ok: true, modelId: 'anthropic/claude-sonnet-5', providerId: 'anthropic', completion: 'Hello there.' });
     } finally {
       await rm(tempDir, { recursive: true, force: true });
     }
@@ -164,7 +164,7 @@ describe('LlmExecutionAdapter (main process)', () => {
       await credentialStore.setCredential('deepseekApiKey', 'sk-deepseek-test');
       const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
         if (url.includes('generativelanguage')) {
-          expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro:generateContent');
+          expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent');
           expect(url).not.toContain('AIzaSy-test');
           expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('AIzaSy-test');
           return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Gemini says hi.' }] } }] }), { status: 200 });
@@ -175,8 +175,8 @@ describe('LlmExecutionAdapter (main process)', () => {
       });
       const adapter = new LlmExecutionAdapter(credentialStore, { fetchImpl: fetchMock as unknown as typeof fetch });
 
-      const gemini = await adapter.executeCompletion({ modelId: 'gemini-3-pro', prompt: 'Hi' });
-      const deepseek = await adapter.executeCompletion({ modelId: 'deepseek-v3.1', prompt: 'Hi' });
+      const gemini = await adapter.executeCompletion({ modelId: 'google_gemini/gemini-3-pro-preview', prompt: 'Hi' });
+      const deepseek = await adapter.executeCompletion({ modelId: 'deepseek/deepseek-chat', prompt: 'Hi' });
 
       expect(gemini).toMatchObject({ ok: true, providerId: 'google_gemini', completion: 'Gemini says hi.' });
       expect(deepseek).toMatchObject({ ok: true, providerId: 'deepseek', completion: 'DeepSeek says hi.' });
@@ -195,7 +195,7 @@ describe('LlmExecutionAdapter (main process)', () => {
       );
       const adapter = new LlmExecutionAdapter(credentialStore, { fetchImpl: fetchMock as unknown as typeof fetch });
 
-      const result = await adapter.executeCompletion({ modelId: 'gpt-5', prompt: 'Hi' });
+      const result = await adapter.executeCompletion({ modelId: 'openai/gpt-5', prompt: 'Hi' });
 
       expect(result.ok).toBe(false);
       expect(result.error).toContain('Reconnect the provider in Settings');

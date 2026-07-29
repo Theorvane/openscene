@@ -1,5 +1,6 @@
-import type { CredentialStore, ProviderCredentials } from './credentialStore';
-import { DEFAULT_LLM_MODELS } from '../shared/llmModels';
+import type { CredentialStore } from './credentialStore';
+import { getLlmModel, parseLlmModelKey } from '../shared/llmModels';
+import { getLlmProvider, type LlmProviderInfo } from '../shared/llmProviders';
 
 export interface LlmCompletionRequest {
   modelId: string;
@@ -46,7 +47,7 @@ export class LlmExecutionAdapter {
   }
 
   async executeCompletion(request: LlmCompletionRequest): Promise<LlmCompletionResponse> {
-    const model = DEFAULT_LLM_MODELS.find((m) => m.id === request.modelId);
+    const model = getLlmModel(request.modelId);
     if (!model) {
       return {
         ok: false,
@@ -60,7 +61,11 @@ export class LlmExecutionAdapter {
       return this.executeOllamaCompletion(model.id, request);
     }
 
-    return this.executeCloudCompletion(model.id, model.providerId, model.label, model.providerLabel, request);
+    const provider = getLlmProvider(model.providerId);
+    if (provider === undefined || provider.kind !== 'cloud') {
+      return { ok: false, modelId: model.id, providerId: model.providerId, error: `Provider ${model.providerLabel} is not available in the current build.` };
+    }
+    return this.executeCloudCompletion(model.id, provider, request);
   }
 
   private async executeOllamaCompletion(
@@ -132,18 +137,14 @@ export class LlmExecutionAdapter {
 
   private async executeCloudCompletion(
     modelId: string,
-    providerId: string,
-    _modelLabel: string,
-    providerLabel: string,
+    provider: LlmProviderInfo,
     request: LlmCompletionRequest
   ): Promise<LlmCompletionResponse> {
-    let credKey: keyof ProviderCredentials | null = null;
-    if (providerId === 'openai') credKey = 'openaiApiKey';
-    else if (providerId === 'anthropic') credKey = 'anthropicApiKey';
-    else if (providerId === 'google_gemini') credKey = 'geminiApiKey';
-    else if (providerId === 'deepseek') credKey = 'deepseekApiKey';
+    const providerId = provider.id;
+    const providerLabel = provider.label;
+    const credKey = provider.credentialKey;
 
-    if (!credKey || !this.credentialStore) {
+    if (credKey === undefined || !this.credentialStore) {
       return {
         ok: false,
         modelId,
@@ -162,7 +163,8 @@ export class LlmExecutionAdapter {
       };
     }
 
-    const cloudRequest = buildCloudCompletionRequest(providerId, modelId, apiKey.trim(), request);
+    const rawModelId = parseLlmModelKey(modelId)?.modelId ?? modelId;
+    const cloudRequest = buildCloudCompletionRequest(provider, rawModelId, apiKey.trim(), request);
     if (cloudRequest === null) {
       return {
         ok: false,
@@ -257,16 +259,16 @@ function openAiStyleRequest(baseUrl: string, modelId: string, apiKey: string, re
 }
 
 function buildCloudCompletionRequest(
-  providerId: string,
+  provider: LlmProviderInfo,
   modelId: string,
   apiKey: string,
   request: LlmCompletionRequest
 ): CloudCompletionRequest | null {
-  switch (providerId) {
-    case 'openai':
-      return openAiStyleRequest('https://api.openai.com/v1', modelId, apiKey, request);
-    case 'deepseek':
-      return openAiStyleRequest('https://api.deepseek.com', modelId, apiKey, request);
+  switch (provider.adapter) {
+    case 'openai-compatible':
+      return provider.baseUrl === undefined
+        ? null
+        : openAiStyleRequest(provider.baseUrl.replace(/\/$/, ''), modelId, apiKey, request);
     case 'anthropic':
       return {
         url: 'https://api.anthropic.com/v1/messages',
@@ -287,7 +289,7 @@ function buildCloudCompletionRequest(
             .map((part) => part.text)
             .join('')
       };
-    case 'google_gemini':
+    case 'gemini':
       return {
         // The key travels in a header, not the query string, so it can never
         // land in request logs.

@@ -1,9 +1,10 @@
 import { ChatOllama } from '@langchain/ollama';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { DynamicStructuredTool } from '@langchain/core/tools';
-import { getLlmModel, type LlmProviderId } from '../shared/llmModels';
+import { getLlmModel, parseLlmModelKey } from '../shared/llmModels';
+import { getLlmProvider } from '../shared/llmProviders';
 import type { AgentChatModelFactory } from './agentChatGraph';
-import type { CredentialStore, ProviderCredentials } from './credentialStore';
+import type { CredentialStore } from './credentialStore';
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
@@ -11,67 +12,67 @@ export type AgentChatModelSpec =
   | { readonly kind: 'ollama' }
   | {
       readonly kind: 'cloud';
-      readonly providerId: LlmProviderId;
+      readonly providerId: string;
       readonly providerLabel: string;
-      readonly credentialKey: keyof ProviderCredentials;
-      /** OpenAI-compatible providers reuse the OpenAI client with this base URL. */
-      readonly openAiCompatibleBaseUrl?: string;
+      readonly adapter: 'openai-compatible' | 'anthropic' | 'gemini';
+      readonly credentialKey: string;
+      /** Provider-native model id (the part after the provider prefix). */
+      readonly rawModelId: string;
+      readonly baseUrl?: string;
     };
 
 /**
- * Resolve which chat-model client serves a model id. Unknown models fall back
- * to Ollama so custom locally pulled models keep working, matching the
- * pre-provider behavior.
+ * Resolve which chat-model client serves a canonical model key. Unknown keys
+ * fall back to Ollama so custom locally pulled models keep working, matching
+ * the pre-catalog behavior.
  */
 export function resolveAgentChatModelSpec(modelId: string): AgentChatModelSpec {
   const model = getLlmModel(modelId);
-  switch (model?.providerId) {
-    case 'openai':
-      return { kind: 'cloud', providerId: 'openai', providerLabel: 'OpenAI', credentialKey: 'openaiApiKey' };
-    case 'anthropic':
-      return { kind: 'cloud', providerId: 'anthropic', providerLabel: 'Anthropic', credentialKey: 'anthropicApiKey' };
-    case 'google_gemini':
-      return { kind: 'cloud', providerId: 'google_gemini', providerLabel: 'Google Gemini', credentialKey: 'geminiApiKey' };
-    case 'deepseek':
-      return {
-        kind: 'cloud',
-        providerId: 'deepseek',
-        providerLabel: 'DeepSeek',
-        credentialKey: 'deepseekApiKey',
-        openAiCompatibleBaseUrl: 'https://api.deepseek.com'
-      };
-    default:
-      return { kind: 'ollama' };
+  if (model === undefined || model.providerId === 'local_ollama') {
+    return { kind: 'ollama' };
   }
+  const provider = getLlmProvider(model.providerId);
+  if (provider === undefined || provider.kind !== 'cloud' || provider.credentialKey === undefined || provider.adapter === 'ollama') {
+    return { kind: 'ollama' };
+  }
+  return {
+    kind: 'cloud',
+    providerId: provider.id,
+    providerLabel: provider.label,
+    adapter: provider.adapter,
+    credentialKey: provider.credentialKey,
+    rawModelId: parseLlmModelKey(modelId)?.modelId ?? modelId,
+    ...(provider.baseUrl === undefined ? {} : { baseUrl: provider.baseUrl })
+  };
 }
 
 async function createCloudChatModel(
   spec: Extract<AgentChatModelSpec, { kind: 'cloud' }>,
-  modelId: string,
   apiKey: string
 ): Promise<BaseChatModel> {
-  if (spec.providerId === 'anthropic') {
+  if (spec.adapter === 'anthropic') {
     const { ChatAnthropic } = await import('@langchain/anthropic');
-    return new ChatAnthropic({ model: modelId, apiKey });
+    return new ChatAnthropic({ model: spec.rawModelId, apiKey });
   }
-  if (spec.providerId === 'google_gemini') {
+  if (spec.adapter === 'gemini') {
     const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai');
-    return new ChatGoogleGenerativeAI({ model: modelId, apiKey });
+    return new ChatGoogleGenerativeAI({ model: spec.rawModelId, apiKey });
   }
   const { ChatOpenAI } = await import('@langchain/openai');
   return new ChatOpenAI({
-    model: modelId,
+    model: spec.rawModelId,
     apiKey,
-    ...(spec.openAiCompatibleBaseUrl === undefined ? {} : { configuration: { baseURL: spec.openAiCompatibleBaseUrl } })
+    ...(spec.baseUrl === undefined ? {} : { configuration: { baseURL: spec.baseUrl } })
   });
 }
 
 /**
  * Model factory for the Edit Agent graph. The provider is resolved per model
- * id: Ollama models talk to the local engine, cloud models bind the same tool
- * set through their provider's LangChain client with the API key read from
- * main-process safe storage at call time (keys never enter the renderer or
- * the graph config).
+ * key: Ollama models talk to the local engine, catalog cloud models bind the
+ * same tool set through their provider's LangChain client (Anthropic, Gemini,
+ * or any OpenAI-compatible endpoint) with the API key read from main-process
+ * safe storage at call time (keys never enter the renderer or the graph
+ * config).
  */
 export function createAgentChatModel(
   tools: readonly DynamicStructuredTool[],
@@ -92,7 +93,7 @@ export function createAgentChatModel(
         if (apiKey === undefined || apiKey.length === 0) {
           throw new Error(`API key for ${spec.providerLabel} is missing. Connect the provider in Settings first.`);
         }
-        const cloudModel = await createCloudChatModel(spec, modelId, apiKey);
+        const cloudModel = await createCloudChatModel(spec, apiKey);
         if (cloudModel.bindTools === undefined) {
           throw new Error(`${spec.providerLabel} client does not support tool calling in this build.`);
         }
