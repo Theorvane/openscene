@@ -5,15 +5,16 @@
 <h1 align="center">OpenVideo</h1>
 
 <p align="center">
-  A local-first desktop studio for recording a selected window, organizing media, editing a timeline, and exporting an MP4—without uploading your project or media.
+  A local-first desktop video editor with an AI agent that can drive it — your media stays on your machine, and you choose which model providers, if any, it talks to.
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
-  <a href="#what-works-today">What works today</a> ·
-  <a href="#local-first-by-design">Local-first</a> ·
-  <a href="CONTRIBUTING.md">Contributing</a> ·
-  <a href="SECURITY.md">Security</a>
+  <a href="#the-workspace">The workspace</a> ·
+  <a href="#the-edit-agent">Edit Agent</a> ·
+  <a href="#providers-and-models">Providers</a> ·
+  <a href="#where-your-data-lives">Your data</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 <p align="center">
@@ -23,33 +24,82 @@
 </p>
 
 > [!IMPORTANT]
-> **MVP status.** OpenVideo is under active development. It runs from source today; it does **not** yet provide a packaged installer or auto-update service. The hero artwork is concept artwork and does not indicate that external AI-video features are available.
+> **Pre-release.** OpenVideo runs from source. There is no packaged installer or auto-update yet. The hero image above is concept artwork; the screenshots below are the real interface.
 
 ## What is OpenVideo?
 
-OpenVideo is an open-source Electron application for creators who want a straightforward, private video workflow on their own machine. Select a desktop window, record it to a local WebM file, arrange local media in a timeline, review it in the Program Monitor, and render a local H.264/AAC MP4 using FFmpeg.
+OpenVideo is an open-source Electron app for editing video on your own machine. You open a folder as a project, put clips on a timeline, and export an MP4 with your local FFmpeg.
 
-The application is deliberately local-first today: no account, cloud upload, analytics, crash reporting, or provider network calls are part of the current product. Its approved future direction is a hybrid AI editor built around the same local workflow; see [the hybrid AI editor direction](docs/hybrid-ai-editor-direction.md).
+What makes it different is the **Edit Agent**: a chat panel that sits beside the timeline and can actually operate the editor — read the timeline, add and trim clips, generate voice or video, and start an export. It asks for approval before anything that changes your project.
 
-## What works today
+Nothing is uploaded on its own. Model providers are opt-in, connected one at a time with your own API key or sign-in, and the app works with none of them connected.
 
-| Surface | Current capability |
+## The workspace
+
+Open a folder and you land in the workspace. One tab strip switches between editing and the two generation studios; the agent chat stays docked beside all three.
+
+![The OpenVideo editing workspace: media bin, program monitor, inspector, timeline, and the Edit Agent chat panel](docs/assets/screenshot-editor.png)
+
+Projects and past conversations live on the start page. Picking a chat reopens its project and restores the transcript.
+
+![The Projects page listing project folders beside grouped Edit Agent chat history](docs/assets/screenshot-projects.png)
+
+### Editing
+
+- Import local media into a project folder and place it on video and audio tracks
+- Trim, split, move, duplicate, and delete clips, with undo/redo
+- Adjust opacity, scale, position, rotation, and volume, with keyframes, transitions, and per-track audio mix
+- Review with a playhead and a best-effort Program Monitor
+- Export H.264/AAC MP4 through your local FFmpeg
+- Keyboard shortcuts throughout, remappable in Settings
+
+### Voice generation
+
+Write a script, pick a voice model, generate, and import the result straight into the project.
+
+![The Voice Generation studio with a voice picker and a script composer](docs/assets/screenshot-voice.png)
+
+### Video generation
+
+Prompt with a style, aspect ratio, and duration — and optionally a reference image to seed image-to-video.
+
+![The Video Generation studio with style, aspect ratio, duration, and reference image controls](docs/assets/screenshot-video.png)
+
+## The Edit Agent
+
+The chat panel is not a copilot that writes suggestions for you to apply. It calls the same operations the UI does, through a typed tool surface in the main process:
+
+| The agent can | Tool |
 | --- | --- |
-| **Selected-window recording** | Lists capturable desktop windows, grants capture only for the actively selected source, and saves incremental WebM recordings locally. |
-| **Local projects and media** | Creates local projects, imports local assets, and keeps projects, assets, recordings, voice profiles, TTS output, and exports in local app storage. |
-| **Timeline editing** | Adds tracks and clips; trim, split, delete, and adjust opacity, scale, position, rotation, volume, keyframes, transitions, and audio mix settings. |
-| **Review** | Provides playhead movement and a best-effort Program Monitor for reviewing saved timeline state. |
-| **Final export** | Renders a saved timeline locally to H.264 video and AAC audio in an MP4 container through a locally installed FFmpeg executable. |
-| **Optional local narration** | Supports consent-based local voice profiles and user-configured `local_qwen` TTS jobs. No model or runtime is downloaded by OpenVideo. |
+| Read a project timeline and asset metadata | `getProjectTimeline` |
+| Watch footage — sampled frames arrive as images it can actually see | `watchProjectVideo` |
+| Place, trim, and restyle clips | `addClipToTimeline`, `trimTimelineClip`, `updateClipEffects` |
+| Generate speech or video and follow the job | `createSpeechJob`, `createVideoJob`, `getJobStatus` |
+| Import a finished generation into the project | `importGeneratedResult` |
+| Start a local export | `exportProjectVideo` |
+
+Anything that writes to your project or starts a job pauses for approval first. Read-only calls run immediately.
+
+Conversations are kept per project as sessions: start a new one, switch back to an earlier one, or delete it. History is stored in a path-free `chats.json` inside the project folder.
+
+## Providers and models
+
+The provider and model registry is generated from a snapshot of the [models.dev](https://models.dev) catalog — roughly 150 providers and several thousand models — and is regenerated with `scripts/generateLlmCatalog.mjs`.
+
+- **Local**: [Ollama](https://ollama.com) runs models on your machine with no key and no account.
+- **Cloud chat**: connect a provider in *Settings → Providers* with an API key. Only connected providers' models appear in the pickers.
+- **OpenAI**: two login methods on one provider — an API key, or a ChatGPT sign-in (PKCE OAuth) for the model set that backend serves. Tokens stay in main-process safe storage; the renderer only learns whether you are connected.
+- **Generation**: ElevenLabs and OpenAI for speech; Google Veo and OpenAI Sora for video. Providers without a real adapter stay listed but honestly unavailable rather than pretending to work.
+
+API keys are written to Electron `safeStorage` in the main process and never reach the renderer.
 
 ## Quick start
 
 ### Prerequisites
 
-- Node.js 22 or newer
-- npm 10 or newer
-- FFmpeg for final MP4 export
-- On macOS, Screen Recording permission for the terminal that runs OpenVideo or for the packaged app when one becomes available
+- Node.js 22+ and npm 10+
+- FFmpeg, for MP4 export
+- macOS: Screen Recording permission for the terminal running OpenVideo, if you use window capture
 
 ### Install and run
 
@@ -60,73 +110,49 @@ npm install
 npm run dev
 ```
 
-The first capture attempt on macOS can require a permission prompt or a relaunch after you grant access.
-
-### Export an MP4
-
-OpenVideo uses **your local FFmpeg executable**. Set an absolute executable path, or make `ffmpeg` discoverable through an absolute directory in `PATH`:
+OpenVideo uses **your** FFmpeg. Either make `ffmpeg` discoverable through an absolute directory on `PATH`, or point at it explicitly:
 
 ```bash
 VIDEO_TOOL_FFMPEG_PATH=/absolute/path/to/ffmpeg npm run dev
 ```
 
-Relative FFmpeg paths are rejected. If FFmpeg is unavailable, OpenVideo reports the local runtime issue and does not start an export job.
+Relative FFmpeg paths are rejected. Without a usable FFmpeg, OpenVideo reports the problem instead of starting an export.
 
-## A local editing workflow
+### Try the agent without any cloud account
 
-1. **Choose a window** — refresh the available sources and select one desktop window.
-2. **Record locally** — preview, record, pause, resume, and stop. The result is written as a local WebM file.
-3. **Build a project** — create a project, import local media, and place assets on timeline tracks.
-4. **Shape the edit** — trim, split, delete, adjust clip properties, and review the playhead in Program Monitor.
-5. **Export locally** — save the timeline and render an MP4 with the local FFmpeg runtime.
-
-Recordings are stored under Electron user data by default:
-
-```text
-<Electron userData>/recordings
+```bash
+ollama pull qwen2.5-coder
+ollama serve
 ```
 
-For development, override that directory with an absolute path:
+Then pick the local model in the chat panel's model picker. Note that watching footage needs a vision-capable model.
+
+## Where your data lives
+
+Projects are folders you choose. Assets, chat history, and generated results are written inside them; app-managed projects and recordings live under Electron user data.
 
 ```bash
 VIDEO_TOOL_RECORDINGS_DIR=/absolute/path/to/recordings npm run dev
 ```
 
-## Local-first by design
+The renderer talks to the main process through a narrow typed `window.videoTool` bridge. Raw `ipcRenderer`, filesystem paths, FFmpeg arguments, API keys, and OAuth tokens stay outside it — a picked reference image, for example, crosses as bytes, never as a path.
 
-OpenVideo separates Electron's main process, preload bridge, and React renderer. The renderer receives a narrow, typed `window.videoTool` API; raw `ipcRenderer`, local file paths, FFmpeg arguments, voice-sample paths, and export paths remain outside the renderer.
+- **No account, no telemetry.** No analytics, crash reporting, or usage tracking.
+- **No background network calls.** The app talks to a provider only when you ask it to, using a provider you connected.
+- **Capture is scoped.** Window capture grants access to the single source you select.
+- **Removable.** Projects can be removed from the list — a folder you chose is only unregistered, never deleted recursively — and conversations can be deleted.
 
-This boundary supports a few non-negotiables:
+## Current boundaries
 
-- **Your media stays on your device.** There is no cloud upload, hosted render queue, account system, analytics, crash reporting, or provider network call.
-- **Capture is constrained.** The app grants access only to the selected desktop source.
-- **Voice consent matters.** Local voice references must be yours or collected with permission, are stored locally, and can be deleted.
-- **Final rendering stays local.** FFmpeg is the authoritative output path for supported saved timeline state.
-
-## Optional local Qwen TTS
-
-OpenVideo can start a `local_qwen` TTS job only after you configure a compatible local wrapper and model files yourself. This is an optional audio-asset workflow; it does not replace recording and it does not make external requests.
-
-Read [the local Qwen voice-profile guide](docs/local-qwen-voice-profiles.md) and begin with [the safe configuration example](docs/local-qwen-tts-config.example.json). The configuration path and all filesystem paths used by the wrapper must be absolute:
-
-```bash
-VIDEO_TOOL_TTS_CONFIG_PATH=/absolute/path/to/local-qwen-tts.json npm run dev
-```
-
-## Current boundaries and planned seams
-
-OpenVideo intentionally has a narrow MVP boundary.
-
-| Available now | Not available now |
+| Works today | Not yet |
 | --- | --- |
-| Selected-window capture | Full-screen capture |
-| Local WebM recordings | Microphone or system-audio mix in the selected-window recorder |
-| Local projects, media, and timeline editing | Cloud sync, uploads, hosted rendering, accounts, analytics, crash reporting, or auto-update |
-| Local H.264/AAC MP4 export | Multiple final export formats or frame-perfect/multitrack mastering guarantees |
-| User-configured local Qwen TTS | Automatic model/runtime downloads or guaranteed wrapper compatibility |
-| Provider interfaces in `src/shared/providerSeams.ts` | Gemini Veo, OpenAI Sora, ElevenLabs, or any other external AI provider integration |
+| Selected-window capture to local WebM | Full-screen capture; mic or system-audio mix in the recorder |
+| Local projects, media, timeline editing, undo/redo | Cloud sync, hosted rendering, accounts, auto-update |
+| Local H.264/AAC MP4 export | Other export formats; frame-perfect multitrack mastering guarantees |
+| Agent-driven editing, generation, and export | Unattended operation — changes ask for approval |
+| Veo image-to-video via a reference image | Sora reference images (needs a multipart upload path this build does not send) |
 
-Program Monitor is a best-effort review surface, not a frame-perfect final render. For supported saved timeline state, FFmpeg MP4 export is the authoritative local output.
+Program Monitor is a best-effort review surface. FFmpeg export is the authoritative output.
 
 ## Verify from source
 
@@ -136,21 +162,19 @@ npm test
 npm run build
 ```
 
-`npm run build` compiles Electron main, preload, and renderer output into `out/`. It does not package an installer.
+`npm run build` compiles main, preload, and renderer into `out/`. It does not package an installer.
 
-For end-to-end manual QA, run the app on macOS with Screen Recording permission, record one selected window, create a project with a local asset, make a small timeline edit, and export an MP4. Automated tests cannot grant the operating-system permission.
+Some behavior can only be checked by hand: OS permissions, real provider calls, and final render quality.
 
 ## Contribute
 
-OpenVideo welcomes focused contributions that preserve its local-first and security boundaries.
-
 1. Read [AGENTS.md](AGENTS.md) and search existing issues and pull requests.
-2. Create or find a GitHub issue, update `dev`, and create a focused branch.
+2. Create or find a GitHub issue, update `dev`, and branch as `<type>/<issue-number>-<description>`.
 3. Add or update tests for behavior changes.
-4. Run the checks above and open a pull request to `dev`.
+4. Run the checks above and open a pull request against `dev`.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow, [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for participation expectations, [SUPPORT.md](SUPPORT.md) for help, and [SECURITY.md](SECURITY.md) for responsible disclosure guidance.
+See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [SUPPORT.md](SUPPORT.md), and [SECURITY.md](SECURITY.md).
 
 ## License
 
-OpenVideo is distributed under the [MIT License](LICENSE).
+[MIT](LICENSE)
