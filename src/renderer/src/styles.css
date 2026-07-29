@@ -511,7 +511,7 @@ button {
 
 .project-tab--active {
   color: var(--text-strong);
-  background: color-mix(in srgb, #000 26%, transparent);
+  background: color-mix(in srgb, var(--foreground) 12%, transparent);
 }
 
 /* Divider sits between two inactive tabs only, never beside the active one. */
@@ -559,6 +559,13 @@ button {
   background: transparent;
   font-size: 10px;
   cursor: pointer;
+}
+
+/* The tab body carries role="tab", so the shared tab hover reaches it. It is
+   the selection target and stays inert; this out-specifies that rule. */
+.project-tab .project-tab__select:hover {
+  color: inherit;
+  background: transparent;
 }
 
 .project-tab__close:hover {
@@ -1973,7 +1980,7 @@ button {
 [role="tablist"] > .button--primary,
 [role="tablist"] > .button--primary:hover:not(:disabled) {
   color: var(--text-strong);
-  background: color-mix(in srgb, #000 26%, transparent);
+  background: color-mix(in srgb, var(--foreground) 12%, transparent);
 }
 
 [role="tabpanel"] {
@@ -2087,7 +2094,7 @@ button {
      underneath it. */
   border: none;
   color: var(--foreground);
-  background: color-mix(in srgb, #000 26%, transparent);
+  background: color-mix(in srgb, var(--foreground) 12%, transparent);
   box-shadow: none;
   transform: none;
   font-weight: 600;
