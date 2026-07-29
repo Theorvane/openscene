@@ -91,6 +91,21 @@ export async function generateOpenAiSpeech(input: SpeechSynthesisInput): Promise
   return Buffer.from(await response.arrayBuffer());
 }
 
+export type GeneratedVideo = {
+  readonly bytes: Buffer;
+  /** Provider-side job/operation id, surfaced for debugging and future cancel/retry. */
+  readonly providerJobId: string;
+};
+
+/** Sora only accepts these clip lengths; requests snap to the nearest one. */
+export const SORA_ALLOWED_SECONDS = [4, 8, 12] as const;
+
+export function snapSoraSeconds(requested: number): number {
+  return SORA_ALLOWED_SECONDS.reduce((best, candidate) =>
+    Math.abs(candidate - requested) < Math.abs(best - requested) ? candidate : best
+  );
+}
+
 export type VideoSynthesisInput = {
   readonly apiKey: string;
   readonly modelId: string;
@@ -106,7 +121,7 @@ export type VideoSynthesisInput = {
  * Google Veo over the Gemini API: predictLongRunning → poll the operation →
  * download the generated MP4. The key travels in headers only.
  */
-export async function generateVeoVideo(input: VideoSynthesisInput): Promise<Buffer> {
+export async function generateVeoVideo(input: VideoSynthesisInput): Promise<GeneratedVideo> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const pollIntervalMs = input.pollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
   const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
@@ -150,12 +165,12 @@ export async function generateVeoVideo(input: VideoSynthesisInput): Promise<Buff
     }
     const download = await fetchWithTimeout(fetchImpl, videoUri, { method: 'GET', headers: { 'x-goog-api-key': input.apiKey } }, REQUEST_TIMEOUT_MS * 5);
     await expectOk(download, 'Google Veo');
-    return Buffer.from(await download.arrayBuffer());
+    return { bytes: Buffer.from(await download.arrayBuffer()), providerJobId: operation.name };
   }
 }
 
 /** OpenAI Sora over /v1/videos: create → poll → download content as MP4. */
-export async function generateSoraVideo(input: VideoSynthesisInput): Promise<Buffer> {
+export async function generateSoraVideo(input: VideoSynthesisInput): Promise<GeneratedVideo> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const pollIntervalMs = input.pollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
   const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
@@ -168,7 +183,7 @@ export async function generateSoraVideo(input: VideoSynthesisInput): Promise<Buf
     body: JSON.stringify({
       model: input.modelId,
       prompt: input.prompt,
-      seconds: String(Math.min(Math.max(Math.round(input.durationSeconds), 4), 12)),
+      seconds: String(snapSoraSeconds(input.durationSeconds)),
       size
     })
   });
@@ -199,6 +214,6 @@ export async function generateSoraVideo(input: VideoSynthesisInput): Promise<Buf
       headers: { Authorization: `Bearer ${input.apiKey}` }
     }, REQUEST_TIMEOUT_MS * 5);
     await expectOk(download, 'OpenAI Sora');
-    return Buffer.from(await download.arrayBuffer());
+    return { bytes: Buffer.from(await download.arrayBuffer()), providerJobId: created.id };
   }
 }

@@ -7,7 +7,14 @@ import { Button, StatusCard } from './ui';
 
 const STYLE_PRESETS = ['Cinematic', 'Anime', '3D Render', 'Photorealistic', 'Cyberpunk', 'Film Noir'] as const;
 const ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const;
-const DURATIONS = [3, 5, 10] as const;
+
+/** Duration choices per engine: Sora accepts 4/8/12s, Veo 4–8s, local is free. */
+function durationOptionsFor(providerId: string, executionPath: 'local' | 'api'): readonly number[] {
+  if (executionPath === 'local') return [3, 5, 10];
+  if (providerId === 'openai') return [4, 8, 12];
+  if (providerId === 'google_gemini') return [4, 6, 8];
+  return [4, 8];
+}
 
 export function VideoGenerationWorkspace(): ReactElement {
   const { selectedModel } = useAiDomainModel();
@@ -17,8 +24,16 @@ export function VideoGenerationWorkspace(): ReactElement {
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [durationSeconds, setDurationSeconds] = useState<number>(5);
+  const durationOptions = durationOptionsFor(videoModel.providerId, videoModel.executionPath);
+  // Switching engines keeps the chosen length when valid, else the closest option.
+  const effectiveDuration = durationOptions.includes(durationSeconds)
+    ? durationSeconds
+    : durationOptions.reduce((best, candidate) =>
+        Math.abs(candidate - durationSeconds) < Math.abs(best - durationSeconds) ? candidate : best
+      );
   const [selectedStyle, setSelectedStyle] = useState<string>('Cinematic');
   const [jobs, setJobs] = useState<readonly VideoGenerationJob[]>([]);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ text: string; tone: 'neutral' | 'success' | 'warning' | 'danger' }>({
     text: 'Ready to generate AI video. Configure your local runner to begin.',
@@ -38,7 +53,7 @@ export function VideoGenerationWorkspace(): ReactElement {
       const response = await window.videoTool.aiGenerateVideo({
         prompt,
         aspectRatio,
-        durationSeconds,
+        durationSeconds: effectiveDuration,
         stylePreset: selectedStyle,
         mode: isCloudModel ? 'api' : 'local',
         modelId: videoModel.id
@@ -157,11 +172,11 @@ export function VideoGenerationWorkspace(): ReactElement {
             <div>
               <span className="field-label-text">Duration</span>
               <div className="chip-list">
-                {DURATIONS.map((sec) => (
+                {durationOptions.map((sec) => (
                   <button
                     key={sec}
                     type="button"
-                    className={`preset-chip ${durationSeconds === sec ? 'preset-chip--selected' : ''}`}
+                    className={`preset-chip ${effectiveDuration === sec ? 'preset-chip--selected' : ''}`}
                     onClick={() => setDurationSeconds(sec)}
                   >
                     {sec}s

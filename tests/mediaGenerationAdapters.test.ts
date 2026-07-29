@@ -70,7 +70,7 @@ describe('media generation adapters', () => {
       return new Response(VIDEO_BYTES, { status: 200 });
     });
 
-    const bytes = await generateVeoVideo({
+    const generated = await generateVeoVideo({
       apiKey: 'AIza-test',
       modelId: 'veo-3.0-generate-001',
       prompt: 'A sunrise over Seoul',
@@ -81,7 +81,8 @@ describe('media generation adapters', () => {
     });
 
     expect(calls[0]).toBe('https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-001:predictLongRunning');
-    expect([...bytes]).toEqual([9, 8, 7, 6]);
+    expect([...generated.bytes]).toEqual([9, 8, 7, 6]);
+    expect(generated.providerJobId).toBe('operations/op-1');
   });
 
   it('drives Sora through job creation, status polling, and the content download', async () => {
@@ -92,6 +93,8 @@ describe('media generation adapters', () => {
         const body = JSON.parse(init.body as string);
         expect(body.model).toBe('sora-2');
         expect(body.size).toBe('1280x720');
+        // 10s snaps to Sora's nearest allowed clip length.
+        expect(body.seconds).toBe('8');
         return new Response(JSON.stringify({ id: 'video_abc' }), { status: 200 });
       }
       if (url === 'https://api.openai.com/v1/videos/video_abc') {
@@ -102,18 +105,19 @@ describe('media generation adapters', () => {
       return new Response(VIDEO_BYTES, { status: 200 });
     });
 
-    const bytes = await generateSoraVideo({
+    const generated = await generateSoraVideo({
       apiKey: 'sk-sora',
       modelId: 'sora-2',
       prompt: 'A neon city timelapse',
       aspectRatio: '16:9',
-      durationSeconds: 8,
+      durationSeconds: 10,
       pollIntervalMs: 1,
       fetchImpl: fetchMock as unknown as typeof fetch
     });
 
     expect(polls).toBe(2);
-    expect([...bytes]).toEqual([9, 8, 7, 6]);
+    expect([...generated.bytes]).toEqual([9, 8, 7, 6]);
+    expect(generated.providerJobId).toBe('video_abc');
   });
 
   it('reports rejected keys with a reconnect hint and never echoes key material', async () => {

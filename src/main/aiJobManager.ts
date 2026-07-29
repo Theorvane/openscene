@@ -153,19 +153,19 @@ async function invokeCloudVideoProvider(
     durationSeconds: request.durationSeconds ?? 5
   };
   try {
-    let bytes: Buffer;
+    let generated: { bytes: Buffer; providerJobId: string };
     if (model.providerId === 'google_gemini') {
-      bytes = await generateVeoVideo(synthesisInput);
+      generated = await generateVeoVideo(synthesisInput);
     } else if (model.providerId === 'openai') {
-      bytes = await generateSoraVideo(synthesisInput);
+      generated = await generateSoraVideo(synthesisInput);
     } else {
       return {
         ok: false,
         error: `${model.providerLabel} video generation adapter is not implemented in this build.`
       };
     }
-    await writeFile(outputFilePath, bytes);
-    return { ok: true, outputFilePath };
+    await writeFile(outputFilePath, generated.bytes);
+    return { ok: true, outputFilePath, providerJobId: generated.providerJobId };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Cloud video generation failed.' };
   }
