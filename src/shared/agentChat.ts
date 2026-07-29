@@ -18,12 +18,23 @@ export interface AgentToolCallProposal {
 
 export type AgentChatStatus = 'idle' | 'thinking' | 'awaiting-approval' | 'error';
 
+/**
+ * How much of the model's context window the conversation is using, measured
+ * from the last turn that reported usage. `limitTokens` is absent for models
+ * whose context size the catalog does not publish.
+ */
+export interface AgentChatContextUsage {
+  readonly usedTokens: number;
+  readonly limitTokens?: number | undefined;
+}
+
 export interface AgentChatTurnState {
   readonly conversationId: string;
   readonly messages: readonly AgentChatDisplayMessage[];
   readonly pendingApproval: AgentToolCallProposal | null;
   readonly status: AgentChatStatus;
   readonly error?: string | undefined;
+  readonly contextUsage?: AgentChatContextUsage | undefined;
 }
 
 export interface AgentChatSendInput {
@@ -43,12 +54,18 @@ export interface AgentChatSendInput {
   readonly restoredMessages?: readonly AgentChatDisplayMessage[] | undefined;
 }
 
-export type AgentToolApprovalDecision = 'approve' | 'deny';
+/**
+ * `approve` runs the call once; `always` also stops asking for that tool for
+ * the rest of the conversation; `deny` refuses it and may carry feedback that
+ * reaches the model as a correction instead of a bare refusal.
+ */
+export type AgentToolApprovalDecision = 'approve' | 'always' | 'deny';
 
 export interface AgentChatApprovalInput {
   readonly conversationId: string;
   readonly toolCallId: string;
   readonly decision: AgentToolApprovalDecision;
+  readonly feedback?: string | undefined;
 }
 
 export interface AgentChatResetInput {

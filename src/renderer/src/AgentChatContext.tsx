@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import type { AgentChatDisplayMessage, AgentChatHistoryEntry, AgentChatStatus, AgentToolCallProposal } from '../../shared/agentChat';
+import type { AgentChatContextUsage, AgentChatDisplayMessage, AgentChatHistoryEntry, AgentChatStatus, AgentToolApprovalDecision, AgentToolCallProposal } from '../../shared/agentChat';
+import type { EditAgentContextAsset } from '../../shared/editAgentContext';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import type { AiDomainModelConfig } from '../../shared/aiDomainModels';
 import { isProviderConnected } from '../../shared/llmProviders';
@@ -40,12 +41,18 @@ interface AgentChatController {
   readonly error: string | undefined;
   readonly isBusy: boolean;
   readonly activeProject: EditAgentProjectContext | null;
+  /** Context window consumed by the conversation, when a turn reported it. */
+  readonly contextUsage: AgentChatContextUsage | undefined;
+  /** Project assets attached to the next message. */
+  readonly contextAssets: readonly EditAgentContextAsset[];
+  readonly attachContextAsset: (asset: EditAgentContextAsset) => void;
+  readonly detachContextAsset: (assetId: string) => void;
   /** Saved conversations for this project, plus the one currently open. */
   readonly sessions: readonly AgentChatSessionRow[];
   readonly startNewSession: () => void;
   readonly switchSession: (conversationId: string) => Promise<void>;
   readonly sendMessage: (text: string) => Promise<void>;
-  readonly respondToApproval: (decision: 'approve' | 'deny') => Promise<void>;
+  readonly respondToApproval: (decision: AgentToolApprovalDecision, feedback?: string) => Promise<void>;
   readonly resetConversation: () => Promise<void>;
 }
 
@@ -77,6 +84,8 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   const [status, setStatus] = useState<AgentChatStatus>('idle');
   const [error, setError] = useState<string | undefined>(undefined);
   const [isBusy, setIsBusy] = useState(false);
+  const [contextUsage, setContextUsage] = useState<AgentChatContextUsage | undefined>(undefined);
+  const [contextAssets, setContextAssets] = useState<readonly EditAgentContextAsset[]>([]);
   const [historyEntries, setHistoryEntries] = useState<readonly AgentChatHistoryEntry[]>([]);
   // Re-read after each turn so a session that just got its title shows it.
   const [historyRevision, setHistoryRevision] = useState(0);
@@ -162,6 +171,8 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     setStatus('idle');
     setError(undefined);
     setInput('');
+    setContextAssets([]);
+    setContextUsage(undefined);
     setHistoryRevision((revision) => revision + 1);
   };
 
@@ -209,6 +220,7 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
         modelId: selectedModel.id,
         ollamaBaseUrl: providerConfig.ollamaBaseUrl,
         activeProject: activeProject ?? undefined,
+        ...(contextAssets.length === 0 ? {} : { contextAssets }),
         openAiAuthMode,
         reasoningEffort,
         restoredMessages: restoredSeedRef.current ?? undefined
@@ -216,6 +228,8 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
 
       if (response.ok) {
         restoredSeedRef.current = null;
+        setContextAssets([]);
+        setContextUsage(response.value.contextUsage);
         setHistoryRevision((revision) => revision + 1);
         setMessages(
           response.value.status === 'error'
@@ -238,7 +252,7 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     }
   };
 
-  const respondToApproval = async (decision: 'approve' | 'deny'): Promise<void> => {
+  const respondToApproval = async (decision: AgentToolApprovalDecision, feedback?: string): Promise<void> => {
     if (!pendingApproval || isBusy) return;
 
     setIsBusy(true);
@@ -246,10 +260,12 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
       const response = await window.videoTool.agentChatApprove({
         conversationId: conversationIdRef.current,
         toolCallId: pendingApproval.toolCallId,
-        decision
+        decision,
+        ...(feedback === undefined || feedback.trim().length === 0 ? {} : { feedback })
       });
 
       if (response.ok) {
+        setContextUsage(response.value.contextUsage);
         setMessages(response.value.messages);
         setPendingApproval(response.value.pendingApproval);
         setStatus(response.value.status);
@@ -304,6 +320,12 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     error,
     isBusy,
     activeProject,
+    contextUsage,
+    contextAssets,
+    attachContextAsset: (asset) => setContextAssets((current) =>
+      current.some((existing) => existing.assetId === asset.assetId) ? current : [...current, asset]
+    ),
+    detachContextAsset: (assetId) => setContextAssets((current) => current.filter((asset) => asset.assetId !== assetId)),
     sessions,
     startNewSession,
     switchSession,

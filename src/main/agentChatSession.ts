@@ -1,4 +1,5 @@
 import { Command, INTERRUPT, isInterrupted, type StateSnapshot } from '@langchain/langgraph';
+import type { AgentChatContextUsage } from '../shared/agentChat';
 import type { MemorySaver } from '@langchain/langgraph-checkpoint';
 import type { BaseMessage } from '@langchain/core/messages';
 import type {
@@ -10,6 +11,8 @@ import type {
   AgentToolCallProposal
 } from '../shared/agentChat';
 import type { EditAgentContextAsset, EditAgentProjectContext } from '../shared/editAgentContext';
+import { getDomainModel } from '../shared/aiDomainModels';
+import { buildContextUsage, type TurnTokenUsage } from '../shared/agentChatUsage';
 import type { OpenAiAuthMode, ReasoningEffort } from '../shared/openAiAuth';
 import { isAiLike, isHumanMessage, isToolMessage, type AgentChatGraphBundle } from './agentChatGraph';
 
@@ -98,6 +101,9 @@ export class AgentChatSessionManager {
         };
       }
 
+      if (input.feedback !== undefined && input.feedback.trim().length > 0) {
+        await this.graph.updateState(config, { toolFeedback: { [input.toolCallId]: input.feedback } });
+      }
       const result = await this.graph.invoke(new Command({ resume: input.decision }), config);
       return await this.toTurnState(input.conversationId, result);
     } catch (err) {
@@ -135,7 +141,8 @@ export class AgentChatSessionManager {
         conversationId,
         messages: toDisplayMessages(messages),
         pendingApproval: proposal,
-        status: 'awaiting-approval'
+        status: 'awaiting-approval',
+        ...this.contextUsageFor(conversationId, messages)
       };
     }
 
@@ -144,8 +151,22 @@ export class AgentChatSessionManager {
       conversationId,
       messages: toDisplayMessages(messages),
       pendingApproval: null,
-      status: 'idle'
+      status: 'idle',
+      ...this.contextUsageFor(conversationId, messages)
     };
+  }
+
+  /**
+   * Context size comes from the newest turn that reported usage: provider
+   * prompt tokens already cover the whole conversation, so the latest total is
+   * the current context, not a running sum.
+   */
+  private contextUsageFor(conversationId: string, messages: readonly BaseMessage[]): { contextUsage?: AgentChatContextUsage } {
+    const usage = latestTokenUsage(messages);
+    const modelId = this.conversationConfigs.get(conversationId)?.modelId;
+    const contextWindow = modelId === undefined ? undefined : getDomainModel('edit-agent', modelId)?.contextWindow;
+    const contextUsage = buildContextUsage(usage, contextWindow);
+    return contextUsage === undefined ? {} : { contextUsage };
   }
 
   /**
@@ -175,6 +196,23 @@ function findPendingProposal(snapshot: StateSnapshot): AgentToolCallProposal | n
     }
   }
   return null;
+}
+
+/** Newest reported provider usage, however the adapter spells the field. */
+function latestTokenUsage(messages: readonly BaseMessage[]): TurnTokenUsage | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message === undefined || !isAiLike(message)) continue;
+    const usage = (message as unknown as { usage_metadata?: { input_tokens?: number; output_tokens?: number; total_tokens?: number } }).usage_metadata;
+    if (usage === undefined) continue;
+    const turn: TurnTokenUsage = {
+      inputTokens: usage.input_tokens,
+      outputTokens: usage.output_tokens,
+      totalTokens: usage.total_tokens
+    };
+    if (turn.inputTokens !== undefined || turn.outputTokens !== undefined || turn.totalTokens !== undefined) return turn;
+  }
+  return undefined;
 }
 
 function toDisplayMessages(messages: readonly BaseMessage[]): AgentChatDisplayMessage[] {

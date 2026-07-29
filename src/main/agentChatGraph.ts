@@ -144,6 +144,16 @@ const AgentChatState = Annotation.Root({
     reducer: (current, update) => current.concat(update),
     default: () => []
   }),
+  /** Tools the user chose to always allow; never asked about again. */
+  alwaysAllowedTools: Annotation<string[]>({
+    reducer: (current, update) => [...new Set([...current, ...update])],
+    default: () => []
+  }),
+  /** Reason the user gave when denying a call, passed back as a correction. */
+  toolFeedback: Annotation<Record<string, string>>({
+    reducer: (current, update) => ({ ...current, ...update }),
+    default: () => ({})
+  }),
   toolDecisions: Annotation<Record<string, AgentToolApprovalDecision>>({
     reducer: (current, update) => ({ ...current, ...update }),
     default: () => ({})
@@ -191,6 +201,10 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
         if (!call.id || !options.mutatingToolNames.has(call.name) || state.toolDecisions[call.id]) {
           continue;
         }
+        if (state.alwaysAllowedTools.includes(call.name)) {
+          decisions[call.id] = 'approve';
+          continue;
+        }
         const proposal: AgentToolCallProposal = {
           toolCallId: call.id,
           toolName: call.name,
@@ -198,7 +212,11 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
         };
         decisions[call.id] = interrupt<AgentToolCallProposal, AgentToolApprovalDecision>(proposal);
       }
-      return { toolDecisions: decisions };
+      const alwaysAllowedTools = Object.entries(decisions)
+        .filter(([, decision]) => decision === 'always')
+        .map(([callId]) => last.tool_calls?.find((call) => call.id === callId)?.name)
+        .filter((name): name is string => name !== undefined);
+      return { toolDecisions: decisions, alwaysAllowedTools };
     })
     .addNode('executeTools', async (state) => {
       const last = state.messages[state.messages.length - 1];
@@ -211,8 +229,14 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
         if (!call.id) continue;
 
         const decision = options.mutatingToolNames.has(call.name) ? state.toolDecisions[call.id] : 'approve';
-        if (decision !== 'approve') {
-          results.push(new ToolMessage({ content: `User denied the "${call.name}" action.`, tool_call_id: call.id, name: call.name }));
+        if (decision !== 'approve' && decision !== 'always') {
+          // A denial with feedback reads as a correction, so the model can act
+          // on the reason instead of only learning that it was refused.
+          const feedback = state.toolFeedback[call.id];
+          const content = feedback === undefined || feedback.trim().length === 0
+            ? `User denied the "${call.name}" action.`
+            : `User denied the "${call.name}" action: ${feedback.trim()}`;
+          results.push(new ToolMessage({ content, tool_call_id: call.id, name: call.name }));
           continue;
         }
 
