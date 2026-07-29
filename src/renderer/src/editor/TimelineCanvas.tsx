@@ -491,7 +491,9 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                   cursor: 'ew-resize',
                   position: 'relative',
                   minWidth: 0,
-                  overflow: 'hidden'
+                  // Visible so the scrub dot can hang below the ruler and meet
+                  // the continuous playhead line; edge labels self-suppress.
+                  overflow: 'visible'
                 }}
               >
                 {rulerTicks.map((tick) => (
@@ -573,6 +575,25 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                 />
               </div>
             </div>
+
+            {/* One continuous playhead line from the ruler dot down through every
+                track. It lives at the container level so the 4px row gaps and the
+                lanes' overflow clipping cannot break it; the horizontal math
+                mirrors the shared 104px-rail + lane coordinate space. */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                top: 'calc(var(--space-2) + 17px)',
+                bottom: 'var(--space-2)',
+                left: `calc(var(--space-3) + 104px + (100% - (2 * var(--space-3)) - 104px) * ${playheadPercent / 100})`,
+                width: '1.5px',
+                background: 'var(--foreground)',
+                zIndex: 4,
+                pointerEvents: 'none',
+                transition: 'left 80ms ease'
+              }}
+            />
 
             {/* Tracks */}
             {project.timeline.tracks.map((track) => (
@@ -664,9 +685,6 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                     position: 'relative'
                   }}
                 >
-                  {/* Playhead hairline synchronized across lanes */}
-                  <div className="timeline-playhead" style={{ left: `${playheadPercent}%`, transition: 'left 80ms ease' }} aria-hidden="true" />
-
                   {/* Track Clips */}
                   {(view.blocksByTrackId[track.id] ?? []).map((block) => (
                     <button

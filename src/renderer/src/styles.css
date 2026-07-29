@@ -2772,16 +2772,6 @@ button {
   outline-offset: -1px;
 }
 
-.timeline-playhead {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 4;
-  width: 1.5px;
-  background: var(--foreground);
-  pointer-events: none;
-}
-
 .timeline-clip {
   position: absolute;
   top: 4px;
