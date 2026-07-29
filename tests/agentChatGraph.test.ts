@@ -114,6 +114,36 @@ describe('agent chat graph', () => {
     expect(toolMessage?.text).toContain('Trim the intro first');
   });
 
+  it('compacts a long conversation into a summary plus the recent tail', async () => {
+    const replies = Array.from({ length: 9 }, (_, index) => new AIMessage(`reply ${index + 1}`));
+    const session = buildSession([...replies, new AIMessage('## Objective\n- Trim the intro')]);
+
+    for (let turn = 0; turn < 9; turn += 1) {
+      await session.sendMessage({ conversationId: 'c-compact', text: `message ${turn + 1}`, modelId: 'qwen2.5-coder' });
+    }
+    const before = await session.sendMessage({ conversationId: 'c-compact', text: 'one more', modelId: 'qwen2.5-coder' });
+    expect(before.messages.length).toBeGreaterThan(6);
+
+    const compacted = await session.compactConversation({ conversationId: 'c-compact' });
+
+    expect(compacted.status).toBe('idle');
+    // The summary replaces the older turns, and the tail survives verbatim.
+    expect(compacted.messages[0]?.text).toContain('[Compacted conversation summary]');
+    expect(compacted.messages.length).toBeLessThan(before.messages.length);
+    // The newest turns are kept verbatim rather than folded into the summary.
+    expect(compacted.messages.some((message) => message.role === 'user' && message.text === 'one more')).toBe(true);
+  });
+
+  it('refuses to compact a conversation that has nothing to fold away', async () => {
+    const session = buildSession([new AIMessage('Hi.')]);
+    await session.sendMessage({ conversationId: 'c-short', text: 'hello', modelId: 'qwen2.5-coder' });
+
+    const result = await session.compactConversation({ conversationId: 'c-short' });
+
+    expect(result.status).toBe('error');
+    expect(result.error).toContain('too short to compact');
+  });
+
   it('answers directly when the model makes no tool calls', async () => {
     const session = buildSession([new AIMessage('Hello! How can I help?')]);
 

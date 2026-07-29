@@ -1,4 +1,5 @@
 import { Command, INTERRUPT, isInterrupted, type StateSnapshot } from '@langchain/langgraph';
+import type { AgentChatCompactInput } from '../shared/agentChat';
 import type { AgentChatContextUsage } from '../shared/agentChat';
 import type { MemorySaver } from '@langchain/langgraph-checkpoint';
 import type { BaseMessage } from '@langchain/core/messages';
@@ -14,7 +15,7 @@ import type { EditAgentContextAsset, EditAgentProjectContext } from '../shared/e
 import { getDomainModel } from '../shared/aiDomainModels';
 import { buildContextUsage, type TurnTokenUsage } from '../shared/agentChatUsage';
 import type { OpenAiAuthMode, ReasoningEffort } from '../shared/openAiAuth';
-import { isAiLike, isHumanMessage, isToolMessage, type AgentChatGraphBundle } from './agentChatGraph';
+import { isAiLike, isHumanMessage, isSystemMessage, isToolMessage, type AgentChatGraphBundle } from './agentChatGraph';
 
 interface ConversationConfig {
   readonly modelId: string;
@@ -28,11 +29,13 @@ interface ConversationConfig {
 export class AgentChatSessionManager {
   private readonly graph: AgentChatGraphBundle['graph'];
   private readonly checkpointer: MemorySaver;
+  private readonly createModel: AgentChatGraphBundle['createModel'];
   private readonly conversationConfigs = new Map<string, ConversationConfig>();
 
   constructor(bundle: AgentChatGraphBundle) {
     this.graph = bundle.graph;
     this.checkpointer = bundle.checkpointer;
+    this.createModel = bundle.createModel;
   }
 
   async sendMessage(input: AgentChatSendInput): Promise<AgentChatTurnState> {
@@ -106,6 +109,64 @@ export class AgentChatSessionManager {
       }
       const result = await this.graph.invoke(new Command({ resume: input.decision }), config);
       return await this.toTurnState(input.conversationId, result);
+    } catch (err) {
+      return this.errorState(input.conversationId, err);
+    }
+  }
+
+  /**
+   * Summarizes the conversation and restarts the thread from that summary plus
+   * the most recent turns, so a long session can keep going instead of hitting
+   * the model's context window. Mirrors opencode's compaction: a structured
+   * summary replaces the old history, the recent tail stays verbatim.
+   */
+  async compactConversation(input: AgentChatCompactInput): Promise<AgentChatTurnState> {
+    const config = this.runnableConfig(input.conversationId);
+    const stored = this.conversationConfigs.get(input.conversationId);
+    if (stored === undefined) {
+      return this.errorState(input.conversationId, new Error('This conversation has nothing to compact yet.'));
+    }
+
+    try {
+      const snapshot = await this.graph.getState(config);
+      const messages = ((snapshot.values as { messages?: BaseMessage[] } | undefined)?.messages ?? []) as BaseMessage[];
+      const conversation = messages.filter((message) => !isSystemMessage(message));
+      if (conversation.length <= COMPACTION_KEEP_RECENT) {
+        return this.errorState(input.conversationId, new Error('This conversation is too short to compact.'));
+      }
+
+      const { HumanMessage } = await import('@langchain/core/messages');
+      const older = conversation.slice(0, conversation.length - COMPACTION_KEEP_RECENT);
+      const recent = conversation.slice(conversation.length - COMPACTION_KEEP_RECENT);
+
+      const model = this.createModel({
+        modelId: stored.modelId,
+        openAiAuthMode: stored.openAiAuthMode,
+        reasoningEffort: stored.reasoningEffort,
+        ollamaBaseUrl: stored.ollamaBaseUrl
+      });
+      const summaryReply = await model.invoke([
+        new HumanMessage(`${COMPACTION_PROMPT}\n\n<conversation>\n${transcriptForSummary(older)}\n</conversation>`)
+      ]);
+      const summary = contentToText(summaryReply.content).trim();
+      if (summary.length === 0) {
+        return this.errorState(input.conversationId, new Error('The model returned an empty summary; nothing was compacted.'));
+      }
+
+      // Restart the thread so the old turns stop being resent, then seed it
+      // with the summary followed by the untouched recent tail.
+      await this.checkpointer.deleteThread(input.conversationId);
+      const seeded = [new HumanMessage(`${COMPACTION_SUMMARY_PREFIX}\n\n${summary}`), ...recent];
+      await this.graph.updateState(config, { messages: seeded });
+
+      const state = await this.graph.getState(config);
+      const compacted = ((state.values as { messages?: BaseMessage[] } | undefined)?.messages ?? []) as BaseMessage[];
+      return {
+        conversationId: input.conversationId,
+        messages: toDisplayMessages(compacted),
+        pendingApproval: null,
+        status: 'idle'
+      };
     } catch (err) {
       return this.errorState(input.conversationId, err);
     }
@@ -196,6 +257,33 @@ function findPendingProposal(snapshot: StateSnapshot): AgentToolCallProposal | n
     }
   }
   return null;
+}
+
+/** How many trailing messages survive a compaction verbatim. */
+const COMPACTION_KEEP_RECENT = 6;
+
+const COMPACTION_SUMMARY_PREFIX = '[Compacted conversation summary]';
+
+const COMPACTION_PROMPT =
+  'Summarize the video-editing conversation below so it can continue with the history dropped. ' +
+  'Output exactly these Markdown sections, in this order, and nothing else:\n' +
+  '## Objective\n## Important details\n## Work state\n## Next move\n' +
+  'Under each, use short bullets, or "(none)". Keep project ids, asset ids, clip ids, and timings ' +
+  'exactly as written — they are how the tools address things.';
+
+/** Plain transcript of the turns being folded into a summary. */
+function transcriptForSummary(messages: readonly BaseMessage[]): string {
+  return messages
+    .map((message) => {
+      const text = contentToText(message.content).trim();
+      if (text.length === 0) return '';
+      const role = isHumanMessage(message) ? 'user' : isToolMessage(message) ? 'tool' : 'assistant';
+      // Tool payloads are the bulk of a long session and the least reusable.
+      const body = role === 'tool' && text.length > 500 ? `${text.slice(0, 500)}\n[truncated]` : text;
+      return `${role}: ${body}`;
+    })
+    .filter((line) => line.length > 0)
+    .join('\n\n');
 }
 
 /** Newest reported provider usage, however the adapter spells the field. */

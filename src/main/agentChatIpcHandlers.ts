@@ -46,6 +46,16 @@ export function registerAgentChatIpcHandlers(
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.agentChatCompact, async (_event, request) => {
+    try {
+      const turn = await sessions.compactConversation(request);
+      await recordTurn(turn);
+      return ok(turn);
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to compact the agent conversation');
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.agentChatReset, async (_event, request) => {
     try {
       return ok(await sessions.resetConversation(request));

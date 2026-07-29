@@ -68,6 +68,11 @@ export interface AgentChatApprovalInput {
   readonly feedback?: string | undefined;
 }
 
+/** Fold the conversation into a summary so it keeps fitting the context window. */
+export interface AgentChatCompactInput {
+  readonly conversationId: string;
+}
+
 export interface AgentChatResetInput {
   readonly conversationId: string;
 }

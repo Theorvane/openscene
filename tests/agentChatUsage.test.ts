@@ -6,7 +6,10 @@ import {
   formatContextUsage,
   formatTokenCount,
   parseContextWindowTokens,
-  turnUsedTokens
+  turnUsedTokens,
+  contextPressure,
+  needsCompaction,
+  usableContextTokens
 } from '../src/shared/agentChatUsage';
 
 describe('Edit Agent context usage', () => {
@@ -52,5 +55,31 @@ describe('Edit Agent context usage', () => {
     expect(formatContextUsage({ usedTokens: 12_400, limitTokens: 200_000 })).toBe('12.4k / 200k');
     expect(formatContextUsage({ usedTokens: 12_400 })).toBe('12.4k tokens');
     expect(formatContextUsage(undefined)).toBeNull();
+  });
+});
+
+describe('Edit Agent context compaction rules', () => {
+  it('reserves room for the next reply instead of filling the window', () => {
+    expect(usableContextTokens(200_000)).toBe(180_000);
+    expect(usableContextTokens(undefined)).toBeUndefined();
+    // A window smaller than the reserve still leaves half of it usable.
+    expect(usableContextTokens(8_000)).toBe(4_000);
+  });
+
+  it('warns before the window is full and calls for compaction once it is', () => {
+    const at = (usedTokens: number) => ({ usedTokens, limitTokens: 200_000 });
+
+    expect(contextPressure(at(10_000))).toBe('ok');
+    expect(contextPressure(at(150_000))).toBe('warning');
+    expect(contextPressure(at(180_000))).toBe('overflow');
+    expect(needsCompaction(at(180_000))).toBe(true);
+    expect(needsCompaction(at(150_000))).toBe(false);
+  });
+
+  it('never demands compaction for a model with no published window', () => {
+    // Without a limit there is nothing to overflow, so the agent is left alone.
+    expect(contextPressure({ usedTokens: 900_000 })).toBe('ok');
+    expect(needsCompaction({ usedTokens: 900_000 })).toBe(false);
+    expect(contextPressure(undefined)).toBe('ok');
   });
 });

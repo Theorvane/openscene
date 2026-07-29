@@ -75,3 +75,39 @@ export function formatContextUsage(usage: AgentChatContextUsage | undefined): st
   if (usage.limitTokens === undefined) return `${used} tokens`;
   return `${used} / ${formatTokenCount(usage.limitTokens)}`;
 }
+
+/**
+ * Compaction budget, following opencode's overflow rule: a conversation may
+ * fill the window minus a reserve kept free for the next reply. Crossing that
+ * line means the next turn would not fit, so the history has to be summarized
+ * before it is sent again.
+ */
+export const CONTEXT_RESERVE_TOKENS = 20_000;
+
+/** Recent tail kept verbatim after a compaction, ahead of the summary. */
+export const CONTEXT_KEEP_RECENT_TURNS = 6;
+
+export type ContextPressure = 'ok' | 'warning' | 'overflow';
+
+export function usableContextTokens(limitTokens: number | undefined): number | undefined {
+  if (limitTokens === undefined || limitTokens <= 0) return undefined;
+  // Never reserve so much that nothing is usable on a small window.
+  return Math.max(Math.round(limitTokens / 2), limitTokens - CONTEXT_RESERVE_TOKENS);
+}
+
+/**
+ * `overflow` means the next turn no longer fits and the conversation must be
+ * compacted; `warning` is the last stretch before that, so the panel can say so
+ * before the agent is interrupted mid-task.
+ */
+export function contextPressure(usage: AgentChatContextUsage | undefined): ContextPressure {
+  const usable = usableContextTokens(usage?.limitTokens);
+  if (usage === undefined || usable === undefined) return 'ok';
+  if (usage.usedTokens >= usable) return 'overflow';
+  return usage.usedTokens >= usable * 0.8 ? 'warning' : 'ok';
+}
+
+/** True when a conversation should be compacted before the next send. */
+export function needsCompaction(usage: AgentChatContextUsage | undefined): boolean {
+  return contextPressure(usage) === 'overflow';
+}

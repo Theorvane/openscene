@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { AgentChatContextUsage, AgentChatDisplayMessage, AgentChatHistoryEntry, AgentChatStatus, AgentToolApprovalDecision, AgentToolCallProposal } from '../../shared/agentChat';
-import type { EditAgentContextAsset } from '../../shared/editAgentContext';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import type { AiDomainModelConfig } from '../../shared/aiDomainModels';
 import { isProviderConnected } from '../../shared/llmProviders';
@@ -43,10 +42,6 @@ interface AgentChatController {
   readonly activeProject: EditAgentProjectContext | null;
   /** Context window consumed by the conversation, when a turn reported it. */
   readonly contextUsage: AgentChatContextUsage | undefined;
-  /** Project assets attached to the next message. */
-  readonly contextAssets: readonly EditAgentContextAsset[];
-  readonly attachContextAsset: (asset: EditAgentContextAsset) => void;
-  readonly detachContextAsset: (assetId: string) => void;
   /** Saved conversations for this project, plus the one currently open. */
   readonly sessions: readonly AgentChatSessionRow[];
   readonly startNewSession: () => void;
@@ -54,6 +49,8 @@ interface AgentChatController {
   readonly sendMessage: (text: string) => Promise<void>;
   readonly respondToApproval: (decision: AgentToolApprovalDecision, feedback?: string) => Promise<void>;
   readonly resetConversation: () => Promise<void>;
+  /** Folds the conversation into a summary so it keeps fitting the window. */
+  readonly compactConversation: () => Promise<void>;
 }
 
 const AgentChatContext = createContext<AgentChatController | null>(null);
@@ -85,7 +82,6 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
   const [error, setError] = useState<string | undefined>(undefined);
   const [isBusy, setIsBusy] = useState(false);
   const [contextUsage, setContextUsage] = useState<AgentChatContextUsage | undefined>(undefined);
-  const [contextAssets, setContextAssets] = useState<readonly EditAgentContextAsset[]>([]);
   const [historyEntries, setHistoryEntries] = useState<readonly AgentChatHistoryEntry[]>([]);
   // Re-read after each turn so a session that just got its title shows it.
   const [historyRevision, setHistoryRevision] = useState(0);
@@ -171,7 +167,6 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     setStatus('idle');
     setError(undefined);
     setInput('');
-    setContextAssets([]);
     setContextUsage(undefined);
     setHistoryRevision((revision) => revision + 1);
   };
@@ -220,7 +215,6 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
         modelId: selectedModel.id,
         ollamaBaseUrl: providerConfig.ollamaBaseUrl,
         activeProject: activeProject ?? undefined,
-        ...(contextAssets.length === 0 ? {} : { contextAssets }),
         openAiAuthMode,
         reasoningEffort,
         restoredMessages: restoredSeedRef.current ?? undefined
@@ -228,7 +222,6 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
 
       if (response.ok) {
         restoredSeedRef.current = null;
-        setContextAssets([]);
         setContextUsage(response.value.contextUsage);
         setHistoryRevision((revision) => revision + 1);
         setMessages(
@@ -282,6 +275,31 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     }
   };
 
+  const compactConversation = async (): Promise<void> => {
+    if (isBusy) return;
+    setIsBusy(true);
+    setStatus('thinking');
+    try {
+      const response = await window.videoTool.agentChatCompact({ conversationId: conversationIdRef.current });
+      if (!response.ok) {
+        setStatus('error');
+        setError(response.error.message);
+        return;
+      }
+      restoredSeedRef.current = null;
+      setMessages(response.value.messages);
+      setPendingApproval(response.value.pendingApproval);
+      setStatus(response.value.status);
+      setError(response.value.error);
+      setContextUsage(response.value.contextUsage);
+    } catch (cause) {
+      setStatus('error');
+      setError(cause instanceof Error ? cause.message : 'Could not compact the conversation.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   const resetConversation = async (): Promise<void> => {
     if (isBusy) return;
     setIsBusy(true);
@@ -321,17 +339,13 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     isBusy,
     activeProject,
     contextUsage,
-    contextAssets,
-    attachContextAsset: (asset) => setContextAssets((current) =>
-      current.some((existing) => existing.assetId === asset.assetId) ? current : [...current, asset]
-    ),
-    detachContextAsset: (assetId) => setContextAssets((current) => current.filter((asset) => asset.assetId !== assetId)),
     sessions,
     startNewSession,
     switchSession,
     sendMessage,
     respondToApproval,
-    resetConversation
+    resetConversation,
+    compactConversation
   };
 
   return <AgentChatContext.Provider value={controller}>{children}</AgentChatContext.Provider>;

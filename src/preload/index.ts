@@ -38,6 +38,7 @@ import { parseTimelineMenuCommandId } from '../shared/timelineMenuCommands';
 import type { TimelineMenuCommandId, TimelineMenuState } from '../shared/timelineMenuCommands';
 import type {
   AgentChatApprovalInput,
+  AgentChatCompactInput,
   AgentChatHistoryEntry,
   AgentChatHistoryGetInput,
   AgentChatResetInput,
@@ -110,6 +111,7 @@ export interface VideoToolApi {
   agentChatSend(input: AgentChatSendInput): Promise<ApiResponse<AgentChatTurnState>>;
   agentChatApprove(input: AgentChatApprovalInput): Promise<ApiResponse<AgentChatTurnState>>;
   agentChatReset(input: AgentChatResetInput): Promise<ApiResponse<AgentChatTurnState>>;
+  agentChatCompact(input: AgentChatCompactInput): Promise<ApiResponse<AgentChatTurnState>>;
   agentChatHistoryList(): Promise<ApiResponse<readonly AgentChatHistoryEntry[]>>;
   agentChatHistoryGet(input: AgentChatHistoryGetInput): Promise<ApiResponse<AgentChatStoredConversation | null>>;
   agentChatHistoryDelete(input: AgentChatHistoryGetInput): Promise<ApiResponse<boolean>>;
@@ -200,6 +202,7 @@ const videoTool: VideoToolApi = {
   agentChatApprove: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.agentChatApprove, input) as Promise<ApiResponse<AgentChatTurnState>>,
   agentChatReset: (input) => ipcRenderer.invoke(IPC_CHANNELS.agentChatReset, input) as Promise<ApiResponse<AgentChatTurnState>>,
+  agentChatCompact: (input) => ipcRenderer.invoke(IPC_CHANNELS.agentChatCompact, input) as Promise<ApiResponse<AgentChatTurnState>>,
   agentChatHistoryList: () =>
     ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryList) as Promise<ApiResponse<readonly AgentChatHistoryEntry[]>>,
   agentChatHistoryGet: (input) =>

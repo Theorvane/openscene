@@ -276,9 +276,11 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
 
   const checkpointer = new MemorySaver();
   const graph = builder.compile({ checkpointer });
-  return { graph, checkpointer };
+  // Compaction summarizes with the conversation's own model, so the session
+  // manager needs the same factory the graph uses.
+  return { graph, checkpointer, createModel: options.createModel };
 }
 
-export { isHumanMessage, isAiLike, isToolMessage };
+export { isHumanMessage, isAiLike, isSystemMessage, isToolMessage };
 export type AgentChatGraphBundle = ReturnType<typeof buildAgentChatGraph>;
 export type AgentChatGraph = AgentChatGraphBundle['graph'];

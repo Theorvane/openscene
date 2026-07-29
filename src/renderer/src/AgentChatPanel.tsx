@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactElement } from 'react';
 
-import { contextUsagePercent, formatContextUsage } from '../../shared/agentChatUsage';
+import { contextPressure, contextUsagePercent, formatContextUsage } from '../../shared/agentChatUsage';
 import { useAgentChat } from './AgentChatContext';
 import { AgentChatMessageView } from './AgentChatMessageView';
-import { AgentChatContextPicker } from './AgentChatContextPicker';
 import { AgentChatSessionPicker } from './AgentChatSessionPicker';
 import { AgentModelPicker } from './AgentModelPicker';
 import { Button } from './ui';
@@ -33,17 +32,17 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
     setReasoningEffort,
     activeProject,
     contextUsage,
-    contextAssets,
-    detachContextAsset,
     sendMessage,
     respondToApproval,
-    resetConversation
+    resetConversation,
+    compactConversation
   } = useAgentChat();
 
   const listEndRef = useRef<HTMLDivElement | null>(null);
   const [denialFeedback, setDenialFeedback] = useState('');
   const usageLabel = formatContextUsage(contextUsage);
   const usagePercent = contextUsagePercent(contextUsage);
+  const pressure = contextPressure(contextUsage);
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ block: 'end' });
@@ -101,7 +100,7 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
               </span>
               {usageLabel !== null && (
                 <span
-                  className="agent-chat-context-meter"
+                  className={`agent-chat-context-meter agent-chat-context-meter--${pressure}`}
                   title={usagePercent === null ? `${usageLabel} used` : `${usageLabel} of the context window used (${usagePercent}%)`}
                 >
                   <span className="agent-chat-context-meter__track" aria-hidden="true">
@@ -192,6 +191,19 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
           <div ref={listEndRef} />
         </div>
 
+        {pressure !== 'ok' && (
+          <div className={`agent-chat-context-notice agent-chat-context-notice--${pressure}`} role="status">
+            <span>
+              {pressure === 'overflow'
+                ? 'The conversation fills this model\u2019s context window. Compact it to keep going.'
+                : 'This conversation is near the model\u2019s context window.'}
+            </span>
+            <Button variant="ghost" disabled={isBusy} onClick={() => void compactConversation()}>
+              Compact
+            </Button>
+          </div>
+        )}
+
         <form className="agent-chat-panel__form" onSubmit={submitMessage}>
           <div className="agent-chat-prompt-card">
             <textarea
@@ -211,27 +223,8 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
               disabled={isBusy || !modelReady || pendingApproval !== null}
               rows={2}
             />
-            {contextAssets.length > 0 && (
-              <ul className="agent-chat-attachments" aria-label="Attached context">
-                {contextAssets.map((asset) => (
-                  <li key={asset.assetId}>
-                    <span className="agent-chat-attachments__kind">{asset.mediaKind}</span>
-                    <span className="agent-chat-attachments__label">{asset.label}</span>
-                    <button
-                      type="button"
-                      className="agent-chat-attachments__remove"
-                      aria-label={`Remove ${asset.label} from the message context`}
-                      onClick={() => detachContextAsset(asset.assetId)}
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
             <div className="agent-chat-prompt-card__toolbar">
               <div className="agent-chat-prompt-card__meta">
-                <AgentChatContextPicker />
                 <AgentModelPicker reasoningEffort={reasoningEffort} onReasoningEffortChange={setReasoningEffort} />
               </div>
               <Button
