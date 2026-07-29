@@ -545,8 +545,8 @@ button {
   cursor: pointer;
 }
 
-/* Always visible: the strip has no hover states, so a control that only
-   appeared under the pointer would be unreachable with a mouse. */
+/* Always visible: revealing it would need a hover on the tab body, which is the
+   selection target and stays inert. The control keeps its own hover feedback. */
 .project-tab__close {
   display: grid;
   flex: none;
@@ -559,6 +559,11 @@ button {
   background: transparent;
   font-size: 10px;
   cursor: pointer;
+}
+
+.project-tab__close:hover {
+  color: var(--color-danger);
+  background: var(--surface-hover);
 }
 
 .product-chrome__empty {
