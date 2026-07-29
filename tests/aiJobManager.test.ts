@@ -32,16 +32,16 @@ describe('AI Job Manager, provider seams, and local runner execution', () => {
     ).rejects.toThrow('is not available for video-generation');
   });
 
-  it('rejects model execution paths that do not match the requested provider and mode', async () => {
+  it('rejects execution paths that do not match the selected model', async () => {
+    // api mode without a model id resolves the local default → honest mismatch.
     await expect(
       createVideoGenerationJob({
         prompt: 'A cloud scene',
         aspectRatio: '16:9',
         durationSeconds: 3,
-        mode: 'api',
-        provider: 'gemini_veo'
+        mode: 'api'
       })
-    ).rejects.toThrow('does not match video-generation provider gemini_veo and api execution');
+    ).rejects.toThrow('is a local model; the request asked for api execution');
 
     await expect(
       createSpeechGenerationJob({
@@ -50,7 +50,7 @@ describe('AI Job Manager, provider seams, and local runner execution', () => {
         mode: 'api',
         modelId: 'local-qwen-tts'
       })
-    ).rejects.toThrow('does not match voice-generation provider elevenlabs and api execution');
+    ).rejects.toThrow('is a local model; the request asked for api execution');
   });
 
   it('fails unconfigured local video engine jobs gracefully without falsely generating media', async () => {
@@ -117,33 +117,44 @@ printf "\\x00\\x00\\x00\\x20ftypisom\\x00\\x00\\x02\\x00isomiso2avc1mp41\\x00\\x
     });
   }, 10_000);
 
-  it('rejects unavailable cloud video execution before queuing a misleading job', async () => {
-    await expect(createVideoGenerationJob({
+  it('rejects unimplemented cloud models before queuing a misleading job', async () => {
+    // Runway/Kling/Luma/MiniMax models are honestly unavailable until their
+    // adapters land, so job creation refuses them up front.
+    for (const modelId of ['gen4_turbo', 'kling-v2.5-turbo', 'ray-2', 'minimax-hailuo-02']) {
+      await expect(createVideoGenerationJob({
+        prompt: `Test prompt for ${modelId}`,
+        aspectRatio: '16:9',
+        durationSeconds: 5,
+        mode: 'api',
+        modelId
+      })).rejects.toThrow('is not available for video-generation');
+    }
+  });
+
+  it('fails implemented cloud models without a connected key instead of calling out', async () => {
+    const soraJob = await createVideoGenerationJob({
       prompt: 'Test prompt for Sora',
       aspectRatio: '16:9',
       durationSeconds: 5,
       mode: 'api',
-      provider: 'openai_sora'
-    })).rejects.toThrow('does not match video-generation provider openai_sora and api execution');
-  });
+      modelId: 'sora-2'
+    });
+    const elevenJob = await createSpeechGenerationJob({
+      script: 'Cloud narration without a key',
+      voiceId: '',
+      mode: 'api',
+      modelId: 'eleven_multilingual_v2'
+    });
+    expect(soraJob.provider).toBe('openai_sora');
+    expect(elevenJob.provider).toBe('elevenlabs');
 
-  it('rejects every unimplemented cloud video provider instead of reporting a queued job', async () => {
-    const providers: Array<'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream'> = [
-      'openai_sora',
-      'runway_gen4',
-      'kling_v3',
-      'luma_dream'
-    ];
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    for (const provider of providers) {
-      await expect(createVideoGenerationJob({
-        prompt: `Test prompt for ${provider}`,
-        aspectRatio: '16:9',
-        durationSeconds: 5,
-        mode: 'api',
-        provider,
-        apiKey: 'unused-because-adapter-is-unavailable'
-      })).rejects.toThrow(`does not match video-generation provider ${provider} and api execution`);
-    }
-  });
+    const failedVideo = getVideoGenerationJob(soraJob.id);
+    expect(failedVideo?.status).toBe('failed');
+    expect(failedVideo?.error).toContain('API key is required for OpenAI Sora');
+    const failedSpeech = getSpeechGenerationJob(elevenJob.id);
+    expect(failedSpeech?.status).toBe('failed');
+    expect(failedSpeech?.error).toContain('API key is required for ElevenLabs');
+  }, 10_000);
 });

@@ -32,7 +32,13 @@ export function resolveAgentChatModelSpec(modelId: string): AgentChatModelSpec {
     return { kind: 'ollama' };
   }
   const provider = getLlmProvider(model.providerId);
-  if (provider === undefined || provider.kind !== 'cloud' || provider.credentialKey === undefined || provider.adapter === 'ollama') {
+  if (
+    provider === undefined ||
+    provider.kind !== 'cloud' ||
+    provider.credentialKey === undefined ||
+    provider.adapter === 'ollama' ||
+    provider.adapter === 'media'
+  ) {
     return { kind: 'ollama' };
   }
   return {

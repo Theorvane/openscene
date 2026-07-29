@@ -1,5 +1,5 @@
-export type VideoGenerationProviderId = 'gemini_veo' | 'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream' | 'local_video';
-export type TextToSpeechProviderId = 'elevenlabs' | 'local_qwen';
+export type VideoGenerationProviderId = 'gemini_veo' | 'openai_sora' | 'runway_gen4' | 'kling_v3' | 'luma_dream' | 'minimax_hailuo' | 'local_video';
+export type TextToSpeechProviderId = 'elevenlabs' | 'openai_tts' | 'gemini_tts' | 'groq_tts' | 'local_qwen';
 export type ProviderJobStatus = 'queued' | 'running' | 'completed' | 'failed';
 export type ProviderExecutionMode = 'local' | 'api';
 

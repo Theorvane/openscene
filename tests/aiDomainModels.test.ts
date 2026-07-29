@@ -9,8 +9,14 @@ import {
 
 describe('AI domain model catalog', () => {
   it('exposes an independent available local model for each AI domain', () => {
-    expect(getAvailableDomainModels('voice-generation').map((model) => model.id)).toEqual(['local-qwen-tts']);
-    expect(getAvailableDomainModels('video-generation').map((model) => model.id)).toEqual(['local-video-runner']);
+    const voiceModels = getAvailableDomainModels('voice-generation').map((model) => model.id);
+    expect(voiceModels[0]).toBe('local-qwen-tts');
+    expect(voiceModels).toContain('eleven_multilingual_v2');
+    expect(voiceModels).toContain('gpt-4o-mini-tts');
+    const videoModels = getAvailableDomainModels('video-generation').map((model) => model.id);
+    expect(videoModels[0]).toBe('local-video-runner');
+    expect(videoModels).toContain('veo-3.0-generate-001');
+    expect(videoModels).toContain('sora-2');
     const editAgentModels = getAvailableDomainModels('edit-agent');
     expect(editAgentModels[0]?.id).toBe('qwen2.5-coder');
     // The full opencode/models.dev catalog contributes every tool-calling model.

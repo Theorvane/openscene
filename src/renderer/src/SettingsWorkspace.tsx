@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 
 import type { LocalFfmpegRuntimeStatus } from '../../shared/exportTypes';
 import { DEFAULT_LLM_MODELS, type LlmProviderId } from '../../shared/llmModels';
-import { LLM_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, isProviderConnected, type LlmProviderInfo } from '../../shared/llmProviders';
+import { LLM_PROVIDERS, MEDIA_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, isProviderConnected, type LlmProviderInfo } from '../../shared/llmProviders';
 import { useModelVisibility } from './ModelVisibilityContext';
 import { ProviderConnectDialog } from './ProviderConnectDialog';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
@@ -44,9 +44,10 @@ type SettingsWorkspaceProps = {
   readonly onReplayFirstRunOnboarding: () => void;
 };
 
-// Cloud provider rows derive from the shared opencode-style provider registry.
+// Cloud LLM provider rows derive from the shared opencode-style provider
+// registry; media-generation providers get their own subsection.
 const CLOUD_PROVIDERS: readonly LlmProviderInfo[] = LLM_PROVIDERS.filter(
-  (provider) => provider.auth === 'api-key' && provider.credentialKey !== undefined
+  (provider) => provider.auth === 'api-key' && provider.credentialKey !== undefined && provider.adapter !== 'media'
 );
 
 function getSettingsSection(sectionId: SettingsSectionId): SettingsSection {
@@ -194,14 +195,14 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
       case 'voice':
         return (
           <>
-            <AiDomainModelSelector domain="voice-generation" label="Voice generation model" description="Choose the configured model used by the Voice Generation workspace." />
+            <StatusCard tone="neutral">Voice generation models are managed inside the Voice Generation workspace; connect ElevenLabs or another media provider under Providers to unlock cloud synthesis.</StatusCard>
             <StatusCard tone="neutral">Voice samples must be user-owned or authorized, stored locally, and deletable from local app storage.</StatusCard>
           </>
         );
       case 'video':
         return (
           <>
-            <AiDomainModelSelector domain="video-generation" label="Video generation model" description="Choose the configured model used by the Video Generation workspace." />
+            <StatusCard tone="neutral">Video generation models are managed inside the Video Generation workspace; connect Google Gemini (Veo) or OpenAI (Sora) under Providers to unlock cloud synthesis.</StatusCard>
             <StatusCard tone="warning">Provider seams are selectable preferences only; unsupported cloud adapters are not silently called.</StatusCard>
           </>
         );
@@ -263,6 +264,30 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+
+            <div className="settings-group">
+              <h3 className="settings-subheading">Media providers</h3>
+              <div className="settings-list">
+                {MEDIA_PROVIDERS.map((provider) => {
+                  const connected = isProviderKeyStored(provider);
+                  return (
+                    <div key={provider.id} className="settings-list__row">
+                      <div className="settings-list__main settings-list__main--stacked">
+                        <span className="settings-list__name">{provider.label}</span>
+                        <span className="settings-list__note">{provider.description}</span>
+                      </div>
+                      {connected ? (
+                        <Button variant="ghost" onClick={() => void disconnectProvider(provider)} disabled={disconnectingKey === provider.credentialKey}>
+                          {disconnectingKey === provider.credentialKey ? 'Disconnecting…' : 'Disconnect'}
+                        </Button>
+                      ) : (
+                        <Button variant="default" onClick={() => setConnectTarget(provider)}>+ Connect</Button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

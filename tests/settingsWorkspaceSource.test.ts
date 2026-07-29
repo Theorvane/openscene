@@ -12,9 +12,13 @@ describe('Settings workspace source contract', () => {
       expect(source).toContain(`title: '${heading}'`);
     }
     expect(source).toContain('window.videoTool.getFfmpegRuntimeStatus');
-    expect(source).toContain('AiDomainModelSelector domain="voice-generation"');
-    expect(source).toContain('AiDomainModelSelector domain="video-generation"');
+    // Voice/video generation models are managed inside their workspaces now;
+    // Settings keeps only the chat-model surfaces.
+    expect(source).not.toContain('AiDomainModelSelector domain="voice-generation"');
+    expect(source).not.toContain('AiDomainModelSelector domain="video-generation"');
     expect(source).toContain('AiDomainModelSelector domain="edit-agent"');
+    expect(source).toContain('managed inside the Voice Generation workspace');
+    expect(source).toContain('managed inside the Video Generation workspace');
     expect(source).not.toMatch(/executablePath|argv|args:/);
   });
 
@@ -45,6 +49,8 @@ describe('Settings workspace source contract', () => {
     expect(source).toContain('ProviderConnectDialog');
     expect(source).toContain('+ Connect');
     expect(source).toContain('id="ollama-base-url"');
+    expect(source).toContain('Media providers');
+    expect(source).toContain('MEDIA_PROVIDERS.map');
   });
 
   it('renders an opencode-style Models section with search and per-model visibility switches', async () => {

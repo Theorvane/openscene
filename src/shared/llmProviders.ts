@@ -9,7 +9,7 @@ import { LLM_CATALOG, type LlmCatalogProvider } from './llmCatalog.generated';
  */
 export type LlmProviderKind = 'local' | 'cloud';
 export type LlmProviderAuth = 'none' | 'api-key';
-export type LlmProviderAdapter = 'ollama' | 'openai-compatible' | 'anthropic' | 'gemini';
+export type LlmProviderAdapter = 'ollama' | 'openai-compatible' | 'anthropic' | 'gemini' | 'media';
 
 export type LlmCredentialKey = string;
 
@@ -60,9 +60,66 @@ function toProviderInfo(provider: LlmCatalogProvider): LlmProviderInfo {
   };
 }
 
+/**
+ * Media-generation providers (voice/video APIs). They connect exactly like LLM
+ * providers — an API key in safe storage — but expose no chat models; their
+ * models live in the voice/video generation domain catalogs.
+ */
+export const MEDIA_PROVIDERS: readonly LlmProviderInfo[] = [
+  {
+    id: 'elevenlabs',
+    label: 'ElevenLabs',
+    kind: 'cloud',
+    auth: 'api-key',
+    adapter: 'media',
+    credentialKey: 'elevenlabsApiKey',
+    keyPlaceholder: 'sk_...',
+    description: 'Speech synthesis over the ElevenLabs API.'
+  },
+  {
+    id: 'runway',
+    label: 'Runway',
+    kind: 'cloud',
+    auth: 'api-key',
+    adapter: 'media',
+    credentialKey: 'runwayApiKey',
+    keyPlaceholder: 'key_...',
+    description: 'Video generation over the Runway API.'
+  },
+  {
+    id: 'kling',
+    label: 'Kling',
+    kind: 'cloud',
+    auth: 'api-key',
+    adapter: 'media',
+    credentialKey: 'klingApiKey',
+    description: 'Video generation over the Kling API.'
+  },
+  {
+    id: 'luma',
+    label: 'Luma',
+    kind: 'cloud',
+    auth: 'api-key',
+    adapter: 'media',
+    credentialKey: 'lumaApiKey',
+    keyPlaceholder: 'luma-...',
+    description: 'Video generation over the Luma Dream Machine API.'
+  },
+  {
+    id: 'minimax',
+    label: 'MiniMax',
+    kind: 'cloud',
+    auth: 'api-key',
+    adapter: 'media',
+    credentialKey: 'minimax',
+    description: 'Video generation over the MiniMax Hailuo API.'
+  }
+];
+
 export const LLM_PROVIDERS: readonly LlmProviderInfo[] = [
   OLLAMA_PROVIDER,
-  ...LLM_CATALOG.map(toProviderInfo)
+  ...LLM_CATALOG.map(toProviderInfo),
+  ...MEDIA_PROVIDERS
 ];
 
 /** opencode-style popular shortlist shown before "Show all providers". */

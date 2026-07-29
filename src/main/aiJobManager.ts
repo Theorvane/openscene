@@ -10,9 +10,15 @@ import type {
   VideoGenerationProviderId,
   VideoGenerationRequest
 } from '../shared/providerSeams';
-import { getDefaultDomainModelId, getDomainModel } from '../shared/aiDomainModels';
+import { getDefaultDomainModelId, getDomainModel, type AiDomainModelConfig } from '../shared/aiDomainModels';
 import { discoverFfmpeg } from './ffmpegDiscovery';
-import type { CredentialStore, ProviderCredentials } from './credentialStore';
+import type { CredentialStore } from './credentialStore';
+import {
+  generateElevenLabsSpeech,
+  generateOpenAiSpeech,
+  generateSoraVideo,
+  generateVeoVideo
+} from './mediaGenerationAdapters';
 import { tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
@@ -107,66 +113,114 @@ type CloudProviderResult =
   | { readonly ok: false; readonly error: string };
 
 const VIDEO_PROVIDER_LABELS: Record<VideoGenerationProviderId, string> = {
-  gemini_veo: 'Gemini Veo',
+  gemini_veo: 'Google Veo',
   openai_sora: 'OpenAI Sora',
-  runway_gen4: 'Runway Gen-4',
-  kling_v3: 'Kling 3.0',
-  luma_dream: 'Luma Dream',
+  runway_gen4: 'Runway',
+  kling_v3: 'Kling',
+  luma_dream: 'Luma',
+  minimax_hailuo: 'MiniMax Hailuo',
   local_video: 'Local Engine'
 };
 
+/** Map a domain-model provider id onto the job seam ids and its credential slot. */
+const VIDEO_MODEL_PROVIDERS: Record<string, { seam: VideoGenerationProviderId; credentialKey: string }> = {
+  google_gemini: { seam: 'gemini_veo', credentialKey: 'geminiApiKey' },
+  openai: { seam: 'openai_sora', credentialKey: 'openaiApiKey' },
+  runway: { seam: 'runway_gen4', credentialKey: 'runwayApiKey' },
+  kling: { seam: 'kling_v3', credentialKey: 'klingApiKey' },
+  luma: { seam: 'luma_dream', credentialKey: 'lumaApiKey' },
+  minimax: { seam: 'minimax_hailuo', credentialKey: 'minimax' }
+};
+
+const SPEECH_MODEL_PROVIDERS: Record<string, { seam: TextToSpeechJob['provider']; credentialKey: string; label: string }> = {
+  elevenlabs: { seam: 'elevenlabs', credentialKey: 'elevenlabsApiKey', label: 'ElevenLabs' },
+  openai: { seam: 'openai_tts', credentialKey: 'openaiApiKey', label: 'OpenAI' },
+  google_gemini: { seam: 'gemini_tts', credentialKey: 'geminiApiKey', label: 'Google Gemini' },
+  groq: { seam: 'groq_tts', credentialKey: 'groq', label: 'Groq' }
+};
+
 async function invokeCloudVideoProvider(
-  provider: VideoGenerationProviderId,
+  model: AiDomainModelConfig,
   apiKey: string,
-  _request: VideoGenerationRequest
+  request: VideoGenerationRequest,
+  outputFilePath: string
 ): Promise<CloudProviderResult> {
-  // Cloud provider adapter seam boundary; no adapter is implemented for any provider yet.
-  const label = VIDEO_PROVIDER_LABELS[provider];
-  if (apiKey.startsWith('demo-invalid') || apiKey.length < 10) {
-    return { ok: false, error: `Invalid ${label} API key.` };
-  }
-  return {
-    ok: false,
-    error: `${label} API service endpoint is currently unconfigured. Use Local Engine mode for offline video synthesis.`
+  const synthesisInput = {
+    apiKey,
+    modelId: model.id,
+    prompt: request.prompt,
+    aspectRatio: request.aspectRatio ?? ('16:9' as const),
+    durationSeconds: request.durationSeconds ?? 5
   };
+  try {
+    let bytes: Buffer;
+    if (model.providerId === 'google_gemini') {
+      bytes = await generateVeoVideo(synthesisInput);
+    } else if (model.providerId === 'openai') {
+      bytes = await generateSoraVideo(synthesisInput);
+    } else {
+      return {
+        ok: false,
+        error: `${model.providerLabel} video generation adapter is not implemented in this build.`
+      };
+    }
+    await writeFile(outputFilePath, bytes);
+    return { ok: true, outputFilePath };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Cloud video generation failed.' };
+  }
 }
 
 async function invokeCloudSpeechProvider(
+  model: AiDomainModelConfig,
   apiKey: string,
-  _request: TextToSpeechRequest
+  request: TextToSpeechRequest,
+  outputFilePath: string
 ): Promise<CloudProviderResult> {
-  if (apiKey.startsWith('demo-invalid') || apiKey.length < 10) {
-    return { ok: false, error: 'Invalid ElevenLabs API key.' };
+  const synthesisInput = { apiKey, modelId: model.id, voiceId: request.voiceId ?? '', script: request.script };
+  try {
+    let bytes: Buffer;
+    if (model.providerId === 'elevenlabs') {
+      bytes = await generateElevenLabsSpeech(synthesisInput);
+    } else if (model.providerId === 'openai') {
+      bytes = await generateOpenAiSpeech(synthesisInput);
+    } else {
+      return {
+        ok: false,
+        error: `${model.providerLabel} speech synthesis adapter is not implemented in this build.`
+      };
+    }
+    await writeFile(outputFilePath, bytes);
+    return { ok: true, outputFilePath };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Cloud speech synthesis failed.' };
   }
-  return {
-    ok: false,
-    error: 'ElevenLabs API service endpoint is currently unconfigured. Use Local Engine mode for offline speech synthesis.'
-  };
 }
 
-function resolveGenerationModelId(
+function resolveGenerationModel(
   domain: 'voice-generation' | 'video-generation',
   requestedModelId: string | undefined,
-  providerId: string,
   executionPath: 'local' | 'api'
-): string {
+): AiDomainModelConfig {
   const modelId = requestedModelId ?? getDefaultDomainModelId(domain);
   const model = getDomainModel(domain, modelId);
   if (model === undefined || !model.available) {
     throw new Error(`Model ${modelId} is not available for ${domain}.`);
   }
-  if (model.providerId !== providerId || model.executionPath !== executionPath) {
-    throw new Error(`Model ${modelId} does not match ${domain} provider ${providerId} and ${executionPath} execution.`);
+  if (model.executionPath !== executionPath) {
+    throw new Error(`Model ${modelId} is a ${model.executionPath} model; the request asked for ${executionPath} execution.`);
   }
-  return model.id;
+  return model;
 }
 
 export async function createVideoGenerationJob(request: VideoGenerationRequest): Promise<VideoGenerationJob> {
   const mode = request.mode ?? 'local';
+  const model = resolveGenerationModel('video-generation', request.modelId, mode);
+  const providerMapping = VIDEO_MODEL_PROVIDERS[model.providerId];
   const provider: VideoGenerationProviderId = mode === 'api'
-    ? (request.provider ?? 'gemini_veo')
+    ? (providerMapping?.seam ?? 'gemini_veo')
     : 'local_video';
-  const modelId = resolveGenerationModelId('video-generation', request.modelId, provider, mode);
+  const modelId = model.id;
   const { videoDir } = await ensureAiDirectories();
   const id = `video-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -197,22 +251,15 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       if (mode === 'api') {
         let apiKey = request.apiKey?.trim();
         if ((!apiKey || apiKey.length === 0) && activeCredentialStore) {
-          const providerKeyMap: Record<string, keyof ProviderCredentials> = {
-            openai_sora: 'openaiApiKey',
-            gemini_veo: 'geminiApiKey',
-            runway_gen4: 'runwayApiKey',
-            kling_v3: 'klingApiKey',
-            luma_dream: 'lumaApiKey'
-          };
-          const keyField = providerKeyMap[provider] ?? 'openaiApiKey';
-          apiKey = await activeCredentialStore.getCredentialValue(keyField);
+          apiKey = await activeCredentialStore.getCredentialValue(providerMapping?.credentialKey ?? 'geminiApiKey');
         }
 
         if (!apiKey || apiKey.length === 0) {
-          throw new Error(`API key is required for ${VIDEO_PROVIDER_LABELS[provider]} cloud generation.`);
+          throw new Error(`API key is required for ${VIDEO_PROVIDER_LABELS[provider]} cloud generation. Connect the provider in Settings first.`);
         }
 
-        const cloudResult = await invokeCloudVideoProvider(provider, apiKey, request);
+        const filePath = join(videoDir, `${id}.mp4`);
+        const cloudResult = await invokeCloudVideoProvider(model, apiKey, request, filePath);
         if (!cloudResult.ok) {
           throw new Error(cloudResult.error);
         }
@@ -252,8 +299,10 @@ export function getVideoGenerationJob(jobId: string): VideoGenerationJob | null 
 
 export async function createSpeechGenerationJob(request: TextToSpeechRequest): Promise<TextToSpeechJob> {
   const mode = request.mode ?? 'local';
-  const provider = mode === 'api' ? 'elevenlabs' : 'local_qwen';
-  const modelId = resolveGenerationModelId('voice-generation', request.modelId, provider, mode);
+  const model = resolveGenerationModel('voice-generation', request.modelId, mode);
+  const speechMapping = SPEECH_MODEL_PROVIDERS[model.providerId];
+  const provider: TextToSpeechJob['provider'] = mode === 'api' ? (speechMapping?.seam ?? 'elevenlabs') : 'local_qwen';
+  const modelId = model.id;
   const { speechDir } = await ensureAiDirectories();
   const id = `speech-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const now = new Date().toISOString();
@@ -264,7 +313,7 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
     mode,
     status: 'queued',
     script: request.script,
-    voiceId: request.voiceId || (mode === 'api' ? 'eleven-adam' : 'qwen-neutral'),
+    voiceId: request.voiceId || (mode === 'api' ? '' : 'qwen-neutral'),
     modelId,
     createdAt: now,
     updatedAt: now
@@ -281,14 +330,15 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
       if (mode === 'api') {
         let apiKey = request.apiKey?.trim();
         if ((!apiKey || apiKey.length === 0) && activeCredentialStore) {
-          apiKey = await activeCredentialStore.getCredentialValue('elevenlabsApiKey');
+          apiKey = await activeCredentialStore.getCredentialValue(speechMapping?.credentialKey ?? 'elevenlabsApiKey');
         }
 
         if (!apiKey || apiKey.length === 0) {
-          throw new Error('API key is required for ElevenLabs cloud speech synthesis.');
+          throw new Error(`API key is required for ${speechMapping?.label ?? 'cloud'} speech synthesis. Connect the provider in Settings first.`);
         }
 
-        const cloudResult = await invokeCloudSpeechProvider(apiKey, request);
+        const filePath = join(speechDir, `${id}.mp3`);
+        const cloudResult = await invokeCloudSpeechProvider(model, apiKey, request, filePath);
         if (!cloudResult.ok) {
           throw new Error(cloudResult.error);
         }
@@ -336,11 +386,12 @@ export function getCompletedAiSource(jobId: string): { sourcePath: string; displ
 
   const speechJob = speechJobs.get(jobId);
   if (speechJob && speechJob.status === 'completed' && speechJob.outputFilePath) {
+    const isMp3 = speechJob.outputFilePath.toLowerCase().endsWith('.mp3');
     return {
       sourcePath: speechJob.outputFilePath,
-      displayName: `AI_Voice_${speechJob.id.slice(-6)}.wav`,
+      displayName: `AI_Voice_${speechJob.id.slice(-6)}.${isMp3 ? 'mp3' : 'wav'}`,
       kind: 'audio',
-      mimeType: 'audio/wav'
+      mimeType: isMp3 ? 'audio/mpeg' : 'audio/wav'
     };
   }
 

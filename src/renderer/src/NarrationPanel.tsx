@@ -16,7 +16,10 @@ export function NarrationPanel(): ReactElement {
   const voiceModel = selectedModel('voice-generation');
   const projectImport = useProjectResultImport();
   const [importStatus, setImportStatus] = useState<StatusMessage | null>(null);
-  const [mode, setMode] = useState<'local' | 'api'>('local');
+  // The selected voice model drives the execution mode: local models use the
+  // Qwen pipeline, cloud models use the provider adapter through the job seam.
+  const mode: 'local' | 'api' = voiceModel.executionPath === 'api' ? 'api' : 'local';
+  const isElevenLabs = voiceModel.providerId === 'elevenlabs';
   const [elevenApiKey, setElevenApiKey] = useState('');
   const [elevenVoiceId, setElevenVoiceId] = useState('21m00Tcm4TlvDq8ikWAM'); // Default Rachel
   const [elevenScript, setElevenScript] = useState('');
@@ -45,23 +48,19 @@ export function NarrationPanel(): ReactElement {
 
   const handleElevenGenerate = async (): Promise<void> => {
     if (elevenScript.trim().length === 0) {
-      setElevenStatus({ tone: 'danger', text: 'Please enter a narration script for ElevenLabs.' });
+      setElevenStatus({ tone: 'danger', text: `Please enter a narration script for ${voiceModel.providerLabel}.` });
       return;
     }
-    if (elevenApiKey.trim().length === 0) {
-      setElevenStatus({ tone: 'danger', text: 'Please enter your ElevenLabs API key.' });
-      return;
-    }
-
     setIsGeneratingEleven(true);
-    setElevenStatus({ tone: 'neutral', text: 'Synthesizing voice with ElevenLabs API...' });
+    setElevenStatus({ tone: 'neutral', text: `Synthesizing voice with the ${voiceModel.providerLabel} API...` });
 
     try {
       const response = await window.videoTool.aiGenerateSpeech({
         script: elevenScript,
-        voiceId: elevenVoiceId,
+        voiceId: isElevenLabs ? elevenVoiceId : '',
+        modelId: voiceModel.id,
         mode: 'api',
-        apiKey: elevenApiKey
+        ...(elevenApiKey.trim().length > 0 ? { apiKey: elevenApiKey.trim() } : {})
       });
 
       if (response.ok && response.value) {
@@ -113,28 +112,9 @@ export function NarrationPanel(): ReactElement {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <AiDomainModelSelector domain="voice-generation" label="Voice model" />
-          <div className="mode-toggle-group" role="radiogroup" aria-label="Voice execution mode selection">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={mode === 'local'}
-              className={`mode-toggle-btn ${mode === 'local' ? 'mode-toggle-btn--active' : ''}`}
-              onClick={() => setMode('local')}
-            >
-              <span className="mode-badge mode-badge--local">Local</span>
-              <span>Local Qwen</span>
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={mode === 'api'}
-              className={`mode-toggle-btn ${mode === 'api' ? 'mode-toggle-btn--active' : ''}`}
-              onClick={() => setMode('api')}
-            >
-              <span className="mode-badge mode-badge--api">Cloud API</span>
-              <span>ElevenLabs API</span>
-            </button>
-          </div>
+          <span className={`mode-badge mode-badge--${mode}`} role="status" aria-label="Voice execution mode">
+            {mode === 'local' ? 'Local' : `Cloud API · ${voiceModel.providerLabel}`}
+          </span>
         </div>
       </div>
 
@@ -228,29 +208,31 @@ export function NarrationPanel(): ReactElement {
         <div className="narration-grid">
           <section className="narration-card" aria-labelledby="elevenlabs-title">
             <div>
-              <p className="section-kicker">ElevenLabs API</p>
-              <h3 id="elevenlabs-title">Cloud Voice Synthesis</h3>
+              <p className="section-kicker">{voiceModel.providerLabel} API</p>
+              <h3 id="elevenlabs-title">Cloud Voice Synthesis · {voiceModel.label}</h3>
             </div>
             <label className="field-label">
-              ElevenLabs API Key
+              API key override (optional)
               <input
                 type="password"
                 value={elevenApiKey}
                 onChange={(e) => setElevenApiKey(e.target.value)}
-                placeholder="Enter ElevenLabs API Key (e.g. xi-api-key)..."
+                placeholder="Leave empty to use the key connected in Settings → Providers"
               />
             </label>
 
-            <label className="field-label">
-              Voice Model
-              <select value={elevenVoiceId} onChange={(e) => setElevenVoiceId(e.target.value)}>
-                <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Calm & Professional)</option>
-                <option value="AZnzlk1XvdvUeBnXmlld">Domi (Energetic)</option>
-                <option value="EXAVITQu4vr4xnSDxMaL">Bella (Expressive)</option>
-                <option value="ErXwobaYiN019PkySvjV">Antoni (Deep Narrative)</option>
-                <option value="pNInz6obpgDQGcFmaJgB">Adam (Clear Executive)</option>
-              </select>
-            </label>
+            {isElevenLabs && (
+              <label className="field-label">
+                Voice
+                <select value={elevenVoiceId} onChange={(e) => setElevenVoiceId(e.target.value)}>
+                  <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Calm & Professional)</option>
+                  <option value="AZnzlk1XvdvUeBnXmlld">Domi (Energetic)</option>
+                  <option value="EXAVITQu4vr4xnSDxMaL">Bella (Expressive)</option>
+                  <option value="ErXwobaYiN019PkySvjV">Antoni (Deep Narrative)</option>
+                  <option value="pNInz6obpgDQGcFmaJgB">Adam (Clear Executive)</option>
+                </select>
+              </label>
+            )}
 
             <label className="field-label">
               Speech Script
@@ -258,7 +240,7 @@ export function NarrationPanel(): ReactElement {
                 rows={6}
                 value={elevenScript}
                 onChange={(e) => setElevenScript(e.target.value)}
-                placeholder="Enter text to synthesize with ElevenLabs high-definition neural voice..."
+                placeholder="Enter text to synthesize with the selected cloud voice model..."
               />
             </label>
 
@@ -269,7 +251,7 @@ export function NarrationPanel(): ReactElement {
                 onClick={() => void handleElevenGenerate()}
                 disabled={isGeneratingEleven}
               >
-                {isGeneratingEleven ? '⚡ Synthesizing...' : '⚡ Synthesize with ElevenLabs'}
+                {isGeneratingEleven ? '⚡ Synthesizing...' : `⚡ Synthesize with ${voiceModel.providerLabel}`}
               </button>
             </div>
 

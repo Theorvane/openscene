@@ -12,6 +12,7 @@ const DURATIONS = [3, 5, 10] as const;
 export function VideoGenerationWorkspace(): ReactElement {
   const { selectedModel } = useAiDomainModel();
   const videoModel = selectedModel('video-generation');
+  const isCloudModel = videoModel.executionPath === 'api';
   const { importAiResult } = useProjectResultImport();
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
@@ -31,7 +32,7 @@ export function VideoGenerationWorkspace(): ReactElement {
     }
 
     setIsGenerating(true);
-    setStatusMsg({ text: 'Submitting Local AI Engine job...', tone: 'neutral' });
+    setStatusMsg({ text: isCloudModel ? `Submitting ${videoModel.providerLabel} cloud job...` : 'Submitting Local AI Engine job...', tone: 'neutral' });
 
     try {
       const response = await window.videoTool.aiGenerateVideo({
@@ -39,8 +40,7 @@ export function VideoGenerationWorkspace(): ReactElement {
         aspectRatio,
         durationSeconds,
         stylePreset: selectedStyle,
-        mode: 'local',
-        provider: 'local_video',
+        mode: isCloudModel ? 'api' : 'local',
         modelId: videoModel.id
       });
 
@@ -93,7 +93,7 @@ export function VideoGenerationWorkspace(): ReactElement {
         <div>
           <p className="section-kicker">AI Studio</p>
           <h2>AI Video Generation</h2>
-          <span className="ai-workspace__subtitle">Synthesize videos using a locally configured AI runner</span>
+          <span className="ai-workspace__subtitle">{isCloudModel ? `Synthesize videos with ${videoModel.providerLabel} (${videoModel.label})` : 'Synthesize videos using a locally configured AI runner'}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '280px' }}>
           <AiDomainModelSelector domain="video-generation" label="Video model" />
@@ -104,8 +104,8 @@ export function VideoGenerationWorkspace(): ReactElement {
         {/* Controls Column */}
         <div className="ai-workspace__form-panel">
           <div className="local-status-banner">
-            <span className="banner-title">💻 Local AI Video Diffusion Pipeline</span>
-            <p className="banner-desc">Runs video synthesis model on your GPU/CPU. No cloud upload required.</p>
+            <span className="banner-title">{isCloudModel ? `☁️ ${videoModel.providerLabel} Cloud Generation` : '💻 Local AI Video Diffusion Pipeline'}</span>
+            <p className="banner-desc">{isCloudModel ? 'Your prompt is sent to the connected provider API; the finished video downloads back into local storage.' : 'Runs video synthesis model on your GPU/CPU. No cloud upload required.'}</p>
           </div>
 
           {/* Prompt Input */}
@@ -177,7 +177,7 @@ export function VideoGenerationWorkspace(): ReactElement {
             disabled={isGenerating}
             style={{ width: '100%', marginTop: 'var(--space-4)', padding: 'var(--space-3)' }}
           >
-            {isGenerating ? '✨ Generating Video...' : '✨ Generate Local Video'}
+            {isGenerating ? '✨ Generating Video...' : isCloudModel ? `✨ Generate with ${videoModel.providerLabel}` : '✨ Generate Local Video'}
           </Button>
 
           <StatusCard tone={statusMsg.tone} style={{ marginTop: 'var(--space-3)' }}>

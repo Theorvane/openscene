@@ -53,18 +53,110 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     domains: ['voice-generation'],
     available: true
   },
+  // ── Voice generation: cloud TTS models. ElevenLabs and OpenAI adapters are
+  // implemented; the rest stay honestly unavailable until an adapter lands.
   {
-    id: 'elevenlabs-multilingual-v2',
+    id: 'eleven_v3',
+    providerId: 'elevenlabs',
+    label: 'Eleven v3',
+    providerLabel: 'ElevenLabs',
+    description: 'Most expressive ElevenLabs speech synthesis model.',
+    executionPath: 'api',
+    domains: ['voice-generation'],
+    available: true
+  },
+  {
+    id: 'eleven_multilingual_v2',
     providerId: 'elevenlabs',
     label: 'Multilingual v2',
     providerLabel: 'ElevenLabs',
-    description: 'Cloud speech synthesis model.',
+    description: 'Stable multilingual ElevenLabs speech synthesis (29 languages).',
     executionPath: 'api',
-    contextWindow: '128k',
-    availableContexts: ['32k', '64k', '128k'],
+    domains: ['voice-generation'],
+    available: true
+  },
+  {
+    id: 'eleven_turbo_v2_5',
+    providerId: 'elevenlabs',
+    label: 'Turbo v2.5',
+    providerLabel: 'ElevenLabs',
+    description: 'Low-latency ElevenLabs synthesis at reduced cost.',
+    executionPath: 'api',
+    domains: ['voice-generation'],
+    available: true
+  },
+  {
+    id: 'eleven_flash_v2_5',
+    providerId: 'elevenlabs',
+    label: 'Flash v2.5',
+    providerLabel: 'ElevenLabs',
+    description: 'Fastest ElevenLabs synthesis (~75ms latency).',
+    executionPath: 'api',
+    domains: ['voice-generation'],
+    available: true
+  },
+  {
+    id: 'gpt-4o-mini-tts',
+    providerId: 'openai',
+    label: 'GPT-4o mini TTS',
+    providerLabel: 'OpenAI',
+    description: 'Steerable OpenAI speech synthesis model.',
+    executionPath: 'api',
+    domains: ['voice-generation'],
+    available: true
+  },
+  {
+    id: 'tts-1-hd',
+    providerId: 'openai',
+    label: 'TTS-1 HD',
+    providerLabel: 'OpenAI',
+    description: 'High-quality OpenAI speech synthesis.',
+    executionPath: 'api',
+    domains: ['voice-generation'],
+    available: true
+  },
+  {
+    id: 'tts-1',
+    providerId: 'openai',
+    label: 'TTS-1',
+    providerLabel: 'OpenAI',
+    description: 'Low-latency OpenAI speech synthesis.',
+    executionPath: 'api',
+    domains: ['voice-generation'],
+    available: true
+  },
+  {
+    id: 'gemini-2.5-flash-preview-tts',
+    providerId: 'google_gemini',
+    label: 'Gemini 2.5 Flash TTS',
+    providerLabel: 'Google Gemini',
+    description: 'Controllable Gemini speech generation.',
+    executionPath: 'api',
     domains: ['voice-generation'],
     available: false,
-    unavailableReason: 'ElevenLabs adapter is not implemented in this build.'
+    unavailableReason: 'Gemini TTS adapter is not implemented in this build.'
+  },
+  {
+    id: 'gemini-2.5-pro-preview-tts',
+    providerId: 'google_gemini',
+    label: 'Gemini 2.5 Pro TTS',
+    providerLabel: 'Google Gemini',
+    description: 'Highest-quality Gemini speech generation.',
+    executionPath: 'api',
+    domains: ['voice-generation'],
+    available: false,
+    unavailableReason: 'Gemini TTS adapter is not implemented in this build.'
+  },
+  {
+    id: 'playai-tts',
+    providerId: 'groq',
+    label: 'PlayAI TTS',
+    providerLabel: 'Groq',
+    description: 'PlayAI Dialog speech synthesis served by Groq.',
+    executionPath: 'api',
+    domains: ['voice-generation'],
+    available: false,
+    unavailableReason: 'Groq PlayAI TTS adapter is not implemented in this build.'
   },
   {
     id: 'local-video-runner',
@@ -78,31 +170,144 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     domains: ['video-generation'],
     available: true
   },
+  // ── Video generation: cloud models. Veo (Gemini API) and Sora (OpenAI API)
+  // adapters are implemented; the rest stay honestly unavailable.
   {
-    id: 'gemini-veo',
-    providerId: 'gemini',
-    label: 'Veo Video Generator',
-    providerLabel: 'Google Gemini',
-    description: 'Cloud video generation model.',
+    id: 'veo-3.1-generate-preview',
+    providerId: 'google_gemini',
+    label: 'Veo 3.1 (Preview)',
+    providerLabel: 'Google Veo',
+    description: 'Latest Veo text-to-video with native audio.',
     executionPath: 'api',
-    contextWindow: '1M',
-    availableContexts: ['128k', '512k', '1M'],
     domains: ['video-generation'],
-    available: false,
-    unavailableReason: 'Gemini Veo adapter is not implemented in this build.'
+    available: true
   },
   {
-    id: 'openai-sora',
-    providerId: 'openai',
-    label: 'Sora',
-    providerLabel: 'OpenAI',
-    description: 'Cloud video generation model.',
+    id: 'veo-3.0-generate-001',
+    providerId: 'google_gemini',
+    label: 'Veo 3',
+    providerLabel: 'Google Veo',
+    description: 'Stable Veo 3 text-to-video with native audio.',
     executionPath: 'api',
-    contextWindow: '128k',
-    availableContexts: ['32k', '64k', '128k'],
+    domains: ['video-generation'],
+    available: true
+  },
+  {
+    id: 'veo-3.0-fast-generate-001',
+    providerId: 'google_gemini',
+    label: 'Veo 3 Fast',
+    providerLabel: 'Google Veo',
+    description: 'Faster, cheaper Veo 3 text-to-video.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: true
+  },
+  {
+    id: 'veo-2.0-generate-001',
+    providerId: 'google_gemini',
+    label: 'Veo 2',
+    providerLabel: 'Google Veo',
+    description: 'Previous-generation Veo text-to-video.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: true
+  },
+  {
+    id: 'sora-2',
+    providerId: 'openai',
+    label: 'Sora 2',
+    providerLabel: 'OpenAI Sora',
+    description: 'OpenAI text-to-video with synced audio.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: true
+  },
+  {
+    id: 'sora-2-pro',
+    providerId: 'openai',
+    label: 'Sora 2 Pro',
+    providerLabel: 'OpenAI Sora',
+    description: 'Higher-fidelity OpenAI text-to-video.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: true
+  },
+  {
+    id: 'gen4_turbo',
+    providerId: 'runway',
+    label: 'Runway Gen-4 Turbo',
+    providerLabel: 'Runway',
+    description: 'Runway image/text-to-video generation.',
+    executionPath: 'api',
     domains: ['video-generation'],
     available: false,
-    unavailableReason: 'OpenAI Sora adapter is not implemented in this build.'
+    unavailableReason: 'Runway adapter is not implemented in this build.'
+  },
+  {
+    id: 'gen4_aleph',
+    providerId: 'runway',
+    label: 'Runway Aleph',
+    providerLabel: 'Runway',
+    description: 'Runway in-context video editing model.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: false,
+    unavailableReason: 'Runway adapter is not implemented in this build.'
+  },
+  {
+    id: 'kling-v2.5-turbo',
+    providerId: 'kling',
+    label: 'Kling 2.5 Turbo',
+    providerLabel: 'Kling',
+    description: 'Kuaishou Kling text-to-video generation.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: false,
+    unavailableReason: 'Kling adapter is not implemented in this build.'
+  },
+  {
+    id: 'kling-v2.1-master',
+    providerId: 'kling',
+    label: 'Kling 2.1 Master',
+    providerLabel: 'Kling',
+    description: 'High-fidelity Kling text/image-to-video.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: false,
+    unavailableReason: 'Kling adapter is not implemented in this build.'
+  },
+  {
+    id: 'ray-2',
+    providerId: 'luma',
+    label: 'Luma Ray 2',
+    providerLabel: 'Luma',
+    description: 'Luma Dream Machine text-to-video.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: false,
+    unavailableReason: 'Luma adapter is not implemented in this build.'
+  },
+  {
+    id: 'ray-flash-2',
+    providerId: 'luma',
+    label: 'Luma Ray Flash 2',
+    providerLabel: 'Luma',
+    description: 'Faster, cheaper Luma text-to-video.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: false,
+    unavailableReason: 'Luma adapter is not implemented in this build.'
+  },
+  {
+    id: 'minimax-hailuo-02',
+    providerId: 'minimax',
+    label: 'Hailuo 02',
+    providerLabel: 'MiniMax',
+    description: 'MiniMax Hailuo text/image-to-video.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: false,
+    unavailableReason: 'MiniMax adapter is not implemented in this build.'
   },
   {
     id: 'qwen2.5-coder',
