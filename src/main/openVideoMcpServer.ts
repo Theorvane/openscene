@@ -1,9 +1,18 @@
 import { randomUUID } from 'node:crypto';
+import { resolve as resolvePath, sep } from 'node:path';
 import { getMcpServerDefinition, McpResource, McpServer, McpTool } from '@theorvane/type-mcp';
 import { z } from 'zod';
 import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, type ClipEffects, type TimelineTrack } from '../shared/timelineTypes';
 import type { ExportIpcService } from './exportIpcService';
 import type { ProjectStore } from './projectStore';
+import { discoverFfmpeg } from './ffmpegDiscovery';
+import {
+  extractVideoFrames,
+  formatFrameTimestamp,
+  planFrameTimestamps,
+  WATCH_FRAME_HARD_CAP,
+  type ExtractedFrame
+} from './videoFrameAnalysis';
 import {
   createSpeechGenerationJob,
   createVideoGenerationJob,
@@ -11,14 +20,37 @@ import {
   getVideoGenerationJob
 } from './aiJobManager';
 
+/** Injectable frame extractor so tests never need a real FFmpeg runtime. */
+export type WatchFrameExtractor = (input: {
+  readonly filePath: string;
+  readonly timestampsMs: readonly number[];
+}) => Promise<readonly ExtractedFrame[]>;
+
+async function defaultWatchFrameExtractor(input: {
+  readonly filePath: string;
+  readonly timestampsMs: readonly number[];
+}): Promise<readonly ExtractedFrame[]> {
+  const ffmpeg = await discoverFfmpeg();
+  if (ffmpeg.kind === 'unavailable') {
+    throw new Error(`FFmpeg is unavailable: ${ffmpeg.reason}`);
+  }
+  return extractVideoFrames({ ffmpegPath: ffmpeg.executablePath, filePath: input.filePath, timestampsMs: input.timestampsMs });
+}
+
 @McpServer({ name: 'openvideo-mcp-server', version: '0.1.0' })
 export class OpenVideoMcpServer {
   private projectStore: ProjectStore | undefined;
   private exportIpcService: ExportIpcService | undefined;
+  private watchFrameExtractor: WatchFrameExtractor = defaultWatchFrameExtractor;
 
-  public setServices(projectStore?: ProjectStore | undefined, exportIpcService?: ExportIpcService | undefined): void {
+  public setServices(
+    projectStore?: ProjectStore | undefined,
+    exportIpcService?: ExportIpcService | undefined,
+    watchFrameExtractor?: WatchFrameExtractor | undefined
+  ): void {
     this.projectStore = projectStore;
     this.exportIpcService = exportIpcService;
+    this.watchFrameExtractor = watchFrameExtractor ?? defaultWatchFrameExtractor;
   }
 
   @McpTool({
@@ -183,6 +215,100 @@ export class OpenVideoMcpServer {
       return {
         success: false,
         error: err instanceof Error ? err.message : `Failed to inspect project ${params.projectId}`
+      };
+    }
+  }
+
+  @McpTool({
+    description:
+      'Watch a project video asset: samples a small set of frames across the video (or a focused startMs–endMs section) ' +
+      'so the model can see what is on screen. Read-only. The frames are attached to the conversation as images with ' +
+      'timestamps — describe or reason about them after they arrive. Use a vision-capable model to actually see them.',
+    input: z.object({
+      projectId: z.string().min(1),
+      assetId: z.string().min(1),
+      startMs: z.number().finite().min(0).optional(),
+      endMs: z.number().finite().min(0).optional(),
+      maxFrames: z.number().int().min(1).max(WATCH_FRAME_HARD_CAP).optional()
+    })
+  })
+  async watchProjectVideo(params: {
+    projectId: string;
+    assetId: string;
+    startMs?: number;
+    endMs?: number;
+    maxFrames?: number;
+  }) {
+    if (!this.projectStore) {
+      return { success: false as const, error: 'ProjectStore service is not available.' };
+    }
+
+    try {
+      const project = await this.projectStore.open(params.projectId);
+      if (!project) {
+        return { success: false as const, error: `Project ${params.projectId} not found.` };
+      }
+      const asset = project.assets.find((candidate) => candidate.id === params.assetId);
+      if (!asset) {
+        return { success: false as const, error: `Asset ${params.assetId} not found in project ${params.projectId}.` };
+      }
+      if (asset.kind !== 'video') {
+        return { success: false as const, error: `Asset ${params.assetId} is ${asset.kind}, not video.` };
+      }
+      const durationMs = asset.metadata?.durationMs;
+      if (durationMs === undefined || durationMs <= 0) {
+        return { success: false as const, error: 'The asset has no duration metadata yet; open it in the editor to probe it first.' };
+      }
+
+      const timestampsMs = planFrameTimestamps({
+        durationMs,
+        startMs: params.startMs,
+        endMs: params.endMs,
+        maxFrames: params.maxFrames
+      });
+      if (timestampsMs.length === 0) {
+        return { success: false as const, error: 'The requested range contains nothing to sample.' };
+      }
+
+      // Confinement: the asset file must stay inside its resolved project folder.
+      const projectDirectory = await this.projectStore.resolveDirectory(params.projectId);
+      const filePath = resolvePath(projectDirectory, asset.projectRelativePath);
+      if (!filePath.startsWith(`${projectDirectory}${sep}`)) {
+        return { success: false as const, error: 'The asset path escapes the project folder and was refused.' };
+      }
+
+      let frames: readonly ExtractedFrame[];
+      try {
+        frames = await this.watchFrameExtractor({ filePath, timestampsMs });
+      } catch {
+        // Extraction errors can carry filesystem paths in FFmpeg stderr; keep the tool result path-free.
+        return { success: false as const, error: 'FFmpeg could not extract frames from this asset. Check FFmpeg readiness in Settings → Local Tools.' };
+      }
+      if (frames.length === 0) {
+        return { success: false as const, error: 'FFmpeg produced no frames for the requested range.' };
+      }
+
+      return {
+        success: true as const,
+        projectId: params.projectId,
+        assetId: asset.id,
+        displayName: asset.displayName,
+        durationMs,
+        frameCount: frames.length,
+        summary:
+          `Sampled ${frames.length} frames from "${asset.displayName}" at ` +
+          `${frames.map((frame) => formatFrameTimestamp(frame.timeMs)).join(', ')}. ` +
+          'The frames are attached to the conversation as images in chronological order.',
+        frames: frames.map((frame) => ({
+          timeMs: frame.timeMs,
+          timestamp: formatFrameTimestamp(frame.timeMs),
+          jpegBase64: frame.jpegBase64
+        }))
+      };
+    } catch (err) {
+      return {
+        success: false as const,
+        error: err instanceof Error ? err.message : `Failed to watch asset ${params.assetId}.`
       };
     }
   }
@@ -426,7 +552,7 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'getProjectTimeline', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'exportProjectVideo']
+      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'exportProjectVideo']
     };
   }
 }

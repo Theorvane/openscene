@@ -37,7 +37,17 @@ type AppShellProps = {
   readonly activeProjectContext: EditAgentProjectContext | null;
   readonly chatRestoreRequest?: AgentChatRestoreRequest | null;
   readonly onChatRestoreHandled?: () => void;
+  readonly canNavigateBack?: boolean;
+  readonly onNavigateBack?: () => void;
 };
+
+function BackIcon(): ReactElement {
+  return (
+    <svg className="product-chrome__button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M14.5 5.5L8 12l6.5 6.5" />
+    </svg>
+  );
+}
 
 function SettingsIcon(): ReactElement {
   return (
@@ -66,7 +76,7 @@ function FolderIcon(): ReactElement {
   );
 }
 
-function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext, chatRestoreRequest = null }: AppShellProps): ReactElement {
+function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext, chatRestoreRequest = null, canNavigateBack = false, onNavigateBack }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
   const shellBodyRef = useRef<HTMLDivElement | null>(null);
@@ -147,6 +157,16 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
               <span className="local-pill">● Local</span>
             </div>
             <div className="product-chrome__actions">
+              <Button
+                aria-label="Back"
+                className="product-chrome__nav-button"
+                disabled={!canNavigateBack}
+                onClick={() => onNavigateBack?.()}
+                title={canNavigateBack ? 'Back to the previous page' : 'No previous page'}
+                variant="ghost"
+              >
+                <BackIcon />
+              </Button>
               <Button
                 aria-controls="app-page-panel-projects"
                 aria-current={projectsIsActive ? 'page' : undefined}

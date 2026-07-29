@@ -2,7 +2,7 @@ import { useState, type ReactElement, type ReactNode } from 'react';
 
 import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS } from '../../../shared/timelineTypes';
 import { formatDuration, formatTimestamp } from '../format';
-import { Button, MetadataList, PanelHeading, StatusCard, TabPanel, Tabs } from '../ui';
+import { Button, MetadataList, PanelHeading, TabPanel, Tabs } from '../ui';
 import type { TabDefinition } from '../ui';
 import {
   effectDbToVolume,
@@ -270,10 +270,6 @@ export function InspectorPanel({ activeTabId, editor, onActiveTabChange, tabs }:
           <ProjectInspector editor={editor} />
         </TabPanel>
       </div>
-
-      {editor.statusMessage.text.length > 0 && (
-        <StatusCard tone={editor.statusMessage.tone}>{editor.statusMessage.text}</StatusCard>
-      )}
     </aside>
   );
 }

@@ -27,6 +27,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     expect(definition?.version).toBe('0.1.0');
 
     const toolNames = definition?.tools.map((t) => t.name);
+    expect(toolNames).toContain('watchProjectVideo');
     expect(toolNames).toContain('createVideoJob');
     expect(toolNames).toContain('createSpeechJob');
     expect(toolNames).toContain('getJobStatus');
@@ -400,5 +401,84 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
     const targetTrack = reloaded?.timeline.tracks.find((t) => t.id === trackId);
     expect(targetTrack?.clips).toHaveLength(1);
     expect(targetTrack?.clips[0]!.assetId).toBe(assetId);
+  });
+
+  it('watchProjectVideo samples a confined video asset and returns path-free frames with timestamps', async () => {
+    const server = new OpenVideoMcpServer();
+    const seenPaths: string[] = [];
+    server.setServices(projectStore, undefined, async ({ filePath, timestampsMs }) => {
+      seenPaths.push(filePath);
+      return timestampsMs.map((timeMs) => ({ timeMs, jpegBase64: 'ZmFrZS1qcGVn' }));
+    });
+
+    const project = await projectStore.create({ name: 'Watch Project' });
+    const nowIso = new Date('2026-07-29T12:00:00.000Z').toISOString();
+    const asset: MediaAsset = {
+      id: 'asset-watch-123456789',
+      displayName: 'take.mp4',
+      projectRelativePath: 'assets/asset-watch-123456789/original.mp4',
+      kind: 'video',
+      mimeType: 'video/mp4',
+      byteLength: 2048,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      metadata: { durationMs: 10_000, width: 1920, height: 1080 }
+    };
+    await projectStore.registerAsset(project.id, asset);
+
+    const result = await server.watchProjectVideo({ projectId: project.id, assetId: asset.id });
+
+    expect(result.success).toBe(true);
+    const watched = result as { success: true; frameCount: number; summary: string; frames: readonly { timeMs: number; timestamp: string; jpegBase64: string }[] };
+    expect(watched.frameCount).toBe(8);
+    expect(watched.frames[0]).toMatchObject({ timestamp: '0:00', jpegBase64: 'ZmFrZS1qcGVn' });
+    expect(watched.summary).toContain('take.mp4');
+    expect(JSON.stringify(result)).not.toContain(tempDir);
+    expect(seenPaths[0]).toContain('original.mp4');
+  });
+
+  it('watchProjectVideo rejects non-video assets, missing assets, and missing duration without touching FFmpeg', async () => {
+    const server = new OpenVideoMcpServer();
+    let extractorCalls = 0;
+    server.setServices(projectStore, undefined, async ({ timestampsMs }) => {
+      extractorCalls += 1;
+      return timestampsMs.map((timeMs) => ({ timeMs, jpegBase64: 'ZmFrZQ==' }));
+    });
+
+    const project = await projectStore.create({ name: 'Guard Project' });
+    const nowIso = new Date('2026-07-29T12:00:00.000Z').toISOString();
+    const audioAsset: MediaAsset = {
+      id: 'asset-audio-123456789',
+      displayName: 'song.mp3',
+      projectRelativePath: 'assets/asset-audio-123456789/original.mp3',
+      kind: 'audio',
+      mimeType: 'audio/mpeg',
+      byteLength: 1024,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      metadata: { durationMs: 5_000 }
+    };
+    const unprobedVideo: MediaAsset = {
+      id: 'asset-unprobed-12345678',
+      displayName: 'raw.mp4',
+      projectRelativePath: 'assets/asset-unprobed-12345678/original.mp4',
+      kind: 'video',
+      mimeType: 'video/mp4',
+      byteLength: 1024,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      metadata: null
+    };
+    await projectStore.registerAsset(project.id, audioAsset);
+    await projectStore.registerAsset(project.id, unprobedVideo);
+
+    const audioResult = await server.watchProjectVideo({ projectId: project.id, assetId: audioAsset.id });
+    const unprobedResult = await server.watchProjectVideo({ projectId: project.id, assetId: unprobedVideo.id });
+    const missingResult = await server.watchProjectVideo({ projectId: project.id, assetId: 'asset-none' });
+
+    expect(audioResult).toMatchObject({ success: false, error: expect.stringContaining('not video') });
+    expect(unprobedResult).toMatchObject({ success: false, error: expect.stringContaining('duration metadata') });
+    expect(missingResult.success).toBe(false);
+    expect(extractorCalls).toBe(0);
   });
 });
