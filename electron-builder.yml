@@ -3,6 +3,13 @@
 appId: tech.theorvane.openvideo
 productName: OpenVideo
 copyright: Open source under the MIT License
+# Declared so electron-builder generates the latest*.yml update manifests the
+# in-app updater reads. The release workflow uploads the artifacts itself with
+# `--publish never`, so nothing is pushed from a packaging run.
+publish:
+  provider: github
+  owner: Theorvane
+  repo: openvideo
 directories:
   output: dist
   buildResources: build
@@ -32,11 +39,20 @@ win:
       arch: [x64]
     - target: zip
       arch: [x64]
+deb:
+  packageName: openvideo
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
 linux:
   icon: build/icon.png
+  # The deb package name, the binary, and the artifact filename all default to
+  # package.json's `name`, so an install reads video-window-recorder while
+  # everything the user sees says OpenVideo. executableName fixes the binary and
+  # the desktop entry; artifactName and the deb package name are set separately
+  # because electron-builder derives neither from it.
+  executableName: openvideo
+  artifactName: openvideo-${version}-${arch}.${ext}
   category: AudioVideo
   target:
     - target: AppImage

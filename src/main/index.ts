@@ -14,6 +14,8 @@ import { ProjectLocationRegistry } from './projectLocations';
 import { ProjectStore } from './projectStore';
 import { RecordingFileStore } from './recordingStore';
 import { registerResultAssetImportHandlers } from './resultAssetImportHandlers';
+import { registerUpdaterIpcHandlers } from './updaterIpcHandlers';
+import { setupUpdater } from './updater';
 import { REFERENCE_IMAGE_EXTENSIONS, selectReferenceImage } from './referenceImagePicker';
 import { ResultAssetImportService } from './resultAssetImportService';
 import { registerTimelineAssetProtocol, registerTimelineAssetScheme } from './timelineAssetProtocol';
@@ -49,6 +51,7 @@ const projectStore = new ProjectStore(join(app.getPath('userData'), 'projects'),
 const assetLibraryStore = new AssetLibraryStore(join(app.getPath('userData'), 'projects'), projectStore);
 const exportJobStore = new ExportJobStore();
 const credentialStore = new CredentialStore(app.getPath('userData'));
+const updaterController = setupUpdater();
 const chatGptOAuthService = new ChatGptOAuthService(app.getPath('userData'), {
   openExternal: (url) => shell.openExternal(url)
 });
@@ -249,6 +252,11 @@ async function installIpcHandlers(): Promise<void> {
   });
   registerTimelineIpcHandlers(ipcMain, timelineIpcService);
   registerResultAssetImportHandlers(ipcMain, resultAssetImportService);
+  registerUpdaterIpcHandlers(ipcMain, {
+    controller: updaterController,
+    currentVersion: app.getVersion(),
+    listWindows: () => BrowserWindow.getAllWindows()
+  });
 
   ipcMain.handle(IPC_CHANNELS.aiSelectReferenceImage, () =>
     selectReferenceImage(() => dialog.showOpenDialog({
@@ -390,6 +398,12 @@ app.whenReady().then(async () => {
   registerTimelineAssetProtocol(timelineIpcService);
   await installIpcHandlers();
   createWindow();
+
+  // Checked after the window exists so the first result has somewhere to land,
+  // and left unawaited so a slow or unreachable GitHub never delays startup.
+  void updaterController.start().catch((error: unknown) => {
+    console.error('Update check failed:', error);
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

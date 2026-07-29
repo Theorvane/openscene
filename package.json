@@ -22,6 +22,7 @@
     "@langchain/openai": "^1.5.5",
     "@theorvane/type-mcp": "^0.2.0",
     "@vitejs/plugin-react": "5.1.4",
+    "electron-updater": "^6.8.9",
     "electron-vite": "^5.0.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -37,5 +38,8 @@
     "vite": "7.3.6",
     "vitest": "^4.1.10"
   },
-  "author": "Theorvane"
+  "author": {
+    "name": "Theorvane",
+    "email": "openvideo@theorvane.tech"
+  }
 }

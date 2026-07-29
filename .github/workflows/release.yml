@@ -100,6 +100,8 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npx electron-builder --${{ matrix.platform }} --publish never
 
+      # latest*.yml and the blockmaps are what the in-app updater reads; shipping
+      # only the installers leaves it unable to see that a release happened.
       - uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
         with:
           name: openvideo-${{ matrix.platform }}
@@ -109,6 +111,8 @@ jobs:
             dist/*.exe
             dist/*.AppImage
             dist/*.deb
+            dist/*.yml
+            dist/*.blockmap
           if-no-files-found: error
 
   release:

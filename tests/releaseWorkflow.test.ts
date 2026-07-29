@@ -9,6 +9,7 @@ const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json
   readonly scripts: Record<string, string>;
   readonly dependencies: Record<string, string>;
   readonly devDependencies: Record<string, string>;
+  readonly author: { readonly name?: string; readonly email?: string };
 };
 
 describe('release workflow', () => {
@@ -108,6 +109,38 @@ describe('release workflow', () => {
     const ciTools = ci.match(toolchain)?.[1]?.trim();
     expect(ciTools).toBeDefined();
     expect(workflow).toContain(`brew install ${ciTools ?? ''}`);
+  });
+
+  it('publishes the update metadata the in-app updater reads, not only the installers', () => {
+    // electron-updater looks for latest.yml / latest-mac.yml / latest-linux.yml
+    // in the release. Ship the installers without them and the updater cannot
+    // see that a release happened at all — it fails silently, on the one code
+    // path no CI run exercises.
+    expect(builderConfig).toContain('publish:');
+    expect(builderConfig).toContain('provider: github');
+    expect(workflow).toContain('dist/*.yml');
+    // Blockmaps are what make a Windows update a delta rather than a full
+    // re-download; without them electron-updater falls back to the whole file.
+    expect(workflow).toContain('dist/*.blockmap');
+  });
+
+  it('carries the maintainer identity the Linux packages require', () => {
+    // fpm refuses to build a deb without a maintainer email, and the failure is
+    // a packaging-time error, not a test failure — so it only ever surfaces on
+    // the Linux runner during a release. A plain "Theorvane" string is not
+    // enough; the object form with an email is.
+    const author = packageJson.author;
+    expect(typeof author).toBe('object');
+    expect(author.email).toMatch(/@/);
+  });
+
+  it('names the Linux artifacts after the product rather than the internal package', () => {
+    // Every default here comes from package.json's `name`, which is
+    // video-window-recorder — so an install would read that while the app,
+    // the menu bar, and the release all say OpenVideo.
+    expect(builderConfig).toContain('executableName: openvideo');
+    expect(builderConfig).toContain('packageName: openvideo');
+    expect(builderConfig).toMatch(/artifactName: openvideo-\$\{version\}/);
   });
 
   it('declares a target for every platform the workflow builds', () => {

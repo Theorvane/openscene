@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 import { IPC_CHANNELS } from '../shared/ipc';
+import type { UpdaterState } from '../shared/updater';
 import type { ExportJobActionInput, LocalExportJob, LocalFfmpegRuntimeStatus, StartExportJobInput } from '../shared/exportTypes';
 import type { ReferenceImageSelection, TextToSpeechJob, TextToSpeechRequest, VideoGenerationJob, VideoGenerationRequest } from '../shared/providerSeams';
 import type {
@@ -116,6 +117,24 @@ export interface VideoToolApi {
   agentChatHistoryList(): Promise<ApiResponse<readonly AgentChatHistoryEntry[]>>;
   agentChatHistoryGet(input: AgentChatHistoryGetInput): Promise<ApiResponse<AgentChatStoredConversation | null>>;
   agentChatHistoryDelete(input: AgentChatHistoryGetInput): Promise<ApiResponse<boolean>>;
+  onUpdaterStateChanged(listener: (snapshot: UpdaterSnapshot) => void): () => void;
+  getUpdaterState(): Promise<ApiResponse<UpdaterSnapshot>>;
+  checkForUpdates(): Promise<ApiResponse<UpdaterSnapshot>>;
+  installUpdate(): Promise<ApiResponse<UpdaterSnapshot>>;
+}
+
+export type UpdaterSnapshot = {
+  readonly state: UpdaterState;
+  readonly currentVersion: string;
+};
+
+// Pushed state crosses the bridge as unknown; anything that is not a shaped
+// snapshot is dropped rather than handed to the renderer as one.
+function parseUpdaterSnapshot(payload: unknown): UpdaterSnapshot | null {
+  const candidate = payload as { state?: { status?: unknown }; currentVersion?: unknown } | null;
+  if (typeof candidate?.state?.status !== 'string') return null;
+  if (typeof candidate.currentVersion !== 'string') return null;
+  return candidate as UpdaterSnapshot;
 }
 
 const videoTool: VideoToolApi = {
@@ -210,7 +229,18 @@ const videoTool: VideoToolApi = {
   agentChatHistoryGet: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryGet, input) as Promise<ApiResponse<AgentChatStoredConversation | null>>,
   agentChatHistoryDelete: (input) =>
-    ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryDelete, input) as Promise<ApiResponse<boolean>>
+    ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryDelete, input) as Promise<ApiResponse<boolean>>,
+  onUpdaterStateChanged: (listener) => {
+    const subscription = (_event: IpcRendererEvent, payload: unknown): void => {
+      const snapshot = parseUpdaterSnapshot(payload);
+      if (snapshot !== null) listener(snapshot);
+    };
+    ipcRenderer.on(IPC_CHANNELS.updaterStateChanged, subscription);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.updaterStateChanged, subscription);
+  },
+  getUpdaterState: () => ipcRenderer.invoke(IPC_CHANNELS.updaterGetState) as Promise<ApiResponse<UpdaterSnapshot>>,
+  checkForUpdates: () => ipcRenderer.invoke(IPC_CHANNELS.updaterCheck) as Promise<ApiResponse<UpdaterSnapshot>>,
+  installUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.updaterInstall) as Promise<ApiResponse<UpdaterSnapshot>>
 };
 
 contextBridge.exposeInMainWorld('videoTool', videoTool);

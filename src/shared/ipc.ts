@@ -51,7 +51,11 @@ export const IPC_CHANNELS = {
   agentChatHistoryList: 'agent-chat:history-list',
   agentChatHistoryGet: 'agent-chat:history-get',
   agentChatHistoryDelete: 'agent-chat:history-delete',
-  agentChatCompact: 'agent-chat:compact'
+  agentChatCompact: 'agent-chat:compact',
+  updaterGetState: 'updater:get-state',
+  updaterCheck: 'updater:check',
+  updaterInstall: 'updater:install',
+  updaterStateChanged: 'updater:state-changed'
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
