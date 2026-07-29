@@ -124,8 +124,17 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "$TAG"
-          git push origin "refs/tags/$TAG"
+          # The check job's guard only covers a fresh push to main. Re-running
+          # this job alone replays a tag push that already landed, so ask origin
+          # rather than assume. The branch push needs no guard: pushing it again
+          # at the same commit is already a no-op, and a different commit under
+          # the same release tag is a real conflict worth failing on.
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "$TAG is already tagged on origin; keeping the published tag."
+          else
+            git tag -a "$TAG" -m "$TAG"
+            git push origin "refs/tags/$TAG"
+          fi
           git push origin "HEAD:refs/heads/release/$TAG"
 
       - name: Publish the GitHub release
@@ -133,8 +142,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.check.outputs.tag }}
         run: |
-          gh release create "$TAG" \
-            --title "OpenVideo $TAG" \
-            --generate-notes \
-            --notes "These builds are unsigned. macOS reports an unidentified developer and Windows SmartScreen warns on first run; open the app from the Finder context menu, or choose More info then Run anyway, or run OpenVideo from source." \
-            artifacts/*
+          # Re-running after a partial upload should repair the release, not
+          # fail on the one that is already there.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists; replacing its artifacts."
+            gh release upload "$TAG" artifacts/* --clobber
+          else
+            gh release create "$TAG" \
+              --title "OpenVideo $TAG" \
+              --generate-notes \
+              --notes "These builds are unsigned. macOS reports an unidentified developer and Windows SmartScreen warns on first run; open the app from the Finder context menu, or choose More info then Run anyway, or run OpenVideo from source." \
+              artifacts/*
+          fi

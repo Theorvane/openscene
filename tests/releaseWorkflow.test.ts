@@ -7,6 +7,7 @@ const builderConfig = readFileSync(resolve(process.cwd(), 'electron-builder.yml'
 const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8')) as {
   readonly version: string;
   readonly scripts: Record<string, string>;
+  readonly dependencies: Record<string, string>;
   readonly devDependencies: Record<string, string>;
 };
 
@@ -74,6 +75,25 @@ describe('release workflow', () => {
     // electron-vite writes the app into out/; the package must carry it.
     expect(builderConfig).toContain('out/**');
     expect(builderConfig).toContain('productName: OpenVideo');
+  });
+
+  it('lets the release job be re-run without aborting on what it already published', () => {
+    // The check job's tag guard only covers a fresh push to main. Re-running the
+    // release job alone, after a flaky upload, replays a tag push and a release
+    // creation that have already happened; both must no-op rather than error.
+    expect(workflow).toContain('git ls-remote --exit-code --tags origin "refs/tags/$TAG"');
+    expect(workflow).toContain('gh release view "$TAG"');
+    expect(workflow).toContain('gh release upload "$TAG" artifacts/* --clobber');
+  });
+
+  it('pins every dependency instead of floating on latest', () => {
+    // The same reproducibility hole this workflow closed for electron: a "latest"
+    // float lets two packaging runs of one commit resolve different trees.
+    const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+    const floating = Object.entries(allDeps)
+      .filter(([, range]) => range === 'latest' || range === '*')
+      .map(([name]) => name);
+    expect(floating).toEqual([]);
   });
 
   it('declares a target for every platform the workflow builds', () => {
