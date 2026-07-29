@@ -14,6 +14,7 @@ type ChatGptAuthContextValue = {
   readonly connect: () => Promise<boolean>;
   readonly cancel: () => Promise<void>;
   readonly disconnect: () => Promise<void>;
+  readonly refresh: () => Promise<void>;
 };
 
 const ChatGptAuthContext = createContext<ChatGptAuthContextValue | null>(null);
@@ -22,16 +23,22 @@ export function ChatGptAuthProvider({ children }: { readonly children: ReactNode
   const [state, setState] = useState<ChatGptAuthState>('checking');
   const [error, setError] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    let cancelled = false;
-    void window.videoTool.getChatGptOAuthStatus().then((response) => {
-      if (cancelled) return;
-      setState(response.ok && response.value.kind === 'connected' ? 'connected' : 'disconnected');
-    });
-    return () => {
-      cancelled = true;
-    };
+  const refresh = useCallback(async (): Promise<void> => {
+    const response = await window.videoTool.getChatGptOAuthStatus();
+    setState(response.ok && response.value.kind === 'connected' ? 'connected' : 'disconnected');
+    if (!response.ok) setError(response.error.message);
   }, []);
+
+  useEffect(() => {
+    void refresh();
+    // A sign-in finishes in the browser, so re-read the status when the window
+    // comes back into focus rather than trusting a single mount-time read.
+    const onFocus = (): void => {
+      void refresh();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refresh]);
 
   const connect = useCallback(async (): Promise<boolean> => {
     setState('connecting');
@@ -60,8 +67,8 @@ export function ChatGptAuthProvider({ children }: { readonly children: ReactNode
   }, []);
 
   const value = useMemo<ChatGptAuthContextValue>(
-    () => ({ state, isConnected: state === 'connected', error, connect, cancel, disconnect }),
-    [cancel, connect, disconnect, error, state]
+    () => ({ state, isConnected: state === 'connected', error, connect, cancel, disconnect, refresh }),
+    [cancel, connect, disconnect, error, refresh, state]
   );
 
   return <ChatGptAuthContext.Provider value={value}>{children}</ChatGptAuthContext.Provider>;

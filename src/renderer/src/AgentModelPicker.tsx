@@ -58,7 +58,10 @@ export function AgentModelPicker(): ReactElement {
 
   const providerStatusLabel = (group: ProviderGroup): string => {
     if (group.models[0]?.executionPath === 'local') return 'Local';
-    return group.models.some((model) => isModelLinked(group.providerId, model.id)) ? 'Connected' : 'Not connected';
+    if (isProviderConnected(group.providerId, credentialStatus)) return 'Connected';
+    // A ChatGPT sign-in connects OpenAI without a stored key — say which method
+    // is carrying the group so an empty-looking list is never a mystery.
+    return group.models.some((model) => isModelLinked(group.providerId, model.id)) ? 'ChatGPT' : 'Not connected';
   };
 
   return (

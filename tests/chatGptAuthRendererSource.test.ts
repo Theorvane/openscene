@@ -18,6 +18,9 @@ describe('unified OpenAI provider renderer contract', () => {
     expect(source).toContain('window.videoTool.startChatGptOAuth()');
     expect(source).toContain('window.videoTool.cancelChatGptOAuth()');
     expect(source).toContain('window.videoTool.logoutChatGptOAuth()');
+    // A sign-in completes in the browser, so the status is re-read on focus
+    // rather than trusting a single mount-time read.
+    expect(source).toContain("window.addEventListener('focus', onFocus)");
     // Only a connected/disconnected status may cross the bridge.
     expect(source).not.toMatch(/accessToken|refreshToken|accountId|localStorage/);
   });
@@ -51,5 +54,8 @@ describe('unified OpenAI provider renderer contract', () => {
     expect(chatContext).toContain('openAiAuthMode,');
     expect(picker).toContain('isOpenAiCodexModelKey');
     expect(picker).toContain('isModelLinked');
+    // An OpenAI group carried only by a sign-in says so, so an empty-looking
+    // model list is never a mystery.
+    expect(picker).toContain("? 'ChatGPT' : 'Not connected'");
   });
 });
