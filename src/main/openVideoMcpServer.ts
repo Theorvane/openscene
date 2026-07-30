@@ -17,7 +17,7 @@ import {
   type ExtractedFrame
 } from './videoFrameAnalysis';
 import { estimateVideoPlanCost, formatCostEstimate, estimateImageCost, estimateSpeechCost } from '../shared/mediaGenerationPricing';
-import { planVideoStoryboard, supportedShotSeconds } from '../shared/videoStoryboardPlan';
+import { MAX_SUPPORTED_SHOT_SECONDS, planVideoStoryboard, supportedShotSeconds } from '../shared/videoStoryboardPlan';
 import { checkNarrationFit, narrationBudget, detectScriptKind } from '../shared/narrationTiming';
 import { getDomainModel, getDefaultDomainModelId } from '../shared/aiDomainModels';
 import {
@@ -232,7 +232,8 @@ export class OpenVideoMcpServer {
     input: z.object({
       prompt: z.string().min(1, 'Prompt is required'),
       aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
-      durationSeconds: z.number().min(1).max(10).default(5),
+      // Derived, not a literal: see MAX_SUPPORTED_SHOT_SECONDS.
+      durationSeconds: z.number().min(1).max(MAX_SUPPORTED_SHOT_SECONDS).default(5),
       stylePreset: z.string().optional().default('Cinematic'),
       modelId: z.string().optional(),
       referenceImageJobId: z
