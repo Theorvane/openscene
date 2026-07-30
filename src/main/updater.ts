@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs';
 import { readFile, writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -60,8 +61,43 @@ function createReadyRecordStore(filePath: string) {
   };
 }
 
+/**
+ * electron-updater says a great deal about what it is doing — which release it
+ * found, what it downloaded, why a differential download was skipped — and by
+ * default says all of it to a console no packaged app has. Diagnosing "the
+ * update is not working" then means guessing.
+ *
+ * Written synchronously and best-effort: a logger that throws, or that loses
+ * lines because the process is quitting to install, would be worse than none.
+ */
+function createUpdaterLogger(filePath: string) {
+  const write = (level: string, message: unknown, ...rest: unknown[]): void => {
+    try {
+      const detail = [message, ...rest]
+        .map((entry) => (entry instanceof Error ? entry.stack ?? entry.message : String(entry)))
+        .join(' ');
+      appendFileSync(filePath, `${new Date().toISOString()} ${level} ${detail}\n`);
+    } catch {
+      // Logging must never be the reason an update fails.
+    }
+  };
+  return {
+    info: (message: unknown, ...rest: unknown[]) => write('info', message, ...rest),
+    warn: (message: unknown, ...rest: unknown[]) => write('warn', message, ...rest),
+    error: (message: unknown, ...rest: unknown[]) => write('error', message, ...rest),
+    debug: (message: unknown, ...rest: unknown[]) => write('debug', message, ...rest)
+  };
+}
+
+/** Where the updater's own account of itself is kept. */
+export function updaterLogPath(): string {
+  return join(app.getPath('userData'), 'updater.log');
+}
+
 export function setupUpdater(): UpdaterController {
   const capability = resolveUpdaterCapability();
+
+  autoUpdater.logger = createUpdaterLogger(updaterLogPath());
 
   // Downloading is a deliberate act, and an install that happens behind a quit
   // is a surprise; the controller drives both explicitly.

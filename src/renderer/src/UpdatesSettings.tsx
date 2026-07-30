@@ -66,7 +66,8 @@ export function UpdatesSettings(): ReactElement {
       <MetadataList
         items={[
           { term: 'Installed version', description: version },
-          { term: 'Update channel', description: 'Stable releases published on GitHub.' }
+          { term: 'Update channel', description: 'Stable releases published on GitHub.' },
+          { term: 'Log', description: 'updater.log in the app data folder records every check, download, and failure.' }
         ]}
       />
       <StatusCard tone={toneFor(snapshot.state)}>{describeUpdaterState(snapshot.state, version)}</StatusCard>

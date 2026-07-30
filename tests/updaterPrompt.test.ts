@@ -81,3 +81,28 @@ describe('prompt when the user asked', () => {
     }
   });
 });
+
+describe('updater logging', () => {
+  it('sends electron-updater output to a file rather than a console nobody sees', async () => {
+    // Given
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(resolve(process.cwd(), 'src/main/updater.ts'), 'utf8');
+
+    // Then
+    // Without this, diagnosing "the update is not working" means guessing:
+    // electron-updater reports which release it found and what it downloaded,
+    // and a packaged app has no console to report it to.
+    expect(source).toContain('autoUpdater.logger = createUpdaterLogger(updaterLogPath())');
+    expect(source).toContain("join(app.getPath('userData'), 'updater.log')");
+    // Best-effort: a throwing logger must not be why an update fails.
+    expect(source).toMatch(/} catch \{\n\s*\/\/ Logging must never be the reason an update fails\./);
+  });
+
+  it('tells the user where that log is', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const settings = readFileSync(resolve(process.cwd(), 'src/renderer/src/UpdatesSettings.tsx'), 'utf8');
+    expect(settings).toContain('updater.log');
+  });
+});
