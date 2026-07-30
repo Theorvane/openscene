@@ -2431,7 +2431,16 @@ button {
     "splitter splitter splitter splitter splitter"
     "timeline timeline timeline timeline timeline";
   grid-template-columns: var(--editor-left-dock-width, 320px) var(--space-2) minmax(0, 1fr) var(--space-2) var(--editor-inspector-width, 340px);
-  grid-template-rows: minmax(0, var(--editor-program-percent, 58fr)) var(--space-2) minmax(0, var(--editor-timeline-percent, 42fr));
+  /* The timeline row has a pixel floor, not just a percentage one. Its toolbar
+     keeps its full height as the row shrinks, so with a 0 minimum the track
+     area is what collapses — past a point the panel folds into its own header
+     and the timeline looks like it is shrinking upwards. The floor keeps the
+     ruler and one video track on screen no matter how short the window is,
+     which a percentage clamp cannot promise. */
+  grid-template-rows:
+    minmax(0, var(--editor-program-percent, 58fr))
+    var(--space-2)
+    minmax(var(--editor-timeline-min-height, 150px), var(--editor-timeline-percent, 42fr));
   gap: 2px;
   height: 100%;
   min-height: 0;
