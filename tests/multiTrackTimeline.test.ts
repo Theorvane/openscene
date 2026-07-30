@@ -204,3 +204,17 @@ describe('timeline rail geometry', () => {
     expect(source).not.toContain("gridTemplateRows: 'auto auto auto'");
   });
 });
+
+describe('timeline fills its panel', () => {
+  it('stretches the surface to the bottom instead of stopping under the last track', () => {
+    // Given
+    const source = readFileSync(resolve(process.cwd(), 'src/renderer/src/editor/TimelineCanvas.tsx'), 'utf8');
+
+    // Then
+    // A content-height grid left dead space below the last track, and the
+    // playhead — which is positioned against this element — stopped there too.
+    expect(source).toContain("minHeight: '100%'");
+    expect(source).toContain("flexDirection: 'column'");
+    expect(source).toContain("flex: '1 1 auto'");
+  });
+});

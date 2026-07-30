@@ -476,7 +476,24 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
           style={{ overflowX: 'auto', position: 'relative', height: '100%', cursor: activeTool === 'hand' ? (panOriginRef.current === null ? 'grab' : 'grabbing') : undefined }}
         >
           {/* Scrollable Container based on zoomLevel */}
-          <div style={{ width: `calc(100% * ${zoomLevel})`, minWidth: '100%', position: 'relative', display: 'grid', gap: '4px', padding: 'var(--space-2) var(--space-3)' }}>
+          {/* Column, not a content-height grid: the rows keep their natural
+              heights and a trailing spacer takes whatever is left, so the
+              surface reaches the bottom of the panel instead of stopping under
+              the last track. The playhead is absolutely positioned against this
+              element, so it runs the full height too. */}
+          <div
+            style={{
+              width: `calc(100% * ${zoomLevel})`,
+              minWidth: '100%',
+              minHeight: '100%',
+              boxSizing: 'border-box',
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              padding: 'var(--space-2) var(--space-3)'
+            }}
+          >
 
             {/* Slim mono ruler. The scale cell mirrors the track grid (rail + lane),
                 so the scrub dot, the lane playhead line, and seek mapping share the exact
@@ -823,6 +840,15 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
               </div>
               <div className="timeline-track__lane" />
             </div>
+
+            {/* Takes the remaining height so the timeline fills its panel.
+                Clicking it clears the selection, like empty space in any NLE. */}
+            <div
+              style={{ flex: '1 1 auto', minHeight: '16px' }}
+              onPointerDown={(event) => {
+                if (event.target === event.currentTarget) editor.clearSelection();
+              }}
+            />
                 </div>
               </div>
             ))}
