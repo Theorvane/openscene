@@ -67,32 +67,27 @@ export function renameTrack(timeline: TimelineDocument, trackId: string, name: s
 }
 
 /**
- * Moves a track one row up or down among the tracks of its own kind. Kinds stay
- * grouped because interleaving a video row between two audio rows would make the
- * timeline read as though audio composited over video.
+ * Inserts a track directly above or below an existing one. Position matters:
+ * track order is layer order, so inserting above puts the new track over the
+ * reference track in the composite.
  */
-export function moveTrack(
+export function addTrackBeside(
   timeline: TimelineDocument,
-  trackId: string,
-  direction: 'up' | 'down'
+  reference: { readonly trackId: string; readonly position: 'above' | 'below' },
+  input: AddTrackInput
 ): TimelineDocument | null {
-  const index = timeline.tracks.findIndex((track) => track.id === trackId);
+  const index = timeline.tracks.findIndex((track) => track.id === reference.trackId);
   if (index === -1) return null;
-  const kind = timeline.tracks[index]?.kind;
-  const step = direction === 'up' ? -1 : 1;
 
-  let target = index + step;
-  while (target >= 0 && target < timeline.tracks.length && timeline.tracks[target]?.kind !== kind) {
-    target += step;
-  }
-  if (target < 0 || target >= timeline.tracks.length) return null;
+  // Reuse addTrack for validation so the id, name, and duplicate rules cannot
+  // drift between appending and inserting.
+  const appended = addTrack(timeline, input);
+  if (appended === null) return null;
+  const created = appended.tracks[appended.tracks.length - 1];
+  if (created === undefined) return null;
 
   const tracks = [...timeline.tracks];
-  const moved = tracks[index];
-  const displaced = tracks[target];
-  if (moved === undefined || displaced === undefined) return null;
-  tracks[index] = displaced;
-  tracks[target] = moved;
+  tracks.splice(reference.position === 'above' ? index : index + 1, 0, created);
   return { ...timeline, tracks };
 }
 

@@ -116,7 +116,7 @@ const ADD_TRACK_BUTTON_STYLE = {
 } as const satisfies CSSProperties;
 const TRACK_GRID_TEMPLATE = `${TRACK_RAIL_WIDTH} minmax(0, 1fr)`;
 
-const TRACK_TOGGLE_STYLE = {
+const TRACK_TOGGLE_STYLE_BASE = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -131,6 +131,17 @@ const TRACK_TOGGLE_STYLE = {
   lineHeight: 1,
   transition: 'background var(--transition-fast), color var(--transition-fast)'
 } as const satisfies CSSProperties;
+
+const TRACK_TOGGLE_STYLE = TRACK_TOGGLE_STYLE_BASE;
+
+/** Two glyphs, so the 20px toggle box would wrap them onto two lines. */
+const INSERT_TRACK_BUTTON_STYLE = {
+  ...TRACK_TOGGLE_STYLE_BASE,
+  width: 'auto',
+  padding: '0 3px',
+  fontSize: 'var(--text-micro)'
+} as const satisfies CSSProperties;
+
 
 function trackToggleStyle(isOn: boolean, tone: 'danger' | 'warning' | 'primary'): CSSProperties {
   if (!isOn) return TRACK_TOGGLE_STYLE;
@@ -708,27 +719,28 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                       {lockedTracks[track.id] ? ICONS.lock : ICONS.unlock}
                     </button>
 
-                    {/* Separated because these change the document, not just the
-                        view: track order is video layer order. */}
+                    {/* Separated because these change the document, not just
+                        the view. Insert position is layer order: above means
+                        over this track in the composite. */}
                     <span aria-hidden="true" style={{ width: '1px', height: '12px', margin: '0 2px', background: 'var(--line-subtle)' }} />
 
                     <button
                       type="button"
-                      title="Move track up (higher video layer)"
-                      aria-label={`Move ${track.name} up`}
-                      onClick={(e) => { e.stopPropagation(); editor.moveTimelineTrack(track.id, 'up'); }}
-                      style={TRACK_TOGGLE_STYLE}
+                      title="Add a track above (higher video layer)"
+                      aria-label={`Add a track above ${track.name}`}
+                      onClick={(e) => { e.stopPropagation(); editor.insertTimelineTrack(track.id, 'above'); }}
+                      style={INSERT_TRACK_BUTTON_STYLE}
                     >
-                      ↑
+                      +↑
                     </button>
                     <button
                       type="button"
-                      title="Move track down (lower video layer)"
-                      aria-label={`Move ${track.name} down`}
-                      onClick={(e) => { e.stopPropagation(); editor.moveTimelineTrack(track.id, 'down'); }}
-                      style={TRACK_TOGGLE_STYLE}
+                      title="Add a track below (lower video layer)"
+                      aria-label={`Add a track below ${track.name}`}
+                      onClick={(e) => { e.stopPropagation(); editor.insertTimelineTrack(track.id, 'below'); }}
+                      style={INSERT_TRACK_BUTTON_STYLE}
                     >
-                      ↓
+                      +↓
                     </button>
                     <button
                       type="button"

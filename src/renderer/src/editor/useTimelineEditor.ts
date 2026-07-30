@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   addTrack,
-  moveTrack,
+  addTrackBeside,
   removeTrack,
   renameTrack,
   deleteClip,
@@ -239,12 +239,17 @@ export function useTimelineEditor() {
     replaceTimeline((timeline) => renameTrack(timeline, trackId, name), 'Renamed the track.', 'That track name is not valid.');
   }, [replaceTimeline]);
 
-  const moveTimelineTrack = useCallback((trackId: string, direction: 'up' | 'down') => {
-    replaceTimeline(
-      (timeline) => moveTrack(timeline, trackId, direction),
-      'Moved the track.',
-      'That track is already at the edge of its group.'
-    );
+  /** Inserts a same-kind track above or below an existing one. */
+  const insertTimelineTrack = useCallback((trackId: string, position: 'above' | 'below') => {
+    replaceTimeline((timeline) => {
+      const kind = timeline.tracks.find((track) => track.id === trackId)?.kind;
+      if (kind === undefined) return null;
+      return addTrackBeside(
+        timeline,
+        { trackId, position },
+        { id: createOpaqueId(`${kind}-track`), kind, name: nextTrackName(timeline, kind) }
+      );
+    }, 'Added a track.', 'The track could not be added.');
   }, [replaceTimeline]);
 
   const selectClip = useCallback((clipId: string) => {
@@ -448,7 +453,7 @@ export function useTimelineEditor() {
   }, [project, setLoadedProject]);
 
   return {
-    addTimelineTrack, removeTimelineTrack, renameTimelineTrack, moveTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
+    addTimelineTrack, removeTimelineTrack, renameTimelineTrack, insertTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
     openProject, openProjectFolder, renameProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
     clearSelection, goToTimelineEnd, goToTimelineStart, selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,

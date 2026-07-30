@@ -8,7 +8,7 @@ import {
   INITIAL_VIDEO_TRACK_ID,
   addTrack,
   createInitialTimeline,
-  moveTrack,
+  addTrackBeside,
   removeTrack,
   renameTrack
 } from '../src/shared/timelineLogic';
@@ -62,7 +62,7 @@ describe('track lifecycle', () => {
     const timeline = withVideoTracks();
     const populated: TimelineDocument = {
       ...timeline,
-      tracks: timeline.tracks.map((track) =>
+      tracks: timeline.tracks.map((track: (typeof timeline.tracks)[number]) =>
         track.id === 'video-2' ? { ...track, clips: [clip('c9', 'asset-1', 0)] } : track
       ),
       transitions: [{ fromClipId: 'c9', toClipId: 'c9', type: TRANSITION_TYPES[0], durationMs: 500 }]
@@ -89,29 +89,49 @@ describe('track lifecycle', () => {
   });
 });
 
-describe('track ordering', () => {
-  it('moves a track among tracks of its own kind, skipping the other kind', () => {
+describe('inserting a track beside another', () => {
+  it('inserts above, which is the higher video layer', () => {
     // Given
-    const timeline = withVideoTracks(); // video-1, audio-1, video-2
+    const timeline = createInitialTimeline();
 
     // When
-    const moved = moveTrack(timeline, 'video-2', 'up');
+    const next = addTrackBeside(
+      timeline,
+      { trackId: INITIAL_VIDEO_TRACK_ID, position: 'above' },
+      { id: 'video-2', name: 'Overlay', kind: 'video' }
+    );
 
     // Then
-    // video-2 swaps with video-1, hopping over the audio row: interleaving kinds
-    // would make the timeline read as though audio composited over video.
-    expect(moved?.tracks.map((track) => track.id)).toEqual(['video-2', INITIAL_AUDIO_TRACK_ID, INITIAL_VIDEO_TRACK_ID]);
+    // Order is layer order, so "above" has to mean earlier in the array.
+    expect(next?.tracks.map((track) => track.id)).toEqual(['video-2', INITIAL_VIDEO_TRACK_ID, INITIAL_AUDIO_TRACK_ID]);
   });
 
-  it('refuses to move past the ends', () => {
+  it('inserts below the reference track', () => {
+    // Given / When
+    const next = addTrackBeside(
+      createInitialTimeline(),
+      { trackId: INITIAL_VIDEO_TRACK_ID, position: 'below' },
+      { id: 'video-2', name: 'Video 2', kind: 'video' }
+    );
+
+    // Then
+    expect(next?.tracks.map((track) => track.id)).toEqual([INITIAL_VIDEO_TRACK_ID, 'video-2', INITIAL_AUDIO_TRACK_ID]);
+  });
+
+  it('applies the same validation as appending', () => {
     // Given
-    const timeline = withVideoTracks();
+    const timeline = createInitialTimeline();
 
     // When / Then
-    expect(moveTrack(timeline, INITIAL_VIDEO_TRACK_ID, 'up')).toBeNull();
-    expect(moveTrack(timeline, 'video-2', 'down')).toBeNull();
-    expect(moveTrack(timeline, INITIAL_AUDIO_TRACK_ID, 'up')).toBeNull();
-    expect(moveTrack(timeline, 'nope', 'up')).toBeNull();
+    // Reusing addTrack for validation is the point: the id, name, and duplicate
+    // rules cannot drift between appending and inserting.
+    expect(addTrackBeside(timeline, { trackId: INITIAL_VIDEO_TRACK_ID, position: 'above' }, { id: 'bad id', name: 'X', kind: 'video' })).toBeNull();
+    expect(addTrackBeside(timeline, { trackId: INITIAL_VIDEO_TRACK_ID, position: 'above' }, { id: 'ok', name: '  ', kind: 'video' })).toBeNull();
+    expect(addTrackBeside(timeline, { trackId: INITIAL_VIDEO_TRACK_ID, position: 'above' }, { id: INITIAL_AUDIO_TRACK_ID, name: 'Dup', kind: 'audio' })).toBeNull();
+  });
+
+  it('returns null for an unknown reference track', () => {
+    expect(addTrackBeside(createInitialTimeline(), { trackId: 'nope', position: 'above' }, { id: 'video-2', name: 'V2', kind: 'video' })).toBeNull();
   });
 });
 
