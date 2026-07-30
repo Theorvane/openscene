@@ -657,6 +657,51 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                       {lockedTracks[track.id] ? ICONS.lock : ICONS.unlock}
                     </button>
                   </div>
+
+                  {/* Track order is layer order: the top row is the topmost
+                      video layer, so moving a row changes what covers what. */}
+                  <div style={{ display: 'flex', gap: '2px' }}>
+                    <button
+                      type="button"
+                      title="Move track up"
+                      aria-label={`Move ${track.name} up`}
+                      onClick={(e) => { e.stopPropagation(); editor.moveTimelineTrack(track.id, 'up'); }}
+                      style={trackToggleStyle(false, 'primary')}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      title="Move track down"
+                      aria-label={`Move ${track.name} down`}
+                      onClick={(e) => { e.stopPropagation(); editor.moveTimelineTrack(track.id, 'down'); }}
+                      style={trackToggleStyle(false, 'primary')}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      title="Rename track"
+                      aria-label={`Rename ${track.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = window.prompt('Track name', track.name);
+                        if (next !== null) editor.renameTimelineTrack(track.id, next);
+                      }}
+                      style={trackToggleStyle(false, 'primary')}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      title="Remove track"
+                      aria-label={`Remove ${track.name}`}
+                      onClick={(e) => { e.stopPropagation(); editor.removeTimelineTrack(track.id); }}
+                      style={trackToggleStyle(false, 'danger')}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
 
                 {/* Track Lane */}
@@ -724,6 +769,32 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                       <span className="timeline-clip__handle timeline-clip__handle--right" draggable={!lockedTracks[track.id] && activeTool === 'select'} onDragStart={(event) => writeTimelineDrag(event, { kind: 'trim', clipId: block.clip.id, edge: 'right' })} aria-hidden="true" />
                     </button>
                   ))}
+
+            {/* Adding a track was previously reachable only from the native
+                application menu, which is not where anyone looks for it. */}
+            <div className="timeline-track" style={{ gridTemplateColumns: '104px minmax(0, 1fr)', minHeight: '28px' }}>
+              <div className="timeline-track__label" style={{ display: 'flex', gap: '4px', alignItems: 'center', padding: 'var(--space-2)' }}>
+                <button
+                  type="button"
+                  title="Add a video track"
+                  aria-label="Add a video track"
+                  onClick={() => editor.addTimelineTrack('video')}
+                  style={trackToggleStyle(false, 'primary')}
+                >
+                  + 🎬
+                </button>
+                <button
+                  type="button"
+                  title="Add an audio track"
+                  aria-label="Add an audio track"
+                  onClick={() => editor.addTimelineTrack('audio')}
+                  style={trackToggleStyle(false, 'primary')}
+                >
+                  + 🎵
+                </button>
+              </div>
+              <div className="timeline-track__lane" />
+            </div>
                 </div>
               </div>
             ))}

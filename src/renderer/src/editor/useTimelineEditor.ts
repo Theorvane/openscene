@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   addTrack,
+  moveTrack,
+  removeTrack,
+  renameTrack,
   deleteClip,
   moveClip,
   placeClip,
@@ -173,11 +176,16 @@ export function useTimelineEditor() {
 
   const { importAssets, importRecordingResult, importAiResult } = useProjectAssetImports({ project, setIsBusy, setProject, setSelectedAssetId, setStatusMessage });
 
-  const replaceTimeline = useCallback((update: TimelineUpdate, successText: string): TimelineDocument | null => {
+  const replaceTimeline = useCallback((update: TimelineUpdate, successText: string, rejectionText?: string): TimelineDocument | null => {
     if (project === null) return null;
     const timeline = update(project.timeline);
     if (timeline === null) {
-      setStatusMessage({ tone: 'warning', text: 'Timeline edit was rejected because it would break track or clip rules.' });
+      // The generic message is right for clip edits, where the rule broken is
+      // rarely one the user was thinking about. Track edits get to say why.
+      setStatusMessage({
+        tone: 'warning',
+        text: rejectionText ?? 'Timeline edit was rejected because it would break track or clip rules.'
+      });
       return null;
     }
     setProject({ ...project, timeline });
@@ -215,6 +223,28 @@ export function useTimelineEditor() {
 
   const addTimelineTrack = useCallback((kind: MediaKind) => {
     replaceTimeline((timeline) => addTrack(timeline, { id: createOpaqueId(`${kind}-track`), kind, name: nextTrackName(timeline, kind) }), `Added a ${kind} track.`);
+  }, [replaceTimeline]);
+
+  const removeTimelineTrack = useCallback((trackId: string) => {
+    replaceTimeline(
+      (timeline) => removeTrack(timeline, trackId),
+      'Removed the track.',
+      // The model refuses to remove the last track of a kind; say why rather
+      // than letting the click look like it did nothing.
+      'A project needs at least one video and one audio track.'
+    );
+  }, [replaceTimeline]);
+
+  const renameTimelineTrack = useCallback((trackId: string, name: string) => {
+    replaceTimeline((timeline) => renameTrack(timeline, trackId, name), 'Renamed the track.', 'That track name is not valid.');
+  }, [replaceTimeline]);
+
+  const moveTimelineTrack = useCallback((trackId: string, direction: 'up' | 'down') => {
+    replaceTimeline(
+      (timeline) => moveTrack(timeline, trackId, direction),
+      'Moved the track.',
+      'That track is already at the edge of its group.'
+    );
   }, [replaceTimeline]);
 
   const selectClip = useCallback((clipId: string) => {
@@ -418,7 +448,7 @@ export function useTimelineEditor() {
   }, [project, setLoadedProject]);
 
   return {
-    addTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
+    addTimelineTrack, removeTimelineTrack, renameTimelineTrack, moveTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
     openProject, openProjectFolder, renameProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
     clearSelection, goToTimelineEnd, goToTimelineStart, selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,

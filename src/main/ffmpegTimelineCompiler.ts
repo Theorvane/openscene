@@ -82,18 +82,32 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
   const videoClips: Array<{ readonly clip: PersistedTimelineClip; readonly inputIndex: number }> = [];
   const audioClips: Array<{ readonly track: AudioTimelineTrack; readonly clip: PersistedTimelineClip; readonly inputIndex: number }> = [];
   let inputIndex = 0;
+  // Inputs are declared in timeline order so -i indexes stay stable and
+  // predictable; layer order is decided separately, below.
+  const videoLayers: Array<Array<{ readonly clip: PersistedTimelineClip; readonly inputIndex: number }>> = [];
   for (const track of input.timeline.tracks) {
+    const layer: Array<{ readonly clip: PersistedTimelineClip; readonly inputIndex: number }> = [];
     for (const clip of track.clips) {
       args.push('-i', requireAssetPath(input.assetPaths, clip.assetId));
       if (track.kind === 'video') {
         if (clip.effects.opacity > 0 && clip.effects.scale > 0) {
-          videoClips.push({ clip, inputIndex });
+          layer.push({ clip, inputIndex });
         }
       } else {
         audioClips.push({ track, clip, inputIndex });
       }
       inputIndex += 1;
     }
+    if (track.kind === 'video') videoLayers.push(layer);
+  }
+
+  // tracks[0] is the top row in the timeline, and every NLE treats the higher
+  // track as the higher layer. FFmpeg stacks each overlay on top of the last, so
+  // the rows are composited bottom-first to put the top row on top. Building the
+  // chain in array order — as this did — silently inverts the layers, which is
+  // invisible with one video track and wrong with two.
+  for (const layer of [...videoLayers].reverse()) {
+    videoClips.push(...layer);
   }
 
   filters.push(`color=c=black:s=${input.width}x${input.height}:r=${input.frameRate}:d=${seconds(durationMs)}[video-base]`);

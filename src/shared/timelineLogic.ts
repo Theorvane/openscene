@@ -35,6 +35,67 @@ export function createInitialTimeline(): TimelineDocument {
   };
 }
 
+/**
+ * Track order is layer order: tracks[0] is the top row in the timeline and the
+ * topmost video layer. The compiler reverses this when building its overlay
+ * chain, since FFmpeg stacks later overlays on top.
+ */
+export function removeTrack(timeline: TimelineDocument, trackId: string): TimelineDocument | null {
+  const track = timeline.tracks.find((candidate) => candidate.id === trackId);
+  if (track === undefined) return null;
+  // Removing the last track of a kind would leave imports of that kind with
+  // nowhere to land, and the editor with no row to drop onto.
+  if (timeline.tracks.filter((candidate) => candidate.kind === track.kind).length <= 1) return null;
+  return {
+    ...timeline,
+    tracks: timeline.tracks.filter((candidate) => candidate.id !== trackId),
+    // A transition referring to a clip that just left would dangle.
+    transitions: timeline.transitions.filter(
+      (transition) => !track.clips.some((clip) => clip.id === transition.fromClipId || clip.id === transition.toClipId)
+    )
+  };
+}
+
+export function renameTrack(timeline: TimelineDocument, trackId: string, name: string): TimelineDocument | null {
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed.length > 80) return null;
+  if (!timeline.tracks.some((track) => track.id === trackId)) return null;
+  return {
+    ...timeline,
+    tracks: timeline.tracks.map((track) => (track.id === trackId ? { ...track, name: trimmed } : track))
+  };
+}
+
+/**
+ * Moves a track one row up or down among the tracks of its own kind. Kinds stay
+ * grouped because interleaving a video row between two audio rows would make the
+ * timeline read as though audio composited over video.
+ */
+export function moveTrack(
+  timeline: TimelineDocument,
+  trackId: string,
+  direction: 'up' | 'down'
+): TimelineDocument | null {
+  const index = timeline.tracks.findIndex((track) => track.id === trackId);
+  if (index === -1) return null;
+  const kind = timeline.tracks[index]?.kind;
+  const step = direction === 'up' ? -1 : 1;
+
+  let target = index + step;
+  while (target >= 0 && target < timeline.tracks.length && timeline.tracks[target]?.kind !== kind) {
+    target += step;
+  }
+  if (target < 0 || target >= timeline.tracks.length) return null;
+
+  const tracks = [...timeline.tracks];
+  const moved = tracks[index];
+  const displaced = tracks[target];
+  if (moved === undefined || displaced === undefined) return null;
+  tracks[index] = displaced;
+  tracks[target] = moved;
+  return { ...timeline, tracks };
+}
+
 export function timelineDurationMs(timeline: TimelineDocument): number {
   let durationMs = 0;
   for (const track of timeline.tracks) {
