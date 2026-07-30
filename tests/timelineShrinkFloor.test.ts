@@ -16,8 +16,21 @@ describe('timeline shrink floor', () => {
     // 100px and the track area 52px — less than one 56px video track, so all
     // that stayed on screen was the toolbar and the panel appeared to fold into
     // its own header.
-    expect(css).toContain('minmax(var(--editor-timeline-min-height, 150px), var(--editor-timeline-percent, 42fr))');
-    expect(css).not.toContain('minmax(0, var(--editor-timeline-percent, 42fr))');
+    expect(css).toContain('minmax(var(--editor-timeline-min-height,');
+    expect(css).not.toContain('minmax(0, var(--editor-timeline-percent');
+  });
+
+  it('sets the floor high enough to hold the toolbar, ruler, and one track', () => {
+    // Raised in review: pinning the exact token means tuning the floor breaks
+    // the test for the wrong reason. Assert the number instead, against what the
+    // pieces actually measure.
+    const TOOLBAR_PX = 46;
+    const RULER_PX = 20;
+    const SHORTEST_VIDEO_TRACK_PX = 56;
+
+    const declared = css.match(/--editor-timeline-min-height,\s*(\d+)px/)?.[1];
+    expect(declared, 'the floor needs a px fallback, not only a variable').toBeDefined();
+    expect(Number(declared)).toBeGreaterThanOrEqual(TOOLBAR_PX + RULER_PX + SHORTEST_VIDEO_TRACK_PX);
   });
 
   it('keeps the program row free to shrink so the floor can be honoured', () => {
