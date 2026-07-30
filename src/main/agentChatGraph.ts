@@ -15,18 +15,39 @@ import type { AgentToolCallProposal, AgentToolApprovalDecision } from '../shared
 import { parseEditAgentProjectContext, type EditAgentContextAsset, type EditAgentProjectContext } from '../shared/editAgentContext';
 import type { OpenAiAuthMode, ReasoningEffort } from '../shared/openAiAuth';
 
+/**
+ * The costing procedure the agent follows before spending the user's money.
+ * Kept as a named export so the skill document and the tests describe the same
+ * text rather than two drifting copies of it.
+ */
+export const GENERATION_COST_POLICY =
+  'Generation spends real money on user provider account. Never start video generation from bare request. Order:\n' +
+  '1. Length. Ask target length if user not said. Never assume.\n' +
+  '2. Shots. Call planVideoScenario for legal shot lengths and start times. Never compute shot lengths yourself. ' +
+  'Write one description per shot; repeat every continuity field in each shot prompt.\n' +
+  '3. Price. Call estimateGenerationCost with every shot. Never state price from own knowledge \u2014 prices you ' +
+  'recall are not real prices. Report exactly what tool returned, with as-of date, as estimate not quote.\n' +
+  '4. Approve. Present total. Wait for user approval in a message. Plan approval and per-call tool approval are ' +
+  'separate; both required. Any shot unpriced: name it, ask user to confirm they accept unknown charge.\n' +
+  '5. Generate shot by shot.\n' +
+  'Steps 3 and 4 output: write full clear prose, not compressed. User approves a charge and must not misread it.\n' +
+  'User explicitly says skip estimate: do it, say plainly you generate without cost check. ' +
+  'Same steps for image and speech at their scale.';
+
 const AGENT_CHAT_SYSTEM_PROMPT =
-  'You are the OpenVideo in-app agent. You drive the whole editor through the provided tools: read a ' +
-  'project timeline, add, trim, and remove clips, adjust clip effects, and start an FFmpeg export. ' +
-  'You also own generation end to end. To add generated media: call createVideoJob or createSpeechJob, ' +
-  'poll getJobStatus until it reports completed, call importGeneratedResult to bring the result into the ' +
-  'project as an asset, then place that assetId with addClipToTimeline. Do not ask the user to do those ' +
-  'steps by hand. Generation runs against the cloud provider connected in Settings and fails with an ' +
-  'explicit error when none is connected — report that error rather than claiming a provider works. ' +
-  'You can also watch a project video with the watchProjectVideo tool: sampled frames arrive attached to ' +
-  'the conversation as images with timestamps — use them to describe or reason about the footage ' +
-  '(a vision-capable model is required to actually see them). ' +
-  'Keep replies short, and say what you are about to do before calling a tool.';
+  'OpenVideo in-app agent. You drive the whole editor through tools: read project timeline, add, trim, and remove ' +
+  'clips, adjust clip effects, start FFmpeg export. ' +
+  'You own generation end to end. To add generated media: call createVideoJob, createImageJob, or createSpeechJob, ' +
+  'poll getJobStatus until completed, call importGeneratedResult, then place the returned assetId with ' +
+  'addClipToTimeline. Never ask the user to do those steps by hand. ' +
+  'Generation runs against the cloud provider connected in Settings; none connected fails with an explicit error. ' +
+  'Report that error, never claim a provider works. ' +
+  'createImageJob then createVideoJob with referenceImageJobId turns a still into a matching shot. ' +
+  'watchProjectVideo samples frames into the conversation as timestamped images; use them to describe footage ' +
+  '(vision-capable model required to see them). ' +
+  'Keep replies short. Say what you do before calling a tool.' +
+  '\n\n' +
+  GENERATION_COST_POLICY;
 
 // isAIMessage narrows on `_getType() === 'ai'`, which is also true for the AIMessageChunk that
 // chat model .invoke() calls actually return, so it doubles as our AI-message-of-either-kind check.
@@ -163,6 +184,8 @@ const AgentChatState = Annotation.Root({
 export interface BuildAgentChatGraphOptions {
   readonly tools: readonly DynamicStructuredTool[];
   readonly mutatingToolNames: ReadonlySet<string>;
+  /** Charges the user's provider account; never auto-approved by "always". */
+  readonly spendToolNames?: ReadonlySet<string>;
   readonly createModel: AgentChatModelFactory;
 }
 
@@ -201,7 +224,10 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
         if (!call.id || !options.mutatingToolNames.has(call.name) || state.toolDecisions[call.id]) {
           continue;
         }
-        if (state.alwaysAllowedTools.includes(call.name)) {
+        // A spend tool re-asks even after "always": that answer was given about
+        // one charge, and cannot stand in for consent to every later one.
+        const spends = options.spendToolNames?.has(call.name) ?? false;
+        if (!spends && state.alwaysAllowedTools.includes(call.name)) {
           decisions[call.id] = 'approve';
           continue;
         }
@@ -215,7 +241,10 @@ export function buildAgentChatGraph(options: BuildAgentChatGraphOptions) {
       const alwaysAllowedTools = Object.entries(decisions)
         .filter(([, decision]) => decision === 'always')
         .map(([callId]) => last.tool_calls?.find((call) => call.id === callId)?.name)
-        .filter((name): name is string => name !== undefined);
+        .filter((name): name is string => name !== undefined)
+        // Recording a spend tool here would make the next charge silent even
+        // though this pass correctly stopped to ask about this one.
+        .filter((name) => !(options.spendToolNames?.has(name) ?? false));
       return { toolDecisions: decisions, alwaysAllowedTools };
     })
     .addNode('executeTools', async (state) => {

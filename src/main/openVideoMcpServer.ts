@@ -16,7 +16,11 @@ import {
   WATCH_FRAME_HARD_CAP,
   type ExtractedFrame
 } from './videoFrameAnalysis';
+import { estimateVideoPlanCost, formatCostEstimate, estimateImageCost, estimateSpeechCost } from '../shared/mediaGenerationPricing';
+import { planVideoStoryboard, supportedShotSeconds } from '../shared/videoStoryboardPlan';
+import { getDomainModel, getDefaultDomainModelId } from '../shared/aiDomainModels';
 import {
+  getGeneratedImageAsReference,
   createImageGenerationJob,
   createSpeechGenerationJob,
   createVideoGenerationJob,
@@ -79,15 +83,124 @@ export class OpenVideoMcpServer {
 
   @McpTool({
     description:
-      'Create an AI video generation job with the selected video-generation model. ' +
-      'Generation runs against the connected provider API (Google Veo or OpenAI Sora); ' +
-      'the provider must be connected in Settings or the job fails with an explicit error.',
+      'Split a total video length into shots the provider accepts. Returns legal per-shot durations, start ' +
+      'times, continuity fields to repeat in every shot prompt. Call before writing a scenario. Never compute ' +
+      'shot lengths yourself: an illegal duration is rejected only after the user approved the spend. ' +
+      'Read-only, spends nothing.',
+    input: z.object({
+      totalSeconds: z.number().min(1),
+      modelId: z.string().optional().describe('Video model the shots will be rendered with.')
+    })
+  })
+  planVideoScenario(params: { totalSeconds: number; modelId?: string }) {
+    const modelId = params.modelId ?? getDefaultDomainModelId('video-generation');
+    const model = getDomainModel('video-generation', modelId);
+    if (model === undefined) {
+      return { success: false, error: `Model ${modelId} is not a video-generation model.` };
+    }
+
+    const plan = planVideoStoryboard({ totalSeconds: params.totalSeconds, providerId: model.providerId });
+    return {
+      success: true,
+      modelId,
+      providerLabel: model.providerLabel,
+      supportedShotSeconds: supportedShotSeconds(model.providerId),
+      totalSeconds: plan.totalSeconds,
+      requestedSeconds: plan.requestedSeconds,
+      roundedFrom: plan.roundedFrom,
+      shots: plan.shots,
+      continuityKeys: plan.continuityKeys,
+      message:
+        (plan.roundedFrom === undefined
+          ? `${plan.shots.length} shot(s) totalling ${plan.totalSeconds}s.`
+          : `${plan.shots.length} shot(s) totalling ${plan.totalSeconds}s; ${plan.roundedFrom}s was not reachable from this model's shot lengths. Tell the user the length changed.`) +
+        ' Write one description per shot, repeating every continuity field in each. Then price the whole list with estimateGenerationCost.'
+    };
+  }
+
+  @McpTool({
+    description:
+      'Price a generation plan. Call before createVideoJob, createImageJob, createSpeechJob; show result to ' +
+      'user. Read-only, spends nothing. Never state a price you did not get from this tool: recalled figures ' +
+      'are not real prices. Shot comes back unpriced: say so, ask user to confirm unknown charge.',
+    input: z.object({
+      kind: z.enum(['video', 'image', 'speech']),
+      shots: z
+        .array(z.object({ modelId: z.string().min(1), durationSeconds: z.number() }))
+        .optional()
+        .describe('Video only: one entry per shot in the planned scenario.'),
+      modelId: z.string().optional().describe('Image and speech only.'),
+      imageCount: z.number().optional().describe('Image only; defaults to 1.')
+    })
+  })
+  estimateGenerationCost(params: {
+    kind: 'video' | 'image' | 'speech';
+    shots?: readonly { modelId: string; durationSeconds: number }[];
+    modelId?: string;
+    imageCount?: number;
+  }) {
+    if (params.kind === 'video') {
+      const shots = params.shots ?? [];
+      if (shots.length === 0) {
+        return { success: false, error: 'Video estimates need at least one shot with a modelId and durationSeconds.' };
+      }
+      const plan = estimateVideoPlanCost(shots);
+      return {
+        success: true,
+        kind: 'video',
+        shots: plan.shots.map((estimate, index) => ({
+          shot: index + 1,
+          modelId: estimate.modelId,
+          priced: estimate.priced,
+          amountUsd: estimate.amountUsd,
+          summary: formatCostEstimate(estimate)
+        })),
+        totalUsd: plan.totalUsd,
+        fullyPriced: plan.fullyPriced,
+        asOf: plan.asOf,
+        message: plan.fullyPriced
+          ? `Estimated total $${plan.totalUsd?.toFixed(2)} across ${plan.shots.length} shot(s). Show this to the user and wait for approval before generating.`
+          : 'At least one shot could not be priced. Tell the user which, and ask them to confirm they accept an unknown charge before generating.'
+      };
+    }
+
+    if (params.modelId === undefined || params.modelId.length === 0) {
+      return { success: false, error: `${params.kind} estimates need a modelId.` };
+    }
+
+    const estimate =
+      params.kind === 'image'
+        ? estimateImageCost({ modelId: params.modelId, imageCount: params.imageCount ?? 1 })
+        : estimateSpeechCost({ modelId: params.modelId });
+
+    return {
+      success: true,
+      kind: params.kind,
+      modelId: estimate.modelId,
+      priced: estimate.priced,
+      amountUsd: estimate.amountUsd,
+      asOf: estimate.asOf,
+      summary: formatCostEstimate(estimate),
+      message: estimate.priced
+        ? 'Show this to the user and wait for approval before generating.'
+        : 'Cost is unknown. Ask the user to confirm they accept an unknown charge before generating.'
+    };
+  }
+
+  @McpTool({
+    description:
+      'Create AI video generation job with the selected video-generation model. Runs against the provider ' +
+      'connected in Settings; none connected fails with an explicit error.',
     input: z.object({
       prompt: z.string().min(1, 'Prompt is required'),
       aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
       durationSeconds: z.number().min(1).max(10).default(5),
       stylePreset: z.string().optional().default('Cinematic'),
       modelId: z.string().optional(),
+      referenceImageJobId: z
+        .string()
+        .optional()
+        .describe('A completed createImageJob id. Seeds image-to-video so the shot matches its still.'),
       apiKey: z.string().optional()
     })
   })
@@ -97,14 +210,30 @@ export class OpenVideoMcpServer {
     durationSeconds?: number;
     stylePreset?: string;
     modelId?: string;
+    referenceImageJobId?: string;
     apiKey?: string;
   }) {
+    // The still crosses as inline bytes, exactly as a picked file would, so
+    // image-to-video does not care that this seed was generated.
+    let referenceImage: { displayName: string; mimeType: string; base64: string } | undefined;
+    if (params.referenceImageJobId !== undefined) {
+      const resolved = getGeneratedImageAsReference(params.referenceImageJobId);
+      if (resolved === null) {
+        return {
+          success: false,
+          error: `Image job ${params.referenceImageJobId} has no completed image to use as a reference.`
+        };
+      }
+      referenceImage = { ...resolved };
+    }
+
     const job = await createVideoGenerationJob({
       prompt: params.prompt,
       aspectRatio: params.aspectRatio ?? '16:9',
       durationSeconds: params.durationSeconds ?? 5,
       stylePreset: params.stylePreset ?? 'Cinematic',
-      ...(params.modelId === undefined ? {} : { modelId: params.modelId })
+      ...(params.modelId === undefined ? {} : { modelId: params.modelId }),
+      ...(referenceImage === undefined ? {} : { referenceImage })
     });
 
     return {
@@ -119,9 +248,8 @@ export class OpenVideoMcpServer {
 
   @McpTool({
     description:
-      'Create an AI voiceover/speech synthesis job with the selected voice-generation model. ' +
-      'Generation runs against the connected provider API (ElevenLabs or OpenAI); ' +
-      'the provider must be connected in Settings or the job fails with an explicit error.',
+      'Create AI speech job with the selected voice-generation model. Runs against the provider connected ' +
+      'in Settings; none connected fails with an explicit error.',
     input: z.object({
       script: z.string().min(1, 'Script is required'),
       voiceId: z.string().default(''),
@@ -692,7 +820,7 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['createVideoJob', 'createSpeechJob', 'createImageJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'removeTimelineClip', 'exportProjectVideo']
+      tools: ['planVideoScenario', 'estimateGenerationCost', 'createVideoJob', 'createSpeechJob', 'createImageJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'removeTimelineClip', 'exportProjectVideo']
     };
   }
 }

@@ -11,6 +11,7 @@ import { OpenVideoMcpServer } from './openVideoMcpServer';
 export const AGENT_CHAT_MUTATING_TOOL_NAMES: ReadonlySet<string> = new Set([
   'createVideoJob',
   'createSpeechJob',
+  'createImageJob',
   'trimTimelineClip',
   'updateClipEffects',
   'addClipToTimeline',
@@ -23,3 +24,15 @@ export async function createAgentChatTools(instance: OpenVideoMcpServer): Promis
   const resolver: InstanceResolver<OpenVideoMcpServer> = { resolve: () => instance };
   return createLangChainTools(OpenVideoMcpServer, { resolver });
 }
+
+/**
+ * Tools that bill the user's provider account. These are approved per call and
+ * are deliberately excluded from the always-allow shortcut: "always" is a
+ * reasonable answer to "may I trim this clip again", and an unreasonable one to
+ * "may I charge your card whenever I like". Every charge stays visible.
+ */
+export const AGENT_CHAT_SPEND_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'createVideoJob',
+  'createSpeechJob',
+  'createImageJob'
+]);
