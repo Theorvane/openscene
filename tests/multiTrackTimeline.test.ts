@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { compileFfmpegTimeline } from '../src/main/ffmpegTimelineCompiler';
@@ -173,5 +175,32 @@ describe('video layer order in the export', () => {
 
     // Then
     expect(args[args.indexOf('-filter_complex') + 1]).toContain('[video-out]');
+  });
+});
+
+describe('timeline rail geometry', () => {
+  it('measures the ruler, tracks, and playhead from one rail constant', () => {
+    // Given
+    const source = readFileSync(resolve(process.cwd(), 'src/renderer/src/editor/TimelineCanvas.tsx'), 'utf8');
+
+    // Then
+    // The width used to be written out five times, including inside the
+    // playhead's calc(). Any one of them drifting puts the ruler out of step
+    // with the clips underneath it, which is what "the layout went weird" is.
+    expect(source).toContain('export const TRACK_RAIL_WIDTH');
+    expect(source).not.toMatch(/'104px minmax/);
+    expect(source.match(/gridTemplateColumns: TRACK_GRID_TEMPLATE/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(source).toContain('${TRACK_RAIL_WIDTH} + (100% -');
+  });
+
+  it('keeps the track header to two rows so it fits the shortest track', () => {
+    // Given
+    const source = readFileSync(resolve(process.cwd(), 'src/renderer/src/editor/TimelineCanvas.tsx'), 'utf8');
+
+    // Then
+    // Audio rows are 42px. A third row of 18px controls overflowed them, which
+    // is the regression this pins.
+    expect(source).toContain("gridTemplateRows: 'auto auto'");
+    expect(source).not.toContain("gridTemplateRows: 'auto auto auto'");
   });
 });

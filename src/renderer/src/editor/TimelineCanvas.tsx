@@ -90,6 +90,32 @@ const ICONS = {
   unlock: toolIcon(<><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 017.8-1.3" /></>, 12)
 } as const;
 
+/**
+ * The track rail is one shared coordinate: the ruler, every track row, and the
+ * playhead's left offset all measure from it. It lives in one constant because
+ * it was previously written out five times, and any one of them drifting puts
+ * the ruler out of step with the clips underneath it.
+ */
+export const TRACK_RAIL_WIDTH = '168px';
+
+/** Wider than a toggle: these carry a label, not a single glyph. */
+const ADD_TRACK_BUTTON_STYLE = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '3px',
+  height: '18px',
+  padding: '0 5px',
+  border: '1px solid var(--line-subtle)',
+  borderRadius: 'var(--radius-xs)',
+  background: 'transparent',
+  color: 'var(--text-weak)',
+  fontSize: 'var(--text-micro)',
+  lineHeight: 1,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap'
+} as const satisfies CSSProperties;
+const TRACK_GRID_TEMPLATE = `${TRACK_RAIL_WIDTH} minmax(0, 1fr)`;
+
 const TRACK_TOGGLE_STYLE = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -452,14 +478,14 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
           {/* Scrollable Container based on zoomLevel */}
           <div style={{ width: `calc(100% * ${zoomLevel})`, minWidth: '100%', position: 'relative', display: 'grid', gap: '4px', padding: 'var(--space-2) var(--space-3)' }}>
 
-            {/* Slim mono ruler. The scale cell mirrors the track grid (104px rail + lane),
+            {/* Slim mono ruler. The scale cell mirrors the track grid (rail + lane),
                 so the scrub dot, the lane playhead line, and seek mapping share the exact
                 same horizontal coordinate space. */}
             <div
               className="timeline-ruler"
               style={{
                 display: 'grid',
-                gridTemplateColumns: '104px minmax(0, 1fr)',
+                gridTemplateColumns: TRACK_GRID_TEMPLATE,
                 gap: 0,
                 height: '20px',
                 position: 'relative',
@@ -579,14 +605,14 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
             {/* One continuous playhead line from the ruler dot down through every
                 track. It lives at the container level so the 4px row gaps and the
                 lanes' overflow clipping cannot break it; the horizontal math
-                mirrors the shared 104px-rail + lane coordinate space. */}
+                mirrors the shared rail + lane coordinate space. */}
             <div
               aria-hidden="true"
               style={{
                 position: 'absolute',
                 top: 'calc(var(--space-2) + 17px)',
                 bottom: 'var(--space-2)',
-                left: `calc(var(--space-3) + 104px + (100% - (2 * var(--space-3)) - 104px) * ${playheadPercent / 100})`,
+                left: `calc(var(--space-3) + ${TRACK_RAIL_WIDTH} + (100% - (2 * var(--space-3)) - ${TRACK_RAIL_WIDTH}) * ${playheadPercent / 100})`,
                 width: '1.5px',
                 background: 'var(--foreground)',
                 zIndex: 4,
@@ -601,7 +627,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                 className="timeline-track"
                 key={track.id}
                 style={{
-                  gridTemplateColumns: '104px minmax(0, 1fr)',
+                  gridTemplateColumns: TRACK_GRID_TEMPLATE,
                   minHeight: trackMinHeight(track.kind),
                   opacity: mutedTracks[track.id] ? 0.55 : 1
                 }}
@@ -619,13 +645,14 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span aria-hidden="true" style={{ fontSize: '10px' }}>{track.kind === 'video' ? '🎬' : '🎵'}</span>
-                    <strong style={{ fontSize: 'var(--text-micro)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70px' }}>
+                    <strong style={{ fontSize: 'var(--text-micro)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '118px' }}>
                       {track.name}
                     </strong>
                   </div>
 
-                  {/* Track toggle cluster */}
-                  <div style={{ display: 'flex', gap: '2px' }}>
+                  {/* One row: the state toggles, then the lifecycle actions.
+                      A third row overflowed the 42px audio track height. */}
+                  <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
                     <button
                       type="button"
                       title={mutedTracks[track.id] ? 'Unmute track' : 'Mute track'}
@@ -656,26 +683,26 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                     >
                       {lockedTracks[track.id] ? ICONS.lock : ICONS.unlock}
                     </button>
-                  </div>
 
-                  {/* Track order is layer order: the top row is the topmost
-                      video layer, so moving a row changes what covers what. */}
-                  <div style={{ display: 'flex', gap: '2px' }}>
+                    {/* Separated because these change the document, not just the
+                        view: track order is video layer order. */}
+                    <span aria-hidden="true" style={{ width: '1px', height: '12px', margin: '0 2px', background: 'var(--line-subtle)' }} />
+
                     <button
                       type="button"
-                      title="Move track up"
+                      title="Move track up (higher video layer)"
                       aria-label={`Move ${track.name} up`}
                       onClick={(e) => { e.stopPropagation(); editor.moveTimelineTrack(track.id, 'up'); }}
-                      style={trackToggleStyle(false, 'primary')}
+                      style={TRACK_TOGGLE_STYLE}
                     >
                       ↑
                     </button>
                     <button
                       type="button"
-                      title="Move track down"
+                      title="Move track down (lower video layer)"
                       aria-label={`Move ${track.name} down`}
                       onClick={(e) => { e.stopPropagation(); editor.moveTimelineTrack(track.id, 'down'); }}
-                      style={trackToggleStyle(false, 'primary')}
+                      style={TRACK_TOGGLE_STYLE}
                     >
                       ↓
                     </button>
@@ -688,7 +715,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                         const next = window.prompt('Track name', track.name);
                         if (next !== null) editor.renameTimelineTrack(track.id, next);
                       }}
-                      style={trackToggleStyle(false, 'primary')}
+                      style={TRACK_TOGGLE_STYLE}
                     >
                       ✎
                     </button>
@@ -772,25 +799,26 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
 
             {/* Adding a track was previously reachable only from the native
                 application menu, which is not where anyone looks for it. */}
-            <div className="timeline-track" style={{ gridTemplateColumns: '104px minmax(0, 1fr)', minHeight: '28px' }}>
+            <div className="timeline-track" style={{ gridTemplateColumns: TRACK_GRID_TEMPLATE, minHeight: '30px' }}>
               <div className="timeline-track__label" style={{ display: 'flex', gap: '4px', alignItems: 'center', padding: 'var(--space-2)' }}>
+                <span style={{ fontSize: 'var(--text-micro)', color: 'var(--text-weaker)', marginRight: '2px' }}>Add</span>
                 <button
                   type="button"
                   title="Add a video track"
                   aria-label="Add a video track"
                   onClick={() => editor.addTimelineTrack('video')}
-                  style={trackToggleStyle(false, 'primary')}
+                  style={ADD_TRACK_BUTTON_STYLE}
                 >
-                  + 🎬
+                  <span aria-hidden="true">+</span> Video
                 </button>
                 <button
                   type="button"
                   title="Add an audio track"
                   aria-label="Add an audio track"
                   onClick={() => editor.addTimelineTrack('audio')}
-                  style={trackToggleStyle(false, 'primary')}
+                  style={ADD_TRACK_BUTTON_STYLE}
                 >
-                  + 🎵
+                  <span aria-hidden="true">+</span> Audio
                 </button>
               </div>
               <div className="timeline-track__lane" />
