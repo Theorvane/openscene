@@ -54,12 +54,26 @@ function createCommandItemFactory(onCommand: SendTimelineMenuCommand) {
   });
 }
 
-export function createApplicationMenuTemplate(onCommand: SendTimelineMenuCommand): MenuItemConstructorOptions[] {
+export function createApplicationMenuTemplate(
+  onCommand: SendTimelineMenuCommand,
+  /**
+   * Reaching the updater on demand. The startup check is silent unless there is
+   * an update; this is where a user who wants to know now can ask, and where an
+   * up-to-date or failed answer is worth reporting.
+   */
+  onCheckForUpdates?: () => void
+): MenuItemConstructorOptions[] {
   const commandItem = createCommandItemFactory(onCommand);
   const template: MenuItemConstructorOptions[] = [];
   // macOS always titles the first menu with the running bundle's name, so the
   // label is what a packaged OpenVideo build shows; a dev run reads Electron.
   if (process.platform === 'darwin') template.push({ label: 'OpenVideo', role: 'appMenu' });
+  if (onCheckForUpdates !== undefined) {
+    template.push({
+      label: 'OpenVideo',
+      submenu: [{ label: 'Check for Updates…', click: onCheckForUpdates }]
+    });
+  }
   template.push(
     { role: 'fileMenu' },
     { role: 'editMenu' },
@@ -134,8 +148,10 @@ export function applyTimelineMenuState(menu: TimelineMenuTarget, state: Timeline
   if (playPauseItem !== null) playPauseItem.label = state.playPauseLabel;
 }
 
-export function installApplicationMenu(): void {
-  const menu = Menu.buildFromTemplate(createApplicationMenuTemplate(dispatchTimelineMenuCommand));
+export function installApplicationMenu(onCheckForUpdates?: () => void): void {
+  const menu = Menu.buildFromTemplate(
+    createApplicationMenuTemplate(dispatchTimelineMenuCommand, onCheckForUpdates)
+  );
   Menu.setApplicationMenu(menu);
   ipcMain.on(IPC_CHANNELS.timelineMenuState, (event, payload: unknown) => {
     const focusedWindow = BrowserWindow.getFocusedWindow();

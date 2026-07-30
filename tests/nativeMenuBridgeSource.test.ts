@@ -41,7 +41,10 @@ describe('native Timeline menu source boundaries', () => {
     expect(source).toContain('BrowserWindow.getFocusedWindow');
     expect(source).toContain('webContents.send');
     expect(source).toContain('focusedWindow.webContents !== event.sender');
-    expect(mainIndexSource).toContain('installApplicationMenu();');
+    // Installed from the main entry, now with the check-for-updates handler it
+    // needs to offer that item at all.
+    expect(mainIndexSource).toContain('installApplicationMenu(');
+    expect(mainIndexSource).toMatch(/installApplicationMenu\(\(\) => \{/);
     expect(source).not.toContain('executeJavaScript');
   });
 });

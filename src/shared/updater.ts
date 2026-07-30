@@ -114,3 +114,84 @@ export function describeUpdaterState(state: UpdaterState, currentVersion: string
       return state.message;
   }
 }
+
+/**
+ * What to put in front of the user for a given updater state.
+ *
+ * Pure, so the decision is testable without Electron: only the dialog call
+ * needs the runtime. Modelled on opencode's showUpdaterDialog, including the
+ * part that matters most — it stays silent on startup unless there is something
+ * to act on. A launch that announces "you are up to date" trains the user to
+ * dismiss the box that also carries the real update.
+ */
+export type UpdaterPromptAction = 'install' | 'open-release' | 'dismiss';
+
+export type UpdaterPrompt = {
+  readonly kind: 'question' | 'info' | 'error';
+  readonly title: string;
+  readonly message: string;
+  /** First entry is the default; the last is always the way out. */
+  readonly buttons: readonly string[];
+  /** What pressing the default button should do. */
+  readonly confirmAction: UpdaterPromptAction;
+};
+
+export function updaterPromptFor(
+  state: UpdaterState,
+  options: { readonly reportNothingToDo: boolean }
+): UpdaterPrompt | null {
+  switch (state.status) {
+    case 'ready':
+      return {
+        kind: 'question',
+        title: 'Update ready',
+        message: `OpenVideo ${state.version} is downloaded. Restart to install it?`,
+        buttons: ['Restart', 'Later'],
+        confirmAction: 'install'
+      };
+    case 'available':
+      return {
+        kind: 'question',
+        title: `OpenVideo ${state.version} is available`,
+        message:
+          `OpenVideo ${state.version} is out, but this build cannot replace itself. ` +
+          'Open the download page to get it?',
+        buttons: ['Open download page', 'Later'],
+        confirmAction: 'open-release'
+      };
+    // Everything below is only worth interrupting for when the user asked.
+    case 'up-to-date':
+      return options.reportNothingToDo
+        ? {
+            kind: 'info',
+            title: 'No updates',
+            message: 'OpenVideo is up to date.',
+            buttons: ['OK'],
+            confirmAction: 'dismiss'
+          }
+        : null;
+    case 'error':
+      return options.reportNothingToDo
+        ? {
+            kind: 'error',
+            title: 'Update check failed',
+            message: state.message,
+            buttons: ['OK'],
+            confirmAction: 'dismiss'
+          }
+        : null;
+    case 'disabled':
+      return options.reportNothingToDo
+        ? {
+            kind: 'info',
+            title: 'Updates unavailable',
+            message: state.reason,
+            buttons: ['OK'],
+            confirmAction: 'dismiss'
+          }
+        : null;
+    // A check still running, or a download in flight, has nothing to ask yet.
+    default:
+      return null;
+  }
+}

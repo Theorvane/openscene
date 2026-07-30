@@ -17,6 +17,7 @@ import { RecordingFileStore } from './recordingStore';
 import { registerResultAssetImportHandlers } from './resultAssetImportHandlers';
 import { registerUpdaterIpcHandlers } from './updaterIpcHandlers';
 import { setupUpdater } from './updater';
+import { promptForUpdate } from './updaterPrompt';
 import { REFERENCE_IMAGE_EXTENSIONS, selectReferenceImage } from './referenceImagePicker';
 import { ResultAssetImportService } from './resultAssetImportService';
 import { registerTimelineAssetProtocol, registerTimelineAssetScheme } from './timelineAssetProtocol';
@@ -53,6 +54,10 @@ const assetLibraryStore = new AssetLibraryStore(join(app.getPath('userData'), 'p
 const exportJobStore = new ExportJobStore();
 const credentialStore = new CredentialStore(app.getPath('userData'));
 const updaterController = setupUpdater();
+const updaterPromptIo = {
+  showMessageBox: (input: Parameters<typeof dialog.showMessageBox>[0]) => dialog.showMessageBox(input),
+  openExternal: (url: string) => shell.openExternal(url)
+};
 const chatGptOAuthService = new ChatGptOAuthService(app.getPath('userData'), {
   openExternal: (url) => shell.openExternal(url)
 });
@@ -442,7 +447,13 @@ app.setAboutPanelOptions({
 });
 
 app.whenReady().then(async () => {
-  installApplicationMenu();
+  installApplicationMenu(() => {
+    // The user asked, so an up-to-date or failed answer is reported here where
+    // the startup path stays quiet about both.
+    void promptForUpdate(updaterController, { reportNothingToDo: true, ...updaterPromptIo }).catch((error: unknown) => {
+      console.error('Update check failed:', error);
+    });
+  });
   installDisplayMediaHandler();
   registerTimelineAssetProtocol(timelineIpcService);
   await installIpcHandlers();
@@ -450,9 +461,14 @@ app.whenReady().then(async () => {
 
   // Checked after the window exists so the first result has somewhere to land,
   // and left unawaited so a slow or unreachable GitHub never delays startup.
-  void updaterController.start().catch((error: unknown) => {
-    console.error('Update check failed:', error);
-  });
+  // Silent unless there is an update to act on: a launch that announces "up to
+  // date" trains the user to dismiss the box that also carries the real one.
+  void updaterController
+    .start()
+    .then(() => promptForUpdate(updaterController, { reportNothingToDo: false, ...updaterPromptIo }))
+    .catch((error: unknown) => {
+      console.error('Update check failed:', error);
+    });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
