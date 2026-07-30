@@ -209,7 +209,8 @@ describe('timeline rail geometry', () => {
     // with the clips underneath it, which is what "the layout went weird" is.
     expect(source).toContain('export const TRACK_RAIL_WIDTH');
     expect(source).not.toMatch(/'104px minmax/);
-    expect(source.match(/gridTemplateColumns: TRACK_GRID_TEMPLATE/g)?.length).toBeGreaterThanOrEqual(3);
+    // The ruler and the track rows; the add strip that was the third user is gone.
+    expect(source.match(/gridTemplateColumns: TRACK_GRID_TEMPLATE/g)?.length).toBeGreaterThanOrEqual(2);
     expect(source).toContain('${TRACK_RAIL_WIDTH} + (100% -');
   });
 
@@ -248,6 +249,6 @@ describe('flex column hazards', () => {
     // Flex children shrink by default where grid rows did not. The lane inside
     // each row has min-height 72px, so a shrunk row lets the lane overflow and
     // paint its background across the clips on the row below.
-    expect(source.match(/flexShrink: 0/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(source.match(/flexShrink: 0/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });

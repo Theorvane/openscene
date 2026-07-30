@@ -98,22 +98,6 @@ const ICONS = {
  */
 export const TRACK_RAIL_WIDTH = '168px';
 
-/** Wider than a toggle: these carry a label, not a single glyph. */
-const ADD_TRACK_BUTTON_STYLE = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '3px',
-  height: '18px',
-  padding: '0 5px',
-  border: '1px solid var(--line-subtle)',
-  borderRadius: 'var(--radius-xs)',
-  background: 'transparent',
-  color: 'var(--text-weak)',
-  fontSize: 'var(--text-micro)',
-  lineHeight: 1,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap'
-} as const satisfies CSSProperties;
 const TRACK_GRID_TEMPLATE = `${TRACK_RAIL_WIDTH} minmax(0, 1fr)`;
 
 const TRACK_TOGGLE_STYLE_BASE = {
@@ -832,33 +816,6 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                       <span className="timeline-clip__handle timeline-clip__handle--right" draggable={!lockedTracks[track.id] && activeTool === 'select'} onDragStart={(event) => writeTimelineDrag(event, { kind: 'trim', clipId: block.clip.id, edge: 'right' })} aria-hidden="true" />
                     </button>
                   ))}
-
-            {/* Adding a track was previously reachable only from the native
-                application menu, which is not where anyone looks for it. */}
-            <div className="timeline-track" style={{ gridTemplateColumns: TRACK_GRID_TEMPLATE, minHeight: '30px', flexShrink: 0 }}>
-              <div className="timeline-track__label" style={{ display: 'flex', gap: '4px', alignItems: 'center', padding: 'var(--space-2)' }}>
-                <span style={{ fontSize: 'var(--text-micro)', color: 'var(--text-weaker)', marginRight: '2px' }}>Add</span>
-                <button
-                  type="button"
-                  title="Add a video track"
-                  aria-label="Add a video track"
-                  onClick={() => editor.addTimelineTrack('video')}
-                  style={ADD_TRACK_BUTTON_STYLE}
-                >
-                  <span aria-hidden="true">+</span> Video
-                </button>
-                <button
-                  type="button"
-                  title="Add an audio track"
-                  aria-label="Add an audio track"
-                  onClick={() => editor.addTimelineTrack('audio')}
-                  style={ADD_TRACK_BUTTON_STYLE}
-                >
-                  <span aria-hidden="true">+</span> Audio
-                </button>
-              </div>
-              <div className="timeline-track__lane" style={{ minHeight: 0, background: 'transparent' }} />
-            </div>
 
             {/* Takes the remaining height so the timeline fills its panel.
                 Clicking it clears the selection, like empty space in any NLE. */}
