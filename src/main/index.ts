@@ -17,7 +17,7 @@ import { RecordingFileStore } from './recordingStore';
 import { registerResultAssetImportHandlers } from './resultAssetImportHandlers';
 import { registerUpdaterIpcHandlers } from './updaterIpcHandlers';
 import { setupUpdater } from './updater';
-import { promptForUpdate } from './updaterPrompt';
+import { promptForUpdate, promptForUpdateState } from './updaterPrompt';
 import { REFERENCE_IMAGE_EXTENSIONS, selectReferenceImage } from './referenceImagePicker';
 import { ResultAssetImportService } from './resultAssetImportService';
 import { registerTimelineAssetProtocol, registerTimelineAssetScheme } from './timelineAssetProtocol';
@@ -465,7 +465,9 @@ app.whenReady().then(async () => {
   // date" trains the user to dismiss the box that also carries the real one.
   void updaterController
     .start()
-    .then(() => promptForUpdate(updaterController, { reportNothingToDo: false, ...updaterPromptIo }))
+    // start() already checked; prompting from its result avoids a second
+    // network round trip on every launch.
+    .then((state) => promptForUpdateState(updaterController, state, { reportNothingToDo: false, ...updaterPromptIo }))
     .catch((error: unknown) => {
       console.error('Update check failed:', error);
     });

@@ -1,4 +1,4 @@
-import { updaterPromptFor } from '../shared/updater';
+import { updaterPromptFor, type UpdaterState } from '../shared/updater';
 import type { UpdaterController } from './updaterController';
 
 /**
@@ -30,11 +30,17 @@ export type PromptForUpdateOptions = {
   readonly openExternal: (url: string) => Promise<unknown>;
 };
 
-export async function promptForUpdate(
+/**
+ * Acts on a state that has already been resolved. Startup uses this with the
+ * state `controller.start()` returned: calling check() again would repeat the
+ * network request, since an up-to-date result is not short-circuited the way a
+ * downloaded or notify-only one is.
+ */
+export async function promptForUpdateState(
   controller: UpdaterController,
+  state: UpdaterState,
   options: PromptForUpdateOptions
 ): Promise<void> {
-  const state = await controller.check();
   const prompt = updaterPromptFor(state, { reportNothingToDo: options.reportNothingToDo });
   if (prompt === null) return;
 
@@ -59,4 +65,12 @@ export async function promptForUpdate(
   if (prompt.confirmAction === 'open-release' && state.status === 'available') {
     await options.openExternal(state.releaseUrl);
   }
+}
+
+/** Checks first, then prompts. The menu path, where the user asked for a check. */
+export async function promptForUpdate(
+  controller: UpdaterController,
+  options: PromptForUpdateOptions
+): Promise<void> {
+  return promptForUpdateState(controller, await controller.check(), options);
 }

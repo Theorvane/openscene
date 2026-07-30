@@ -199,3 +199,47 @@ describe('menu placement', () => {
     }
   });
 });
+
+describe('startup does not check twice', () => {
+  it('prompts from the state start() already resolved', async () => {
+    // Given
+    const { promptForUpdateState } = await import('../src/main/updaterPrompt');
+    const controller = fakeController({ status: 'up-to-date' });
+    const showMessageBox = vi.fn(async () => ({ response: 0 }));
+
+    // When
+    await promptForUpdateState(controller, { status: 'ready', version: '0.3.0' }, {
+      reportNothingToDo: false,
+      showMessageBox,
+      openExternal: noopOpen
+    });
+
+    // Then
+    // An up-to-date result is not short-circuited inside check(), so calling it
+    // again after start() repeated the network request on every launch.
+    expect(controller.check).not.toHaveBeenCalled();
+    expect(showMessageBox).toHaveBeenCalledTimes(1);
+  });
+
+  it('still checks on the menu path, where the user asked for one', async () => {
+    // Given
+    const controller = fakeController({ status: 'up-to-date' });
+
+    // When
+    await promptForUpdate(controller, {
+      reportNothingToDo: true,
+      showMessageBox: async () => ({ response: 0 }),
+      openExternal: noopOpen
+    });
+
+    // Then
+    expect(controller.check).toHaveBeenCalledTimes(1);
+  });
+
+  it('wires the startup path through the state-taking form', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const index = readFileSync(resolve(process.cwd(), 'src/main/index.ts'), 'utf8');
+    expect(index).toContain('.then((state) => promptForUpdateState(updaterController, state,');
+  });
+});
