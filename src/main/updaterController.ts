@@ -89,6 +89,32 @@ export function createUpdaterController(input: UpdaterControllerInput) {
   return {
     getState: (): UpdaterState => state,
 
+    /**
+     * electron-updater fires download-progress many times a second. Every
+     * transition is broadcast to every window, so this only moves the state
+     * when the whole percentage changes — throttling at the source rather than
+     * asking each subscriber to cope with a flood.
+     *
+     * Ignored unless a download is actually in flight: a late event arriving
+     * after the download finished must not knock 'ready' back to 'downloading'.
+     */
+    reportDownloadProgress(progress: {
+      readonly percent: number;
+      readonly transferredBytes?: number;
+      readonly totalBytes?: number;
+    }): void {
+      if (state.status !== 'downloading') return;
+      const percent = Math.min(100, Math.max(0, progress.percent));
+      if (state.percent !== undefined && Math.round(state.percent) === Math.round(percent)) return;
+      transition({
+        status: 'downloading',
+        version: state.version,
+        percent,
+        ...(progress.transferredBytes === undefined ? {} : { transferredBytes: progress.transferredBytes }),
+        ...(progress.totalBytes === undefined ? {} : { totalBytes: progress.totalBytes })
+      });
+    },
+
     subscribe(listener: (state: UpdaterState) => void): () => void {
       listeners.add(listener);
       listener(state);

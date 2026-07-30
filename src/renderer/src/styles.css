@@ -881,6 +881,30 @@ button {
   outline-offset: 1px;
 }
 
+/* Update download progress. An indeterminate <progress> — no value attribute —
+   is the honest rendering before the first progress event arrives, rather than a
+   bar sitting at zero as though nothing were happening. */
+.updater-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.updater-progress__bar {
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  accent-color: var(--primary);
+}
+
+.updater-progress__label {
+  flex: none;
+  color: var(--text-weak);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
 .studio-reference {
   display: flex;
   align-items: center;

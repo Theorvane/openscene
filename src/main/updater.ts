@@ -1,4 +1,4 @@
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, renameSync, statSync } from 'node:fs';
 import { readFile, writeFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -70,9 +70,25 @@ function createReadyRecordStore(filePath: string) {
  * Written synchronously and best-effort: a logger that throws, or that loses
  * lines because the process is quitting to install, would be worse than none.
  */
+const UPDATER_LOG_MAX_BYTES = 512 * 1024;
+
 function createUpdaterLogger(filePath: string) {
+  /**
+   * One rotation, not a rolling archive. A long-lived install would otherwise
+   * grow this without bound, and nobody needs last year's update checks.
+   */
+  const rotateIfLarge = (): void => {
+    try {
+      if (statSync(filePath).size < UPDATER_LOG_MAX_BYTES) return;
+      renameSync(filePath, `${filePath}.1`);
+    } catch {
+      // No file yet, or it cannot be moved; either way, keep appending.
+    }
+  };
+
   const write = (level: string, message: unknown, ...rest: unknown[]): void => {
     try {
+      rotateIfLarge();
       const detail = [message, ...rest]
         .map((entry) => (entry instanceof Error ? entry.stack ?? entry.message : String(entry)))
         .join(' ');
@@ -105,7 +121,7 @@ export function setupUpdater(): UpdaterController {
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;
 
-  return createUpdaterController({
+  const controller = createUpdaterController({
     capability,
     currentVersion: app.getVersion(),
     releaseUrlFor,
@@ -123,4 +139,17 @@ export function setupUpdater(): UpdaterController {
     },
     persistence: createReadyRecordStore(join(app.getPath('userData'), 'pending-update.json'))
   });
+
+  // The controller decides whether a progress report is worth a state change;
+  // this only forwards what electron-updater reports.
+  autoUpdater.on('download-progress', (progress: { percent?: number; transferred?: number; total?: number }) => {
+    if (typeof progress.percent !== 'number') return;
+    controller.reportDownloadProgress({
+      percent: progress.percent,
+      ...(typeof progress.transferred === 'number' ? { transferredBytes: progress.transferred } : {}),
+      ...(typeof progress.total === 'number' ? { totalBytes: progress.total } : {})
+    });
+  });
+
+  return controller;
 }

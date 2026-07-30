@@ -229,3 +229,95 @@ describe('updater controller', () => {
     expect(controller.getState()).toEqual({ status: 'ready', version: '0.2.0' });
   });
 });
+
+describe('download progress reporting', () => {
+  function downloadingController() {
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const { controller } = makeController({
+      checkForUpdates: vi.fn(async () => ({ updateAvailable: true, version: '0.3.0' })),
+      downloadUpdate: vi.fn(async () => {
+        await gate;
+      })
+    });
+    const seen: UpdaterState[] = [];
+    controller.subscribe((state) => seen.push(state));
+    const finished = controller.check();
+    return { controller, seen, finishDownload: () => release?.(), finished };
+  }
+
+  it('moves the state as the download advances', async () => {
+    // Given
+    const { controller, seen, finishDownload, finished } = downloadingController();
+    await Promise.resolve();
+
+    // When
+    controller.reportDownloadProgress({ percent: 12.4, transferredBytes: 1_000, totalBytes: 8_000 });
+    finishDownload();
+    await finished;
+
+    // Then
+    const downloading = seen.filter((state) => state.status === 'downloading');
+    expect(downloading.at(-1)).toEqual({
+      status: 'downloading',
+      version: '0.3.0',
+      percent: 12.4,
+      transferredBytes: 1_000,
+      totalBytes: 8_000
+    });
+  });
+
+  it('collapses reports that round to the same whole percent', async () => {
+    // Given
+    const { controller, seen, finishDownload, finished } = downloadingController();
+    await Promise.resolve();
+    const before = seen.length;
+
+    // When
+    // electron-updater fires this many times a second, and every transition is
+    // broadcast to every window.
+    controller.reportDownloadProgress({ percent: 30.1 });
+    controller.reportDownloadProgress({ percent: 30.2 });
+    controller.reportDownloadProgress({ percent: 30.4 });
+    controller.reportDownloadProgress({ percent: 31.6 });
+    finishDownload();
+    await finished;
+
+    // Then
+    const emitted = seen.slice(before).filter((state) => state.status === 'downloading').length;
+    expect(emitted).toBe(2);
+  });
+
+  it('clamps a nonsense percentage instead of publishing it', async () => {
+    // Given
+    const { controller, seen, finishDownload, finished } = downloadingController();
+    await Promise.resolve();
+
+    // When
+    controller.reportDownloadProgress({ percent: 480 });
+    finishDownload();
+    await finished;
+
+    // Then
+    const last = seen.filter((state) => state.status === 'downloading').at(-1);
+    expect(last?.status === 'downloading' && last.percent).toBe(100);
+  });
+
+  it('ignores a progress report that arrives after the download finished', async () => {
+    // Given
+    const { controller } = makeController({
+      checkForUpdates: vi.fn(async () => ({ updateAvailable: true, version: '0.3.0' }))
+    });
+    await controller.check();
+    expect(controller.getState()).toEqual({ status: 'ready', version: '0.3.0' });
+
+    // When
+    controller.reportDownloadProgress({ percent: 55 });
+
+    // Then
+    // A late event must not knock 'ready' back to 'downloading'.
+    expect(controller.getState()).toEqual({ status: 'ready', version: '0.3.0' });
+  });
+});

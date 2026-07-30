@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 
-import { describeUpdaterState, updaterActionFor, type UpdaterState } from '../../shared/updater';
+import { describeUpdaterState, formatDownloadProgress, updaterActionFor, type UpdaterState } from '../../shared/updater';
 import type { StatusTone } from './appTypes';
 import { Button, MetadataList, StatusCard } from './ui';
 
@@ -71,6 +71,16 @@ export function UpdatesSettings(): ReactElement {
         ]}
       />
       <StatusCard tone={toneFor(snapshot.state)}>{describeUpdaterState(snapshot.state, version)}</StatusCard>
+      {snapshot.state.status === 'downloading' && (
+        <div className="updater-progress">
+          <progress
+            className="updater-progress__bar"
+            aria-label={`Downloading ${snapshot.state.version}`}
+            {...(snapshot.state.percent === undefined ? {} : { value: snapshot.state.percent, max: 100 })}
+          />
+          <span className="updater-progress__label">{formatDownloadProgress(snapshot.state)}</span>
+        </div>
+      )}
       {failure.length > 0 ? <StatusCard tone="danger">{failure}</StatusCard> : null}
       <Button variant="default" disabled={action.kind === 'none'} onClick={() => void run()}>
         {action.label}

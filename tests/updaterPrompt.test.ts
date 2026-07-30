@@ -106,3 +106,16 @@ describe('updater logging', () => {
     expect(settings).toContain('updater.log');
   });
 });
+
+describe('updater log bounds', () => {
+  it('rotates once instead of growing without bound', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(resolve(process.cwd(), 'src/main/updater.ts'), 'utf8');
+
+    // Raised in review: append-only with no cap. One rotation is enough —
+    // nobody needs last year's update checks.
+    expect(source).toContain('UPDATER_LOG_MAX_BYTES');
+    expect(source).toContain('renameSync(filePath, `${filePath}.1`)');
+  });
+});

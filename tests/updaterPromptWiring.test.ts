@@ -147,3 +147,55 @@ describe('application menu', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('menu placement', () => {
+  const labelsOf = (template: readonly { label?: string; role?: string; submenu?: unknown }[]) =>
+    template.map((entry) => entry.label ?? entry.role ?? '');
+
+  it('puts Check for Updates inside the single macOS app menu, not beside it', () => {
+    // Given
+    const platform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+    try {
+      // When
+      const template = createApplicationMenuTemplate(vi.fn(), vi.fn());
+
+      // Then
+      // Pushing a second entry labelled OpenVideo left the menu bar with two
+      // app-named menus: the real one and a stub holding one item.
+      expect(labelsOf(template).filter((label) => label === 'OpenVideo')).toHaveLength(1);
+      const appMenu = template.find((entry) => entry.label === 'OpenVideo');
+      const items = (appMenu?.submenu as { label?: string; role?: string }[] | undefined) ?? [];
+      expect(items.map((item) => item.label ?? item.role)).toContain('Check for Updates…');
+      // Folding it in means the standard items have to be there explicitly.
+      expect(items.map((item) => item.role)).toContain('quit');
+      expect(items.map((item) => item.role)).toContain('about');
+    } finally {
+      Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+    }
+  });
+
+  it('keeps the plain app menu role when no handler is wired', () => {
+    const platform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+    try {
+      const template = createApplicationMenuTemplate(vi.fn());
+      expect(template.find((entry) => entry.label === 'OpenVideo')?.role).toBe('appMenu');
+    } finally {
+      Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+    }
+  });
+
+  it('uses Help on Windows and Linux, which have no app menu', () => {
+    const platform = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    try {
+      const template = createApplicationMenuTemplate(vi.fn(), vi.fn());
+      expect(labelsOf(template)).not.toContain('OpenVideo');
+      const help = template.find((entry) => entry.role === 'help');
+      expect((help?.submenu as { label?: string }[] | undefined)?.[0]?.label).toBe('Check for Updates…');
+    } finally {
+      Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+    }
+  });
+});

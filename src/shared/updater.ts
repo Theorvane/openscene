@@ -7,7 +7,14 @@ export type UpdaterState =
   | { readonly status: 'idle' }
   | { readonly status: 'checking' }
   | { readonly status: 'up-to-date' }
-  | { readonly status: 'downloading'; readonly version: string }
+  | {
+      readonly status: 'downloading';
+      readonly version: string;
+      /** 0-100, absent until the first progress event arrives. */
+      readonly percent?: number;
+      readonly transferredBytes?: number;
+      readonly totalBytes?: number;
+    }
   | { readonly status: 'ready'; readonly version: string }
   | { readonly status: 'installing'; readonly version: string }
   // Detected but not installable here: the platform can read the release and
@@ -78,7 +85,13 @@ export function updaterActionFor(state: UpdaterState): UpdaterAction {
     case 'checking':
       return { kind: 'none', label: 'Checking…' };
     case 'downloading':
-      return { kind: 'none', label: `Downloading ${state.version}…` };
+      return {
+        kind: 'none',
+        label:
+          state.percent === undefined
+            ? `Downloading ${state.version}…`
+            : `Downloading ${state.version}… ${Math.round(state.percent)}%`
+      };
     case 'installing':
       return { kind: 'none', label: 'Installing…' };
     case 'ready':
@@ -103,7 +116,9 @@ export function describeUpdaterState(state: UpdaterState, currentVersion: string
     case 'up-to-date':
       return `${currentVersion} is the latest release.`;
     case 'downloading':
-      return `Downloading ${state.version}.`;
+      return state.percent === undefined
+        ? `Downloading ${state.version}.`
+        : `Downloading ${state.version} — ${formatDownloadProgress(state)}.`;
     case 'ready':
       return `${state.version} is downloaded and installs on restart.`;
     case 'installing':
@@ -194,4 +209,29 @@ export function updaterPromptFor(
     default:
       return null;
   }
+}
+
+/** Whole megabytes below a gigabyte; a byte count means nothing at a glance. */
+export function formatTransferSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 MB';
+  const megabytes = bytes / 1_000_000;
+  return megabytes >= 1_000 ? `${(megabytes / 1_000).toFixed(1)} GB` : `${Math.round(megabytes)} MB`;
+}
+
+/**
+ * "42% · 63 MB of 151 MB", degrading to whatever is actually known. Progress
+ * events do not always carry a total, and a bar with no total is still worth
+ * showing as a percentage.
+ */
+export function formatDownloadProgress(state: {
+  readonly percent?: number;
+  readonly transferredBytes?: number;
+  readonly totalBytes?: number;
+}): string {
+  const parts: string[] = [];
+  if (state.percent !== undefined) parts.push(`${Math.round(state.percent)}%`);
+  if (state.transferredBytes !== undefined && state.totalBytes !== undefined && state.totalBytes > 0) {
+    parts.push(`${formatTransferSize(state.transferredBytes)} of ${formatTransferSize(state.totalBytes)}`);
+  }
+  return parts.length === 0 ? 'starting' : parts.join(' · ');
 }

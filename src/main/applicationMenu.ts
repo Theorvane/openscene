@@ -67,12 +67,32 @@ export function createApplicationMenuTemplate(
   const template: MenuItemConstructorOptions[] = [];
   // macOS always titles the first menu with the running bundle's name, so the
   // label is what a packaged OpenVideo build shows; a dev run reads Electron.
-  if (process.platform === 'darwin') template.push({ label: 'OpenVideo', role: 'appMenu' });
-  if (onCheckForUpdates !== undefined) {
-    template.push({
-      label: 'OpenVideo',
-      submenu: [{ label: 'Check for Updates…', click: onCheckForUpdates }]
-    });
+  //
+  // The updates item goes *inside* that menu. Pushing a second entry labelled
+  // OpenVideo — which is what this did — leaves the menu bar with two app-named
+  // menus, the real one and a stub holding one item.
+  if (process.platform === 'darwin') {
+    template.push(
+      onCheckForUpdates === undefined
+        ? { label: 'OpenVideo', role: 'appMenu' }
+        : {
+            label: 'OpenVideo',
+            submenu: [
+              { role: 'about' },
+              { type: 'separator' },
+              // Where macOS users look for it: just under About.
+              { label: 'Check for Updates…', click: onCheckForUpdates },
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit' }
+            ]
+          }
+    );
   }
   template.push(
     { role: 'fileMenu' },
@@ -134,6 +154,13 @@ export function createApplicationMenuTemplate(
     },
     { role: 'windowMenu' }
   );
+  // Windows and Linux have no app menu, so Help is where an updates item goes.
+  if (onCheckForUpdates !== undefined && process.platform !== 'darwin') {
+    template.push({
+      role: 'help',
+      submenu: [{ label: 'Check for Updates…', click: onCheckForUpdates }]
+    });
+  }
   return template;
 }
 

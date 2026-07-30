@@ -123,3 +123,30 @@ describe('updater description', () => {
     expect(text).toMatch(/cannot update itself/);
   });
 });
+
+describe('download progress', () => {
+  it('formats percent and bytes, degrading to what is known', async () => {
+    const { formatDownloadProgress, formatTransferSize } = await import('../src/shared/updater');
+
+    expect(formatDownloadProgress({ percent: 41.6, transferredBytes: 63_000_000, totalBytes: 151_000_000 })).toBe(
+      '42% · 63 MB of 151 MB'
+    );
+    // A progress event does not always carry a total; a percentage alone is
+    // still worth showing.
+    expect(formatDownloadProgress({ percent: 7 })).toBe('7%');
+    expect(formatDownloadProgress({})).toBe('starting');
+    expect(formatTransferSize(2_400_000_000)).toBe('2.4 GB');
+    expect(formatTransferSize(-1)).toBe('0 MB');
+  });
+
+  it('puts the percentage in the label and the description', async () => {
+    const { updaterActionFor, describeUpdaterState } = await import('../src/shared/updater');
+    const state = { status: 'downloading', version: '0.3.0', percent: 42.4 } as const;
+
+    expect(updaterActionFor(state).label).toBe('Downloading 0.3.0… 42%');
+    expect(describeUpdaterState(state, '0.2.0')).toContain('42%');
+    // Before the first event there is no number to show, and inventing 0% would
+    // read as stalled.
+    expect(updaterActionFor({ status: 'downloading', version: '0.3.0' }).label).toBe('Downloading 0.3.0…');
+  });
+});
