@@ -415,8 +415,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
 
     // 1. Missing ExportIpcService
     const noExportServiceResult = await server.exportProjectVideo({
-      projectId: 'proj-123',
-      preset: 'high'
+      projectId: 'proj-123'
     });
     expect(noExportServiceResult.success).toBe(false);
     expect(noExportServiceResult.error).toContain('Export service is not available');
@@ -428,8 +427,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
 
     server.setServices(projectStore, mockFailingExportService);
     const failResult = await server.exportProjectVideo({
-      projectId: 'proj-123',
-      preset: 'high'
+      projectId: 'proj-123'
     });
     expect(failResult.success).toBe(false);
     expect(failResult.error).toBe('FFmpeg binary not found');
@@ -449,8 +447,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
 
     server.setServices(projectStore, mockSuccessExportService);
     const successResult = await server.exportProjectVideo({
-      projectId: 'proj-123',
-      preset: 'high'
+      projectId: 'proj-123'
     });
     expect(successResult.success).toBe(true);
     expect(successResult.exportJobId).toBe('export-job-999');

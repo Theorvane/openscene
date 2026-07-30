@@ -18,6 +18,7 @@ import {
 } from './videoFrameAnalysis';
 import { estimateVideoPlanCost, formatCostEstimate, estimateImageCost, estimateSpeechCost } from '../shared/mediaGenerationPricing';
 import { planVideoStoryboard, supportedShotSeconds } from '../shared/videoStoryboardPlan';
+import { checkNarrationFit, narrationBudget, detectScriptKind } from '../shared/narrationTiming';
 import { getDomainModel, getDefaultDomainModelId } from '../shared/aiDomainModels';
 import {
   getGeneratedImageAsReference,
@@ -79,6 +80,43 @@ export class OpenVideoMcpServer {
   /** Lets the agent finish a generation by importing its result, as the UI does. */
   public setResultImportService(resultImports: ResultAssetImportService): void {
     this.resultImports = resultImports;
+  }
+
+  @McpTool({
+    description:
+      'Check a narration script against the seconds it has to fill, before paying for speech. Returns an ' +
+      'estimated duration, a verdict, and a word or character budget. Never estimate narration length ' +
+      'yourself: an over-running script is only discovered after the speech job was billed and placed. ' +
+      'Read-only, spends nothing.',
+    input: z.object({
+      script: z.string().min(1),
+      targetSeconds: z.number().min(0),
+      pace: z.enum(['measured', 'natural', 'brisk']).optional()
+    })
+  })
+  checkNarrationLength(params: { script: string; targetSeconds: number; pace?: 'measured' | 'natural' | 'brisk' }) {
+    const fit = checkNarrationFit({
+      script: params.script,
+      targetSeconds: params.targetSeconds,
+      ...(params.pace === undefined ? {} : { pace: params.pace })
+    });
+    const budget = narrationBudget({
+      targetSeconds: params.targetSeconds,
+      kind: detectScriptKind(params.script),
+      ...(params.pace === undefined ? {} : { pace: params.pace })
+    });
+    return {
+      success: true,
+      verdict: fit.verdict,
+      estimatedSeconds: fit.estimate.estimatedSeconds,
+      targetSeconds: fit.targetSeconds,
+      deltaSeconds: fit.deltaSeconds,
+      countedAs: fit.estimate.kind,
+      units: fit.estimate.units,
+      budgetUnits: budget.units,
+      pace: fit.estimate.pace,
+      message: fit.advice
+    };
   }
 
   @McpTool({
@@ -773,13 +811,15 @@ export class OpenVideoMcpServer {
   }
 
   @McpTool({
-    description: 'Start FFmpeg MP4 export for an OpenVideo project timeline.',
+    // No quality parameter: the export pipeline has no preset concept
+    // (StartExportJobInput carries only size and frame rate), and the tool used
+    // to accept one, drop it, and echo it back as if it had applied.
+    description: 'Start FFmpeg MP4 export for an OpenVideo project timeline. Exports at the project settings; there is no quality preset.',
     input: z.object({
-      projectId: z.string().min(1),
-      preset: z.enum(['fast', 'high', 'lossless']).default('high')
+      projectId: z.string().min(1)
     })
   })
-  async exportProjectVideo(params: { projectId: string; preset?: 'fast' | 'high' | 'lossless' }) {
+  async exportProjectVideo(params: { projectId: string }) {
     if (!this.exportIpcService) {
       return { success: false, error: 'Export service is not available.' };
     }
@@ -800,7 +840,6 @@ export class OpenVideoMcpServer {
         success: true,
         exportJobId: response.value.id,
         projectId: params.projectId,
-        preset: params.preset ?? 'high',
         message: `Started FFmpeg export job ${response.value.id} for project ${params.projectId}`
       };
     } catch (err) {
@@ -820,7 +859,7 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['planVideoScenario', 'estimateGenerationCost', 'createVideoJob', 'createSpeechJob', 'createImageJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'removeTimelineClip', 'exportProjectVideo']
+      tools: ['planVideoScenario', 'checkNarrationLength', 'estimateGenerationCost', 'createVideoJob', 'createSpeechJob', 'createImageJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'removeTimelineClip', 'exportProjectVideo']
     };
   }
 }
