@@ -55,10 +55,30 @@ export interface RecordingResult {
   createdAt: string;
 }
 
+/**
+ * The platform strings the app branches on, declared here rather than borrowed
+ * from NodeJS.Platform. This is shared code: it is typechecked by the mobile app
+ * too, where Node's global type namespace does not exist, and borrowing from it
+ * made the shared core quietly depend on a Node type environment.
+ */
+export type HostPlatform =
+  | 'aix'
+  | 'android'
+  | 'darwin'
+  | 'freebsd'
+  | 'haiku'
+  | 'ios'
+  | 'linux'
+  | 'openbsd'
+  | 'sunos'
+  | 'win32'
+  | 'cygwin'
+  | 'netbsd';
+
 export interface AppSettings {
   recordingsPath: string;
   screenPermission: string;
-  platform: NodeJS.Platform;
+  platform: HostPlatform;
 }
 
 export interface SelectSourceInput {

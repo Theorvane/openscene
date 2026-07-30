@@ -1,3 +1,5 @@
+import type { HostPlatform } from './models';
+
 // The updater's vocabulary, shared by the main-process controller that owns the
 // state and the renderer that draws it. Kept here so neither side can drift into
 // describing a state the other does not have.
@@ -31,7 +33,7 @@ export type UpdaterCapability =
   | { readonly kind: 'none'; readonly reason: string };
 
 export type UpdaterPlatformInput = {
-  readonly platform: NodeJS.Platform;
+  readonly platform: HostPlatform;
   readonly packaged: boolean;
   // electron-builder sets APPIMAGE for AppImage runs; a .deb install does not
   // have it, and electron-updater has no path for deb.
