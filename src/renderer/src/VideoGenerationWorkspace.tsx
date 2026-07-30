@@ -15,7 +15,20 @@ function durationOptionsFor(providerId: string): readonly number[] {
   return [4, 8];
 }
 
-export function VideoGenerationWorkspace(): ReactElement {
+type VideoGenerationWorkspaceProps = {
+  /**
+   * Controlled from App so the image studio's "Use for video" can hand a
+   * generated still straight into this form. Keeping it local meant the handoff
+   * could only ever be a suggestion to go and re-pick the file.
+   */
+  readonly referenceImage: ReferenceImageSelection | null;
+  readonly onReferenceImageChange: (reference: ReferenceImageSelection | null) => void;
+};
+
+export function VideoGenerationWorkspace({
+  referenceImage,
+  onReferenceImageChange
+}: VideoGenerationWorkspaceProps): ReactElement {
   const { selectedModel } = useAiDomainModel();
   const videoModel = selectedModel('video-generation');
   const { importAiResult } = useProjectResultImport();
@@ -31,7 +44,6 @@ export function VideoGenerationWorkspace(): ReactElement {
       );
   const [selectedStyle, setSelectedStyle] = useState<string>('Cinematic');
   // Image-to-video seed: the bytes travel inline, so no path reaches here.
-  const [referenceImage, setReferenceImage] = useState<ReferenceImageSelection | null>(null);
   const [jobs, setJobs] = useState<readonly VideoGenerationJob[]>([]);
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -96,7 +108,7 @@ export function VideoGenerationWorkspace(): ReactElement {
       setStatusMsg({ text: response.error.message, tone: 'danger' });
       return;
     }
-    if (response.value !== null) setReferenceImage(response.value);
+    if (response.value !== null) onReferenceImageChange(response.value);
   };
 
   const handleImportToProject = async (job: VideoGenerationJob): Promise<void> => {
@@ -189,7 +201,7 @@ export function VideoGenerationWorkspace(): ReactElement {
                 alt={`Reference image ${referenceImage.displayName}`}
               />
               <span className="studio-reference__name">{referenceImage.displayName}</span>
-              <Button variant="ghost" onClick={() => setReferenceImage(null)} aria-label="Remove reference image">
+              <Button variant="ghost" onClick={() => onReferenceImageChange(null)} aria-label="Remove reference image">
                 Remove
               </Button>
             </div>

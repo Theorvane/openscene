@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react';
 
-import type { ImageAspectRatio, ImageGenerationJob } from '../../shared/providerSeams';
+import type { ImageAspectRatio, ImageGenerationJob, ReferenceImageSelection } from '../../shared/providerSeams';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { DomainModelPicker } from './DomainModelPicker';
 import { Button, StatusCard } from './ui';
@@ -10,7 +10,12 @@ const ASPECT_RATIOS: readonly ImageAspectRatio[] = ['1:1', '16:9', '9:16', '4:3'
 
 type StatusMessage = { readonly text: string; readonly tone: 'neutral' | 'success' | 'warning' | 'danger' };
 
-export function ImageGenerationWorkspace(): ReactElement {
+type ImageGenerationWorkspaceProps = {
+  /** Hands a finished still to the video studio and switches to it. */
+  readonly onUseForVideo: (reference: ReferenceImageSelection) => void;
+};
+
+export function ImageGenerationWorkspace({ onUseForVideo }: ImageGenerationWorkspaceProps): ReactElement {
   const { selectedModel } = useAiDomainModel();
   const imageModel = selectedModel('image-generation');
   const [prompt, setPrompt] = useState('');
@@ -84,14 +89,13 @@ export function ImageGenerationWorkspace(): ReactElement {
 
   const handleUseForVideo = async (job: ImageGenerationJob): Promise<void> => {
     const response = await window.videoTool.aiUseImageAsVideoReference(job.id);
-    setStatusMsg(
-      response.ok
-        ? {
-            text: `${response.value.displayName} is ready to use — open Video Generation and add it as the reference image.`,
-            tone: 'success'
-          }
-        : { text: response.error.message, tone: 'danger' }
-    );
+    if (!response.ok) {
+      setStatusMsg({ text: response.error.message, tone: 'danger' });
+      return;
+    }
+    // Puts the still into the video form and moves the user there, rather than
+    // telling them to save it and pick it again.
+    onUseForVideo(response.value);
   };
 
   return (

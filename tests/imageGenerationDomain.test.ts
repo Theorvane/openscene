@@ -67,3 +67,27 @@ describe('image generation domain', () => {
     expect(getDomainModel('edit-agent', 'imagen-4.0-generate-001')).toBeUndefined();
   });
 });
+
+describe('still-to-video handoff', () => {
+  const app = readFileSync(resolve(process.cwd(), 'src/renderer/src/App.tsx'), 'utf8');
+  const imageStudio = readFileSync(resolve(process.cwd(), 'src/renderer/src/ImageGenerationWorkspace.tsx'), 'utf8');
+  const videoStudio = readFileSync(resolve(process.cwd(), 'src/renderer/src/VideoGenerationWorkspace.tsx'), 'utf8');
+
+  it('lands the still in the video form instead of describing how to do it by hand', () => {
+    // The reference lives in App because both studios touch it. Held locally in
+    // the video studio, "Use for video" could only ever be a suggestion to save
+    // the image and pick it again.
+    expect(app).toContain('const [videoReferenceImage, setVideoReferenceImage]');
+    expect(videoStudio).toContain('readonly referenceImage: ReferenceImageSelection | null;');
+    expect(videoStudio).not.toContain('useState<ReferenceImageSelection | null>(null)');
+  });
+
+  it('switches to the video tab as part of the handoff', () => {
+    expect(app).toMatch(/setVideoReferenceImage\(reference\);\s*\n\s*selectWorkspaceTab\('video'\);/);
+  });
+
+  it('no longer tells the user to go and add the image themselves', () => {
+    expect(imageStudio).not.toMatch(/open Video Generation and add it/);
+    expect(imageStudio).toContain('onUseForVideo(response.value);');
+  });
+});
