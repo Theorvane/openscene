@@ -68,6 +68,10 @@ For each approved still, `createVideoJob` with `referenceImageJobId` set to that
 
 The video prompt describes *motion*, not content — the content is in the still. "Slow push in, subject turns toward camera" rather than a second description of the scene.
 
+## Stills are reference-only
+
+A generated still cannot become a project asset: `MEDIA_KINDS` is `['video', 'audio']`, so `importGeneratedResult` has nothing to import it as. A still's two exits are the save dialog and the video reference. Do not offer to place one on the timeline.
+
 ## Step 7 — Assemble
 
 Per clip: `getJobStatus` until completed, `importGeneratedResult` to make it a project asset, `addClipToTimeline` in shot order. Report progress per shot rather than going silent for several minutes.

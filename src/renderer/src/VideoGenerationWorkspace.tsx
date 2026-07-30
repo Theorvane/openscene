@@ -3,19 +3,33 @@ import type { ReferenceImageSelection, VideoGenerationJob } from '../../shared/p
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
+import { supportedShotSeconds } from '../../shared/videoStoryboardPlan';
 import { Button, StatusCard } from './ui';
 
 const STYLE_PRESETS = ['Cinematic', 'Anime', '3D Render', 'Photorealistic', 'Cyberpunk', 'Film Noir'] as const;
 const ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const;
 
-/** Duration choices per engine: Sora accepts 4/8/12s, Veo 4–8s. */
-function durationOptionsFor(providerId: string): readonly number[] {
-  if (providerId === 'openai') return [4, 8, 12];
-  if (providerId === 'google_gemini') return [4, 6, 8];
-  return [4, 8];
-}
+/**
+ * Read from the same table the agent's planner and the createVideoJob schema
+ * use. Three copies of these numbers is how a 12s Sora shot became something
+ * the UI offered and the tool rejected.
+ */
+const durationOptionsFor = supportedShotSeconds;
 
-export function VideoGenerationWorkspace(): ReactElement {
+type VideoGenerationWorkspaceProps = {
+  /**
+   * Controlled from App so the image studio's "Use for video" can hand a
+   * generated still straight into this form. Keeping it local meant the handoff
+   * could only ever be a suggestion to go and re-pick the file.
+   */
+  readonly referenceImage: ReferenceImageSelection | null;
+  readonly onReferenceImageChange: (reference: ReferenceImageSelection | null) => void;
+};
+
+export function VideoGenerationWorkspace({
+  referenceImage,
+  onReferenceImageChange
+}: VideoGenerationWorkspaceProps): ReactElement {
   const { selectedModel } = useAiDomainModel();
   const videoModel = selectedModel('video-generation');
   const { importAiResult } = useProjectResultImport();
@@ -31,7 +45,6 @@ export function VideoGenerationWorkspace(): ReactElement {
       );
   const [selectedStyle, setSelectedStyle] = useState<string>('Cinematic');
   // Image-to-video seed: the bytes travel inline, so no path reaches here.
-  const [referenceImage, setReferenceImage] = useState<ReferenceImageSelection | null>(null);
   const [jobs, setJobs] = useState<readonly VideoGenerationJob[]>([]);
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -96,7 +109,7 @@ export function VideoGenerationWorkspace(): ReactElement {
       setStatusMsg({ text: response.error.message, tone: 'danger' });
       return;
     }
-    if (response.value !== null) setReferenceImage(response.value);
+    if (response.value !== null) onReferenceImageChange(response.value);
   };
 
   const handleImportToProject = async (job: VideoGenerationJob): Promise<void> => {
@@ -189,7 +202,7 @@ export function VideoGenerationWorkspace(): ReactElement {
                 alt={`Reference image ${referenceImage.displayName}`}
               />
               <span className="studio-reference__name">{referenceImage.displayName}</span>
-              <Button variant="ghost" onClick={() => setReferenceImage(null)} aria-label="Remove reference image">
+              <Button variant="ghost" onClick={() => onReferenceImageChange(null)} aria-label="Remove reference image">
                 Remove
               </Button>
             </div>

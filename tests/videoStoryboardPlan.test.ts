@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import {
   CONTINUITY_KEYS,
+  MAX_SUPPORTED_SHOT_SECONDS,
   MAX_PLANNED_SHOTS,
   planVideoStoryboard,
   supportedShotSeconds
@@ -92,5 +96,35 @@ describe('storyboard planning', () => {
     expect(plan.continuityKeys).toEqual(CONTINUITY_KEYS);
     expect(plan.continuityKeys).toContain('wardrobe');
     expect(plan.continuityKeys).toContain('lighting');
+  });
+});
+
+describe('one shot-length table', () => {
+  it('bounds the createVideoJob schema by the longest planned shot', () => {
+    // Given
+    const mcp = readFileSync(resolve(process.cwd(), 'src/main/openVideoMcpServer.ts'), 'utf8');
+
+    // Then
+    // The schema used to carry .max(10) while the planner emitted 12s shots for
+    // Sora, so a priced and approved shot was rejected at the tool boundary —
+    // the exact failure the planner exists to prevent.
+    expect(MAX_SUPPORTED_SHOT_SECONDS).toBe(12);
+    expect(mcp).toContain('.max(MAX_SUPPORTED_SHOT_SECONDS)');
+    expect(mcp).not.toMatch(/durationSeconds: z\.number\(\)\.min\(1\)\.max\(\d/);
+
+    for (const providerId of ['openai', 'google_gemini', 'byteplus', 'unknown']) {
+      for (const seconds of supportedShotSeconds(providerId)) {
+        expect(seconds, `${providerId} plans ${seconds}s`).toBeLessThanOrEqual(MAX_SUPPORTED_SHOT_SECONDS);
+      }
+    }
+  });
+
+  it('has the video studio read the same table instead of its own copy', () => {
+    // Given
+    const ui = readFileSync(resolve(process.cwd(), 'src/renderer/src/VideoGenerationWorkspace.tsx'), 'utf8');
+
+    // Then
+    expect(ui).toContain("import { supportedShotSeconds } from '../../shared/videoStoryboardPlan'");
+    expect(ui).not.toMatch(/return \[4, 8, 12\]/);
   });
 });
