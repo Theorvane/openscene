@@ -115,6 +115,43 @@ export const MEDIA_PROVIDERS: readonly LlmProviderInfo[] = [
     adapter: 'media',
     credentialKey: 'minimax',
     description: 'Video generation over the MiniMax Hailuo API.'
+  },
+  {
+    id: 'byteplus',
+    label: 'BytePlus ModelArk',
+    kind: 'cloud',
+    auth: 'api-key',
+    adapter: 'media',
+    credentialKey: 'bytePlusApiKey',
+    description: 'ByteDance Seedream image generation and Seedance video over BytePlus ModelArk.'
+  },
+  {
+    id: 'stability',
+    label: 'Stability AI',
+    kind: 'cloud',
+    auth: 'api-key',
+    adapter: 'media',
+    credentialKey: 'stabilityApiKey',
+    keyPlaceholder: 'sk-...',
+    description: 'Image generation over the Stability AI API.'
+  },
+  {
+    id: 'black_forest_labs',
+    label: 'Black Forest Labs',
+    kind: 'cloud',
+    auth: 'api-key',
+    adapter: 'media',
+    credentialKey: 'blackForestLabsApiKey',
+    description: 'FLUX image generation over the Black Forest Labs API.'
+  },
+  {
+    id: 'alibaba_dashscope',
+    label: 'Alibaba DashScope',
+    kind: 'cloud',
+    auth: 'api-key',
+    adapter: 'media',
+    credentialKey: 'dashscopeApiKey',
+    description: 'Alibaba Wan and Qwen image and video generation over DashScope.'
   }
 ];
 

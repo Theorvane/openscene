@@ -17,8 +17,10 @@ import {
   type ExtractedFrame
 } from './videoFrameAnalysis';
 import {
+  createImageGenerationJob,
   createSpeechGenerationJob,
   createVideoGenerationJob,
+  getImageGenerationJob,
   getSpeechGenerationJob,
   getVideoGenerationJob
 } from './aiJobManager';
@@ -150,14 +152,52 @@ export class OpenVideoMcpServer {
   }
 
   @McpTool({
-    description: 'Check status of an AI video or speech generation job.',
+    description:
+      'Generate a still image from a text prompt using the configured cloud image model. Useful for poster frames, title cards, and as a seed for image-to-video generation.',
     input: z.object({
-      jobId: z.string().min(1),
-      kind: z.enum(['video', 'speech'])
+      prompt: z.string().min(1),
+      aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4']).default('1:1'),
+      negativePrompt: z.string().optional(),
+      modelId: z.string().optional()
     })
   })
-  async getJobStatus(params: { jobId: string; kind: 'video' | 'speech' }) {
-    const job = params.kind === 'video' ? getVideoGenerationJob(params.jobId) : getSpeechGenerationJob(params.jobId);
+  async createImageJob(params: {
+    prompt: string;
+    aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+    negativePrompt?: string;
+    modelId?: string;
+  }) {
+    const job = await createImageGenerationJob({
+      prompt: params.prompt,
+      aspectRatio: params.aspectRatio ?? '1:1',
+      ...(params.negativePrompt === undefined ? {} : { negativePrompt: params.negativePrompt }),
+      ...(params.modelId === undefined ? {} : { modelId: params.modelId })
+    });
+
+    return {
+      success: true,
+      jobId: job.id,
+      status: job.status,
+      mode: job.mode,
+      provider: job.provider,
+      message: `AI image job created: ${job.id}`
+    };
+  }
+
+  @McpTool({
+    description: 'Check status of an AI video, speech, or image generation job.',
+    input: z.object({
+      jobId: z.string().min(1),
+      kind: z.enum(['video', 'speech', 'image'])
+    })
+  })
+  async getJobStatus(params: { jobId: string; kind: 'video' | 'speech' | 'image' }) {
+    const job =
+      params.kind === 'video'
+        ? getVideoGenerationJob(params.jobId)
+        : params.kind === 'image'
+          ? getImageGenerationJob(params.jobId)
+          : getSpeechGenerationJob(params.jobId);
     if (!job) {
       return { success: false, error: `Job ${params.jobId} not found.` };
     }
@@ -652,7 +692,7 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['createVideoJob', 'createSpeechJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'removeTimelineClip', 'exportProjectVideo']
+      tools: ['createVideoJob', 'createSpeechJob', 'createImageJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'removeTimelineClip', 'exportProjectVideo']
     };
   }
 }

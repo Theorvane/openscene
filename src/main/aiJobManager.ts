@@ -2,6 +2,9 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { app } from 'electron';
 import type {
+  ImageGenerationJob,
+  ImageGenerationProviderId,
+  ImageGenerationRequest,
   TextToSpeechJob,
   TextToSpeechRequest,
   VideoGenerationJob,
@@ -17,10 +20,18 @@ import {
   generateSoraVideo,
   generateVeoVideo
 } from './mediaGenerationAdapters';
+import {
+  generateBytePlusImage,
+  generateImagenImage,
+  generateOpenAiImage,
+  imageExtensionFor,
+  type GeneratedImage
+} from './imageGenerationAdapters';
 import { tmpdir } from 'node:os';
 
 const videoJobs = new Map<string, VideoGenerationJob>();
 const speechJobs = new Map<string, TextToSpeechJob>();
+const imageJobs = new Map<string, ImageGenerationJob>();
 let activeCredentialStore: CredentialStore | undefined;
 
 export function setAiJobManagerCredentialStore(store?: CredentialStore | undefined): void {
@@ -32,13 +43,15 @@ function getAiStorageDir(): string {
   return join(userDataDir, 'ai_generations');
 }
 
-export async function ensureAiDirectories(): Promise<{ videoDir: string; speechDir: string }> {
+export async function ensureAiDirectories(): Promise<{ videoDir: string; speechDir: string; imageDir: string }> {
   const baseDir = getAiStorageDir();
   const videoDir = join(baseDir, 'video');
   const speechDir = join(baseDir, 'speech');
+  const imageDir = join(baseDir, 'image');
   await mkdir(videoDir, { recursive: true });
   await mkdir(speechDir, { recursive: true });
-  return { videoDir, speechDir };
+  await mkdir(imageDir, { recursive: true });
+  return { videoDir, speechDir, imageDir };
 }
 
 type CloudProviderResult =
@@ -62,6 +75,24 @@ const VIDEO_MODEL_PROVIDERS: Record<string, { seam: VideoGenerationProviderId; c
   kling: { seam: 'kling_v3', credentialKey: 'klingApiKey' },
   luma: { seam: 'luma_dream', credentialKey: 'lumaApiKey' },
   minimax_hailuo: { seam: 'minimax_hailuo', credentialKey: 'minimax' }
+};
+
+const IMAGE_PROVIDER_LABELS: Record<ImageGenerationProviderId, string> = {
+  openai_images: 'OpenAI Images',
+  google_imagen: 'Google Imagen',
+  byteplus_seedream: 'BytePlus Seedream',
+  stability_image: 'Stability AI',
+  flux_image: 'Black Forest Labs',
+  alibaba_wan_image: 'Alibaba Wan'
+};
+
+const IMAGE_MODEL_PROVIDERS: Record<string, { seam: ImageGenerationProviderId; credentialKey: string }> = {
+  openai: { seam: 'openai_images', credentialKey: 'openaiApiKey' },
+  google_gemini: { seam: 'google_imagen', credentialKey: 'geminiApiKey' },
+  byteplus: { seam: 'byteplus_seedream', credentialKey: 'bytePlusApiKey' },
+  stability: { seam: 'stability_image', credentialKey: 'stabilityApiKey' },
+  black_forest_labs: { seam: 'flux_image', credentialKey: 'blackForestLabsApiKey' },
+  alibaba_dashscope: { seam: 'alibaba_wan_image', credentialKey: 'dashscopeApiKey' }
 };
 
 const SPEECH_MODEL_PROVIDERS: Record<string, { seam: TextToSpeechJob['provider']; credentialKey: string; label: string }> = {
@@ -130,9 +161,46 @@ async function invokeCloudSpeechProvider(
   }
 }
 
+type CloudImageResult =
+  | { readonly ok: true; readonly image: GeneratedImage }
+  | { readonly ok: false; readonly error: string };
+
+async function invokeCloudImageProvider(
+  model: AiDomainModelConfig,
+  apiKey: string,
+  request: ImageGenerationRequest
+): Promise<CloudImageResult> {
+  const synthesisInput = {
+    apiKey,
+    modelId: model.id,
+    prompt: request.prompt,
+    aspectRatio: request.aspectRatio ?? ('1:1' as const),
+    ...(request.negativePrompt === undefined ? {} : { negativePrompt: request.negativePrompt }),
+    ...(request.referenceImage === undefined ? {} : { referenceImage: request.referenceImage })
+  };
+  try {
+    let image: GeneratedImage;
+    if (model.providerId === 'openai') {
+      image = await generateOpenAiImage(synthesisInput);
+    } else if (model.providerId === 'google_gemini') {
+      image = await generateImagenImage(synthesisInput);
+    } else if (model.providerId === 'byteplus') {
+      image = await generateBytePlusImage(synthesisInput);
+    } else {
+      return {
+        ok: false,
+        error: `${model.providerLabel} image generation adapter is not implemented in this build.`
+      };
+    }
+    return { ok: true, image };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Cloud image generation failed.' };
+  }
+}
+
 /** Media generation is cloud-only: every selectable model runs against a provider API. */
 function resolveGenerationModel(
-  domain: 'voice-generation' | 'video-generation',
+  domain: 'voice-generation' | 'video-generation' | 'image-generation',
   requestedModelId: string | undefined
 ): AiDomainModelConfig {
   const modelId = requestedModelId ?? getDefaultDomainModelId(domain);
@@ -212,6 +280,98 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
 
 export function getVideoGenerationJob(jobId: string): VideoGenerationJob | null {
   return videoJobs.get(jobId) ?? null;
+}
+
+export async function createImageGenerationJob(request: ImageGenerationRequest): Promise<ImageGenerationJob> {
+  const model = resolveGenerationModel('image-generation', request.modelId);
+  const providerMapping = IMAGE_MODEL_PROVIDERS[model.providerId];
+  const provider: ImageGenerationProviderId = providerMapping?.seam ?? 'openai_images';
+  const { imageDir } = await ensureAiDirectories();
+  const id = `image-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const now = new Date().toISOString();
+
+  const job: ImageGenerationJob = {
+    id,
+    provider,
+    mode: 'api',
+    status: 'queued',
+    prompt: request.prompt,
+    aspectRatio: request.aspectRatio ?? '1:1',
+    modelId: model.id,
+    ...(request.stylePreset === undefined ? {} : { stylePreset: request.stylePreset }),
+    ...(request.negativePrompt === undefined ? {} : { negativePrompt: request.negativePrompt }),
+    createdAt: now,
+    updatedAt: now
+  };
+
+  imageJobs.set(id, job);
+
+  setTimeout(async () => {
+    const running: ImageGenerationJob = { ...job, status: 'running', updatedAt: new Date().toISOString() };
+    imageJobs.set(id, running);
+    try {
+      let apiKey = request.apiKey?.trim();
+      if ((apiKey === undefined || apiKey.length === 0) && activeCredentialStore) {
+        apiKey = await activeCredentialStore.getCredentialValue(providerMapping?.credentialKey ?? 'openaiApiKey');
+      }
+      if (apiKey === undefined || apiKey.length === 0) {
+        throw new Error(
+          `API key is required for ${IMAGE_PROVIDER_LABELS[provider]} image generation. Connect the provider in Settings first.`
+        );
+      }
+
+      const result = await invokeCloudImageProvider(model, apiKey, request);
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+
+      const outputFilePath = join(imageDir, `${id}.${imageExtensionFor(result.image.mimeType)}`);
+      await writeFile(outputFilePath, result.image.bytes);
+
+      imageJobs.set(id, {
+        ...running,
+        status: 'completed',
+        outputFilePath,
+        providerJobId: result.image.providerJobId,
+        // Carried inline so the studio can show the result without ever
+        // learning a filesystem path.
+        previewMimeType: result.image.mimeType,
+        previewBase64: result.image.bytes.toString('base64'),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      imageJobs.set(id, {
+        ...running,
+        status: 'failed',
+        error: err instanceof Error ? err.message : 'Image generation failed',
+        updatedAt: new Date().toISOString()
+      });
+    }
+  }, 0);
+
+  return job;
+}
+
+export function getImageGenerationJob(jobId: string): ImageGenerationJob | null {
+  return imageJobs.get(jobId) ?? null;
+}
+
+/**
+ * A finished image, handed back as bytes for use as a video reference. The
+ * renderer gets the same inline shape a picked file would produce, so image-to
+ * -video does not care whether the seed was generated or chosen from disk.
+ */
+export function getGeneratedImageAsReference(
+  jobId: string
+): { readonly displayName: string; readonly mimeType: string; readonly base64: string } | null {
+  const job = imageJobs.get(jobId);
+  if (job === undefined || job.status !== 'completed' || job.previewBase64 === undefined) return null;
+  const mimeType = job.previewMimeType ?? 'image/png';
+  return {
+    displayName: `AI_Image_${job.id.slice(-6)}.${imageExtensionFor(mimeType)}`,
+    mimeType,
+    base64: job.previewBase64
+  };
 }
 
 export async function createSpeechGenerationJob(request: TextToSpeechRequest): Promise<TextToSpeechJob> {

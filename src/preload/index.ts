@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc';
 import type { UpdaterState } from '../shared/updater';
 import type { ExportJobActionInput, LocalExportJob, LocalFfmpegRuntimeStatus, StartExportJobInput } from '../shared/exportTypes';
-import type { ReferenceImageSelection, TextToSpeechJob, TextToSpeechRequest, VideoGenerationJob, VideoGenerationRequest } from '../shared/providerSeams';
+import type { ImageGenerationJob, ImageGenerationRequest, ReferenceImageSelection, TextToSpeechJob, TextToSpeechRequest, VideoGenerationJob, VideoGenerationRequest } from '../shared/providerSeams';
 import type {
   AbortRecordingInput,
   ApiResponse,
@@ -117,6 +117,10 @@ export interface VideoToolApi {
   agentChatHistoryList(): Promise<ApiResponse<readonly AgentChatHistoryEntry[]>>;
   agentChatHistoryGet(input: AgentChatHistoryGetInput): Promise<ApiResponse<AgentChatStoredConversation | null>>;
   agentChatHistoryDelete(input: AgentChatHistoryGetInput): Promise<ApiResponse<boolean>>;
+  aiGenerateImage(request: ImageGenerationRequest): Promise<ApiResponse<ImageGenerationJob>>;
+  aiGetImageJob(jobId: string): Promise<ApiResponse<ImageGenerationJob>>;
+  aiUseImageAsVideoReference(jobId: string): Promise<ApiResponse<ReferenceImageSelection>>;
+  aiSaveImageResult(jobId: string): Promise<ApiResponse<{ readonly saved: boolean }>>;
   onUpdaterStateChanged(listener: (snapshot: UpdaterSnapshot) => void): () => void;
   getUpdaterState(): Promise<ApiResponse<UpdaterSnapshot>>;
   checkForUpdates(): Promise<ApiResponse<UpdaterSnapshot>>;
@@ -230,6 +234,13 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryGet, input) as Promise<ApiResponse<AgentChatStoredConversation | null>>,
   agentChatHistoryDelete: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.agentChatHistoryDelete, input) as Promise<ApiResponse<boolean>>,
+  aiGenerateImage: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiGenerateImage, request) as Promise<ApiResponse<ImageGenerationJob>>,
+  aiGetImageJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetImageJob, jobId) as Promise<ApiResponse<ImageGenerationJob>>,
+  aiUseImageAsVideoReference: (jobId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiUseImageAsVideoReference, jobId) as Promise<ApiResponse<ReferenceImageSelection>>,
+  aiSaveImageResult: (jobId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiSaveImageResult, jobId) as Promise<ApiResponse<{ readonly saved: boolean }>>,
   onUpdaterStateChanged: (listener) => {
     const subscription = (_event: IpcRendererEvent, payload: unknown): void => {
       const snapshot = parseUpdaterSnapshot(payload);

@@ -1,6 +1,6 @@
 import { LLM_CATALOG } from './llmCatalog.generated';
 
-export type AiDomain = 'voice-generation' | 'video-generation' | 'edit-agent';
+export type AiDomain = 'voice-generation' | 'video-generation' | 'image-generation' | 'edit-agent';
 
 export type AiDomainProvider = {
   readonly id: string;
@@ -15,7 +15,11 @@ export const AI_DOMAIN_PROVIDERS: readonly AiDomainProvider[] = [
   { id: 'google_gemini', label: 'Google Gemini', executionPath: 'api' },
   { id: 'deepseek', label: 'DeepSeek', executionPath: 'api' },
   { id: 'gemini', label: 'Google Gemini', executionPath: 'api' },
-  { id: 'elevenlabs', label: 'ElevenLabs', executionPath: 'api' }
+  { id: 'elevenlabs', label: 'ElevenLabs', executionPath: 'api' },
+  { id: 'byteplus', label: 'BytePlus ModelArk', executionPath: 'api' },
+  { id: 'stability', label: 'Stability AI', executionPath: 'api' },
+  { id: 'black_forest_labs', label: 'Black Forest Labs', executionPath: 'api' },
+  { id: 'alibaba_dashscope', label: 'Alibaba DashScope', executionPath: 'api' }
 ] as const;
 
 export type AiDomainModelConfig = {
@@ -317,10 +321,137 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
         domains: ['edit-agent'],
         available: true
       }))
-  )
+  ),
+  // ── Image generation: cloud models. OpenAI Images, Google Imagen, and BytePlus
+  // Seedream adapters are implemented; the rest stay honestly unavailable so the
+  // picker never offers a model that would fail after the user hits Generate.
+  {
+    id: 'gpt-image-1',
+    providerId: 'openai',
+    label: 'GPT Image 1',
+    providerLabel: 'OpenAI Images',
+    description: 'OpenAI image model with strong prompt adherence and text rendering.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true
+  },
+  {
+    id: 'dall-e-3',
+    providerId: 'openai',
+    label: 'DALL-E 3',
+    providerLabel: 'OpenAI Images',
+    description: 'Previous-generation OpenAI image model.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true
+  },
+  {
+    id: 'imagen-4.0-generate-001',
+    providerId: 'google_gemini',
+    label: 'Imagen 4',
+    providerLabel: 'Google Imagen',
+    description: 'Google photorealistic image generation with native aspect ratios.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true
+  },
+  {
+    id: 'imagen-4.0-ultra-generate-001',
+    providerId: 'google_gemini',
+    label: 'Imagen 4 Ultra',
+    providerLabel: 'Google Imagen',
+    description: 'Highest-fidelity Imagen tier, one image per request.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true
+  },
+  {
+    id: 'imagen-3.0-generate-002',
+    providerId: 'google_gemini',
+    label: 'Imagen 3',
+    providerLabel: 'Google Imagen',
+    description: 'Previous-generation Imagen model.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true
+  },
+  {
+    id: 'seedream-4-0-250828',
+    providerId: 'byteplus',
+    label: 'Seedream 4.0',
+    providerLabel: 'BytePlus Seedream',
+    description: 'ByteDance Seedream text-to-image and image editing, up to 4K.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true
+  },
+  {
+    id: 'seedream-3-0-t2i-250415',
+    providerId: 'byteplus',
+    label: 'Seedream 3.0',
+    providerLabel: 'BytePlus Seedream',
+    description: 'Seedream 3.0 text-to-image with strong Chinese and English typography.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true
+  },
+  {
+    id: 'seededit-3-0-i2i-250628',
+    providerId: 'byteplus',
+    label: 'SeedEdit 3.0',
+    providerLabel: 'BytePlus Seedream',
+    description: 'Instruction-driven image editing over a reference image.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true
+  },
+  {
+    id: 'stable-image-ultra',
+    providerId: 'stability',
+    label: 'Stable Image Ultra',
+    providerLabel: 'Stability AI',
+    description: 'Stability flagship text-to-image.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: false,
+    unavailableReason: 'Stability AI adapter is not implemented in this build.'
+  },
+  {
+    id: 'flux-pro-1.1',
+    providerId: 'black_forest_labs',
+    label: 'FLUX 1.1 Pro',
+    providerLabel: 'Black Forest Labs',
+    description: 'FLUX text-to-image with high prompt fidelity.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: false,
+    unavailableReason: 'Black Forest Labs adapter is not implemented in this build.'
+  },
+  {
+    id: 'wan2.2-t2i-flash',
+    providerId: 'alibaba_dashscope',
+    label: 'Wan 2.2 T2I Flash',
+    providerLabel: 'Alibaba Wan',
+    description: 'Alibaba Wan text-to-image over DashScope.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: false,
+    unavailableReason: 'Alibaba DashScope adapter is not implemented in this build.'
+  },
+  {
+    id: 'qwen-image',
+    providerId: 'alibaba_dashscope',
+    label: 'Qwen-Image',
+    providerLabel: 'Alibaba Qwen',
+    description: 'Qwen image generation with Chinese text rendering.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: false,
+    unavailableReason: 'Alibaba DashScope adapter is not implemented in this build.'
+  }
 ];
 
-const AI_DOMAINS: readonly AiDomain[] = ['voice-generation', 'video-generation', 'edit-agent'];
+const AI_DOMAINS: readonly AiDomain[] = ['voice-generation', 'video-generation', 'image-generation', 'edit-agent'];
 
 export function formatAiModelOptionLabel(model: AiDomainModelConfig): string {
   const isZen = model.id === 'qwen2.5-coder';

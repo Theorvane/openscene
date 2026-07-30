@@ -10,6 +10,7 @@ import { Tabs } from './ui';
 import { closeProjectTab, openProjectTab, pruneProjectTabs, type ProjectTab } from './projectTabs';
 import { ProjectSettingsDialog } from './ProjectSettingsDialog';
 import { NarrationPanel } from './NarrationPanel';
+import { ImageGenerationWorkspace } from './ImageGenerationWorkspace';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
 import {
   WORKSPACE_TAB_IDS,
@@ -368,6 +369,16 @@ export function App(): ReactElement {
                 tabIndex={-1}
               >
                 <VideoGenerationWorkspace />
+              </section>
+              <section
+                aria-label={WORKSPACE_TAB_LABELS.image}
+                className="workspace-studio-panel"
+                hidden={workspaceTabId !== 'image' || !workspaceIsVisible}
+                role="region"
+                style={APP_WORKSPACE_PANEL_STYLE}
+                tabIndex={-1}
+              >
+                <ImageGenerationWorkspace />
               </section>
             </div>
           </div>

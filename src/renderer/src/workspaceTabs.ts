@@ -1,11 +1,14 @@
 /**
- * The workspace area shows one of three surfaces, chosen by the tab strip in
- * its top-left corner: the timeline editor, or the voice and video generation
- * studios. They are tabs rather than pages so producing a clip and placing it
- * on the timeline never leaves the workspace, and the Edit Agent chat stays
- * open beside all three.
+ * The workspace area shows one of four surfaces, chosen by the tab strip in its
+ * top-left corner: the timeline editor, or the voice, video, and image
+ * generation studios. They are tabs rather than pages so producing a clip and
+ * placing it on the timeline never leaves the workspace, and the Edit Agent chat
+ * stays open beside all of them.
+ *
+ * Image sits last because it feeds the others: a generated still is most often
+ * the seed for image-to-video rather than an end in itself.
  */
-export const WORKSPACE_TAB_IDS = ['edit', 'voice', 'video'] as const;
+export const WORKSPACE_TAB_IDS = ['edit', 'voice', 'video', 'image'] as const;
 
 export type WorkspaceTabId = (typeof WORKSPACE_TAB_IDS)[number];
 
@@ -15,7 +18,8 @@ export const WORKSPACE_DEFAULT_TAB_ID: WorkspaceTabId = 'edit';
 export const WORKSPACE_TAB_LABELS: Readonly<Record<WorkspaceTabId, string>> = {
   edit: 'Editing',
   voice: 'Voice Generation',
-  video: 'Video Generation'
+  video: 'Video Generation',
+  image: 'Image Generation'
 };
 
 export function isWorkspaceTabId(value: unknown): value is WorkspaceTabId {

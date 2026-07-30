@@ -1,6 +1,7 @@
 import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, session, shell, systemPreferences } from 'electron';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { copyFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
 
 import { AssetLibraryStore } from './assetLibraryStore';
 import type { AppSettings, CaptureSource } from '../shared/models';
@@ -26,7 +27,7 @@ import { fail, ok } from './ipcResponses';
 import { IPC_CHANNELS } from '../shared/ipc';
 import { installApplicationMenu } from './applicationMenu';
 
-import { createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getSpeechGenerationJob, getVideoGenerationJob, setAiJobManagerCredentialStore } from './aiJobManager';
+import { createImageGenerationJob, createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getGeneratedImageAsReference, getImageGenerationJob, getSpeechGenerationJob, getVideoGenerationJob, setAiJobManagerCredentialStore } from './aiJobManager';
 import { CredentialStore } from './credentialStore';
 import { LlmExecutionAdapter } from './llmAdapter';
 import { getOpenVideoMcpDefinition, OpenVideoMcpServer } from './openVideoMcpServer';
@@ -290,6 +291,53 @@ async function installIpcHandlers(): Promise<void> {
       return fail('JOB_NOT_FOUND', 'Video generation job was not found.');
     }
     return ok(job);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.aiGenerateImage, async (_event, request) => {
+    try {
+      const job = await createImageGenerationJob(request);
+      return ok(job);
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to create image job');
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.aiGetImageJob, async (_event, jobId: string) => {
+    const job = getImageGenerationJob(jobId);
+    if (job === null) {
+      return fail('JOB_NOT_FOUND', 'Image generation job was not found.');
+    }
+    return ok(job);
+  });
+
+  // Hands a generated still back in the same inline shape the file picker
+  // produces, so image-to-video does not care where the seed came from.
+  ipcMain.handle(IPC_CHANNELS.aiUseImageAsVideoReference, async (_event, jobId: string) => {
+    const reference = getGeneratedImageAsReference(jobId);
+    if (reference === null) {
+      return fail('JOB_NOT_FOUND', 'No completed image is available for that job.');
+    }
+    return ok(reference);
+  });
+
+  // The only route a generated image has out of the app until the timeline
+  // learns about stills: the user picks the destination, main writes the bytes.
+  ipcMain.handle(IPC_CHANNELS.aiSaveImageResult, async (_event, jobId: string) => {
+    const job = getImageGenerationJob(jobId);
+    if (job === null || job.status !== 'completed' || job.outputFilePath === undefined) {
+      return fail('JOB_NOT_FOUND', 'No completed image is available for that job.');
+    }
+    const suggested = `AI_Image_${job.id.slice(-6)}${extname(job.outputFilePath)}`;
+    const choice = await dialog.showSaveDialog({ title: 'Save generated image', defaultPath: suggested });
+    if (choice.canceled || choice.filePath === undefined || choice.filePath.length === 0) {
+      return ok({ saved: false });
+    }
+    try {
+      await copyFile(job.outputFilePath, choice.filePath);
+      return ok({ saved: true });
+    } catch (err) {
+      return fail('FILE_WRITE_FAILED', err instanceof Error ? err.message : 'The image could not be saved.');
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.aiGenerateSpeech, async (_event, request) => {

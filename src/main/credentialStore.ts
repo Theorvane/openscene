@@ -20,7 +20,8 @@ const ALWAYS_REPORTED_CREDENTIAL_KEYS = [
   'elevenlabsApiKey',
   'runwayApiKey',
   'klingApiKey',
-  'lumaApiKey'
+  'lumaApiKey',
+  'bytePlusApiKey'
 ] as const;
 
 export class CredentialStore {

@@ -49,6 +49,7 @@ describe('AI domain model catalog', () => {
     ).toEqual({
       'voice-generation': 'eleven_v3',
       'video-generation': 'veo-3.1-generate-preview',
+      'image-generation': 'gpt-image-1',
       'edit-agent': 'qwen2.5-coder'
     });
   });
@@ -69,6 +70,7 @@ describe('AI domain model catalog', () => {
     expect(parseAiDomainModelPreferences(null)).toEqual({
       'voice-generation': 'eleven_v3',
       'video-generation': 'veo-3.1-generate-preview',
+      'image-generation': 'gpt-image-1',
       'edit-agent': 'qwen2.5-coder'
     });
   });
