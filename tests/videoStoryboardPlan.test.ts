@@ -128,3 +128,24 @@ describe('one shot-length table', () => {
     expect(ui).not.toMatch(/return \[4, 8, 12\]/);
   });
 });
+
+describe('the adapter reads the same table', () => {
+  it('derives Sora shot lengths from supportedShotSeconds instead of a second literal', () => {
+    // Given
+    const adapters = readFileSync(resolve(process.cwd(), 'src/main/mediaGenerationAdapters.ts'), 'utf8');
+
+    // Then
+    // A length the table knows and the adapter does not would be snapped to a
+    // different duration than the one the user was quoted and approved.
+    expect(adapters).toContain("supportedShotSeconds('openai')");
+    expect(adapters).not.toMatch(/SORA_ALLOWED_SECONDS = \[4, 8, 12\]/);
+  });
+
+  it('keeps snapping to a legal length', async () => {
+    const { snapSoraSeconds, SORA_ALLOWED_SECONDS } = await import('../src/main/mediaGenerationAdapters');
+    expect([...SORA_ALLOWED_SECONDS]).toEqual([...supportedShotSeconds('openai')]);
+    for (const requested of [1, 5, 7, 11, 30]) {
+      expect(SORA_ALLOWED_SECONDS).toContain(snapSoraSeconds(requested));
+    }
+  });
+});

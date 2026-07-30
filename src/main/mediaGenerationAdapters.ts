@@ -5,6 +5,8 @@
  * never echo key material and keep provider detail short.
  */
 
+import { supportedShotSeconds } from '../shared/videoStoryboardPlan';
+
 type FetchLike = typeof fetch;
 
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -98,7 +100,13 @@ export type GeneratedVideo = {
 };
 
 /** Sora only accepts these clip lengths; requests snap to the nearest one. */
-export const SORA_ALLOWED_SECONDS = [4, 8, 12] as const;
+/**
+ * Sora takes a discrete set of lengths, so a request has to land on one of them.
+ * The numbers come from the shared table rather than a second literal: a length
+ * the table knows and the adapter does not would be silently snapped to a
+ * different duration than the one the user was quoted and approved.
+ */
+export const SORA_ALLOWED_SECONDS: readonly number[] = supportedShotSeconds('openai');
 
 export function snapSoraSeconds(requested: number): number {
   return SORA_ALLOWED_SECONDS.reduce((best, candidate) =>
