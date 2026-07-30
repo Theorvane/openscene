@@ -218,3 +218,16 @@ describe('timeline fills its panel', () => {
     expect(source).toContain("flex: '1 1 auto'");
   });
 });
+
+describe('flex column hazards', () => {
+  it('stops the ruler and track rows from being shrunk by the flex column', () => {
+    // Given
+    const source = readFileSync(resolve(process.cwd(), 'src/renderer/src/editor/TimelineCanvas.tsx'), 'utf8');
+
+    // Then
+    // Flex children shrink by default where grid rows did not. The lane inside
+    // each row has min-height 72px, so a shrunk row lets the lane overflow and
+    // paint its background across the clips on the row below.
+    expect(source.match(/flexShrink: 0/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+});

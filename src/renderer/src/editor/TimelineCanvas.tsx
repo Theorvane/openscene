@@ -505,6 +505,9 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                 gridTemplateColumns: TRACK_GRID_TEMPLATE,
                 gap: 0,
                 height: '20px',
+                // Flex children shrink by default. In the old grid this row
+                // could not be squashed; without this the ruler collapses.
+                flexShrink: 0,
                 position: 'relative',
                 overflow: 'visible',
                 padding: 0,
@@ -646,6 +649,10 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                 style={{
                   gridTemplateColumns: TRACK_GRID_TEMPLATE,
                   minHeight: trackMinHeight(track.kind),
+                  // The lane inside is min-height 72px. Let the row shrink and
+                  // the lane overflows it, painting its background over the
+                  // clips on the row below.
+                  flexShrink: 0,
                   opacity: mutedTracks[track.id] ? 0.55 : 1
                 }}
               >
@@ -816,7 +823,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
 
             {/* Adding a track was previously reachable only from the native
                 application menu, which is not where anyone looks for it. */}
-            <div className="timeline-track" style={{ gridTemplateColumns: TRACK_GRID_TEMPLATE, minHeight: '30px' }}>
+            <div className="timeline-track" style={{ gridTemplateColumns: TRACK_GRID_TEMPLATE, minHeight: '30px', flexShrink: 0 }}>
               <div className="timeline-track__label" style={{ display: 'flex', gap: '4px', alignItems: 'center', padding: 'var(--space-2)' }}>
                 <span style={{ fontSize: 'var(--text-micro)', color: 'var(--text-weaker)', marginRight: '2px' }}>Add</span>
                 <button
@@ -838,7 +845,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                   <span aria-hidden="true">+</span> Audio
                 </button>
               </div>
-              <div className="timeline-track__lane" />
+              <div className="timeline-track__lane" style={{ minHeight: 0, background: 'transparent' }} />
             </div>
 
             {/* Takes the remaining height so the timeline fills its panel.
