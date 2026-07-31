@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/openvideo-hero.png" alt="OpenScene: the wordmark beside a dark editor window showing a timeline and an agent chat that has trimmed a clip, added another, and is asking permission to export" width="100%" />
+  <img src="docs/assets/openscene-hero.png" alt="OpenScene: the wordmark beside a dark editor window showing a timeline and an agent chat that has trimmed a clip, added another, and is asking permission to export" width="100%" />
 </p>
 
 <h1 align="center">OpenScene</h1>
@@ -12,6 +12,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#the-workspace">The workspace</a> ·
   <a href="#the-edit-agent">Edit Agent</a> ·
+  <a href="#on-a-phone">Mobile</a> ·
   <a href="#providers-and-models">Providers</a> ·
   <a href="#where-your-data-lives">Your data</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
@@ -24,11 +25,13 @@
 </p>
 
 > [!IMPORTANT]
-> **Pre-release.** OpenScene runs from source. There is no packaged installer or auto-update yet. The hero and screenshots below show the real interface.
+> **Early.** There are signed installers on the [releases page](https://github.com/Theorvane/openscene/releases) for macOS, Windows and Linux, and the app updates itself once installed. Running from source is still the fastest way to follow `dev`. The hero and screenshots below show the real interface.
+>
+> The desktop app was called **OpenVideo** through 0.2.0. Because the rename changes the application id, an existing OpenVideo install will not update itself to OpenScene — download 0.3.0 once and the old one can be removed.
 
 ## What is OpenScene?
 
-OpenScene is an open-source Electron app for editing video on your own machine. You open a folder as a project, put clips on a timeline, and export an MP4 with your local FFmpeg.
+OpenScene is an open-source video editor for your own machine — an Electron desktop app, and a React Native app that shares its editing core rather than approximating it. You open a folder as a project, put clips on a timeline, and export an MP4 with your local FFmpeg.
 
 What makes it different is the **Edit Agent**: a chat panel that sits beside the timeline and can actually operate the editor — read the timeline, add and trim clips, generate voice or video, and start an export. It asks for approval before anything that changes your project.
 
@@ -65,6 +68,10 @@ Prompt with a style, aspect ratio, and duration — and optionally a reference i
 
 ![The Video Generation studio with style, aspect ratio, duration, and reference image controls](docs/assets/screenshot-video.png)
 
+### Image generation
+
+Stills from a prompt, at the aspect ratio you need — and a seed for image-to-video on the engines that accept one.
+
 ## The Edit Agent
 
 The chat panel is not a copilot that writes suggestions for you to apply. It calls the same operations the UI does, through a typed tool surface in the main process:
@@ -82,6 +89,33 @@ Anything that writes to your project or starts a job pauses for approval first. 
 
 Conversations are kept per project as sessions: start a new one, switch back to an earlier one, or delete it. History is stored in a path-free `chats.json` inside the project folder.
 
+## On a phone
+
+`mobile/` is a React Native app that runs **the same editing rules as the desktop**. Every timeline
+operation — placing, trimming, splitting, moving, what plays at a given moment, what an export
+composites — is a pure function in `src/shared/`, imported by both. Neither reimplements a rule, which
+is what stops a project behaving one way on a laptop and another on a phone.
+
+Projects live inside the app rather than in a folder you file away, because a phone user has no
+filesystem they think in. Export hands you the finished MP4 through the share sheet.
+
+- A timeline with a preview, playback, pinch-to-zoom, draggable clips and trim handles, and a media bin
+- Video, image and voice generation against the same provider catalog, with any OpenAI-compatible
+  endpoint addable yourself
+- A tool-calling assistant that shows every call for approval before it runs
+- Spending permission asked **per kind** — allowing every image is a different decision from allowing
+  every video, and they do not cost the same
+- Multi-shot video that continues each shot from the last frame of the one before
+
+Export renders natively with AVFoundation on iOS. **On Android it is not implemented yet and says
+so** — editing, generation and frame extraction all work there; only the render does not.
+
+```bash
+cd mobile
+npm install
+npx expo run:ios     # or: npx expo run:android
+```
+
 ## Providers and models
 
 The provider and model registry is generated from a snapshot of the [models.dev](https://models.dev) catalog — roughly 150 providers and several thousand models — and is regenerated with `scripts/generateLlmCatalog.mjs`.
@@ -89,7 +123,7 @@ The provider and model registry is generated from a snapshot of the [models.dev]
 - **Local**: [Ollama](https://ollama.com) runs models on your machine with no key and no account.
 - **Cloud chat**: connect a provider in *Settings → Providers* with an API key. Only connected providers' models appear in the pickers.
 - **OpenAI**: two login methods on one provider — an API key, or a ChatGPT sign-in (PKCE OAuth) for the model set that backend serves. Tokens stay in main-process safe storage; the renderer only learns whether you are connected.
-- **Generation**: ElevenLabs and OpenAI for speech; Google Veo and OpenAI Sora for video. Providers without a real adapter stay listed but honestly unavailable rather than pretending to work.
+- **Generation**: 17 runnable video models across Google Veo, OpenAI Sora, Runway and Luma — Runway alone fronts Seedance, Veo 3.1, HappyHorse and Gemini Omni Flash on one key. Eight image models and seven voices. Providers without a real adapter stay listed but honestly unavailable rather than pretending to work, and every model says which it is.
 
 API keys are written to Electron `safeStorage` in the main process and never reach the renderer.
 
@@ -105,7 +139,7 @@ API keys are written to Electron `safeStorage` in the main process and never rea
 
 ```bash
 git clone https://github.com/Theorvane/openscene.git
-cd openvideo
+cd openscene
 npm install
 npm run dev
 ```
@@ -147,8 +181,9 @@ The renderer talks to the main process through a narrow typed `window.videoTool`
 | Works today | Not yet |
 | --- | --- |
 | Selected-window capture to local WebM | Full-screen capture; mic or system-audio mix in the recorder |
-| Local projects, media, timeline editing, undo/redo | Cloud sync, hosted rendering, accounts, auto-update |
+| Local projects, media, timeline editing, undo/redo | A published mobile build — the app exists, the store listing does not |
 | Local H.264/AAC MP4 export | Other export formats; frame-perfect multitrack mastering guarantees |
+| Signed installers and auto-update on all three desktop platforms | Cloud sync, hosted rendering, accounts |
 | Agent-driven editing, generation, and export | Unattended operation — changes ask for approval |
 | Veo image-to-video via a reference image | Sora reference images (needs a multipart upload path this build does not send) |
 
