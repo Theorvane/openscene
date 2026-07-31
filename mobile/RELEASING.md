@@ -58,14 +58,20 @@ OPENSCENE_KEY_PASSWORD=…
 build falls back to the debug key, so a local build still works for testing and
 only a real submission needs the keystore.
 
-## App Store Connect automation
+## Store distribution on main releases
 
-The manually triggered **iOS App Store Connect** workflow builds an IPA and
-uploads it to App Store Connect. It never submits an app for review: that
-remains an explicit App Store Connect action after build processing and metadata
-review.
+The **release** workflow is the only store-distribution trigger. It runs when
+an unreleased version is promoted to `main`, after the release verification and
+desktop packaging jobs finish. It calls the iOS and Android distribution
+workflows; they cannot be run manually. A push to `main` with an already tagged
+version skips all release and store-distribution work.
 
-Create the `app-store-production` GitHub Environment, restrict it to the `dev`
+The iOS job builds an IPA and uploads it to App Store Connect. It never submits
+an app for review: that remains an explicit App Store Connect action after build
+processing and metadata review. The Android job uploads the signed AAB to the
+Google Play **production** track with status `completed`.
+
+Create the `app-store-production` GitHub Environment, restrict it to the `main`
 branch, and require a reviewer before deploying. Store the following values as
 environment configuration (not in the repository):
 
@@ -83,13 +89,8 @@ commit any of these files or their decoded values.
 
 ### Google Play automation
 
-The manually triggered **Android Google Play** workflow builds a signed Android
-App Bundle (AAB) and uploads it to the explicitly selected Play track. It
-defaults to an `internal` track `draft`; selecting `production` and `completed`
-is a deliberate release decision made at dispatch time.
-
 Create the `play-store-production` GitHub Environment, restrict it to the
-`dev` branch, and require a reviewer before deploying. Store the following
+`main` branch, and require a reviewer before deploying. Store the following
 values as environment configuration (not in the repository):
 
 - Variable: `ANDROID_PACKAGE_NAME` (`com.sloki9637.openscene`).

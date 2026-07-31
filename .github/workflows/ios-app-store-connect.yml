@@ -1,7 +1,7 @@
 name: iOS App Store Connect
 
 on:
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

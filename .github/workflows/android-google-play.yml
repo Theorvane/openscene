@@ -1,24 +1,14 @@
 name: Android Google Play
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       track:
-        description: Google Play track to receive the release
-        type: choice
+        type: string
         required: true
-        default: internal
-        options:
-          - internal
-          - production
       release_status:
-        description: Publish state for the selected track
-        type: choice
+        type: string
         required: true
-        default: draft
-        options:
-          - draft
-          - completed
 
 permissions:
   contents: read

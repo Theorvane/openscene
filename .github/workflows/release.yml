@@ -136,8 +136,23 @@ jobs:
             dist/*.blockmap
           if-no-files-found: error
 
-  release:
+  app-store-connect:
     needs: [check, build]
+    if: needs.check.outputs.already-released == 'false'
+    uses: ./.github/workflows/ios-app-store-connect.yml
+    secrets: inherit
+
+  google-play:
+    needs: [check, build]
+    if: needs.check.outputs.already-released == 'false'
+    uses: ./.github/workflows/android-google-play.yml
+    with:
+      track: production
+      release_status: completed
+    secrets: inherit
+
+  release:
+    needs: [check, build, app-store-connect, google-play]
     if: needs.check.outputs.already-released == 'false'
     runs-on: ubuntu-latest
     steps:
