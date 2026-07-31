@@ -1,14 +1,26 @@
 {
   "expo": {
     "name": "OpenScene",
-    "slug": "mobile",
+    "slug": "openscene",
     "version": "0.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "scheme": "openscene",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#101014",
+    "primaryColor": "#A690FF",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "tech.theorvane.openscene"
+      "bundleIdentifier": "com.sloki9637.openscene",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "OpenScene reads the videos you pick so you can put them on a timeline. It copies the ones you choose into the project and never scans your library on its own.",
+        "NSPhotoLibraryAddUsageDescription": "OpenScene saves a finished export to your photo library when you ask it to.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,15 +30,41 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "tech.theorvane.openscene"
+      "package": "com.sloki9637.openscene",
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-system-ui",
       "expo-secure-store",
       "expo-video",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "OpenScene reads the videos you pick so you can put them on a timeline."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "OpenScene saves a finished export to your photo library when you ask it to.",
+          "photosPermission": "OpenScene reads the videos you pick so you can put them on a timeline.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      "./plugins/withReleaseSigning"
     ]
   }
 }
