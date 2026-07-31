@@ -71,6 +71,36 @@ migrate what is stored under it, it orphans it:
 - Preserve consent boundaries for voice samples. Samples must be user-owned or authorized, stored locally, and deletable from the app store.
 - When editing docs, use `OpenScene` for the product name and keep compatibility identifiers exactly as written above.
 
+## Two Surfaces, One Core
+
+The desktop app and `mobile/` are two front ends over the same editing rules.
+A feature is not finished on one of them.
+
+- **Put the rule in `src/shared/` first.** Anything that decides an outcome —
+  what a trim does, what plays at a moment, what an export composites, what a
+  model costs — is a pure function there, imported by both. Neither surface
+  reimplements a rule. A project that behaves one way on a laptop and another on
+  a phone is the failure this exists to prevent, and it is discovered by users,
+  not by tests.
+- **Ship the mobile screen in the same pull request.** Not a follow-up issue:
+  a feature that lands on the desktop alone leaves the shared core with a caller
+  on one side only, and the second caller is what proves the seam was drawn in
+  the right place. It has found real mistakes — `NodeJS.Platform` in shared code,
+  and image adapters returning a Node `Buffer` — each caught by the mobile
+  typecheck and by nothing else.
+- **Say so when a surface genuinely cannot have it.** Some things are honestly
+  platform-bound: window capture has no phone equivalent, and Android export is
+  not written yet. Those stay visible and disabled with the reason, in the UI and
+  in the pull request. Silence reads as an oversight; a stated limit reads as a
+  decision.
+- **Verify on both.** `npm run typecheck && npm test && npm run build` at the
+  root, `npm run typecheck` in `mobile/`, and the screen exercised on a
+  development client. The mobile typecheck is not optional — it is the only
+  check that compiles the shared core against a non-Node environment.
+- **Do not reach for a native module to avoid sharing.** Native code is for what
+  only the platform can do — AVFoundation and Media3 for rendering, the keystore
+  for secrets. It is not a place to put a rule that both surfaces need.
+
 ## Agent Skills & TypeMCP Integration
 
 - **Agent Skills Location**: `.agents/skills/api-to-typemcp/SKILL.md` (Integrates `api-to-typemcp` skill for converting OpenAPI/Swagger specifications or API docs into TypeMCP MCP projects).

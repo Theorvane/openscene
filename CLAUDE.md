@@ -30,5 +30,6 @@ npm run build      # Perform typecheck and build Electron main, preload, & rende
 4. Use Conventional Commit format: `type(scope): subject`.
 5. Push branch and open a PR targeting `dev` with `Closes #<issue-number>` in the body.
 6. Verify code using `npm run typecheck && npm test && npm run build` before asking for review or merging.
+7. Implement the mobile screen in the same PR as the desktop one, and run `npm run typecheck` in `mobile/` too. Rules live in `src/shared/`; a surface that genuinely cannot have a feature says so, visibly and with the reason, rather than omitting it. See **Two Surfaces, One Core** in [`AGENTS.md`](./AGENTS.md).
 
 For full architecture details, local security constraints, and public compatibility identifiers, refer directly to [`AGENTS.md`](./AGENTS.md).
