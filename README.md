@@ -19,8 +19,8 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-7c3aed?style=flat-square" /></a>
-  <a href="https://github.com/Theorvane/openvideo/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Theorvane/openvideo/ci.yml?branch=dev&style=flat-square&label=CI" /></a>
-  <a href="https://github.com/Theorvane/openvideo/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/Theorvane/openvideo?style=flat-square" /></a>
+  <a href="https://github.com/Theorvane/openscene/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Theorvane/openscene/ci.yml?branch=dev&style=flat-square&label=CI" /></a>
+  <a href="https://github.com/Theorvane/openscene/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/Theorvane/openscene?style=flat-square" /></a>
 </p>
 
 > [!IMPORTANT]
@@ -104,7 +104,7 @@ API keys are written to Electron `safeStorage` in the main process and never rea
 ### Install and run
 
 ```bash
-git clone https://github.com/Theorvane/openvideo.git
+git clone https://github.com/Theorvane/openscene.git
 cd openvideo
 npm install
 npm run dev
