@@ -126,6 +126,7 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
             meta={row.meta}
             connected={connected[row.slot] === true}
             onChange={() => void refresh()}
+            chatGptSignIn={row.slot === 'openaiApiKey'}
           />
         ))}
         <AddCustomProvider onAdded={refreshCustom} />

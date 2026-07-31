@@ -1,6 +1,7 @@
 import { getLlmProvider, type LlmProviderInfo } from '@openvideo/shared/llmProviders';
 import { readSlot } from './credentials';
 import { customCredentialKey, findCustomProvider, isCustomProviderId } from './customProviders';
+import { chatGptCredentials } from './openAiSignIn';
 
 /**
  * A tool-calling chat turn, spoken directly from the device.
@@ -111,16 +112,27 @@ export async function sendChatTurn(input: {
 
   const credentialKey = custom !== undefined ? customCredentialKey(custom.id) : provider?.credentialKey;
   const apiKey = credentialKey === undefined ? null : await readSlot(credentialKey);
-  if (apiKey === null && (custom !== undefined || provider?.auth === 'api-key')) {
-    return { ok: false, message: `${label} has no key stored — add one in Settings.` };
+
+  // A ChatGPT sign-in is a second way to reach OpenAI, not a replacement: a
+  // stored key wins because it is the one the user typed most recently, and the
+  // sign-in only serves the models that backend actually runs.
+  const chatGpt = apiKey === null && input.providerId === 'openai' ? await chatGptCredentials() : null;
+  if (apiKey === null && chatGpt === null && (custom !== undefined || provider?.auth === 'api-key')) {
+    return {
+      ok: false,
+      message: `${label} is not connected — add a key, or sign in with ChatGPT, in Settings.`
+    };
   }
+  const bearer = apiKey ?? chatGpt?.accessToken ?? null;
 
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        ...(apiKey === null ? {} : { authorization: `Bearer ${apiKey}` })
+        ...(bearer === null ? {} : { authorization: `Bearer ${bearer}` }),
+        // The Codex backend routes on the account the token belongs to.
+        ...(chatGpt?.accountId == null ? {} : { 'ChatGPT-Account-Id': chatGpt.accountId })
       },
       body: JSON.stringify({
         model: input.modelId,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { readSlot, writeSlot } from '../lib/credentials';
+import { isSignedIn, signInWithChatGpt, signOut } from '../lib/openAiSignIn';
 import { theme } from '../lib/theme';
 
 /**
@@ -24,7 +25,8 @@ export function ProviderConnect({
   meta,
   connected,
   onChange,
-  compact
+  compact,
+  chatGptSignIn
 }: {
   readonly slot: string;
   readonly label: string;
@@ -35,9 +37,13 @@ export function ProviderConnect({
   readonly onChange: () => void;
   /** Inline form used beside a model picker; the full card is for Settings. */
   readonly compact?: boolean;
+  /** OpenAI alone offers a second way in: a ChatGPT account instead of a key. */
+  readonly chatGptSignIn?: boolean;
 }) {
   const [draft, setDraft] = useState('');
   const [note, setNote] = useState<string | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
+  const [busy, setBusy] = useState(false);
   // Collapsed by default when connected: a filled-in key field invites editing
   // something that is already working.
   const [open, setOpen] = useState(!connected);
@@ -45,6 +51,10 @@ export function ProviderConnect({
   useEffect(() => {
     setOpen(!connected);
   }, [connected]);
+
+  useEffect(() => {
+    if (chatGptSignIn === true) void isSignedIn().then(setSignedIn);
+  }, [chatGptSignIn, connected]);
 
   const save = useCallback(async (): Promise<void> => {
     const value = draft.trim();
@@ -104,6 +114,40 @@ export function ProviderConnect({
             </Pressable>
             {note !== null && <Text style={styles.note}>{note}</Text>}
           </View>
+          {chatGptSignIn === true && (
+            <>
+              <Text style={styles.or}>or</Text>
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy}
+                onPress={() => {
+                  setBusy(true);
+                  const finish = (message: string | null): void => {
+                    setBusy(false);
+                    setNote(message);
+                    void isSignedIn().then(setSignedIn);
+                    onChange();
+                  };
+                  if (signedIn) {
+                    void signOut().then(() => finish('Signed out.'));
+                    return;
+                  }
+                  void signInWithChatGpt().then((result) =>
+                    finish(result.ok ? 'Signed in.' : result.message)
+                  );
+                }}
+                style={[styles.oauth, busy && styles.oauthBusy]}
+              >
+                <Text style={styles.oauthText}>
+                  {busy ? 'Opening…' : signedIn ? 'Sign out of ChatGPT' : 'Sign in with ChatGPT'}
+                </Text>
+              </Pressable>
+              <Text style={styles.footnote}>
+                Opens your browser, so the password is typed there and never in this app. Serves only the models that
+                backend runs; a key reaches everything else.
+              </Text>
+            </>
+          )}
           <Text style={styles.footnote}>
             Held in the device keystore — Keychain on iOS, Keystore on Android. Never read back for display.
           </Text>
@@ -141,5 +185,9 @@ const styles = StyleSheet.create({
   saveText: { color: theme.bg, fontSize: 13, fontWeight: '700' },
   saveClearText: { color: theme.danger },
   note: { color: theme.mint, fontSize: 11 },
+  or: { color: theme.textWeaker, fontSize: 10, textAlign: 'center', marginTop: 2 },
+  oauth: { paddingVertical: 11, borderRadius: 9, alignItems: 'center', borderWidth: 1, borderColor: theme.accent },
+  oauthBusy: { opacity: 0.5 },
+  oauthText: { color: theme.accent, fontSize: 13, fontWeight: '700' },
   footnote: { color: theme.textWeaker, fontSize: 10, lineHeight: 15 }
 });
