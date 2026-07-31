@@ -8,11 +8,11 @@
 
 ## 1. Objective
 
-OpenVideo will expose three distinct AI domains rather than one global AI-model setting:
+OpenScene will expose three distinct AI domains rather than one global AI-model setting:
 
 1. **Voice Studio** selects a text-to-speech-capable execution model/provider.
 2. **Video Studio** selects a video-generation-capable execution model/provider.
-3. **Edit Agent** selects a tool-calling language model and uses LangGraph to convert natural-language edit requests into reviewable OpenVideo timeline actions.
+3. **Edit Agent** selects a tool-calling language model and uses LangGraph to convert natural-language edit requests into reviewable OpenScene timeline actions.
 
 The local project and timeline remain the source of truth. AI may propose, generate, import, or execute approved operations; it must not silently overwrite project state or replace direct editing.
 
@@ -65,7 +65,7 @@ Provider credentials and endpoint information can remain shared where appropriat
 
 The main process resolves a selected provider/model from the corresponding domain catalog before it starts a job or creates an agent model. It rejects unavailable or cross-domain selection with a typed error.
 
-Existing local runners remain user-configured through main-process environment/runtime configuration. OpenVideo will not download model weights, infer a model name from an arbitrary executable, or claim a local runner supports a specific model unless the configured runner contract confirms it.
+Existing local runners remain user-configured through main-process environment/runtime configuration. OpenScene will not download model weights, infer a model name from an arbitrary executable, or claim a local runner supports a specific model unless the configured runner contract confirms it.
 
 ## 4. Workspace design
 
@@ -102,7 +102,7 @@ The workspace has four explicit regions:
 3. **Approval queue** — every action that writes a project, starts a generation job, or exports waits here for explicit approval. A denied request becomes an auditable tool result; it does not mutate the project.
 4. **Project context** — active project summary, selected timeline item where available, and imported/generated assets that the user has explicitly attached. Users can remove context before prompting.
 
-The agent is OpenCode-like in its model configuration and transparent tool-run execution, not in its product scope: it controls only OpenVideo's approved, typed tool set and not arbitrary shell commands, filesystem access, or network actions.
+The agent is OpenCode-like in its model configuration and transparent tool-run execution, not in its product scope: it controls only OpenScene's approved, typed tool set and not arbitrary shell commands, filesystem access, or network actions.
 
 ## 5. Asset handoff and prompt workflow
 

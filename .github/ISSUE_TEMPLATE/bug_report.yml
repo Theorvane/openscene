@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem in OpenVideo.
+description: Report a reproducible problem in OpenScene.
 title: "fix: "
 labels: [bug]
 body:
@@ -33,7 +33,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: OpenVideo version or commit
+      label: OpenScene version or commit
       placeholder: e.g. 0.1.0 or abc1234
     validations:
       required: true

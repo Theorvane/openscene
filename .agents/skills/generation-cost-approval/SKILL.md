@@ -1,6 +1,6 @@
 # Skill: generation cost approval
 
-**Applies to:** the OpenVideo in-app agent, whenever a user asks it to generate video, images, or speech.
+**Applies to:** the OpenScene in-app agent, whenever a user asks it to generate video, images, or speech.
 
 Generation bills the user's own provider account. This skill is the procedure that stands between a request and a charge.
 

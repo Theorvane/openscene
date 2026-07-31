@@ -23,7 +23,7 @@ export type GenerationRate =
 
 const UNKNOWN_THIRD_PARTY: GenerationRate = {
   kind: 'unknown',
-  reason: 'No list price is recorded for this model in OpenVideo.'
+  reason: 'No list price is recorded for this model in OpenScene.'
 };
 
 /**
@@ -146,7 +146,7 @@ function unpriced(kind: GenerationKind, modelId: string, rate: GenerationRate): 
     caveat:
       rate.kind === 'unknown'
         ? `${rate.reason} Ask the user to confirm they accept an unknown charge before generating.`
-        : 'This model is billed on a basis OpenVideo cannot convert to a dollar figure.'
+        : 'This model is billed on a basis OpenScene cannot convert to a dollar figure.'
   };
 }
 

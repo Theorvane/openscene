@@ -1,4 +1,4 @@
-# OpenVideo mobile
+# OpenScene mobile
 
 A React Native app that consumes the desktop app's domain code rather than a copy of it.
 

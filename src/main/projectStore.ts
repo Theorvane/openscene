@@ -46,7 +46,7 @@ function invalidAssetRelationMessage(relation: InvalidAssetRelation): string {
   }
 }
 
-const PROJECT_FOLDER_NAME_FALLBACK = 'OpenVideo Project';
+const PROJECT_FOLDER_NAME_FALLBACK = 'OpenScene Project';
 
 function sanitizeFolderName(name: string): string {
   const sanitized = name.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();

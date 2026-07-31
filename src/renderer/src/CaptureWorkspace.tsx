@@ -32,7 +32,7 @@ export function CaptureWorkspace(): ReactElement {
         <div className="permission-card">
           <span className="permission-card__label">Screen permission</span>
           <strong>{capture.settings?.screenPermission ?? 'checking'}</strong>
-          <small>Recordings stay local and are managed by OpenVideo.</small>
+          <small>Recordings stay local and are managed by OpenScene.</small>
         </div>
 
         <div className="source-list" role="listbox" aria-label="Capturable window list">

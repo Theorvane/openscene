@@ -30,7 +30,7 @@ describe('Edit Agent workspace wiring', () => {
     expect(panel).toContain('<AgentChatMessageView key={message.id} message={message} />');
     expect(panel).toContain('agent-chat-approval');
     expect(panel).toContain('Reset conversation');
-    expect(panel).toContain('Tell OpenVideo what to do…');
+    expect(panel).toContain('Tell OpenScene what to do…');
     expect(panel).toContain('Respond to the approval above first...');
     expect(panel).toContain('agent-chat-panel__form');
     expect(panel).not.toContain('EditAgentWorkspace');

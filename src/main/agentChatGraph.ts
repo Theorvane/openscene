@@ -35,7 +35,7 @@ export const GENERATION_COST_POLICY =
   'Same steps for image and speech at their scale.';
 
 const AGENT_CHAT_SYSTEM_PROMPT =
-  'OpenVideo in-app agent. You drive the whole editor through tools: read project timeline, add, trim, and remove ' +
+  'OpenScene in-app agent. You drive the whole editor through tools: read project timeline, add, trim, and remove ' +
   'clips, adjust clip effects, start FFmpeg export. ' +
   'You own generation end to end. To add generated media: call createVideoJob, createImageJob, or createSpeechJob, ' +
   'poll getJobStatus until completed, call importGeneratedResult, then place the returned assetId with ' +
@@ -139,7 +139,7 @@ function buildWatchFramesMessage(toolName: string, payload: WatchFramesPayload):
     content: [
       {
         type: 'text',
-        text: `[OpenVideo] ${payload.frames.length} video frames from ${toolName}, chronological, at ${timestamps}.`
+        text: `[OpenScene] ${payload.frames.length} video frames from ${toolName}, chronological, at ${timestamps}.`
       },
       ...payload.frames.map((frame) => ({
         type: 'image_url' as const,

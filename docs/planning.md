@@ -1,4 +1,4 @@
-# OpenVideo Product Plan
+# OpenScene Product Plan
 
 Status: Draft
 Created: 2026-07-20
@@ -6,11 +6,11 @@ Audience: product decision-makers, implementers, and security reviewers
 
 ## 1. Product Goal
 
-OpenVideo is an Electron video production app for selecting one desktop window, recording only that window, and editing the result with imported local assets in a local project timeline. The implementation started with capture and recording. It now includes local projects, assets, tracks, clips, and timeline editing.
+OpenScene is an Electron video production app for selecting one desktop window, recording only that window, and editing the result with imported local assets in a local project timeline. The implementation started with capture and recording. It now includes local projects, assets, tracks, clips, and timeline editing.
 
 The user should be able to create work demos, lessons, product walkthroughs, and short presentation videos without setting up a full broadcast tool. The app should reduce accidental privacy exposure by recording a selected window instead of the entire screen.
 
-Longer term, OpenVideo will evolve into a hybrid AI video editor: the local recording and editing flow stays primary, while users can optionally use local models or explicitly selected external AI services for assisted editing and media generation. The future direction, data boundary, consent requirements, shared job architecture, and release-copy rules are defined in [`hybrid-ai-editor-direction.md`](hybrid-ai-editor-direction.md). Gemini Veo, OpenAI Sora, and ElevenLabs remain possible future provider targets only; they are not implemented in the current MVP.
+Longer term, OpenScene will evolve into a hybrid AI video editor: the local recording and editing flow stays primary, while users can optionally use local models or explicitly selected external AI services for assisted editing and media generation. The future direction, data boundary, consent requirements, shared job architecture, and release-copy rules are defined in [`hybrid-ai-editor-direction.md`](hybrid-ai-editor-direction.md). Gemini Veo, OpenAI Sora, and ElevenLabs remain possible future provider targets only; they are not implemented in the current MVP.
 
 ## 2. Core Users
 
@@ -127,7 +127,7 @@ Local voice profile storage and local Qwen TTS jobs are separate local audio ass
 
 ## 6. Secure Electron Architecture
 
-OpenVideo separates renderer, preload, and main process responsibilities. Capture permission and file system access belong to the main process. The renderer does not access Node.js APIs directly.
+OpenScene separates renderer, preload, and main process responsibilities. Capture permission and file system access belong to the main process. The renderer does not access Node.js APIs directly.
 
 ### 6.1 Principles
 
@@ -217,7 +217,7 @@ Current boundaries:
 3. Runtime config is read from the JSON file referenced by `VIDEO_TOOL_TTS_CONFIG_PATH`.
 4. Executable, model, and working directory paths must be absolute.
 5. Wrapper args may receive `{modelPath}`, `{voiceSamplePath}`, `{textPath}`, `{outputPath}`, and `{language}` tokens.
-6. OpenVideo only runs the wrapper and verifies the result file. Model compatibility, GPU VRAM, memory, and latency are runtime-dependent prerequisites.
+6. OpenScene only runs the wrapper and verifies the result file. Model compatibility, GPU VRAM, memory, and latency are runtime-dependent prerequisites.
 7. Voicebox is a reference for local profile workflow. OpenCut is inspiration for local-first asset and timeline UX. Neither is a code dependency or copied source.
 
 ## 8. Data Model Draft
@@ -641,7 +641,7 @@ The implementation started with capture and recording. The current product value
 
 ## 15. Compatibility Identifiers
 
-These identifiers must stay unchanged even when user-facing product prose uses OpenVideo:
+These identifiers must stay unchanged even when user-facing product prose uses OpenScene:
 
 - `window-loom-theme`
 - `window-loom-editor-layout`

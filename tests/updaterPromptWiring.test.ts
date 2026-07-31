@@ -161,10 +161,10 @@ describe('menu placement', () => {
       const template = createApplicationMenuTemplate(vi.fn(), vi.fn());
 
       // Then
-      // Pushing a second entry labelled OpenVideo left the menu bar with two
+      // Pushing a second entry labelled OpenScene left the menu bar with two
       // app-named menus: the real one and a stub holding one item.
-      expect(labelsOf(template).filter((label) => label === 'OpenVideo')).toHaveLength(1);
-      const appMenu = template.find((entry) => entry.label === 'OpenVideo');
+      expect(labelsOf(template).filter((label) => label === 'OpenScene')).toHaveLength(1);
+      const appMenu = template.find((entry) => entry.label === 'OpenScene');
       const items = (appMenu?.submenu as { label?: string; role?: string }[] | undefined) ?? [];
       expect(items.map((item) => item.label ?? item.role)).toContain('Check for Updates…');
       // Folding it in means the standard items have to be there explicitly.
@@ -180,7 +180,7 @@ describe('menu placement', () => {
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
     try {
       const template = createApplicationMenuTemplate(vi.fn());
-      expect(template.find((entry) => entry.label === 'OpenVideo')?.role).toBe('appMenu');
+      expect(template.find((entry) => entry.label === 'OpenScene')?.role).toBe('appMenu');
     } finally {
       Object.defineProperty(process, 'platform', { value: platform, configurable: true });
     }
@@ -191,7 +191,7 @@ describe('menu placement', () => {
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
     try {
       const template = createApplicationMenuTemplate(vi.fn(), vi.fn());
-      expect(labelsOf(template)).not.toContain('OpenVideo');
+      expect(labelsOf(template)).not.toContain('OpenScene');
       const help = template.find((entry) => entry.role === 'help');
       expect((help?.submenu as { label?: string }[] | undefined)?.[0]?.label).toBe('Check for Updates…');
     } finally {

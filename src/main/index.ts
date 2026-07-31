@@ -130,7 +130,7 @@ function getScreenPermissionStatus(): string {
  * macOS reads the application-menu title from the running bundle, so a dev run
  * still shows Electron; this is what a packaged build and the About panel use.
  */
-const APP_NAME = 'OpenVideo';
+const APP_NAME = 'OpenScene';
 
 /** Window icon for platforms that take one; macOS uses the bundle icon. */
 function appIconPath(): string | undefined {

@@ -1,4 +1,4 @@
-# OpenVideo hybrid AI editor direction
+# OpenScene hybrid AI editor direction
 
 **Status:** Approved future product direction; no AI provider integration is currently shipped
 **Date:** 2026-07-23
@@ -6,7 +6,7 @@
 
 ## 1. Decision
 
-OpenVideo will evolve into an open-source **hybrid AI video editor**. The local timeline remains the primary workspace and system of record. AI supports the creator with proposed edits and optional generated assets; it does not replace human review, local project ownership, or the existing local export path.
+OpenScene will evolve into an open-source **hybrid AI video editor**. The local timeline remains the primary workspace and system of record. AI supports the creator with proposed edits and optional generated assets; it does not replace human review, local project ownership, or the existing local export path.
 
 The product supports two future, user-controlled AI paths:
 
@@ -27,7 +27,7 @@ AI operations return suggestions, candidate edits, or optional assets. Before th
 
 ### 2.3 Connections are explicit
 
-Before an external request, OpenVideo must make the following information visible in the initiating workflow:
+Before an external request, OpenScene must make the following information visible in the initiating workflow:
 
 - the service or model selected for the operation;
 - the operation being requested;
@@ -39,7 +39,7 @@ A remote provider must never be selected implicitly, used in the background, or 
 
 ### 2.4 Local model setup stays user-controlled
 
-OpenVideo may support a user-provided local runtime through typed configuration and verified executable/model paths. It must not download models or runtimes automatically, promise compatibility, or expose executable paths to the renderer.
+OpenScene may support a user-provided local runtime through typed configuration and verified executable/model paths. It must not download models or runtimes automatically, promise compatibility, or expose executable paths to the renderer.
 
 ## 3. Future capability groups
 

@@ -80,7 +80,7 @@ export function ProjectSettingsDialog({ project, summary, isBusy, onRename, onRe
 
         <section className="project-settings__section project-settings__danger" aria-label="Remove project">
           <div>
-            <p className="project-settings__label">{isExternal ? 'Remove from OpenVideo' : 'Delete project'}</p>
+            <p className="project-settings__label">{isExternal ? 'Remove from OpenScene' : 'Delete project'}</p>
             <p className="project-settings__hint">
               {isExternal
                 ? 'Takes the project out of the list. The folder and its files stay on disk.'

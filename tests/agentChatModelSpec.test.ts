@@ -96,7 +96,7 @@ describe('agent chat model provider resolution', () => {
           Authorization: 'Bearer oauth-access-token',
           'ChatGPT-Account-Id': 'account-123',
           // The Codex backend 400s without a client identity. This app presents
-          // itself as OpenVideo; only the OAuth client id stays Codex's, since
+          // itself as OpenScene; only the OAuth client id stays Codex's, since
           // ChatGPT-subscription sign-in has no public app registration.
           originator: 'openvideo',
           'User-Agent': 'openvideo/0.0.0',

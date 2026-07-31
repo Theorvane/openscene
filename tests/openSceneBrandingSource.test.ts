@@ -17,8 +17,8 @@ const PRELOAD_SOURCE_URL = new URL('../src/preload/index.ts', import.meta.url);
 const CAPTURE_RECORDER_SOURCE_URL = new URL('../src/renderer/src/useCaptureRecorder.ts', import.meta.url);
 const PROVIDER_SEAMS_SOURCE_URL = new URL('../src/shared/providerSeams.ts', import.meta.url);
 
-describe('OpenVideo branding source contract', () => {
-  it('Given visible application metadata and UI copy, When source files are read, Then they use OpenVideo branding', async () => {
+describe('OpenScene branding source contract', () => {
+  it('Given visible application metadata and UI copy, When source files are read, Then they use OpenScene branding', async () => {
     const [packageSource, indexHtmlSource, mainIndexSource, timelineEditorSource, videoGenWorkspaceSource, designSource] = await Promise.all([
       readFile(PACKAGE_SOURCE_URL, 'utf8'),
       readFile(INDEX_HTML_SOURCE_URL, 'utf8'),
@@ -28,19 +28,19 @@ describe('OpenVideo branding source contract', () => {
       readFile(DESIGN_SOURCE_URL, 'utf8')
     ]);
 
-    expect(packageSource).toContain('"productName": "OpenVideo"');
-    expect(packageSource).toContain('"description": "OpenVideo secure Electron MVP for selected-window preview and local WebM recording."');
-    expect(indexHtmlSource).toContain('<title>OpenVideo</title>');
+    expect(packageSource).toContain('"productName": "OpenScene"');
+    expect(packageSource).toContain('"description": "OpenScene secure Electron MVP for selected-window preview and local WebM recording."');
+    expect(indexHtmlSource).toContain('<title>OpenScene</title>');
     // The name is a constant now, so the window title and the About panel and
     // app.setName() cannot drift apart.
-    expect(mainIndexSource).toContain("const APP_NAME = 'OpenVideo'");
+    expect(mainIndexSource).toContain("const APP_NAME = 'OpenScene'");
     expect(mainIndexSource).toContain('app.setName(APP_NAME)');
     expect(mainIndexSource).toContain('title: APP_NAME');
-    expect(timelineEditorSource).toContain('<h1 id="timeline-editor-title">OpenVideo</h1>');
+    expect(timelineEditorSource).toContain('<h1 id="timeline-editor-title">OpenScene</h1>');
     // The studio headings dropped the "AI" prefix with the chat-style redesign.
     expect(videoGenWorkspaceSource).toContain('id="video-generation-title">Video Generation<');
-    expect(designSource).toContain('# OpenVideo Design System');
-    expect(designSource).toContain('The Edit workspace keeps `Local studio`, `OpenVideo`, and the `Timeline editor` subtitle as visually hidden region labels for accessibility;');
+    expect(designSource).toContain('# OpenScene Design System');
+    expect(designSource).toContain('The Edit workspace keeps `Local studio`, `OpenScene`, and the `Timeline editor` subtitle as visually hidden region labels for accessibility;');
   });
 
   it('Given compatibility-sensitive contracts, When source files are read, Then the rebrand keeps persisted and bridge identifiers unchanged', async () => {

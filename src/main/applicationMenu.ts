@@ -66,17 +66,17 @@ export function createApplicationMenuTemplate(
   const commandItem = createCommandItemFactory(onCommand);
   const template: MenuItemConstructorOptions[] = [];
   // macOS always titles the first menu with the running bundle's name, so the
-  // label is what a packaged OpenVideo build shows; a dev run reads Electron.
+  // label is what a packaged OpenScene build shows; a dev run reads Electron.
   //
   // The updates item goes *inside* that menu. Pushing a second entry labelled
-  // OpenVideo — which is what this did — leaves the menu bar with two app-named
+  // OpenScene — which is what this did — leaves the menu bar with two app-named
   // menus, the real one and a stub holding one item.
   if (process.platform === 'darwin') {
     template.push(
       onCheckForUpdates === undefined
-        ? { label: 'OpenVideo', role: 'appMenu' }
+        ? { label: 'OpenScene', role: 'appMenu' }
         : {
-            label: 'OpenVideo',
+            label: 'OpenScene',
             submenu: [
               { role: 'about' },
               { type: 'separator' },

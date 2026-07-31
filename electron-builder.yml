@@ -1,7 +1,7 @@
 # Packaging for the release workflow. electron-vite compiles main, preload, and
 # renderer into out/; this only wraps that output into a macOS app.
 appId: tech.theorvane.openvideo
-productName: OpenVideo
+productName: OpenScene
 copyright: Open source under the MIT License
 # Declared so electron-builder generates the latest*.yml update manifests the
 # in-app updater reads. The release workflow uploads the artifacts itself with
@@ -54,7 +54,7 @@ linux:
   icon: build/icon.png
   # The deb package name, the binary, and the artifact filename all default to
   # package.json's `name`, so an install reads video-window-recorder while
-  # everything the user sees says OpenVideo. executableName fixes the binary and
+  # everything the user sees says OpenScene. executableName fixes the binary and
   # the desktop entry; artifactName and the deb package name are set separately
   # because electron-builder derives neither from it.
   executableName: openvideo

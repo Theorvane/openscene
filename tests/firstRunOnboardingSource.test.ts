@@ -18,8 +18,8 @@ describe('first-run onboarding source contract', () => {
     expect(onboarding).toContain('Skip setup');
     expect(onboarding).toContain('Back');
     expect(onboarding).toContain('Next');
-    expect(onboarding).toContain('Start using OpenVideo');
-    expect(onboarding).toContain('Welcome to OpenVideo');
+    expect(onboarding).toContain('Start using OpenScene');
+    expect(onboarding).toContain('Welcome to OpenScene');
     expect(onboarding).toContain('Local readiness');
     expect(onboarding).toContain('Voice setup');
     expect(onboarding).toContain('Edit Agent');

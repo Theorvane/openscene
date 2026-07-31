@@ -64,15 +64,15 @@ describe('timeline editor layout source contract', () => {
     expect(hookSource).not.toContain('ipcRenderer');
   });
 
-  it('Given product identity, When the app shell and editor render, Then OpenVideo branding belongs to the program header', async () => {
+  it('Given product identity, When the app shell and editor render, Then OpenScene branding belongs to the program header', async () => {
     const source = await readTimelineEditorSource();
     const appShellSource = await readAppShellSource();
 
     expect(source).toContain('<p className="section-kicker">Local studio</p>');
-    expect(source).toContain('<h1 id="timeline-editor-title">OpenVideo</h1>');
+    expect(source).toContain('<h1 id="timeline-editor-title">OpenScene</h1>');
     expect(source).toContain('<span className="editor-program-region__subtitle">Timeline editor</span>');
     expect(appShellSource).not.toContain('product-chrome__eyebrow');
-    expect(appShellSource).not.toContain('<h1 id="app-title">OpenVideo</h1>');
+    expect(appShellSource).not.toContain('<h1 id="app-title">OpenScene</h1>');
     expect(appShellSource).toContain('aria-label="Application chrome"');
   });
 

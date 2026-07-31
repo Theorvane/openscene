@@ -228,7 +228,7 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
         {/* Branding stays for accessibility and region labeling but is no longer visible chrome. */}
         <div className="visually-hidden">
           <p className="section-kicker">Local studio</p>
-          <h1 id="timeline-editor-title">OpenVideo</h1>
+          <h1 id="timeline-editor-title">OpenScene</h1>
           <span className="editor-program-region__subtitle">Timeline editor</span>
         </div>
         {floatingProgramVisible ? <div className="empty-slate">Program Monitor is floating above the workspace.</div> : <ProgramMonitor editor={editor} exportControl={floatingExportVisible ? null : <ExportPanel editor={editor} />} />}

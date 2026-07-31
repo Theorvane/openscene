@@ -181,7 +181,7 @@ jobs:
             gh release upload "$TAG" artifacts/* --clobber
           else
             gh release create "$TAG" \
-              --title "OpenVideo $TAG" \
+              --title "OpenScene $TAG" \
               --generate-notes \
               --notes "The macOS builds are signed with a Developer ID certificate and notarized by Apple, so they open normally. The Windows builds are unsigned, so SmartScreen warns on first run: choose More info, then Run anyway. The Linux builds are unsigned, which is normal for AppImage and deb." \
               artifacts/*

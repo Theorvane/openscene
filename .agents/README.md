@@ -1,6 +1,6 @@
 # Agent Notes
 
-This directory keeps concise guidance for agents working on OpenVideo documentation and code. Read the root `AGENTS.md` first, then use these notes for focused tasks.
+This directory keeps concise guidance for agents working on OpenScene documentation and code. Read the root `AGENTS.md` first, then use these notes for focused tasks.
 
 Files:
 

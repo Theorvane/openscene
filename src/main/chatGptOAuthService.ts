@@ -31,7 +31,7 @@ export const CHATGPT_CODEX_ENDPOINT_METADATA = {
  * both places read this one constant.
  *
  * Note the client id itself is still Codex's: ChatGPT-subscription OAuth has no
- * public app registration, so the sign-in cannot present an OpenVideo client.
+ * public app registration, so the sign-in cannot present an OpenScene client.
  * Only the originator and User-Agent are ours.
  */
 export const CHATGPT_CLIENT_ORIGINATOR = 'openvideo';

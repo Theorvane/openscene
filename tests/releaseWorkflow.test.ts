@@ -55,7 +55,7 @@ describe('release workflow', () => {
 
   it('signs, hardens, and notarizes macOS rather than shipping what Gatekeeper calls damaged', () => {
     // An unsigned app plus the download quarantine attribute is what produced
-    // "OpenVideo is damaged and can't be opened" on v0.1.0.
+    // "OpenScene is damaged and can't be opened" on v0.1.0.
     expect(builderConfig).toContain('hardenedRuntime: true');
     expect(builderConfig).toContain('notarize: true');
     expect(builderConfig).toContain('entitlements: build/entitlements.mac.plist');
@@ -91,7 +91,7 @@ describe('release workflow', () => {
     expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+$/);
     // electron-vite writes the app into out/; the package must carry it.
     expect(builderConfig).toContain('out/**');
-    expect(builderConfig).toContain('productName: OpenVideo');
+    expect(builderConfig).toContain('productName: OpenScene');
   });
 
   it('lets the release job be re-run without aborting on what it already published', () => {
@@ -156,7 +156,7 @@ describe('release workflow', () => {
   it('names the Linux artifacts after the product rather than the internal package', () => {
     // Every default here comes from package.json's `name`, which is
     // video-window-recorder — so an install would read that while the app,
-    // the menu bar, and the release all say OpenVideo.
+    // the menu bar, and the release all say OpenScene.
     expect(builderConfig).toContain('executableName: openvideo');
     expect(builderConfig).toContain('packageName: openvideo');
     expect(builderConfig).toMatch(/artifactName: openvideo-\$\{version\}/);

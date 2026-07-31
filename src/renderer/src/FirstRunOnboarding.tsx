@@ -16,21 +16,21 @@ type OnboardingStep = {
 const ONBOARDING_STEPS = [
   {
     kicker: 'Welcome',
-    title: 'Welcome to OpenVideo',
-    body: 'OpenVideo is a local-first desktop studio for recording, arranging, narrating, and exporting media on your machine.',
+    title: 'Welcome to OpenScene',
+    body: 'OpenScene is a local-first desktop studio for recording, arranging, narrating, and exporting media on your machine.',
     bullets: ['No account is required.', 'Home stays available behind this setup guide.', 'The Edit Agent panel remains docked on the right.']
   },
   {
     kicker: 'Local readiness',
     title: 'Local readiness',
     body: 'Final MP4 export uses your local FFmpeg setup, and desktop capture depends on operating-system screen recording permission.',
-    bullets: ['Configure FFmpeg through an absolute path or PATH discovery.', 'Grant Screen Recording permission when macOS asks.', 'OpenVideo never shows FFmpeg paths or arguments in the renderer.']
+    bullets: ['Configure FFmpeg through an absolute path or PATH discovery.', 'Grant Screen Recording permission when macOS asks.', 'OpenScene never shows FFmpeg paths or arguments in the renderer.']
   },
   {
     kicker: 'Voice',
     title: 'Voice setup',
     body: 'Voice Generation uses consent-based samples and your configured local narration workflow.',
-    bullets: ['Use only samples you own or have permission to use.', 'Samples and generated audio stay in local app storage.', 'Local Qwen is user-configured; OpenVideo does not download models.']
+    bullets: ['Use only samples you own or have permission to use.', 'Samples and generated audio stay in local app storage.', 'Local Qwen is user-configured; OpenScene does not download models.']
   },
   {
     kicker: 'Edit Agent',
@@ -41,7 +41,7 @@ const ONBOARDING_STEPS = [
   {
     kicker: 'Privacy',
     title: 'Privacy boundary',
-    body: 'OpenVideo keeps recordings, imports, projects, voice profiles, TTS output, and exports local unless a future reviewed provider operation is explicitly authorized.',
+    body: 'OpenScene keeps recordings, imports, projects, voice profiles, TTS output, and exports local unless a future reviewed provider operation is explicitly authorized.',
     bullets: ['No analytics, crash reporting, or account system is implemented.', 'Provider seams are configuration surfaces, not hidden uploads.', 'Delete local samples and projects from inside the app.']
   },
   {
@@ -89,7 +89,7 @@ export function FirstRunOnboarding({ onComplete }: FirstRunOnboardingProps): Rea
           <div className="first-run-onboarding__step-actions">
             <Button disabled={isFirstStep} onClick={() => setStepIndex((current) => Math.max(0, current - 1))}>Back</Button>
             {isFinalStep ? (
-              <Button onClick={onComplete} variant="primary">Start using OpenVideo</Button>
+              <Button onClick={onComplete} variant="primary">Start using OpenScene</Button>
             ) : (
               <Button onClick={() => setStepIndex((current) => Math.min(ONBOARDING_STEPS.length - 1, current + 1))} variant="primary">Next</Button>
             )}

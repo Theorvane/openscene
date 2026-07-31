@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/openvideo-hero.png" alt="OpenVideo: the wordmark beside a dark editor window showing a timeline and an agent chat that has trimmed a clip, added another, and is asking permission to export" width="100%" />
+  <img src="docs/assets/openvideo-hero.png" alt="OpenScene: the wordmark beside a dark editor window showing a timeline and an agent chat that has trimmed a clip, added another, and is asking permission to export" width="100%" />
 </p>
 
-<h1 align="center">OpenVideo</h1>
+<h1 align="center">OpenScene</h1>
 
 <p align="center">
   A local-first desktop video editor with an AI agent that can drive it — your media stays on your machine, and you choose which model providers, if any, it talks to.
@@ -24,11 +24,11 @@
 </p>
 
 > [!IMPORTANT]
-> **Pre-release.** OpenVideo runs from source. There is no packaged installer or auto-update yet. The hero and screenshots below show the real interface.
+> **Pre-release.** OpenScene runs from source. There is no packaged installer or auto-update yet. The hero and screenshots below show the real interface.
 
-## What is OpenVideo?
+## What is OpenScene?
 
-OpenVideo is an open-source Electron app for editing video on your own machine. You open a folder as a project, put clips on a timeline, and export an MP4 with your local FFmpeg.
+OpenScene is an open-source Electron app for editing video on your own machine. You open a folder as a project, put clips on a timeline, and export an MP4 with your local FFmpeg.
 
 What makes it different is the **Edit Agent**: a chat panel that sits beside the timeline and can actually operate the editor — read the timeline, add and trim clips, generate voice or video, and start an export. It asks for approval before anything that changes your project.
 
@@ -38,7 +38,7 @@ Nothing is uploaded on its own. Model providers are opt-in, connected one at a t
 
 Open a folder and you land in the workspace. One tab strip switches between editing and the two generation studios; the agent chat stays docked beside all three.
 
-![The OpenVideo editing workspace: media bin, program monitor, inspector, timeline, and the Edit Agent chat panel](docs/assets/screenshot-editor.png)
+![The OpenScene editing workspace: media bin, program monitor, inspector, timeline, and the Edit Agent chat panel](docs/assets/screenshot-editor.png)
 
 Projects and past conversations live on the start page. Picking a chat reopens its project and restores the transcript.
 
@@ -99,7 +99,7 @@ API keys are written to Electron `safeStorage` in the main process and never rea
 
 - Node.js 22+ and npm 10+
 - FFmpeg, for MP4 export
-- macOS: Screen Recording permission for the terminal running OpenVideo, if you use window capture
+- macOS: Screen Recording permission for the terminal running OpenScene, if you use window capture
 
 ### Install and run
 
@@ -110,13 +110,13 @@ npm install
 npm run dev
 ```
 
-OpenVideo uses **your** FFmpeg. Either make `ffmpeg` discoverable through an absolute directory on `PATH`, or point at it explicitly:
+OpenScene uses **your** FFmpeg. Either make `ffmpeg` discoverable through an absolute directory on `PATH`, or point at it explicitly:
 
 ```bash
 VIDEO_TOOL_FFMPEG_PATH=/absolute/path/to/ffmpeg npm run dev
 ```
 
-Relative FFmpeg paths are rejected. Without a usable FFmpeg, OpenVideo reports the problem instead of starting an export.
+Relative FFmpeg paths are rejected. Without a usable FFmpeg, OpenScene reports the problem instead of starting an export.
 
 ### Try the agent without any cloud account
 

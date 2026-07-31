@@ -1,10 +1,10 @@
-# OpenVideo Agent & Development Guidelines (Claude Entrypoint)
+# OpenScene Agent & Development Guidelines (Claude Entrypoint)
 
 > **Inherits and enforces all rules in [`AGENTS.md`](./AGENTS.md).**
 
 ## Project Overview & Architecture
 
-OpenVideo is an Electron, React, TypeScript, and Vite desktop application built with local-first security and hybrid AI capabilities.
+OpenScene is an Electron, React, TypeScript, and Vite desktop application built with local-first security and hybrid AI capabilities.
 
 - **Main Surface** (`src/main/`): Desktop capture, project storage, FFmpeg jobs, local TTS, TypeMCP server (`src/main/openVideoMcpServer.ts`).
 - **Preload Surface** (`src/preload/`): Context-isolated IPC bridge exposing typed `window.videoTool`.

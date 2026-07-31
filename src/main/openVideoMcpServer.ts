@@ -378,7 +378,7 @@ export class OpenVideoMcpServer {
   }
 
   @McpTool({
-    description: 'Inspect an OpenVideo project timeline and safe asset metadata for edit planning. This is read-only and never returns filesystem paths or credentials.',
+    description: 'Inspect an OpenScene project timeline and safe asset metadata for edit planning. This is read-only and never returns filesystem paths or credentials.',
     input: z.object({
       projectId: z.string().min(1)
     })
@@ -815,7 +815,7 @@ export class OpenVideoMcpServer {
     // No quality parameter: the export pipeline has no preset concept
     // (StartExportJobInput carries only size and frame rate), and the tool used
     // to accept one, drop it, and echo it back as if it had applied.
-    description: 'Start FFmpeg MP4 export for an OpenVideo project timeline. Exports at the project settings; there is no quality preset.',
+    description: 'Start FFmpeg MP4 export for an OpenScene project timeline. Exports at the project settings; there is no quality preset.',
     input: z.object({
       projectId: z.string().min(1)
     })
@@ -854,7 +854,7 @@ export class OpenVideoMcpServer {
   @McpResource({
     uri: 'openvideo://mcp-capabilities',
     mimeType: 'application/json',
-    description: 'OpenVideo MCP Server Capability Descriptor'
+    description: 'OpenScene MCP Server Capability Descriptor'
   })
   readCapabilities() {
     return {

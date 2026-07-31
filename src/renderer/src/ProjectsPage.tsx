@@ -113,7 +113,7 @@ export function ProjectsPage({
           </ul>
         ) : (
           <p className="projects-home__empty">
-            No project folders yet. Pick any folder with the add button: an OpenVideo project inside opens, and any other folder becomes a new project named after it.
+            No project folders yet. Pick any folder with the add button: an OpenScene project inside opens, and any other folder becomes a new project named after it.
           </p>
         )}
       </aside>

@@ -1,6 +1,6 @@
-# Contributing to OpenVideo
+# Contributing to OpenScene
 
-Thanks for improving OpenVideo. This is a local-first Electron desktop app: keep project media, recordings, exports, voice samples, and processing on the user's device unless a proposal explicitly changes that boundary.
+Thanks for improving OpenScene. This is a local-first Electron desktop app: keep project media, recordings, exports, voice samples, and processing on the user's device unless a proposal explicitly changes that boundary.
 
 ## Before You Start
 

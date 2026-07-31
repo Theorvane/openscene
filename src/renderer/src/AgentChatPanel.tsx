@@ -56,11 +56,11 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
   const panelStyle: AgentChatPanelStyle = { '--agent-chat-panel-width': `${width}px` };
 
   return (
-    <aside id="app-shell-agent-chat" className="agent-chat-panel-shell" aria-label="OpenVideo agent chat" style={panelStyle}>
+    <aside id="app-shell-agent-chat" className="agent-chat-panel-shell" aria-label="OpenScene agent chat" style={panelStyle}>
       <div className="agent-chat-panel">
         <div className="agent-chat-panel__header">
           <div className="agent-chat-panel__title">
-            <p className="agent-chat-panel__title-label">OpenVideo Edit Agent</p>
+            <p className="agent-chat-panel__title-label">OpenScene Edit Agent</p>
             <span className="agent-chat-panel__title-meta">
               {selectedModel.label} · {selectedModel.providerLabel} · {isLocalModel ? 'Local' : modelReady ? 'Connected' : 'Not connected'}
             </span>
@@ -182,7 +182,7 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
             </div>
           )}
 
-          {status === 'thinking' && <p className="agent-chat-status">Working through OpenVideo…</p>}
+          {status === 'thinking' && <p className="agent-chat-status">Working through OpenScene…</p>}
           {error && (
             <div className="status-card status-card--danger" role="status">
               {error}
@@ -218,7 +218,7 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
                   }
                 }
               }}
-              placeholder={pendingApproval ? 'Respond to the approval above first...' : 'Tell OpenVideo what to do…'}
+              placeholder={pendingApproval ? 'Respond to the approval above first...' : 'Tell OpenScene what to do…'}
               aria-label="Edit Agent prompt"
               disabled={isBusy || !modelReady || pendingApproval !== null}
               rows={2}

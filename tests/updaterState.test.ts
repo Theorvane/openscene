@@ -37,7 +37,7 @@ describe('updater capability', () => {
 
   it('installs from an AppImage and only notifies from a package-managed install', () => {
     // Given / When / Then
-    expect(updaterCapability({ platform: 'linux', packaged: true, appImagePath: '/tmp/OpenVideo.AppImage' }).kind).toBe(
+    expect(updaterCapability({ platform: 'linux', packaged: true, appImagePath: '/tmp/OpenScene.AppImage' }).kind).toBe(
       'install'
     );
     expect(updaterCapability({ platform: 'linux', packaged: true, appImagePath: undefined }).kind).toBe('notify');

@@ -54,7 +54,7 @@ export function updaterCapability(input: UpdaterPlatformInput): UpdaterCapabilit
       ? { kind: 'install' }
       : {
           kind: 'notify',
-          reason: 'These macOS builds are unsigned, so an update cannot replace the running app. OpenVideo can still tell you when a new version is out.'
+          reason: 'These macOS builds are unsigned, so an update cannot replace the running app. OpenScene can still tell you when a new version is out.'
         };
   }
 
@@ -124,7 +124,7 @@ export function describeUpdaterState(state: UpdaterState, currentVersion: string
     case 'ready':
       return `${state.version} is downloaded and installs on restart.`;
     case 'installing':
-      return `Installing ${state.version}. OpenVideo will restart.`;
+      return `Installing ${state.version}. OpenScene will restart.`;
     case 'available':
       return `${state.version} is out. This build cannot update itself, so the download opens in your browser.`;
     case 'error':
@@ -162,16 +162,16 @@ export function updaterPromptFor(
       return {
         kind: 'question',
         title: 'Update ready',
-        message: `OpenVideo ${state.version} is downloaded. Restart to install it?`,
+        message: `OpenScene ${state.version} is downloaded. Restart to install it?`,
         buttons: ['Restart', 'Later'],
         confirmAction: 'install'
       };
     case 'available':
       return {
         kind: 'question',
-        title: `OpenVideo ${state.version} is available`,
+        title: `OpenScene ${state.version} is available`,
         message:
-          `OpenVideo ${state.version} is out, but this build cannot replace itself. ` +
+          `OpenScene ${state.version} is out, but this build cannot replace itself. ` +
           'Open the download page to get it?',
         buttons: ['Open download page', 'Later'],
         confirmAction: 'open-release'
@@ -182,7 +182,7 @@ export function updaterPromptFor(
         ? {
             kind: 'info',
             title: 'No updates',
-            message: 'OpenVideo is up to date.',
+            message: 'OpenScene is up to date.',
             buttons: ['OK'],
             confirmAction: 'dismiss'
           }

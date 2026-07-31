@@ -19,7 +19,7 @@ const videoAsset = (): MediaAsset => ({
   metadata: { durationMs: 10_000, width: 1920, height: 1080 }
 });
 
-describe('OpenVideo TypeMCP Server and Tool declarations', () => {
+describe('OpenScene TypeMCP Server and Tool declarations', () => {
   let tempDir: string;
   let projectStore: ProjectStore;
 
@@ -127,7 +127,7 @@ describe('OpenVideo TypeMCP Server and Tool declarations', () => {
   it('executes createSpeechJob MCP tool against the selected cloud model', async () => {
     const server = new OpenVideoMcpServer();
     const result = await server.createSpeechJob({
-      script: 'Welcome to OpenVideo desktop suite',
+      script: 'Welcome to OpenScene desktop suite',
       voiceId: '',
       modelId: 'eleven_multilingual_v2'
     });

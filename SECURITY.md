@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-OpenVideo does **not currently have a private vulnerability-reporting channel configured**.
+OpenScene does **not currently have a private vulnerability-reporting channel configured**.
 
 Until one is available, do **not** open a public GitHub issue or pull request containing secrets, private media, personal data, exploit steps, proof-of-concept code, or other material that could enable abuse.
 
@@ -10,7 +10,7 @@ If you discover a potential vulnerability, limit public discussion to a non-sens
 
 ## Scope and Safety
 
-OpenVideo is a local-first desktop application. Reports involving Electron security boundaries, preload/IPC exposure, local file handling, FFmpeg invocation, bundled dependencies, or accidental network behavior are in scope.
+OpenScene is a local-first desktop application. Reports involving Electron security boundaries, preload/IPC exposure, local file handling, FFmpeg invocation, bundled dependencies, or accidental network behavior are in scope.
 
 Do not test against systems, accounts, files, or media you do not own or have explicit permission to assess. Do not publish credentials, tokens, private file paths, user recordings, voice samples, or exploit material.
 
