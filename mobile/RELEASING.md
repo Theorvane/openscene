@@ -58,6 +58,29 @@ OPENSCENE_KEY_PASSWORD=…
 build falls back to the debug key, so a local build still works for testing and
 only a real submission needs the keystore.
 
+## App Store Connect automation
+
+The manually triggered **iOS App Store Connect** workflow builds an IPA and
+uploads it to App Store Connect. It never submits an app for review: that
+remains an explicit App Store Connect action after build processing and metadata
+review.
+
+Create the `app-store-production` GitHub Environment, restrict it to the `dev`
+branch, and require a reviewer before deploying. Store the following values as
+environment configuration (not in the repository):
+
+- Variables: `APPLE_TEAM_ID` (`5H9F8F82WT`) and `APP_STORE_PROFILE_NAME`
+  (`macbook`).
+- Secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`,
+  `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`,
+  `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`, and
+  `APP_STORE_PROVISIONING_PROFILE_BASE64`.
+
+`ASC_PRIVATE_KEY` is the complete content of the downloaded App Store Connect
+`.p8` file. The two `*_BASE64` secrets are base64-encoded copies of the signing
+certificate `.p12` and the App Store provisioning profile respectively. Never
+commit any of these files or their decoded values.
+
 ### Build
 
 ```bash
