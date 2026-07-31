@@ -41,11 +41,11 @@ Nothing is uploaded on its own. Model providers are opt-in, connected one at a t
 
 Open a folder and you land in the workspace. One tab strip switches between editing and the two generation studios; the agent chat stays docked beside all three.
 
-![The OpenScene editing workspace: media bin, program monitor, inspector, timeline, and the Edit Agent chat panel](docs/assets/screenshot-editor.png)
+![The OpenScene editing workspace on a new project: media bin, program monitor, inspector, timeline tracks, and the Edit Agent chat panel docked on the right](docs/assets/screenshot-editor.png)
 
 Projects and past conversations live on the start page. Picking a chat reopens its project and restores the transcript.
 
-![The Projects page listing project folders beside grouped Edit Agent chat history](docs/assets/screenshot-projects.png)
+![The Projects page listing project folders beside Edit Agent chat history](docs/assets/screenshot-projects.png)
 
 ### Editing
 
@@ -71,6 +71,8 @@ Prompt with a style, aspect ratio, and duration — and optionally a reference i
 ### Image generation
 
 Stills from a prompt, at the aspect ratio you need — and a seed for image-to-video on the engines that accept one.
+
+![The Image Generation studio with model, aspect ratio, and prompt controls](docs/assets/screenshot-image.png)
 
 ## The Edit Agent
 
