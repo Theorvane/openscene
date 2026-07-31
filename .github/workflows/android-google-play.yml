@@ -1,0 +1,93 @@
+name: Android Google Play
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: Google Play track to receive the release
+        type: choice
+        required: true
+        default: internal
+        options:
+          - internal
+          - production
+      release_status:
+        description: Publish state for the selected track
+        type: choice
+        required: true
+        default: draft
+        options:
+          - draft
+          - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: google-play-production
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Build and upload Android app
+    runs-on: ubuntu-24.04
+    environment: play-store-production
+    env:
+      ANDROID_PACKAGE_NAME: ${{ vars.ANDROID_PACKAGE_NAME }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Generate the Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Install Android signing key
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          KEYSTORE_PATH="$RUNNER_TEMP/openscene-release.keystore"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          echo "OPENSCENE_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Build the signed Android App Bundle
+        working-directory: mobile/android
+        run: |
+          set -euo pipefail
+          ./gradlew bundleRelease \
+            -POPENSCENE_STORE_FILE="$OPENSCENE_KEYSTORE_PATH" \
+            -POPENSCENE_STORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD" \
+            -POPENSCENE_KEY_ALIAS="$ANDROID_KEY_ALIAS" \
+            -POPENSCENE_KEY_PASSWORD="$ANDROID_KEY_PASSWORD"
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ vars.ANDROID_PACKAGE_NAME }}
+          releaseFiles: mobile/android/app/build/outputs/bundle/release/app-release.aab
+          tracks: ${{ inputs.track }}
+          status: ${{ inputs.release_status }}
+          changesNotSentForReview: true

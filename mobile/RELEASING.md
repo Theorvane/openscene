@@ -81,6 +81,27 @@ environment configuration (not in the repository):
 certificate `.p12` and the App Store provisioning profile respectively. Never
 commit any of these files or their decoded values.
 
+### Google Play automation
+
+The manually triggered **Android Google Play** workflow builds a signed Android
+App Bundle (AAB) and uploads it to the explicitly selected Play track. It
+defaults to an `internal` track `draft`; selecting `production` and `completed`
+is a deliberate release decision made at dispatch time.
+
+Create the `play-store-production` GitHub Environment, restrict it to the
+`dev` branch, and require a reviewer before deploying. Store the following
+values as environment configuration (not in the repository):
+
+- Variable: `ANDROID_PACKAGE_NAME` (`com.sloki9637.openscene`).
+- Secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+  `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, and
+  `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`.
+
+`ANDROID_KEYSTORE_BASE64` is the base64-encoded release keystore. The Google
+Play service account must have access to the OpenScene app in Play Console and
+the Google Play Android Developer API must be enabled for its Google Cloud
+project. Never commit the keystore, Gradle properties, or service-account JSON.
+
 ### Build
 
 ```bash
