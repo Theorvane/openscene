@@ -19,11 +19,11 @@ describe('release workflow', () => {
     // publish again, so every later step is gated on the tag being absent.
     expect(workflow).toContain('if git rev-parse -q --verify "refs/tags/${TAG}"');
     expect(workflow).toContain("already-released=true");
-    // Packaging and publishing are separate jobs, so each has to be gated too;
-    // a job without the guard would run on any push to main.
+    // Packaging, store distribution, and publishing are separate jobs, so each
+    // has to be gated too; a job without the guard would run on any push to main.
     expect(workflow).toContain("if: needs.check.outputs.already-released == 'false'");
     const jobGates = workflow.match(/if: needs\.check\.outputs\.already-released == 'false'/g) ?? [];
-    expect(jobGates.length).toBe(2);
+    expect(jobGates.length).toBe(4);
   });
 
   it('verifies the exact commit it packages', () => {
@@ -81,8 +81,20 @@ describe('release workflow', () => {
     const uses = workflow.match(/uses: [^\n]+/g) ?? [];
     expect(uses.length).toBeGreaterThan(0);
     for (const use of uses) {
+      // Reusable workflows in this repository are versioned by the exact
+      // commit promoted to main, so they intentionally have a local path
+      // rather than an external action ref.
+      if (use.includes('uses: ./.github/workflows/')) continue;
       expect(use).toMatch(/@[0-9a-f]{40}/);
     }
+  });
+
+  it('distributes mobile stores only as part of a new main release', () => {
+    expect(workflow).toContain('uses: ./.github/workflows/ios-app-store-connect.yml');
+    expect(workflow).toContain('uses: ./.github/workflows/android-google-play.yml');
+    expect(workflow).toContain('track: production');
+    expect(workflow).toContain('release_status: completed');
+    expect(workflow).toContain('needs: [check, build, app-store-connect, google-play]');
   });
 
   it('keeps packaging able to run locally with the same inputs', () => {
