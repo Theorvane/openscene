@@ -13,7 +13,8 @@ concurrency:
 jobs:
   upload:
     name: Build and upload iOS app
-    runs-on: macos-15
+    # Expo's Swift package dependencies require Swift tools 6.2 or newer.
+    runs-on: macos-26
     environment: app-store-production
     env:
       APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
