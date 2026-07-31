@@ -1,6 +1,11 @@
 # Packaging for the release workflow. electron-vite compiles main, preload, and
 # renderer into out/; this only wraps that output into a macOS app.
-appId: tech.theorvane.openvideo
+# Moved with the product rename, deliberately and once. An appId identifies an
+# installed application: anyone already on 0.2.0 keeps the OpenVideo install and
+# is not offered this as an update, because to their machine it is a different
+# app. That break is the cost of the rename and is stated in the release notes
+# rather than discovered.
+appId: tech.theorvane.openscene
 productName: OpenScene
 copyright: Open source under the MIT License
 # Declared so electron-builder generates the latest*.yml update manifests the
@@ -46,7 +51,7 @@ win:
     - target: zip
       arch: [x64]
 deb:
-  packageName: openvideo
+  packageName: openscene
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -57,8 +62,8 @@ linux:
   # everything the user sees says OpenScene. executableName fixes the binary and
   # the desktop entry; artifactName and the deb package name are set separately
   # because electron-builder derives neither from it.
-  executableName: openvideo
-  artifactName: openvideo-${version}-${arch}.${ext}
+  executableName: openscene
+  artifactName: openscene-${version}-${arch}.${ext}
   category: AudioVideo
   target:
     - target: AppImage

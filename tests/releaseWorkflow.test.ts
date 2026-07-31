@@ -157,9 +157,9 @@ describe('release workflow', () => {
     // Every default here comes from package.json's `name`, which is
     // video-window-recorder — so an install would read that while the app,
     // the menu bar, and the release all say OpenScene.
-    expect(builderConfig).toContain('executableName: openvideo');
-    expect(builderConfig).toContain('packageName: openvideo');
-    expect(builderConfig).toMatch(/artifactName: openvideo-\$\{version\}/);
+    expect(builderConfig).toContain('executableName: openscene');
+    expect(builderConfig).toContain('packageName: openscene');
+    expect(builderConfig).toMatch(/artifactName: openscene-\$\{version\}/);
   });
 
   it('declares a target for every platform the workflow builds', () => {
