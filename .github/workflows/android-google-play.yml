@@ -88,6 +88,5 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: ${{ vars.ANDROID_PACKAGE_NAME }}
           releaseFiles: mobile/android/app/build/outputs/bundle/release/app-release.aab
-          tracks: ${{ inputs.track }}
+          track: ${{ inputs.track }}
           status: ${{ inputs.release_status }}
-          changesNotSentForReview: true
