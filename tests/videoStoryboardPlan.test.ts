@@ -42,6 +42,18 @@ describe('storyboard planning', () => {
     expect(plan.shots.map((shot) => shot.index)).toEqual([1, 2, 3]);
   });
 
+  it('uses an exact legal duration combination before rounding a representable request', () => {
+    // Given / When
+    // 10s is representable as 6s + 4s for Veo. A longest-first greedy fill
+    // instead selects 8s + 4s and silently adds two seconds.
+    const plan = planVideoStoryboard({ totalSeconds: 10, providerId: 'google_gemini' });
+
+    // Then
+    expect(plan.shots.map((shot) => shot.durationSeconds)).toEqual([6, 4]);
+    expect(plan.totalSeconds).toBe(10);
+    expect(plan.roundedFrom).toBeUndefined();
+  });
+
   it('reports when it could not hit the requested length exactly', () => {
     // Given / When
     // 10s cannot be made from 4/8/12, so the plan overshoots and says so

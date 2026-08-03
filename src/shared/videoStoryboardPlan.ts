@@ -85,16 +85,52 @@ export function planVideoStoryboard(input: {
   const requested = Math.max(shortest, Math.round(input.totalSeconds));
   const capped = Math.min(requested, longest * MAX_PLANNED_SHOTS);
 
-  const durations: number[] = [];
-  let remaining = capped;
-  while (remaining > 0 && durations.length < MAX_PLANNED_SHOTS) {
-    // Prefer an exact finish; otherwise take the longest shot that fits, and
-    // fall back to the shortest legal length for the final remainder.
-    const exact = options.find((option) => option === remaining);
-    const fits = options.find((option) => option <= remaining);
-    const chosen = exact ?? fits ?? shortest;
-    durations.push(chosen);
-    remaining -= chosen;
+  // A longest-first greedy fill can miss an exact composition: Veo can make
+  // 10 seconds as 6 + 4, but greedy chooses 8 + 4 and turns it into 12. Search
+  // the bounded space instead. A result above this ceiling can never be closer
+  // than one of the legal durations at or below it.
+  const searchCeiling = capped + longest;
+  const candidates: number[][] = [];
+  let previousByTotal = new Map<number, readonly number[]>([[0, []]]);
+
+  for (let shotCount = 1; shotCount <= MAX_PLANNED_SHOTS; shotCount += 1) {
+    const nextByTotal = new Map<number, readonly number[]>();
+    for (const [total, previous] of previousByTotal) {
+      for (const duration of options) {
+        const nextTotal = total + duration;
+        if (nextTotal > searchCeiling) continue;
+        // Options are descending and each prior sequence is already the
+        // lexicographically longest for its total, so the first sequence for a
+        // total has the preferred longer-earlier order.
+        if (!nextByTotal.has(nextTotal)) nextByTotal.set(nextTotal, [...previous, duration]);
+      }
+    }
+
+    for (const sequence of nextByTotal.values()) candidates.push([...sequence]);
+    previousByTotal = nextByTotal;
+  }
+
+  const durations = candidates.reduce<number[] | undefined>((best, candidate) => {
+    if (best === undefined) return candidate;
+
+    const candidateDistance = Math.abs(candidate.reduce((sum, value) => sum + value, 0) - capped);
+    const bestDistance = Math.abs(best.reduce((sum, value) => sum + value, 0) - capped);
+    if (candidateDistance !== bestDistance) return candidateDistance < bestDistance ? candidate : best;
+    if (candidate.length !== best.length) return candidate.length < best.length ? candidate : best;
+
+    for (let index = 0; index < candidate.length; index += 1) {
+      const candidateValue = candidate[index] ?? 0;
+      const bestValue = best[index] ?? 0;
+      if (candidateValue !== bestValue) return candidateValue > bestValue ? candidate : best;
+    }
+    return best;
+  }, undefined);
+
+  // `requested` is at least the shortest legal duration, so the first planning
+  // layer always contributes a candidate. Keep this guard to make the contract
+  // explicit if a provider table is ever accidentally emptied.
+  if (durations === undefined) {
+    throw new Error(`No legal shot durations are configured for provider ${input.providerId}.`);
   }
 
   let startSeconds = 0;
