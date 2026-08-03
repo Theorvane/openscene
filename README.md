@@ -37,6 +37,49 @@ What makes it different is the **Edit Agent**: a chat panel that sits beside the
 
 Nothing is uploaded on its own. Model providers are opt-in, connected one at a time with your own API key or sign-in, and the app works with none of them connected.
 
+## Architecture
+
+```mermaid
+flowchart LR
+  Creator[Creator]
+
+  subgraph Renderer["Renderer — React UI"]
+    Editor["Timeline · Program Monitor"]
+    Agent["Edit Agent · approval UI"]
+    Studios["Voice · Image · Video studios"]
+  end
+
+  Bridge["Preload — typed window.videoTool bridge"]
+
+  subgraph Main["Electron main process"]
+    Policy["Validation · approval · provider policy"]
+    Projects["Local projects · assets · chats"]
+    Jobs["FFmpeg export · AI job manager"]
+    Secrets["safeStorage · OAuth tokens"]
+    Tools["TypeMCP tool surface"]
+  end
+
+  subgraph Shared["Shared editing core"]
+    Timeline["Timeline rules · composition · validation"]
+    Planning["Shot planning · cost estimation"]
+    Contracts["IPC · provider contracts"]
+  end
+
+  Local[("User-controlled local files")]
+  Providers["Connected providers\nonly after explicit approval"]
+
+  Creator --> Renderer --> Bridge --> Main
+  Renderer <--> Shared
+  Main <--> Shared
+  Main <--> Local
+  Jobs --> Providers
+  Tools --> Policy
+```
+
+The **renderer** collects intent and renders editor state; it never receives raw IPC, filesystem paths, FFmpeg arguments, provider credentials, or OAuth tokens. The **preload** layer exposes only the typed `window.videoTool` bridge. The **main process** owns local projects, secrets, job lifecycle, local FFmpeg execution, and the TypeMCP tool surface. Editing rules, composition, validation, and generation planning live in the portable **shared core**, which desktop and mobile use together.
+
+Project folders, imports, generated results, chats, and exports remain local. A connected provider is contacted only after you choose it for an operation and the Edit Agent's approval flow permits that call. The Program Monitor is a best-effort review surface; local FFmpeg MP4 export is the authoritative saved output.
+
 ## The workspace
 
 Open a folder and you land in the workspace. One tab strip switches between editing and the two generation studios; the agent chat stays docked beside all three.

@@ -1,8 +1,10 @@
 # OpenScene hybrid AI editor direction
 
-**Status:** Approved future product direction; no AI provider integration is currently shipped
+**Status:** Historical direction plus future assisted-editing constraints. Provider-backed voice, image, video generation, and the approval-gated Edit Agent are now released; the AI-assisted editing proposals in §3.1 remain future work.
 **Date:** 2026-07-23
 **Issue:** #12
+
+> **Current capability source:** [the root README](../README.md) is the public current-capability and release boundary. This document preserves the initial hybrid-AI direction and defines constraints for capabilities that remain unimplemented.
 
 ## 1. Decision
 
@@ -125,9 +127,11 @@ Accounts, billing, analytics, crash reporting, cloud project sync, and hidden ne
 
 ## 7. Release and public-copy boundary
 
-The current release provides local selected-window capture, local project/timeline editing, local MP4 export, and user-configured local Qwen TTS. It does **not** currently provide AI-assisted editing, AI generation, or connected external AI services.
+The initial July MVP described local selected-window capture, local project/timeline editing, and local MP4 export. The current release boundary is broader: the approval-gated Edit Agent and provider-backed voice, image, and video generation are shipped. See [the root README](../README.md) for provider-specific availability and platform limits.
 
-Until a separately reviewed implementation ships, README, renderer, product site, app metadata, and marketing materials must use future-facing language such as “planned”, “in development”, or “designed for” when mentioning these capabilities. They must not claim automated edits, generated assets, provider calls, or remote processing are available today.
+The following capability groups remain future-facing until a separately reviewed implementation ships: AI-assisted edit suggestions (cuts, highlight sequences, reframing, captions), automated acceptance of suggestions into a saved timeline, cloud project sync, hosted rendering, accounts, analytics, and hidden network activity.
+
+For every shipped or future capability, README, renderer, product site, app metadata, and marketing materials must state whether processing is local or provider-connected, and must not present a proposed capability as current behavior.
 
 ## 8. Implementation sequence
 

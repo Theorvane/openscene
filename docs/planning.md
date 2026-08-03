@@ -1,6 +1,8 @@
-# OpenScene Product Plan
+# OpenScene Product Plan — Historical MVP Baseline
 
-Status: Draft
+> **Current capability source:** [the root README](../README.md) is the current product and release boundary. This document records the 2026-07-20 MVP baseline and its original implementation plan; its former “future” provider and voice statements are not a claim about the current `dev` branch.
+
+Status: Historical planning baseline
 Created: 2026-07-20
 Audience: product decision-makers, implementers, and security reviewers
 
@@ -10,7 +12,7 @@ OpenScene is an Electron video production app for selecting one desktop window, 
 
 The user should be able to create work demos, lessons, product walkthroughs, and short presentation videos without setting up a full broadcast tool. The app should reduce accidental privacy exposure by recording a selected window instead of the entire screen.
 
-Longer term, OpenScene will evolve into a hybrid AI video editor: the local recording and editing flow stays primary, while users can optionally use local models or explicitly selected external AI services for assisted editing and media generation. The future direction, data boundary, consent requirements, shared job architecture, and release-copy rules are defined in [`hybrid-ai-editor-direction.md`](hybrid-ai-editor-direction.md). Gemini Veo, OpenAI Sora, and ElevenLabs remain possible future provider targets only; they are not implemented in the current MVP.
+The longer-term direction is still a hybrid AI editor: local recording and editing remain primary while optional connected services support the currently shipped generation workflows and future assisted-editing workflows. The historical direction, data boundary, consent requirements, shared job architecture, and remaining future constraints are in [`hybrid-ai-editor-direction.md`](hybrid-ai-editor-direction.md). For what is released on the current branch, including provider-specific availability, use [the root README](../README.md).
 
 ## 2. Core Users
 
