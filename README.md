@@ -76,9 +76,9 @@ flowchart LR
   Tools --> Policy
 ```
 
-The **renderer** collects intent and renders editor state; it never receives raw IPC, filesystem paths, FFmpeg arguments, provider credentials, or OAuth tokens. The **preload** layer exposes only the typed `window.videoTool` bridge. The **main process** owns local projects, secrets, job lifecycle, local FFmpeg execution, and the TypeMCP tool surface. Editing rules, composition, validation, and generation planning live in the portable **shared core**, which desktop and mobile use together.
+The **renderer** collects intent and renders editor state; it never receives raw IPC, FFmpeg execution paths or arguments, or stored provider credentials and OAuth tokens. The **preload** layer exposes only the typed `window.videoTool` bridge. The **main process** owns local projects, secrets, job lifecycle, local FFmpeg execution, and the TypeMCP tool surface. Editing rules, composition, validation, and generation planning live in the portable **shared core**, which desktop and mobile use together.
 
-Project folders, imports, generated results, chats, and exports remain local. A connected provider is contacted only after you choose it for an operation and the Edit Agent's approval flow permits that call. The Program Monitor is a best-effort review surface; local FFmpeg MP4 export is the authoritative saved output.
+Project folders, imports, generated results, chats, and exports remain local. A connected provider is contacted only for an operation you explicitly start: in a generation studio, that is the visible **Generate** action; for an agent-initiated mutation or job, the Edit Agent asks for approval before execution. The Program Monitor is a best-effort review surface; local FFmpeg MP4 export is the authoritative saved output.
 
 ## The workspace
 
