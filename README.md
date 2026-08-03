@@ -170,7 +170,7 @@ The provider and model registry is generated from a snapshot of the [models.dev]
 - **OpenAI**: two login methods on one provider — an API key, or a ChatGPT sign-in (PKCE OAuth) for the model set that backend serves. Tokens stay in main-process safe storage; the renderer only learns whether you are connected.
 - **Generation**: 17 runnable video models across Google Veo, OpenAI Sora, Runway and Luma — Runway alone fronts Seedance, Veo 3.1, HappyHorse and Gemini Omni Flash on one key. Eight image models and seven voices. Providers without a real adapter stay listed but honestly unavailable rather than pretending to work, and every model says which it is.
 
-API keys are written to Electron `safeStorage` in the main process and never reach the renderer.
+A provider API key is entered in Settings and sent once through the typed bridge to Electron `safeStorage`; stored provider credentials are never returned to the renderer.
 
 ## Quick start
 
@@ -214,7 +214,7 @@ Projects are folders you choose. Assets, chat history, and generated results are
 VIDEO_TOOL_RECORDINGS_DIR=/absolute/path/to/recordings npm run dev
 ```
 
-The renderer talks to the main process through a narrow typed `window.videoTool` bridge. Raw `ipcRenderer`, filesystem paths, FFmpeg arguments, API keys, and OAuth tokens stay outside it — a picked reference image, for example, crosses as bytes, never as a path.
+The renderer talks to the main process through a narrow typed `window.videoTool` bridge. Raw `ipcRenderer`, FFmpeg executable paths and arguments, stored credentials, and OAuth tokens stay outside it. Some safe display paths and an API key entered in Settings cross through explicit typed operations; a picked reference image, for example, crosses as bytes, never as a path.
 
 - **No account, no telemetry.** No analytics, crash reporting, or usage tracking.
 - **No background network calls.** The app talks to a provider only when you ask it to, using a provider you connected.
