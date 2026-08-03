@@ -1,7 +1,7 @@
 # OpenScene Trust & Planning Design
 
-**Issue:** #197  
-**Status:** Approved for implementation  
+**Issue:** #197
+**Status:** Approved for implementation
 **Date:** 2026-08-03
 
 ## Goal
