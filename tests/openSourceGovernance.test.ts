@@ -11,6 +11,7 @@ describe('open-source CI contract', () => {
 
     expect(workflow).toMatch(/branches:\s*\[dev, main\]/);
     expect(workflow).toMatch(/^\s*pull_request:\s*$/m);
+    expect(workflow).toMatch(/^permissions:\s*\n\s+contents:\s+read\s*$/m);
 
     const ffmpegInstallIndex = workflow.indexOf('brew install ffmpeg');
     const testIndex = workflow.indexOf('npm test');

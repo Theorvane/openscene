@@ -5,6 +5,9 @@ on:
     branches: [dev, main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: macos-latest
