@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { planVideoStoryboard, supportedShotSeconds, CONTINUITY_KEYS } from '@openvideo/shared/videoStoryboardPlan';
 import { getDomainModels } from '@openvideo/shared/aiDomainModels';
@@ -11,7 +11,9 @@ import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { generateShot } from '../lib/videoGeneration';
 import { appendAssetToTimeline, readProject } from '../lib/projectStore';
 import { SpendPrompt } from '../components/SpendPrompt';
+import { FormScreen } from '../components/FormScreen';
 import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
 
 const RATIOS: readonly VideoAspectRatio[] = ['16:9', '9:16', '1:1'];
 
@@ -162,7 +164,7 @@ export function PlanScreen({
     projectId !== null && !running && prompt.trim().length > 0 && connected[model?.providerId ?? ''] === true;
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: topInset + 16 }]}>
+    <FormScreen topInset={topInset}>
       <Text style={styles.h1}>Plan a video</Text>
       <Text style={styles.sub}>Shot lengths and prices come from the same modules the desktop app uses.</Text>
 
@@ -202,7 +204,7 @@ export function PlanScreen({
             accessibilityState={{ checked: continuity && continuityPossible }}
             disabled={!continuityPossible}
             onPress={() => setPlan(() => setContinuity((value) => !value))}
-            style={[styles.toggle, !continuityPossible && styles.toggleOff]}
+            style={press([styles.toggle, !continuityPossible && styles.toggleOff])}
           >
             <View style={[styles.box, continuity && continuityPossible && styles.boxOn]} />
             <Text style={styles.toggleText}>Start each shot from the last frame of the one before</Text>
@@ -268,7 +270,7 @@ export function PlanScreen({
           accessibilityRole="button"
           disabled={!canGenerate}
           onPress={start}
-          style={[styles.approve, !canGenerate && styles.approveOff]}
+          style={press([styles.approve, !canGenerate && styles.approveOff])}
         >
           <Text style={styles.approveText}>
             {running ? 'Generating…' : `Generate ${plan.shots.length} shot${plan.shots.length === 1 ? '' : 's'}`}
@@ -286,7 +288,7 @@ export function PlanScreen({
       </View>
 
       <SpendPrompt feature="video-generation" headline={runLine} visible={asking} onDecide={decide} />
-    </ScrollView>
+    </FormScreen>
   );
 }
 
@@ -313,7 +315,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={[styles.chip, selected && styles.chipOn]}
+      style={press([styles.chip, selected && styles.chipOn])}
     >
       <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
     </Pressable>
@@ -321,35 +323,35 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: 20, paddingBottom: 40, gap: 6 },
   h1: { color: theme.text, fontSize: 26, fontWeight: '700' },
   sub: { color: theme.textWeak, fontSize: 13, lineHeight: 19, marginBottom: 8 },
-  label: { color: theme.text, fontSize: 12, fontWeight: '600', marginTop: 20, marginBottom: 8 },
-  body: { color: theme.textWeak, fontSize: 12, lineHeight: 18 },
+  label: { color: theme.text, fontSize: 13, fontWeight: '600', marginTop: 20, marginBottom: 8 },
+  body: { color: theme.textWeak, fontSize: 13, lineHeight: 19 },
   row: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  chip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
+  chip: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: theme.line },
   chipOn: { backgroundColor: theme.accent, borderColor: theme.accent },
-  chipText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
+  chipText: { color: theme.textWeak, fontSize: 14, fontWeight: '600' },
   chipTextOn: { color: theme.bg },
-  shot: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: theme.line },
-  shotIndex: { color: theme.mint, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  shotBody: { color: theme.text, fontSize: 13, flex: 1, fontVariant: ['tabular-nums'] },
-  shotLen: { color: theme.textWeak, fontSize: 12, fontVariant: ['tabular-nums'] },
-  warn: { color: theme.warn, fontSize: 12, lineHeight: 18, marginTop: 6 },
+  shot: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: theme.line },
+  shotIndex: { color: theme.mint, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  shotBody: { color: theme.text, fontSize: 14, flex: 1, fontVariant: ['tabular-nums'] },
+  shotLen: { color: theme.textWeak, fontSize: 13, fontVariant: ['tabular-nums'] },
+  warn: { color: theme.warn, fontSize: 13, lineHeight: 19, marginTop: 6 },
   runCard: { marginTop: 24, padding: 16, borderRadius: 12, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.line, gap: 4 },
-  footnote: { color: theme.textWeaker, fontSize: 11, lineHeight: 16, marginTop: 8 },
-  toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  footnote: { color: theme.textWeaker, fontSize: 12, lineHeight: 17, marginTop: 8 },
+  // The whole row is the switch, so the target is the sentence rather than the
+  // 18pt box beside it.
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: MIN_TAP, paddingVertical: 4 },
   toggleOff: { opacity: 0.45 },
-  box: { width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: theme.line },
+  box: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: theme.line },
   boxOn: { backgroundColor: theme.accent, borderColor: theme.accent },
-  toggleText: { flex: 1, color: theme.text, fontSize: 12, lineHeight: 17 },
-  input: { minHeight: 84, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface, color: theme.text, fontSize: 14, textAlignVertical: 'top' },
+  toggleText: { flex: 1, color: theme.text, fontSize: 13, lineHeight: 18 },
+  input: { minHeight: 96, padding: 14, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface, color: theme.text, fontSize: 15, lineHeight: 21, textAlignVertical: 'top' },
   status: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  statusText: { color: theme.textWeak, fontSize: 10, fontWeight: '600' },
+  statusText: { color: theme.textWeak, fontSize: 12, fontWeight: '600' },
   statusDone: { color: theme.mint },
   statusFailed: { color: theme.danger },
   approveOff: { opacity: 0.35 },
-  approve: { marginTop: 14, paddingVertical: 14, borderRadius: 10, alignItems: 'center', backgroundColor: theme.accent },
-  approveText: { color: theme.bg, fontSize: 14, fontWeight: '700' }
+  approve: { marginTop: 14, minHeight: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
+  approveText: { color: theme.bg, fontSize: 15, fontWeight: '700' }
 });

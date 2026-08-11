@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { assetByteLength, type MobileAsset } from '../lib/projectStore';
 import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
 
 /**
  * The project's media, and what the timeline is doing with it.
@@ -40,7 +41,7 @@ export function MediaLibrary({
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {assets.map((asset) => {
         const used = usage[asset.id] ?? 0;
         return (
@@ -59,7 +60,7 @@ export function MediaLibrary({
               accessibilityRole="button"
               accessibilityLabel={`Add ${asset.displayName} to the timeline`}
               onPress={() => onAdd(asset.id)}
-              style={styles.action}
+              style={press(styles.action)}
             >
               <Text style={styles.actionText}>+ Add</Text>
             </Pressable>
@@ -74,7 +75,7 @@ export function MediaLibrary({
                   setConfirming(null);
                   onDelete(asset.id);
                 }}
-                style={[styles.action, styles.danger]}
+                style={press([styles.action, styles.danger])}
               >
                 <Text style={styles.dangerText}>{used > 0 ? `Delete + ${used}` : 'Delete'}</Text>
               </Pressable>
@@ -83,7 +84,7 @@ export function MediaLibrary({
                 accessibilityRole="button"
                 accessibilityLabel={`Delete ${asset.displayName}`}
                 onPress={() => setConfirming(asset.id)}
-                style={styles.action}
+                style={press(styles.action)}
               >
                 <Text style={styles.actionText}>✕</Text>
               </Pressable>
@@ -101,16 +102,16 @@ export function MediaLibrary({
 }
 
 const styles = StyleSheet.create({
-  root: { maxHeight: 190 },
+  root: { maxHeight: 220 },
   content: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.line },
   info: { flex: 1 },
-  name: { color: theme.text, fontSize: 12, fontWeight: '600' },
-  meta: { color: theme.textWeaker, fontSize: 10, marginTop: 2, fontVariant: ['tabular-nums'] },
-  action: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, borderWidth: 1, borderColor: theme.line },
-  actionText: { color: theme.textWeak, fontSize: 11, fontWeight: '700' },
+  name: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  meta: { color: theme.textWeaker, fontSize: 12, marginTop: 3, fontVariant: ['tabular-nums'] },
+  action: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
+  actionText: { color: theme.textWeak, fontSize: 13, fontWeight: '700' },
   danger: { borderColor: theme.danger },
-  dangerText: { color: theme.danger, fontSize: 11, fontWeight: '700' },
-  warn: { color: theme.warn, fontSize: 11, lineHeight: 16 },
-  empty: { color: theme.textWeak, fontSize: 12, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 10 }
+  dangerText: { color: theme.danger, fontSize: 13, fontWeight: '700' },
+  warn: { color: theme.warn, fontSize: 12, lineHeight: 17 },
+  empty: { color: theme.textWeak, fontSize: 13, lineHeight: 19, paddingHorizontal: 16, paddingBottom: 10 }
 });

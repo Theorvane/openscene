@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { readSlot, writeSlot } from '../lib/credentials';
 import { isSignedIn, signInWithChatGpt, signOut } from '../lib/openAiSignIn';
 import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
 
 /**
  * Connect a provider where you need it, not somewhere else.
@@ -74,7 +75,7 @@ export function ProviderConnect({
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         onPress={() => setOpen((value) => !value)}
-        style={styles.head}
+        style={press(styles.head)}
       >
         <View style={styles.headText}>
           <Text style={styles.title}>{label}</Text>
@@ -96,6 +97,8 @@ export function ProviderConnect({
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
+            returnKeyType="done"
+            onSubmitEditing={() => void save()}
             accessibilityLabel={`${label} API key`}
           />
           {/* An empty field on a provider with nothing stored has no action to
@@ -106,7 +109,7 @@ export function ProviderConnect({
               accessibilityRole="button"
               disabled={action === 'none'}
               onPress={() => void save()}
-              style={[styles.save, action === 'none' && styles.saveOff, action === 'clear' && styles.saveClear]}
+              style={press([styles.save, action === 'none' && styles.saveOff, action === 'clear' && styles.saveClear])}
             >
               <Text style={[styles.saveText, action === 'clear' && styles.saveClearText]}>
                 {action === 'clear' ? 'Remove stored key' : 'Save'}
@@ -136,7 +139,7 @@ export function ProviderConnect({
                     finish(result.ok ? 'Signed in.' : result.message)
                   );
                 }}
-                style={[styles.oauth, busy && styles.oauthBusy]}
+                style={press([styles.oauth, busy && styles.oauthBusy])}
               >
                 <Text style={styles.oauthText}>
                   {busy ? 'Opening…' : signedIn ? 'Sign out of ChatGPT' : 'Sign in with ChatGPT'}
@@ -161,14 +164,15 @@ const styles = StyleSheet.create({
   root: { gap: 8 },
   card: { padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
   compact: { padding: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.warn, backgroundColor: theme.surface },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: MIN_TAP },
   headText: { flex: 1 },
-  title: { color: theme.text, fontSize: 14, fontWeight: '700' },
-  meta: { color: theme.textWeaker, fontSize: 10, marginTop: 2 },
-  badge: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
+  title: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  meta: { color: theme.textWeaker, fontSize: 12, marginTop: 3 },
+  badge: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
   badgeOn: { color: theme.mint, borderWidth: 1, borderColor: theme.mint },
   badgeOff: { color: theme.textWeaker, borderWidth: 1, borderColor: theme.line },
   input: {
+    minHeight: MIN_TAP,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 9,
@@ -176,18 +180,18 @@ const styles = StyleSheet.create({
     borderColor: theme.line,
     backgroundColor: theme.bg,
     color: theme.text,
-    fontSize: 13
+    fontSize: 15
   },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  save: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, backgroundColor: theme.accent },
+  save: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 18, borderRadius: 8, backgroundColor: theme.accent },
   saveOff: { opacity: 0.35 },
   saveClear: { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.danger },
-  saveText: { color: theme.bg, fontSize: 13, fontWeight: '700' },
+  saveText: { color: theme.bg, fontSize: 14, fontWeight: '700' },
   saveClearText: { color: theme.danger },
-  note: { color: theme.mint, fontSize: 11 },
-  or: { color: theme.textWeaker, fontSize: 10, textAlign: 'center', marginTop: 2 },
-  oauth: { paddingVertical: 11, borderRadius: 9, alignItems: 'center', borderWidth: 1, borderColor: theme.accent },
+  note: { color: theme.mint, fontSize: 12 },
+  or: { color: theme.textWeaker, fontSize: 12, textAlign: 'center', marginTop: 2 },
+  oauth: { minHeight: MIN_TAP, justifyContent: 'center', borderRadius: 9, alignItems: 'center', borderWidth: 1, borderColor: theme.accent },
   oauthBusy: { opacity: 0.5 },
-  oauthText: { color: theme.accent, fontSize: 13, fontWeight: '700' },
-  footnote: { color: theme.textWeaker, fontSize: 10, lineHeight: 15 }
+  oauthText: { color: theme.accent, fontSize: 14, fontWeight: '700' },
+  footnote: { color: theme.textWeaker, fontSize: 12, lineHeight: 17 }
 });

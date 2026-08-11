@@ -71,9 +71,9 @@ export function TimelineRuler({
 }
 
 const styles = StyleSheet.create({
-  root: { height: 26, borderBottomWidth: 1, borderBottomColor: theme.line, position: 'relative' },
+  root: { height: 28, borderBottomWidth: 1, borderBottomColor: theme.line, position: 'relative' },
   tick: { position: 'absolute', top: 0, bottom: 0, alignItems: 'flex-start' },
   mark: { width: 1, height: 9, backgroundColor: theme.line },
   half: { position: 'absolute', top: 0, width: 1, height: 5, backgroundColor: theme.line, opacity: 0.6 },
-  label: { color: theme.textWeaker, fontSize: 9, marginLeft: 3, fontVariant: ['tabular-nums'] }
+  label: { color: theme.textWeak, fontSize: 11, marginLeft: 3, fontVariant: ['tabular-nums'] }
 });

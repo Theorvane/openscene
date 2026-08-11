@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { addCustomProvider, customCredentialKey } from '../lib/customProviders';
 import { writeSlot } from '../lib/credentials';
 import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
 
 /**
  * Add any OpenAI-compatible endpoint.
@@ -41,7 +42,7 @@ export function AddCustomProvider({ onAdded }: { readonly onAdded: () => void })
 
   if (!open) {
     return (
-      <Pressable accessibilityRole="button" onPress={() => setOpen(true)} style={styles.opener}>
+      <Pressable accessibilityRole="button" onPress={() => setOpen(true)} style={press(styles.opener)}>
         <Text style={styles.openerText}>＋ Add a custom provider</Text>
       </Pressable>
     );
@@ -76,10 +77,10 @@ export function AddCustomProvider({ onAdded }: { readonly onAdded: () => void })
       {error !== null && <Text style={styles.error}>{error}</Text>}
 
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" onPress={() => void submit()} style={styles.save}>
+        <Pressable accessibilityRole="button" onPress={() => void submit()} style={press(styles.save)}>
           <Text style={styles.saveText}>Add</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => setOpen(false)} style={styles.cancel}>
+        <Pressable accessibilityRole="button" onPress={() => setOpen(false)} style={press(styles.cancel)}>
           <Text style={styles.cancelText}>Cancel</Text>
         </Pressable>
       </View>
@@ -128,29 +129,30 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  opener: { paddingVertical: 11, borderRadius: 9, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.line, alignItems: 'center' },
-  openerText: { color: theme.textWeak, fontSize: 12, fontWeight: '600' },
+  opener: { minHeight: MIN_TAP, justifyContent: 'center', borderRadius: 9, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.line, alignItems: 'center' },
+  openerText: { color: theme.textWeak, fontSize: 14, fontWeight: '600' },
   card: { padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.accent, backgroundColor: theme.surface, gap: 8 },
-  title: { color: theme.text, fontSize: 14, fontWeight: '700' },
-  blurb: { color: theme.textWeak, fontSize: 11, lineHeight: 16 },
+  title: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  blurb: { color: theme.textWeak, fontSize: 13, lineHeight: 18 },
   field: { gap: 4 },
-  fieldLabel: { color: theme.textWeaker, fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
+  fieldLabel: { color: theme.textWeaker, fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
   input: {
-    paddingHorizontal: 11,
-    paddingVertical: 9,
+    minHeight: MIN_TAP,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.line,
     backgroundColor: theme.bg,
     color: theme.text,
-    fontSize: 13
+    fontSize: 15
   },
-  inputMulti: { minHeight: 56, textAlignVertical: 'top' },
-  error: { color: theme.danger, fontSize: 11, lineHeight: 16 },
+  inputMulti: { minHeight: 64, textAlignVertical: 'top' },
+  error: { color: theme.danger, fontSize: 13, lineHeight: 18 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 2 },
-  save: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 8, backgroundColor: theme.accent },
-  saveText: { color: theme.bg, fontSize: 13, fontWeight: '700' },
-  cancel: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
-  cancelText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
-  footnote: { color: theme.textWeaker, fontSize: 10, lineHeight: 15 }
+  save: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 20, borderRadius: 8, backgroundColor: theme.accent },
+  saveText: { color: theme.bg, fontSize: 14, fontWeight: '700' },
+  cancel: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
+  cancelText: { color: theme.textWeak, fontSize: 14, fontWeight: '600' },
+  footnote: { color: theme.textWeaker, fontSize: 12, lineHeight: 17 }
 });

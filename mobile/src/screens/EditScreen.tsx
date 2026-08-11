@@ -18,9 +18,22 @@ import { TimelineClip } from '../components/TimelineClip';
 import { MediaLibrary } from '../components/MediaLibrary';
 import { TimelineRuler } from '../components/TimelineRuler';
 import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from '../components/Icon';
+import { press, slopFor } from '../lib/touch';
 
-const TRACK_HEIGHT = { video: 56, audio: 40 } as const;
+const TRACK_HEIGHT = { video: 60, audio: 44 } as const;
 const RAIL = 92;
+
+/**
+ * The timeline controls stay small on purpose — a row of 44pt buttons above the
+ * lanes would take the space the lanes are for — so the hit area is grown around
+ * them instead of the button.
+ */
+const SMALL_SLOP = slopFor(36);
+const STEPPER_SLOP = slopFor(36);
+// Vertical only for the rail: the mute and remove buttons sit 6pt apart, so
+// horizontal slop on both would overlap and the taps would land on whichever
+// happened to be drawn last.
+const RAIL_SLOP = { top: 11, bottom: 11, left: 2, right: 2 } as const;
 
 function formatMs(ms: number): string {
   const total = Math.max(0, Math.round(ms / 100) / 10);
@@ -267,7 +280,8 @@ export function EditScreen({
           accessibilityRole="button"
           accessibilityLabel="Previous edit point"
           onPress={() => step('back')}
-          style={styles.small}
+          hitSlop={SMALL_SLOP}
+          style={press(styles.small)}
         >
           <SkipBackIcon />
         </Pressable>
@@ -276,7 +290,7 @@ export function EditScreen({
           accessibilityLabel={playing ? 'Pause' : 'Play'}
           disabled={editor.durationMs === 0}
           onPress={() => setPlaying((value) => !value)}
-          style={[styles.play, editor.durationMs === 0 && styles.disabled]}
+          style={press([styles.play, editor.durationMs === 0 && styles.disabled])}
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
         </Pressable>
@@ -284,7 +298,8 @@ export function EditScreen({
           accessibilityRole="button"
           accessibilityLabel="Next edit point"
           onPress={() => step('forward')}
-          style={styles.small}
+          hitSlop={SMALL_SLOP}
+          style={press(styles.small)}
         >
           <SkipForwardIcon />
         </Pressable>
@@ -295,7 +310,8 @@ export function EditScreen({
           accessibilityRole="button"
           accessibilityLabel="Zoom out"
           onPress={() => setPxPerSecond((value) => Math.max(3, value / 1.5))}
-          style={styles.small}
+          hitSlop={SMALL_SLOP}
+          style={press(styles.small)}
         >
           <Text style={styles.smallText}>−</Text>
         </Pressable>
@@ -310,7 +326,8 @@ export function EditScreen({
               scroller.current?.scrollTo({ x: 0, animated: true });
             }
           }}
-          style={styles.small}
+          hitSlop={SMALL_SLOP}
+          style={press(styles.small)}
         >
           <Text style={styles.smallText}>⤢</Text>
         </Pressable>
@@ -318,7 +335,8 @@ export function EditScreen({
           accessibilityRole="button"
           accessibilityLabel="Zoom in"
           onPress={() => setPxPerSecond((value) => Math.min(400, value * 1.5))}
-          style={styles.small}
+          hitSlop={SMALL_SLOP}
+          style={press(styles.small)}
         >
           <Text style={styles.smallText}>+</Text>
         </Pressable>
@@ -429,7 +447,8 @@ export function EditScreen({
                         accessibilityRole="button"
                         accessibilityLabel={`${track.mix.muted ? 'Unmute' : 'Mute'} ${track.name}`}
                         onPress={() => editor.setTrackMuted(track.id, !track.mix.muted)}
-                        style={styles.railButton}
+                        hitSlop={RAIL_SLOP}
+                        style={press(styles.railButton)}
                       >
                         <Text style={[styles.railButtonText, track.mix.muted && styles.railMuted]}>
                           {track.mix.muted ? 'muted' : 'live'}
@@ -440,7 +459,8 @@ export function EditScreen({
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${track.name}`}
                       onPress={() => editor.removeTrack(track.id)}
-                      style={styles.railButton}
+                      hitSlop={RAIL_SLOP}
+                      style={press(styles.railButton)}
                     >
                       <Text style={styles.railButtonText}>✕</Text>
                     </Pressable>
@@ -504,11 +524,11 @@ function Stepper({
   return (
     <View style={styles.stepper}>
       <Text style={styles.stepperLabel}>{label}</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Decrease ${label}`} onPress={onDown} style={styles.stepperButton}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Decrease ${label}`} onPress={onDown} hitSlop={STEPPER_SLOP} style={press(styles.stepperButton)}>
         <Text style={styles.stepperButtonText}>−</Text>
       </Pressable>
       <Text style={styles.stepperValue}>{value}</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Increase ${label}`} onPress={onUp} style={styles.stepperButton}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Increase ${label}`} onPress={onUp} hitSlop={STEPPER_SLOP} style={press(styles.stepperButton)}>
         <Text style={styles.stepperButtonText}>+</Text>
       </Pressable>
     </View>
@@ -531,7 +551,7 @@ function Tool({
       accessibilityRole="button"
       disabled={disabled === true}
       onPress={onPress}
-      style={[styles.tool, disabled === true && styles.toolOff, tone === 'danger' && styles.toolDanger]}
+      style={press([styles.tool, disabled === true && styles.toolOff, tone === 'danger' && styles.toolDanger])}
     >
       <Text style={[styles.toolText, tone === 'danger' && styles.toolDangerText]}>{label}</Text>
     </Pressable>
@@ -541,27 +561,27 @@ function Tool({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.bg },
   transport: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.line },
-  play: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
+  play: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
   playGlyph: { color: theme.bg, fontSize: 14, fontWeight: '700' },
   disabled: { opacity: 0.3 },
-  clock: { flex: 1, color: theme.text, fontSize: 13, fontVariant: ['tabular-nums'] },
-  small: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, borderColor: theme.line, alignItems: 'center', justifyContent: 'center' },
-  smallText: { color: theme.text, fontSize: 14, fontWeight: '700' },
+  clock: { flex: 1, color: theme.text, fontSize: 14, fontVariant: ['tabular-nums'] },
+  small: { width: 36, height: 36, borderRadius: 9, borderWidth: 1, borderColor: theme.line, alignItems: 'center', justifyContent: 'center' },
+  smallText: { color: theme.text, fontSize: 15, fontWeight: '700' },
   toolbarScroll: { flexGrow: 0 },
   toolbar: { gap: 8, paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' },
-  tool: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  tool: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
   toolOff: { opacity: 0.3 },
   toolDanger: { borderColor: theme.danger },
-  toolText: { color: theme.text, fontSize: 13, fontWeight: '600' },
+  toolText: { color: theme.text, fontSize: 14, fontWeight: '600' },
   toolDangerText: { color: theme.danger },
-  message: { color: theme.warn, fontSize: 12, paddingHorizontal: 16, paddingBottom: 8 },
+  message: { color: theme.warn, fontSize: 13, paddingHorizontal: 16, paddingBottom: 8 },
   inspector: { paddingHorizontal: 16, paddingBottom: 10, gap: 6 },
-  inspectorTitle: { color: theme.textWeak, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepperLabel: { flex: 1, color: theme.text, fontSize: 12 },
-  stepperButton: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: theme.line, alignItems: 'center', justifyContent: 'center' },
-  stepperButtonText: { color: theme.text, fontSize: 14, fontWeight: '700' },
-  stepperValue: { width: 48, textAlign: 'center', color: theme.textWeak, fontSize: 12, fontVariant: ['tabular-nums'] },
+  inspectorTitle: { color: theme.textWeak, fontSize: 12, fontWeight: '700', letterSpacing: 0.6 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
+  stepperLabel: { flex: 1, color: theme.text, fontSize: 14 },
+  stepperButton: { width: 36, height: 36, borderRadius: 9, borderWidth: 1, borderColor: theme.line, alignItems: 'center', justifyContent: 'center' },
+  stepperButtonText: { color: theme.text, fontSize: 16, fontWeight: '700' },
+  stepperValue: { width: 52, textAlign: 'center', color: theme.textWeak, fontSize: 13, fontVariant: ['tabular-nums'] },
   timelineVertical: { flex: 1 },
   tracks: { position: 'relative', paddingBottom: 8 },
   rulerRow: { flexDirection: 'row' },
@@ -569,12 +589,12 @@ const styles = StyleSheet.create({
   rulerLane: { flex: 1 },
   track: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: theme.line },
   rail: { width: RAIL, paddingHorizontal: 10, justifyContent: 'center', gap: 3, borderRightWidth: 1, borderRightColor: theme.line },
-  railName: { color: theme.text, fontSize: 11, fontWeight: '600' },
+  railName: { color: theme.text, fontSize: 12, fontWeight: '600' },
   railRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  railButton: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1, borderColor: theme.line },
-  railButtonText: { color: theme.textWeaker, fontSize: 9, fontWeight: '700' },
+  railButton: { minHeight: 22, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: theme.line },
+  railButtonText: { color: theme.textWeaker, fontSize: 11, fontWeight: '700' },
   railMuted: { color: theme.warn },
   lane: { flex: 1, position: 'relative', backgroundColor: theme.surface },
   playhead: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: theme.text },
-  empty: { color: theme.textWeak, fontSize: 13, lineHeight: 19, paddingHorizontal: 16, paddingTop: 20 }
+  empty: { color: theme.textWeak, fontSize: 14, lineHeight: 20, paddingHorizontal: 16, paddingTop: 20 }
 });

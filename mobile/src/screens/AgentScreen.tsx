@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +22,7 @@ import { sendChatTurn, type ChatMessage, type ToolCallProposal } from '../lib/ag
 import { SpendPrompt } from '../components/SpendPrompt';
 import { AddCustomProvider } from '../components/AddCustomProvider';
 import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
 
 /**
  * The agent, with approval in front of every tool call.
@@ -209,8 +213,14 @@ export function AgentScreen({ topInset, projectId }: { readonly topInset: number
   const spendTool = pending === null ? undefined : findTool(pending.proposal.name);
 
   return (
-    <View style={[styles.root, { paddingTop: topInset }]}>
-      <Pressable accessibilityRole="button" style={styles.modelBar} onPress={() => setPickerOpen((open) => !open)}>
+    // The composer is the bottom-most thing on the screen, so on iOS the
+    // keyboard covered both the field being typed into and the send button.
+    // Android resizes the window itself, which is why it asks for no behavior.
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: topInset }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <Pressable accessibilityRole="button" style={press(styles.modelBar)} onPress={() => setPickerOpen((open) => !open)}>
         <Text style={styles.modelText} numberOfLines={1}>
           {providerLabel} · {modelId.length === 0 ? 'no tool-calling model' : modelId}
         </Text>
@@ -219,21 +229,26 @@ export function AgentScreen({ topInset, projectId }: { readonly topInset: number
 
       {pickerOpen && (
         <View style={styles.picker}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pickerRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.pickerRow}
+          >
             {providers.map((provider) => (
               <Pressable
                 key={provider.id}
                 accessibilityRole="button"
                 accessibilityState={{ selected: provider.id === providerId }}
                 onPress={() => setProviderId(provider.id)}
-                style={[styles.chip, provider.id === providerId && styles.chipOn]}
+                style={press([styles.chip, provider.id === providerId && styles.chipOn])}
               >
                 <Text style={[styles.chipText, provider.id === providerId && styles.chipTextOn]}>{provider.label}</Text>
                 {connected[provider.id] !== true && provider.auth === 'api-key' && <Text style={styles.chipDot}>•</Text>}
               </Pressable>
             ))}
           </ScrollView>
-          <ScrollView style={styles.modelList} nestedScrollEnabled>
+          <ScrollView style={styles.modelList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
             {models.length === 0 ? (
               <Text style={styles.note}>{providerLabel} lists no tool-calling models in the catalog.</Text>
             ) : (
@@ -246,7 +261,7 @@ export function AgentScreen({ topInset, projectId }: { readonly topInset: number
                     setModelId(model.id);
                     setPickerOpen(false);
                   }}
-                  style={[styles.modelRow, model.id === modelId && styles.modelRowOn]}
+                  style={press([styles.modelRow, model.id === modelId && styles.modelRowOn])}
                 >
                   <Text style={styles.modelName}>{model.label}</Text>
                   {model.contextK !== undefined && <Text style={styles.modelMeta}>{model.contextK}k</Text>}
@@ -272,6 +287,10 @@ export function AgentScreen({ topInset, projectId }: { readonly topInset: number
         ref={scroller}
         style={styles.thread}
         contentContainerStyle={styles.threadContent}
+        keyboardShouldPersistTaps="handled"
+        // Dragging the thread pushes the keyboard down with the finger, which is
+        // how every messaging app on both platforms behaves.
+        keyboardDismissMode="interactive"
         onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: true })}
       >
         {messages.length === 0 && (
@@ -296,10 +315,12 @@ export function AgentScreen({ topInset, projectId }: { readonly topInset: number
             </View>
           );
         })}
+        {/* The picture, not the first 48 characters of its data URI. The agent
+            can generate an image and the user could not see it. */}
         {images.map((uri, index) => (
           <View key={`image-${index}`} style={styles.toolBubble}>
             <Text style={styles.toolName}>generated image</Text>
-            <Text style={styles.toolText}>{uri.slice(0, 48)}…</Text>
+            <Image style={styles.image} source={{ uri }} accessibilityLabel="Generated image" resizeMode="cover" />
           </View>
         ))}
         {thinking && (
@@ -320,10 +341,10 @@ export function AgentScreen({ topInset, projectId }: { readonly topInset: number
             {JSON.stringify(pending.proposal.args)}
           </Text>
           <View style={styles.approveRow}>
-            <Pressable accessibilityRole="button" style={styles.approveYes} onPress={() => decide('once')}>
+            <Pressable accessibilityRole="button" style={press(styles.approveYes)} onPress={() => decide('once')}>
               <Text style={styles.approveYesText}>Run</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" style={styles.approveNo} onPress={() => decide('reject')}>
+            <Pressable accessibilityRole="button" style={press(styles.approveNo)} onPress={() => decide('reject')}>
               <Text style={styles.approveNoText}>Decline</Text>
             </Pressable>
           </View>
@@ -346,60 +367,62 @@ export function AgentScreen({ topInset, projectId }: { readonly topInset: number
         />
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Send"
           disabled={thinking || draft.trim().length === 0}
           onPress={send}
-          style={[styles.send, (thinking || draft.trim().length === 0) && styles.sendOff]}
+          style={press([styles.send, (thinking || draft.trim().length === 0) && styles.sendOff])}
         >
           <Text style={styles.sendText}>↑</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.bg },
-  modelBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.line },
-  modelText: { flex: 1, color: theme.text, fontSize: 12, fontWeight: '600' },
-  modelChevron: { color: theme.textWeaker, fontSize: 10 },
+  modelBar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: MIN_TAP, paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.line },
+  modelText: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '600' },
+  modelChevron: { color: theme.textWeaker, fontSize: 11 },
   picker: { borderBottomWidth: 1, borderBottomColor: theme.line, paddingBottom: 10 },
   pickerRow: { gap: 8, paddingHorizontal: 20, paddingVertical: 10 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
+  chip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: MIN_TAP, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: theme.line },
   chipOn: { backgroundColor: theme.accent, borderColor: theme.accent },
-  chipText: { color: theme.textWeak, fontSize: 12, fontWeight: '600' },
+  chipText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
   chipTextOn: { color: theme.bg },
-  chipDot: { color: theme.warn, fontSize: 12 },
-  modelList: { maxHeight: 180 },
-  modelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 9 },
+  chipDot: { color: theme.warn, fontSize: 13 },
+  modelList: { maxHeight: 220 },
+  modelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: MIN_TAP, paddingHorizontal: 20, paddingVertical: 10 },
   modelRowOn: { backgroundColor: theme.surface },
-  modelName: { color: theme.text, fontSize: 12 },
-  modelMeta: { color: theme.textWeaker, fontSize: 10, fontVariant: ['tabular-nums'] },
+  modelName: { flex: 1, color: theme.text, fontSize: 14 },
+  modelMeta: { color: theme.textWeaker, fontSize: 12, fontVariant: ['tabular-nums'] },
   addCustom: { paddingHorizontal: 20, paddingTop: 10 },
-  note: { color: theme.textWeaker, fontSize: 11, lineHeight: 16, paddingHorizontal: 20, paddingTop: 6 },
+  note: { color: theme.textWeaker, fontSize: 12, lineHeight: 17, paddingHorizontal: 20, paddingTop: 6 },
   thread: { flex: 1 },
   threadContent: { padding: 16, gap: 10, paddingBottom: 24 },
-  empty: { color: theme.textWeak, fontSize: 13, lineHeight: 20, padding: 8 },
+  empty: { color: theme.textWeak, fontSize: 14, lineHeight: 21, padding: 8 },
   bubble: { maxWidth: '86%', paddingHorizontal: 13, paddingVertical: 10, borderRadius: 14 },
   mine: { alignSelf: 'flex-end', backgroundColor: theme.accent },
   theirs: { alignSelf: 'flex-start', backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.line },
   mineText: { color: theme.bg, fontSize: 14, lineHeight: 20 },
   theirsText: { color: theme.text, fontSize: 14, lineHeight: 20 },
-  toolBubble: { alignSelf: 'stretch', padding: 11, borderRadius: 10, borderWidth: 1, borderColor: theme.line, gap: 4 },
-  toolName: { color: theme.mint, fontSize: 10, fontWeight: '700', letterSpacing: 0.6 },
-  toolText: { color: theme.textWeak, fontSize: 12, lineHeight: 18 },
+  toolBubble: { alignSelf: 'stretch', padding: 11, borderRadius: 10, borderWidth: 1, borderColor: theme.line, gap: 6 },
+  toolName: { color: theme.mint, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
+  toolText: { color: theme.textWeak, fontSize: 13, lineHeight: 19 },
+  image: { width: '100%', aspectRatio: 1, borderRadius: 8, backgroundColor: theme.bg },
   working: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 4 },
-  error: { color: theme.danger, fontSize: 12, lineHeight: 18 },
+  error: { color: theme.danger, fontSize: 13, lineHeight: 19 },
   approveCard: { margin: 16, marginTop: 0, padding: 14, borderRadius: 12, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.line, gap: 8 },
-  approveTitle: { color: theme.text, fontSize: 14, fontWeight: '700' },
-  approveArgs: { color: theme.textWeaker, fontSize: 11, lineHeight: 16 },
+  approveTitle: { color: theme.text, fontSize: 15, fontWeight: '700' },
+  approveArgs: { color: theme.textWeaker, fontSize: 12, lineHeight: 17 },
   approveRow: { flexDirection: 'row', gap: 8 },
-  approveYes: { flex: 1, paddingVertical: 11, borderRadius: 9, alignItems: 'center', backgroundColor: theme.accent },
-  approveYesText: { color: theme.bg, fontSize: 13, fontWeight: '700' },
-  approveNo: { flex: 1, paddingVertical: 11, borderRadius: 9, alignItems: 'center', borderWidth: 1, borderColor: theme.line },
-  approveNoText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
+  approveYes: { flex: 1, minHeight: MIN_TAP, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
+  approveYesText: { color: theme.bg, fontSize: 14, fontWeight: '700' },
+  approveNo: { flex: 1, minHeight: MIN_TAP, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.line },
+  approveNoText: { color: theme.textWeak, fontSize: 14, fontWeight: '600' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: theme.line },
-  input: { flex: 1, maxHeight: 120, minHeight: 42, paddingHorizontal: 13, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface, color: theme.text, fontSize: 14 },
-  send: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
+  input: { flex: 1, maxHeight: 120, minHeight: MIN_TAP, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 14, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface, color: theme.text, fontSize: 15 },
+  send: { width: MIN_TAP, height: MIN_TAP, borderRadius: MIN_TAP / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
   sendOff: { opacity: 0.35 },
-  sendText: { color: theme.bg, fontSize: 18, fontWeight: '700' }
+  sendText: { color: theme.bg, fontSize: 19, fontWeight: '700' }
 });

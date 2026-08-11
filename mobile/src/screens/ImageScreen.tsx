@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { estimateImageCost } from '@openvideo/shared/mediaGenerationPricing';
 import {
@@ -15,7 +15,9 @@ import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { ModelSelect } from '../components/ModelSelect';
 import { SpendPrompt } from '../components/SpendPrompt';
 import { getDomainModels } from '@openvideo/shared/aiDomainModels';
+import { FormScreen } from '../components/FormScreen';
 import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
 
 const RATIOS: readonly ImageAspectRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4'];
 
@@ -104,7 +106,7 @@ export function ImageScreen({
   };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: topInset + 16 }]}>
+    <FormScreen topInset={topInset}>
       <Text style={styles.h1}>Generate an image</Text>
       <Text style={styles.sub}>Runs against your own provider account, through the shared adapters.</Text>
 
@@ -125,7 +127,7 @@ export function ImageScreen({
             accessibilityRole="button"
             accessibilityState={{ selected: ratio === aspectRatio }}
             onPress={() => setAspectRatio(ratio)}
-            style={[styles.chip, ratio === aspectRatio && styles.chipOn]}
+            style={press([styles.chip, ratio === aspectRatio && styles.chipOn])}
           >
             <Text style={[styles.chipText, ratio === aspectRatio && styles.chipTextOn]}>{ratio}</Text>
           </Pressable>
@@ -153,7 +155,7 @@ export function ImageScreen({
         accessibilityRole="button"
         disabled={result.kind === 'running' || prompt.trim().length === 0}
         onPress={generate}
-        style={[styles.cta, (result.kind === 'running' || prompt.trim().length === 0) && styles.ctaOff]}
+        style={press([styles.cta, (result.kind === 'running' || prompt.trim().length === 0) && styles.ctaOff])}
       >
         <Text style={styles.ctaText}>{result.kind === 'running' ? 'Generating…' : 'Generate'}</Text>
       </Pressable>
@@ -174,40 +176,39 @@ export function ImageScreen({
           <Text style={styles.footnote}>{result.image.providerJobId}</Text>
         </View>
       )}
-    </ScrollView>
+    </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: 20, paddingBottom: 40, gap: 6 },
   h1: { color: theme.text, fontSize: 26, fontWeight: '700' },
   sub: { color: theme.textWeak, fontSize: 13, lineHeight: 19, marginBottom: 8 },
-  label: { color: theme.text, fontSize: 12, fontWeight: '600', marginTop: 20, marginBottom: 8 },
+  label: { color: theme.text, fontSize: 13, fontWeight: '600', marginTop: 20, marginBottom: 8 },
   row: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  chip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
+  chip: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: theme.line },
   chipOn: { backgroundColor: theme.accent, borderColor: theme.accent },
-  chipText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
+  chipText: { color: theme.textWeak, fontSize: 14, fontWeight: '600' },
   chipTextOn: { color: theme.bg },
   input: {
-    minHeight: 88,
-    padding: 12,
+    minHeight: 96,
+    padding: 14,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.line,
     backgroundColor: theme.surface,
     color: theme.text,
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 21,
     textAlignVertical: 'top'
   },
-  cost: { color: theme.textWeak, fontSize: 12, marginTop: 12, fontVariant: ['tabular-nums'] },
-  cta: { marginTop: 14, paddingVertical: 14, borderRadius: 10, alignItems: 'center', backgroundColor: theme.accent },
+  cost: { color: theme.textWeak, fontSize: 13, marginTop: 12, fontVariant: ['tabular-nums'] },
+  cta: { marginTop: 14, minHeight: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
   ctaOff: { opacity: 0.4 },
-  ctaText: { color: theme.bg, fontSize: 14, fontWeight: '700' },
+  ctaText: { color: theme.bg, fontSize: 15, fontWeight: '700' },
   spinner: { marginTop: 20 },
-  warn: { color: theme.warn, fontSize: 12, lineHeight: 18, marginTop: 8 },
-  error: { color: theme.danger, fontSize: 12, lineHeight: 18, marginTop: 14 },
+  warn: { color: theme.warn, fontSize: 13, lineHeight: 19, marginTop: 8 },
+  error: { color: theme.danger, fontSize: 13, lineHeight: 19, marginTop: 14 },
   resultBox: { marginTop: 20, gap: 8 },
   resultImage: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: theme.surface },
-  footnote: { color: theme.textWeaker, fontSize: 10 }
+  footnote: { color: theme.textWeaker, fontSize: 11 }
 });

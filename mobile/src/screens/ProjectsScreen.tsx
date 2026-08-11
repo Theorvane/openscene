@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from 'react-native';
 
 import { createProject, deleteProject, listProjects, renameProject, type ProjectSummary } from '../lib/projectStore';
-import { GearIcon } from '../components/Icon';
+import { CloseIcon, GearIcon, PencilIcon } from '../components/Icon';
+import { FormScreen } from '../components/FormScreen';
 import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
 
 export function ProjectsScreen({
   topInset,
@@ -18,6 +29,8 @@ export function ProjectsScreen({
 }) {
   const [projects, setProjects] = useState<readonly ProjectSummary[]>([]);
   const [draftName, setDraftName] = useState('');
+  /** The project being renamed, and the name being typed for it. */
+  const [renaming, setRenaming] = useState<{ readonly project: ProjectSummary; readonly name: string } | null>(null);
 
   const refresh = useCallback(() => setProjects(listProjects()), []);
   useEffect(refresh, [refresh]);
@@ -38,19 +51,35 @@ export function ProjectsScreen({
     ]);
   };
 
-  const promptRename = (project: ProjectSummary): void => {
-    Alert.prompt?.('Rename project', undefined, (name) => {
-      if (renameProject(project.id, name ?? '') !== null) refresh();
-    }, 'plain-text', project.name);
+  const commitRename = (): void => {
+    if (renaming === null) return;
+    if (renameProject(renaming.project.id, renaming.name) !== null) refresh();
+    setRenaming(null);
+  };
+
+  const create = (): void => {
+    const project = createProject(draftName);
+    setDraftName('');
+    refresh();
+    onOpen(project.id);
   };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: topInset + 16 }]}>
+    <FormScreen
+      topInset={topInset}
+      contentStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={theme.textWeak} />}
+    >
       <View style={styles.headRow}>
         <Text style={styles.h1}>Projects</Text>
         {onOpenSettings !== undefined && (
-          <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={onOpenSettings} style={styles.iconButton}>
-            <GearIcon size={19} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            onPress={onOpenSettings}
+            style={press(styles.iconButton)}
+          >
+            <GearIcon size={20} />
           </Pressable>
         )}
       </View>
@@ -67,17 +96,10 @@ export function ProjectsScreen({
           placeholder="New project name"
           placeholderTextColor={theme.textWeaker}
           accessibilityLabel="New project name"
+          returnKeyType="go"
+          onSubmitEditing={create}
         />
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            const project = createProject(draftName);
-            setDraftName('');
-            refresh();
-            onOpen(project.id);
-          }}
-          style={styles.create}
-        >
+        <Pressable accessibilityRole="button" onPress={create} style={press(styles.create)}>
           <Text style={styles.createText}>Create</Text>
         </Pressable>
       </View>
@@ -87,43 +109,125 @@ export function ProjectsScreen({
       ) : (
         projects.map((project) => (
           <View key={project.id} style={[styles.card, project.id === activeProjectId && styles.cardActive]}>
-            <Pressable style={styles.cardMain} accessibilityRole="button" onPress={() => onOpen(project.id)}>
+            <Pressable style={press(styles.cardMain)} accessibilityRole="button" onPress={() => onOpen(project.id)}>
               <Text style={styles.cardTitle}>{project.name}</Text>
               <Text style={styles.cardMeta}>
                 {project.id === activeProjectId ? 'open · ' : ''}
                 edited {project.updatedAt.slice(0, 16).replace('T', ' ')}
               </Text>
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Rename ${project.name}`} onPress={() => promptRename(project)} style={styles.iconButton}>
-              <Text style={styles.icon}>✎</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Rename ${project.name}`}
+              onPress={() => setRenaming({ project, name: project.name })}
+              style={press(styles.iconButton)}
+            >
+              <PencilIcon size={17} />
             </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${project.name}`} onPress={() => confirmDelete(project)} style={styles.iconButton}>
-              <Text style={[styles.icon, styles.iconDanger]}>✕</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${project.name}`}
+              onPress={() => confirmDelete(project)}
+              style={press(styles.iconButton)}
+            >
+              <CloseIcon size={15} color={theme.danger} />
             </Pressable>
           </View>
         ))
       )}
-    </ScrollView>
+
+      {/*
+        Renaming is a sheet rather than `Alert.prompt`, which is iOS-only: the
+        optional call the screen used to make simply did nothing on Android, so
+        the button was there and the rename was not.
+      */}
+      <Modal
+        visible={renaming !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRenaming(null)}
+      >
+        <View style={styles.scrim}>
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>Rename project</Text>
+            <TextInput
+              style={styles.sheetInput}
+              value={renaming?.name ?? ''}
+              onChangeText={(name) => setRenaming((current) => (current === null ? null : { ...current, name }))}
+              placeholder="Project name"
+              placeholderTextColor={theme.textWeaker}
+              accessibilityLabel="Project name"
+              autoFocus
+              selectTextOnFocus
+              returnKeyType="done"
+              onSubmitEditing={commitRename}
+            />
+            <View style={styles.sheetRow}>
+              <Pressable accessibilityRole="button" onPress={() => setRenaming(null)} style={press(styles.sheetCancel)}>
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={(renaming?.name ?? '').trim().length === 0}
+                onPress={commitRename}
+                style={press([styles.sheetSave, (renaming?.name ?? '').trim().length === 0 && styles.sheetSaveOff])}
+              >
+                <Text style={styles.sheetSaveText}>Rename</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: 20, paddingBottom: 40, gap: 10 },
+  content: { gap: 10 },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   h1: { color: theme.text, fontSize: 26, fontWeight: '700' },
   sub: { color: theme.textWeak, fontSize: 13, lineHeight: 19, marginBottom: 6 },
   newRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  input: { flex: 1, padding: 11, borderRadius: 8, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface, color: theme.text, fontSize: 13 },
-  create: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 8, backgroundColor: theme.accent },
-  createText: { color: theme.bg, fontSize: 13, fontWeight: '700' },
-  empty: { color: theme.textWeak, fontSize: 13, marginTop: 12 },
-  card: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  input: {
+    flex: 1,
+    minHeight: MIN_TAP,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.line,
+    backgroundColor: theme.surface,
+    color: theme.text,
+    fontSize: 15
+  },
+  create: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 18, borderRadius: 10, backgroundColor: theme.accent },
+  createText: { color: theme.bg, fontSize: 14, fontWeight: '700' },
+  empty: { color: theme.textWeak, fontSize: 14, marginTop: 12 },
+  card: { flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingVertical: 6, paddingRight: 4, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
   cardActive: { borderColor: theme.accent },
-  cardMain: { flex: 1 },
-  cardTitle: { color: theme.text, fontSize: 14, fontWeight: '600' },
-  cardMeta: { color: theme.textWeaker, fontSize: 11, marginTop: 2 },
-  iconButton: { paddingHorizontal: 10, paddingVertical: 6 },
-  icon: { color: theme.textWeak, fontSize: 14 },
-  iconDanger: { color: theme.danger }
+  cardMain: { flex: 1, justifyContent: 'center', minHeight: MIN_TAP, paddingVertical: 4 },
+  cardTitle: { color: theme.text, fontSize: 15, fontWeight: '600' },
+  cardMeta: { color: theme.textWeaker, fontSize: 12, marginTop: 3 },
+  iconButton: { width: MIN_TAP, height: MIN_TAP, alignItems: 'center', justifyContent: 'center' },
+
+  scrim: { flex: 1, backgroundColor: '#000000cc', justifyContent: 'center', padding: 26 },
+  sheet: { backgroundColor: theme.surface, borderRadius: 16, padding: 20, gap: 12, borderWidth: 1, borderColor: theme.line },
+  sheetTitle: { color: theme.text, fontSize: 17, fontWeight: '700' },
+  sheetInput: {
+    minHeight: MIN_TAP,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.line,
+    backgroundColor: theme.bg,
+    color: theme.text,
+    fontSize: 15
+  },
+  sheetRow: { flexDirection: 'row', gap: 10 },
+  sheetCancel: { flex: 1, minHeight: MIN_TAP, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: theme.line },
+  sheetCancelText: { color: theme.textWeak, fontSize: 14, fontWeight: '600' },
+  sheetSave: { flex: 1, minHeight: MIN_TAP, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: theme.accent },
+  sheetSaveOff: { opacity: 0.35 },
+  sheetSaveText: { color: theme.bg, fontSize: 14, fontWeight: '700' }
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PROVIDER_KEYS, readSlot } from '../lib/credentials';
 import { SPEND_FEATURES, useSpendPermissions } from '../lib/permissions';
@@ -8,7 +8,9 @@ import { ProviderConnect } from '../components/ProviderConnect';
 import { AddCustomProvider } from '../components/AddCustomProvider';
 import { customCredentialKey, removeCustomProvider, useCustomProviders } from '../lib/customProviders';
 import { LLM_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, getLlmCatalogProvider } from '@openvideo/shared/llmProviders';
+import { FormScreen } from '../components/FormScreen';
 import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
 
 /**
  * Providers, grouped by what connecting one lets you do.
@@ -66,7 +68,7 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
   }, [refresh]);
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: topInset + 16 }]}>
+    <FormScreen topInset={topInset}>
       <Text style={styles.h1}>Providers</Text>
       <Text style={styles.sub}>
         Everything the app generates runs against your own accounts. Keys are held in the device keystore — Keychain on
@@ -111,7 +113,7 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
                 removeCustomProvider(provider.id);
                 refreshCustom();
               }}
-              style={styles.removeCustom}
+              style={press(styles.removeCustom)}
             >
               <Text style={styles.removeCustomText}>Remove this provider</Text>
             </Pressable>
@@ -146,7 +148,7 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
               <Text style={styles.permLabel}>{feature.replace('-generation', '')}</Text>
               <Text style={styles.permValue}>{standing === null ? 'asks each time' : standing}</Text>
               {standing !== null && (
-                <Pressable accessibilityRole="button" onPress={() => permissions.forget(feature)} style={styles.permReset}>
+                <Pressable accessibilityRole="button" onPress={() => permissions.forget(feature)} style={press(styles.permReset)}>
                   <Text style={styles.permResetText}>Reset</Text>
                 </Pressable>
               )}
@@ -154,24 +156,22 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
           );
         })}
       </View>
-    </ScrollView>
+    </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: 20, paddingBottom: 60, gap: 6 },
   h1: { color: theme.text, fontSize: 26, fontWeight: '700' },
   sub: { color: theme.textWeak, fontSize: 13, lineHeight: 19, marginBottom: 6 },
   section: { marginTop: 22, gap: 10 },
-  sectionTitle: { color: theme.text, fontSize: 16, fontWeight: '700' },
-  sectionBlurb: { color: theme.textWeak, fontSize: 12, lineHeight: 18, marginBottom: 2 },
+  sectionTitle: { color: theme.text, fontSize: 17, fontWeight: '700' },
+  sectionBlurb: { color: theme.textWeak, fontSize: 13, lineHeight: 19, marginBottom: 2 },
   customRow: { gap: 6 },
-  removeCustom: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: theme.line },
-  removeCustomText: { color: theme.textWeaker, fontSize: 10, fontWeight: '600' },
-  permRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.line },
-  permLabel: { flex: 1, color: theme.text, fontSize: 13, textTransform: 'capitalize' },
-  permValue: { color: theme.textWeak, fontSize: 12 },
-  permReset: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: theme.line },
-  permResetText: { color: theme.textWeak, fontSize: 11, fontWeight: '600' }
+  removeCustom: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: MIN_TAP, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
+  removeCustomText: { color: theme.textWeaker, fontSize: 13, fontWeight: '600' },
+  permRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.line },
+  permLabel: { flex: 1, color: theme.text, fontSize: 14, textTransform: 'capitalize' },
+  permValue: { color: theme.textWeak, fontSize: 13 },
+  permReset: { justifyContent: 'center', minHeight: MIN_TAP, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
+  permResetText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' }
 });

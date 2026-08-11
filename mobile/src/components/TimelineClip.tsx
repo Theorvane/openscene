@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   audio: { backgroundColor: theme.mint },
   selected: { borderWidth: 2, borderColor: theme.text },
-  label: { color: theme.bg, fontSize: 10, fontWeight: '700' },
+  label: { color: theme.bg, fontSize: 11, fontWeight: '700' },
   handleLeft: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 5, backgroundColor: theme.text },
   handleRight: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 5, backgroundColor: theme.text }
 });

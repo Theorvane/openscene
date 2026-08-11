@@ -6,6 +6,7 @@ import { getDomainModels, type AiDomain, type AiDomainModelConfig } from '@openv
 import { describeProvider, providersForDomain } from '../lib/mediaProviders';
 import { ProviderConnect } from './ProviderConnect';
 import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
 
 /**
  * A select for the current model, and a plus for getting more.
@@ -62,7 +63,7 @@ export function ModelSelect({
           accessibilityRole="button"
           accessibilityLabel="Choose a model"
           onPress={() => setSheet('choose')}
-          style={styles.select}
+          style={press(styles.select)}
         >
           <Text style={styles.model} numberOfLines={1}>
             {selected === undefined ? (
@@ -83,7 +84,7 @@ export function ModelSelect({
           accessibilityRole="button"
           accessibilityLabel="Add a provider"
           onPress={() => setSheet('add')}
-          style={styles.plus}
+          style={press(styles.plus)}
         >
           <View style={styles.plusBar} />
           <View style={[styles.plusBar, styles.plusBarVertical]} />
@@ -101,12 +102,12 @@ export function ModelSelect({
           <View style={styles.sheet}>
             <View style={styles.sheetHead}>
               <Text style={styles.sheetTitle}>{sheet === 'add' ? 'Add a provider' : 'Choose a model'}</Text>
-              <Pressable accessibilityRole="button" onPress={() => setSheet(null)} style={styles.close}>
+              <Pressable accessibilityRole="button" onPress={() => setSheet(null)} style={press(styles.close)}>
                 <Text style={styles.closeText}>Done</Text>
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.sheetBody}>
+            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
               {sheet === 'add' ? (
                 <>
                   <Text style={styles.sheetBlurb}>
@@ -146,7 +147,7 @@ export function ModelSelect({
                             onSelect(model);
                             setSheet(null);
                           }}
-                          style={[styles.option, chosen && styles.optionOn, !model.available && styles.optionOff]}
+                          style={press([styles.option, chosen && styles.optionOn, !model.available && styles.optionOff])}
                         >
                           <View style={styles.optionText}>
                             <Text style={styles.optionLabel}>{model.label}</Text>
@@ -183,15 +184,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    height: 40,
+    height: MIN_TAP,
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.line,
     backgroundColor: theme.surface
   },
-  provider: { color: theme.textWeaker, fontSize: 13, fontWeight: '600' },
-  model: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '600' },
+  provider: { color: theme.textWeaker, fontSize: 14, fontWeight: '600' },
+  model: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '600' },
   chevron: {
     width: 7,
     height: 7,
@@ -202,8 +203,8 @@ const styles = StyleSheet.create({
     marginBottom: 3
   },
   plus: {
-    width: 40,
-    height: 40,
+    width: MIN_TAP,
+    height: MIN_TAP,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.accent,
@@ -212,29 +213,30 @@ const styles = StyleSheet.create({
   },
   plusBar: { position: 'absolute', width: 13, height: 1.5, borderRadius: 1, backgroundColor: theme.accent },
   plusBarVertical: { transform: [{ rotate: '90deg' }] },
-  needsKey: { color: theme.warn, fontSize: 11, lineHeight: 16 },
+  needsKey: { color: theme.warn, fontSize: 12, lineHeight: 17 },
 
   scrim: { flex: 1, backgroundColor: '#000000cc', justifyContent: 'flex-end' },
   sheet: { maxHeight: '86%', backgroundColor: theme.bg, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderTopWidth: 1, borderColor: theme.line },
   sheetHead: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: theme.line },
   sheetTitle: { flex: 1, color: theme.text, fontSize: 17, fontWeight: '700' },
-  close: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: theme.accent },
-  closeText: { color: theme.bg, fontSize: 13, fontWeight: '700' },
+  close: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 8, backgroundColor: theme.accent },
+  closeText: { color: theme.bg, fontSize: 14, fontWeight: '700' },
   sheetBody: { padding: 16, paddingBottom: 40, gap: 10 },
-  sheetBlurb: { color: theme.textWeak, fontSize: 12, lineHeight: 18 },
+  sheetBlurb: { color: theme.textWeak, fontSize: 13, lineHeight: 19 },
 
   group: { gap: 5 },
   groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  groupTitle: { flex: 1, color: theme.text, fontSize: 13, fontWeight: '700' },
-  groupBadge: { fontSize: 9, fontWeight: '700', letterSpacing: 0.4, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, overflow: 'hidden', borderWidth: 1 },
+  groupTitle: { flex: 1, color: theme.text, fontSize: 14, fontWeight: '700' },
+  groupBadge: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 5, overflow: 'hidden', borderWidth: 1 },
   on: { color: theme.mint, borderColor: theme.mint },
   off: { color: theme.textWeaker, borderColor: theme.line },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    minHeight: MIN_TAP,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.line,
@@ -243,7 +245,7 @@ const styles = StyleSheet.create({
   optionOn: { borderColor: theme.accent },
   optionOff: { opacity: 0.45 },
   optionText: { flex: 1 },
-  optionLabel: { color: theme.text, fontSize: 13, fontWeight: '600' },
-  optionMeta: { color: theme.textWeaker, fontSize: 10, lineHeight: 14, marginTop: 1 },
+  optionLabel: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  optionMeta: { color: theme.textWeaker, fontSize: 12, lineHeight: 16, marginTop: 2 },
   tick: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.accent }
 });
