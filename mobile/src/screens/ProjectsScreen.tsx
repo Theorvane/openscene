@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   RefreshControl,
@@ -147,7 +148,10 @@ export function ProjectsScreen({
         animationType="fade"
         onRequestClose={() => setRenaming(null)}
       >
-        <View style={styles.scrim}>
+        {/* A Modal is its own window, so the screen's avoidance does not reach
+            inside it — and this one is vertically centred, which is exactly where
+            the keyboard lands. */}
+        <KeyboardAvoidingView style={styles.scrim} behavior="padding">
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>Rename project</Text>
             <TextInput
@@ -176,7 +180,7 @@ export function ProjectsScreen({
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </FormScreen>
   );

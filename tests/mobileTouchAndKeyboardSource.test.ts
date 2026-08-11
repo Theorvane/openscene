@@ -47,9 +47,11 @@ describe('mobile touch and keyboard source contract', () => {
     const form = await readSource('src/components/FormScreen.tsx');
 
     expect(form).toContain('<KeyboardAvoidingView');
-    // Android resizes the window itself; asking for padding as well lifts the
-    // content twice.
-    expect(form).toContain("behavior={Platform.OS === 'ios' ? 'padding' : undefined}");
+    // Both platforms, not iOS alone. Leaving Android to `adjustResize` is what
+    // the manifest asks for, but edge-to-edge is mandatory from this SDK and an
+    // edge-to-edge window is not resized for the keyboard — it is drawn over.
+    expect(form).toContain('behavior="padding"');
+    expect(form).not.toContain("Platform.OS === 'ios' ? 'padding' : undefined");
     // Without this a tap on the button below a focused field only dismisses the
     // keyboard, which reads as a dead button.
     expect(form).toContain('keyboardShouldPersistTaps="handled"');
@@ -65,8 +67,42 @@ describe('mobile touch and keyboard source contract', () => {
     // thread scrolls above it, so it avoids the keyboard itself.
     const agent = await readSource('src/screens/AgentScreen.tsx');
     expect(agent).toContain('<KeyboardAvoidingView');
-    expect(agent).toContain("behavior={Platform.OS === 'ios' ? 'padding' : undefined}");
+    expect(agent).toContain('behavior="padding"');
     expect(agent).toContain('keyboardDismissMode="interactive"');
+  });
+
+  it('tells each screen how far down the display it starts', async () => {
+    // KeyboardAvoidingView measures itself with onLayout, which is relative to
+    // its parent, and compares that against a keyboard position in screen
+    // coordinates. A screen below a title bar is lifted short by exactly the
+    // height of that bar — far enough to look fixed and still cover the button.
+    const form = await readSource('src/components/FormScreen.tsx');
+    expect(form).toContain('keyboardVerticalOffset={keyboardOffset}');
+
+    const app = await readSource('App.tsx');
+    // Measured, not assumed: the bar carries the top inset and grows a row
+    // whenever an export result is showing.
+    expect(app).toContain('onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}');
+    for (const screen of ['PlanScreen', 'VoiceScreen', 'ImageScreen', 'AgentScreen']) {
+      expect(app, `${screen} must be told where the body starts`).toMatch(
+        new RegExp(`<${screen}[^>]*keyboardOffset=\\{bodyTop\\}`, 's')
+      );
+    }
+
+    const agent = await readSource('src/screens/AgentScreen.tsx');
+    expect(agent).toContain('keyboardVerticalOffset={keyboardOffset}');
+  });
+
+  it('avoids the keyboard inside the sheets that take typing', async () => {
+    // A Modal is its own window, so the calling screen's avoidance does not
+    // reach inside it. Both of these hold a field: the rename sheet is centred
+    // where the keyboard lands, and the provider sheet sits on the bottom edge.
+    for (const path of ['src/screens/ProjectsScreen.tsx', 'src/components/ModelSelect.tsx']) {
+      const body = await readSource(path);
+      expect(body, `${path} must avoid the keyboard inside its Modal`).toContain(
+        '<KeyboardAvoidingView style={styles.scrim} behavior="padding">'
+      );
+    }
   });
 
   it('renames a project without an iOS-only API', async () => {

@@ -36,9 +36,12 @@ type Result =
 
 export function ImageScreen({
   topInset,
+  keyboardOffset,
   connectionsVersion
 }: {
   readonly topInset: number;
+  /** Height of the chrome above this screen; see FormScreen. */
+  readonly keyboardOffset: number;
   /** Changes when Settings closes, so stored keys are picked up. */
   readonly connectionsVersion: number;
 }) {
@@ -106,7 +109,7 @@ export function ImageScreen({
   };
 
   return (
-    <FormScreen topInset={topInset}>
+    <FormScreen topInset={topInset} keyboardOffset={keyboardOffset}>
       <Text style={styles.h1}>Generate an image</Text>
       <Text style={styles.sub}>Runs against your own provider account, through the shared adapters.</Text>
 
@@ -206,7 +209,6 @@ const styles = StyleSheet.create({
   ctaOff: { opacity: 0.4 },
   ctaText: { color: theme.bg, fontSize: 15, fontWeight: '700' },
   spinner: { marginTop: 20 },
-  warn: { color: theme.warn, fontSize: 13, lineHeight: 19, marginTop: 8 },
   error: { color: theme.danger, fontSize: 13, lineHeight: 19, marginTop: 14 },
   resultBox: { marginTop: 20, gap: 8 },
   resultImage: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: theme.surface },

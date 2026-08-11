@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import type { RefreshControlProps, StyleProp, ViewStyle } from 'react-native';
 
 import { theme } from '../lib/theme';
@@ -14,24 +14,36 @@ import { theme } from '../lib/theme';
  * blocks the touch by default to do exactly that. The second is the worse one:
  * the tap looks like it did nothing.
  *
- * `padding` on iOS and nothing on Android is deliberate. Android resizes the
- * window for the keyboard already (Expo's default `adjustResize`), and asking
- * for padding on top of that lifts the content twice.
+ * `padding` on both platforms, not iOS alone. Leaving Android to `adjustResize`
+ * is what the manifest asks for and what Android used to do, but edge-to-edge is
+ * mandatory from this SDK — the plugin refuses to turn it off — and an
+ * edge-to-edge window is not resized for the keyboard. The keyboard simply draws
+ * over the app, so the screen has to move its own content on both platforms.
+ *
+ * `keyboardOffset` is not optional dressing. KeyboardAvoidingView measures
+ * itself with `onLayout`, which reports a position relative to its parent, and
+ * then compares that to a keyboard position in screen coordinates. When the view
+ * does not start at the top of the screen the two disagree by exactly the height
+ * of whatever sits above it, and the content is lifted that much too little —
+ * far enough to look like the fix works and still leave the button covered.
  */
 export function FormScreen({
   topInset,
+  keyboardOffset = 0,
   contentStyle,
   refreshControl,
   children
 }: {
   readonly topInset: number;
+  /** Height of the chrome above this screen, in screen coordinates. */
+  readonly keyboardOffset?: number;
   /** Applied to the column the children sit in — most callers only change `gap`. */
   readonly contentStyle?: StyleProp<ViewStyle>;
   readonly refreshControl?: ReactElement<RefreshControlProps>;
   readonly children: ReactNode;
 }) {
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.root} behavior="padding" keyboardVerticalOffset={keyboardOffset}>
       <ScrollView
         style={styles.root}
         contentContainerStyle={[styles.content, { paddingTop: topInset + 16 }]}

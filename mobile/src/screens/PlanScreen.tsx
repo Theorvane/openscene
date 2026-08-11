@@ -28,10 +28,13 @@ const LENGTHS = [8, 16, 30, 45, 60] as const;
 
 export function PlanScreen({
   topInset,
+  keyboardOffset,
   projectId,
   connectionsVersion
 }: {
   readonly topInset: number;
+  /** Height of the chrome above this screen; see FormScreen. */
+  readonly keyboardOffset: number;
   readonly projectId: string | null;
   /** Changes when Settings closes, so stored keys are picked up. */
   readonly connectionsVersion: number;
@@ -164,7 +167,7 @@ export function PlanScreen({
     projectId !== null && !running && prompt.trim().length > 0 && connected[model?.providerId ?? ''] === true;
 
   return (
-    <FormScreen topInset={topInset}>
+    <FormScreen topInset={topInset} keyboardOffset={keyboardOffset}>
       <Text style={styles.h1}>Plan a video</Text>
       <Text style={styles.sub}>Shot lengths and prices come from the same modules the desktop app uses.</Text>
 

@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -41,7 +40,16 @@ const SYSTEM_PROMPT =
 
 type Pending = { readonly proposal: ToolCallProposal; readonly cost: string };
 
-export function AgentScreen({ topInset, projectId }: { readonly topInset: number; readonly projectId: string | null }) {
+export function AgentScreen({
+  topInset,
+  keyboardOffset,
+  projectId
+}: {
+  readonly topInset: number;
+  /** Height of the chrome above this screen; see FormScreen. */
+  readonly keyboardOffset: number;
+  readonly projectId: string | null;
+}) {
   const permissions = useSpendPermissions();
   const { providers: customProviders, refresh: refreshCustom } = useCustomProviders();
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
@@ -213,12 +221,14 @@ export function AgentScreen({ topInset, projectId }: { readonly topInset: number
   const spendTool = pending === null ? undefined : findTool(pending.proposal.name);
 
   return (
-    // The composer is the bottom-most thing on the screen, so on iOS the
-    // keyboard covered both the field being typed into and the send button.
-    // Android resizes the window itself, which is why it asks for no behavior.
+    // The composer is the bottom-most thing on the screen, so the keyboard
+    // covered both the field being typed into and the send button. `padding` on
+    // both platforms and an offset for the title bar above: the reasoning is in
+    // FormScreen, which has the same problem in a scrolling shape.
     <KeyboardAvoidingView
       style={[styles.root, { paddingTop: topInset }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
+      keyboardVerticalOffset={keyboardOffset}
     >
       <Pressable accessibilityRole="button" style={press(styles.modelBar)} onPress={() => setPickerOpen((open) => !open)}>
         <Text style={styles.modelText} numberOfLines={1}>

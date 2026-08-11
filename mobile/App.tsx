@@ -75,6 +75,17 @@ function Shell() {
     setConnectionsVersion((version) => version + 1);
   };
   const [exportState, setExportState] = useState<ExportState>({ kind: 'idle' });
+  /**
+   * Where the tab body starts, measured rather than assumed.
+   *
+   * KeyboardAvoidingView compares its own `onLayout` box — which is relative to
+   * its parent — against a keyboard position in screen coordinates, so a screen
+   * that does not start at the top of the display has to be told how far down it
+   * begins or it lifts its content that much too little. The title bar's height
+   * is not a constant: it carries the top inset, and it grows by a row whenever
+   * an export result is showing.
+   */
+  const [bodyTop, setBodyTop] = useState(0);
 
   if (route.name === 'projects') {
     return (
@@ -187,12 +198,16 @@ function Shell() {
         </Pressable>
       )}
 
-      <View style={styles.body}>
+      <View style={styles.body} onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}>
         {tab === 'edit' && <EditScreen topInset={0} projectId={route.projectId} />}
-        {tab === 'video' && <PlanScreen topInset={0} projectId={route.projectId} connectionsVersion={connectionsVersion} />}
-        {tab === 'voice' && <VoiceScreen topInset={0} targetSeconds={pictureSeconds} connectionsVersion={connectionsVersion} />}
-        {tab === 'image' && <ImageScreen topInset={0} connectionsVersion={connectionsVersion} />}
-        {tab === 'agent' && <AgentScreen topInset={0} projectId={route.projectId} />}
+        {tab === 'video' && (
+          <PlanScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
+        )}
+        {tab === 'voice' && (
+          <VoiceScreen topInset={0} keyboardOffset={bodyTop} targetSeconds={pictureSeconds} connectionsVersion={connectionsVersion} />
+        )}
+        {tab === 'image' && <ImageScreen topInset={0} keyboardOffset={bodyTop} connectionsVersion={connectionsVersion} />}
+        {tab === 'agent' && <AgentScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} />}
       </View>
 
       <View style={[styles.tabBar, { paddingBottom: insets.bottom, height: 60 + insets.bottom }]}>

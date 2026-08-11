@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { getDomainModels, type AiDomain, type AiDomainModelConfig } from '@openvideo/shared/aiDomainModels';
 
@@ -98,7 +98,10 @@ export function ModelSelect({
       )}
 
       <Modal visible={sheet !== null} animationType="slide" transparent onRequestClose={() => setSheet(null)}>
-        <View style={styles.scrim}>
+        {/* The add-a-provider sheet holds key fields, and a bottom sheet is
+            where the keyboard opens. A Modal is its own window, so the calling
+            screen's avoidance does not reach in here. */}
+        <KeyboardAvoidingView style={styles.scrim} behavior="padding">
           <View style={styles.sheet}>
             <View style={styles.sheetHead}>
               <Text style={styles.sheetTitle}>{sheet === 'add' ? 'Add a provider' : 'Choose a model'}</Text>
@@ -167,7 +170,7 @@ export function ModelSelect({
               )}
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

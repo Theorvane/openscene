@@ -562,7 +562,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.bg },
   transport: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.line },
   play: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
-  playGlyph: { color: theme.bg, fontSize: 14, fontWeight: '700' },
   disabled: { opacity: 0.3 },
   clock: { flex: 1, color: theme.text, fontSize: 14, fontVariant: ['tabular-nums'] },
   small: { width: 36, height: 36, borderRadius: 9, borderWidth: 1, borderColor: theme.line, alignItems: 'center', justifyContent: 'center' },

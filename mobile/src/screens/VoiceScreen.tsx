@@ -16,10 +16,13 @@ import { theme } from '../lib/theme';
  */
 export function VoiceScreen({
   topInset,
+  keyboardOffset,
   targetSeconds,
   connectionsVersion
 }: {
   readonly topInset: number;
+  /** Height of the chrome above this screen; see FormScreen. */
+  readonly keyboardOffset: number;
   readonly targetSeconds: number;
   /** Changes when Settings closes, so stored keys are picked up. */
   readonly connectionsVersion: number;
@@ -40,7 +43,7 @@ export function VoiceScreen({
   );
 
   return (
-    <FormScreen topInset={topInset}>
+    <FormScreen topInset={topInset} keyboardOffset={keyboardOffset}>
       <Text style={styles.h1}>Voice</Text>
       <Text style={styles.sub}>
         Write to the length of the cut. Over-running is the failure that costs a re-record, so the check runs before
