@@ -19,7 +19,7 @@ import { customCredentialKey, useCustomProviders } from '../lib/customProviders'
 import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { AGENT_TOOLS, findTool } from '../lib/agentTools';
 import { sendChatTurn, type ChatMessage, type ToolCallProposal } from '../lib/agentChatClient';
-import { trimHistory } from '../lib/chatMemory';
+import { dropUnansweredCalls, trimHistory } from '../lib/chatMemory';
 import { clearChat, readChat, writeChat } from '../lib/chatStore';
 import { SpendPrompt } from '../components/SpendPrompt';
 import { AddCustomProvider } from '../components/AddCustomProvider';
@@ -190,9 +190,12 @@ export function AgentScreen({
     const turn = await sendChatTurn({
       providerId,
       modelId,
-      // Trimmed here and not only on the way to disk. The cap exists because
-      // every turn re-sends the whole history, and that is this line.
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...trimHistory(history)],
+      // Trimmed here and not only on the way to disk: the cap exists because
+      // every turn re-sends the whole history, and that is this line. Repaired
+      // for the same reason it is repaired on the way back in — a history that
+      // still carries an unanswered call is one the provider refuses outright,
+      // and refusing to send it beats a 400 the user cannot act on.
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...trimHistory(dropUnansweredCalls(history))],
       tools: AGENT_TOOLS
     });
     if (started !== era.current) return;
@@ -302,6 +305,11 @@ export function AgentScreen({
   const send = (): void => {
     const body = draft.trim();
     if (body.length === 0 || modelId.length === 0) return;
+    // The approval card for a free tool sits inline rather than in a modal, so
+    // nothing physically stopped the user typing past it — and a turn sent with
+    // that call still unanswered is rejected outright by the provider. The
+    // question has to be answered before the conversation moves on.
+    if (pending !== null) return;
     setDraft('');
     const next = [...messages, { role: 'user', content: body } as ChatMessage];
     setMessages(next);
@@ -506,9 +514,9 @@ export function AgentScreen({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Send"
-          disabled={thinking || draft.trim().length === 0}
+          disabled={thinking || pending !== null || draft.trim().length === 0}
           onPress={send}
-          style={press([styles.send, (thinking || draft.trim().length === 0) && styles.sendOff])}
+          style={press([styles.send, (thinking || pending !== null || draft.trim().length === 0) && styles.sendOff])}
         >
           <Text style={styles.sendText}>↑</Text>
         </Pressable>

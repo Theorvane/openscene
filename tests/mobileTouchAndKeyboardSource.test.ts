@@ -124,7 +124,7 @@ describe('mobile touch and keyboard source contract', () => {
     // request — trimming only on the way to disk left the cost uncapped until
     // the app was next launched.
     const agent = await readSource('src/screens/AgentScreen.tsx');
-    expect(agent).toContain('...trimHistory(history)');
+    expect(agent).toContain('...trimHistory(dropUnansweredCalls(history))');
   });
 
   it('keeps a generated image on the message that produced it', async () => {
@@ -135,6 +135,19 @@ describe('mobile touch and keyboard source contract', () => {
     expect(agent).not.toContain('setImages');
     expect(agent).toContain('message.image !== undefined');
     expect(agent).toContain('message.imageDropped === true');
+  });
+
+  it('will not let a message be typed past a tool call still waiting', async () => {
+    // The approval card for a free tool is inline, not a modal, so nothing
+    // physically stopped the user typing past it — and a turn carrying an
+    // unanswered call is rejected outright, in-session, with no restart needed
+    // for the repair on read to help.
+    const agent = await readSource('src/screens/AgentScreen.tsx');
+
+    expect(agent).toContain('if (pending !== null) return;');
+    expect(agent).toContain('disabled={thinking || pending !== null || draft.trim().length === 0}');
+    // And the outgoing history is repaired the same way the stored one is.
+    expect(agent).toContain('...trimHistory(dropUnansweredCalls(history))');
   });
 
   it('treats backing out of a price prompt as a dismissal, not a refusal', async () => {
