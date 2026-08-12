@@ -19,22 +19,12 @@ import { chatGptCredentials } from './openAiSignIn';
  * and silently mangled.
  */
 
-export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
-
-export type ChatMessage = {
-  readonly role: ChatRole;
-  readonly content: string;
-  /** Set on assistant turns that proposed calls, and on the tool replies. */
-  readonly toolCallId?: string;
-  readonly toolName?: string;
-  readonly proposals?: readonly ToolCallProposal[];
-};
-
-export type ToolCallProposal = {
-  readonly id: string;
-  readonly name: string;
-  readonly args: Record<string, unknown>;
-};
+// The message shape lives in `chatMemory`, which nothing else depends on, so a
+// stored conversation can be read and trimmed without dragging the keystore and
+// the browser sign-in in with it. Re-exported here because this is where callers
+// already look for it.
+export type { ChatMessage, ChatRole, ToolCallProposal } from './chatMemory';
+import type { ChatMessage, ToolCallProposal } from './chatMemory';
 
 export type ToolSchema = {
   readonly name: string;
