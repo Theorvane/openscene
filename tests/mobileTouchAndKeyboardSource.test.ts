@@ -133,6 +133,24 @@ describe('mobile touch and keyboard source contract', () => {
     expect(app).toContain('tabIconOn');
   });
 
+  it('scrubs to the moment under the finger, including on a tick label', async () => {
+    // The lane's Pressable turns `locationX` into a time. On Android that is
+    // measured from the view which actually received the touch, so while the
+    // ruler's ticks were touchable a tap on one reported a position relative to
+    // that tick — a fraction of a second — rather than to the lane. Taps between
+    // the labels were always right, which is what made it read as flaky.
+    const ruler = await readSource('src/components/TimelineRuler.tsx');
+    const tickLines = ruler.split('\n').filter((line) => line.includes('styles.tick') || line.includes('styles.half'));
+
+    expect(tickLines.length).toBeGreaterThan(0);
+    for (const line of tickLines) {
+      expect(ruler, `a ruler tick must not take touches: ${line.trim()}`).toContain('pointerEvents="none"');
+    }
+    // Not on the root: the root shares its origin with the lane, so leaving it
+    // as the touch target is what makes the reported position correct.
+    expect(ruler).not.toContain('<View pointerEvents="none" style={[styles.root');
+  });
+
   it('resolves no optional native module at import time', async () => {
     // `expo-media-library` resolves `ExpoMediaLibraryNext`, which a client built
     // without it cannot provide. A top-level import threw while the module graph
