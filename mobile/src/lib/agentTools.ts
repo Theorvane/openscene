@@ -13,7 +13,7 @@ import type { ImageAspectRatio } from '@openvideo/shared/providerSeams';
 import { getDomainModels } from '@openvideo/shared/aiDomainModels';
 import type { VideoAspectRatio } from '@openvideo/shared/videoGeneration';
 import { readKey, type ProviderSlot } from './credentials';
-import { appendAssetToTimeline, readProject } from './projectStore';
+import { appendAssetToTimeline, readProject, saveGeneratedImage } from './projectStore';
 import { generateShot } from './videoGeneration';
 import type { SpendFeature } from './permissions';
 import type { ToolSchema } from './agentChatClient';
@@ -210,7 +210,7 @@ export const AGENT_TOOLS: readonly AgentTool[] = [
       const cost = estimateImageCost({ modelId: text(args, 'modelId', 'gpt-image-1'), imageCount: 1 });
       return cost.priced && cost.amountUsd !== undefined ? `~$${cost.amountUsd.toFixed(2)}` : 'Cost unknown';
     },
-    run: async (args) => {
+    run: async (args, context) => {
       const modelId = text(args, 'modelId', 'gpt-image-1');
       const binding = IMAGE_BINDINGS[modelId];
       if (binding === undefined) return { summary: `${modelId} is not a model this device can run.` };
@@ -222,10 +222,26 @@ export const AGENT_TOOLS: readonly AgentTool[] = [
         prompt: text(args, 'prompt'),
         aspectRatio: (text(args, 'aspectRatio', '1:1') as ImageAspectRatio)
       } as never);
+      // Kept in the project, not only shown: the thread drops the bytes when it
+      // is saved, and a still the user paid for should outlive the conversation.
+      const saved =
+        context.projectId === null
+          ? null
+          : saveGeneratedImage(context.projectId, {
+              base64: image.base64,
+              mimeType: image.mimeType,
+              prompt: text(args, 'prompt'),
+              modelId
+            });
       // The bytes go to the screen; the model is told only that it worked, since
       // handing a base64 payload back into the transcript would blow the context
       // window for no benefit.
-      return { summary: `Image generated (${image.providerJobId}).`, image };
+      return {
+        summary: saved === null
+          ? `Image generated (${image.providerJobId}), but no project was open to save it into.`
+          : `Image generated and saved to the project library (${image.providerJobId}).`,
+        image
+      };
     }
   }
 ];

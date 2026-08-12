@@ -22,17 +22,45 @@ import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, type TimelineDocument } f
 
 const ROOT = new Directory(Paths.document, 'projects');
 
+/**
+ * Where an asset came from.
+ *
+ * Optional, because every project written before this existed has assets with
+ * no origin and they are still perfectly good clips. Absent reads as imported.
+ * A generated one carries what made it: the library is the only place the user
+ * ever sees the prompt again, and a still with no prompt beside it is a picture
+ * they cannot ask for a variation of.
+ */
+export type AssetOrigin = {
+  readonly kind: 'generated';
+  readonly modelId: string;
+  readonly prompt: string;
+  readonly at: string;
+};
+
 export type MobileAsset = {
   readonly id: string;
   readonly displayName: string;
-  readonly kind: 'video' | 'audio';
+  /**
+   * `image` cannot go on a timeline — the tracks are video and audio, and the
+   * shared placement rules have nowhere to put a still. It is here because the
+   * project is where a generated image has to live to survive the screen that
+   * made it, and the library is what gives it somewhere to be seen.
+   */
+  readonly kind: 'video' | 'audio' | 'image';
   readonly mimeType: string;
   /** Relative to the project directory, so the record survives a reinstall path change. */
   readonly relativePath: string;
   readonly durationMs: number;
   readonly width: number;
   readonly height: number;
+  readonly origin?: AssetOrigin;
 };
+
+/** Only video and audio have a track to land on, and the editor only takes those. */
+export function isPlaceable(asset: MobileAsset): asset is MobileAsset & { readonly kind: 'video' | 'audio' } {
+  return asset.kind !== 'image';
+}
 
 export type MobileProject = {
   readonly schemaVersion: typeof PROJECT_SCHEMA_VERSION;
@@ -157,10 +185,53 @@ export function deleteProject(id: string): void {
  * permission revoked, and a project that silently loses a clip between sessions
  * is worse than one that costs a copy.
  */
+/**
+ * Writes a generated still into the project and records it.
+ *
+ * Generated images used to be shown and then dropped: leaving the Image tab, or
+ * the assistant's thread scrolling on, lost a picture the user had paid for. The
+ * bytes arrive as base64 from the adapter and go straight to a file — holding a
+ * megabyte of it in the project record would put it through `JSON.parse` on
+ * every read of the project.
+ */
+export function saveGeneratedImage(
+  projectId: string,
+  image: {
+    readonly base64: string;
+    readonly mimeType: string;
+    readonly prompt: string;
+    readonly modelId: string;
+  }
+): MobileAsset | null {
+  const project = readProject(projectId);
+  if (project === null) return null;
+
+  const dir = new Directory(projectDir(projectId), 'media');
+  if (!dir.exists) dir.create({ intermediates: true });
+  const id = `asset-${Date.now().toString(36)}`;
+  const extension = image.mimeType === 'image/jpeg' ? 'jpg' : 'png';
+  const relativePath = `media/${id}.${extension}`;
+  new File(projectDir(projectId), relativePath).write(image.base64, { encoding: 'base64' });
+
+  const asset: MobileAsset = {
+    id,
+    displayName: `${image.modelId} still`,
+    kind: 'image',
+    mimeType: image.mimeType,
+    relativePath,
+    durationMs: 0,
+    width: 0,
+    height: 0,
+    origin: { kind: 'generated', modelId: image.modelId, prompt: image.prompt, at: new Date().toISOString() }
+  };
+  writeProject({ ...project, assets: [...project.assets, asset] });
+  return asset;
+}
+
 export function importAsset(
   projectId: string,
   source: { readonly uri: string; readonly displayName: string; readonly mimeType: string; readonly durationMs: number; readonly width: number; readonly height: number; readonly kind: 'video' | 'audio' }
-): MobileAsset {
+): MobileAsset & { readonly kind: 'video' | 'audio' } {
   const dir = new Directory(projectDir(projectId), 'media');
   if (!dir.exists) dir.create({ intermediates: true });
   const id = `asset-${Date.now().toString(36)}`;
@@ -188,6 +259,10 @@ export function importAsset(
  * shot would have gone silently changes the cut.
  */
 export function appendAssetToTimeline(project: MobileProject, asset: MobileAsset): MobileProject | null {
+  // A still has no track to land on, and the shared placement rules have no
+  // answer for one. Refusing here keeps that decision in the one place that
+  // knows the timeline, rather than in each caller.
+  if (!isPlaceable(asset)) return null;
   // Placement only reads the asset's kind, but the shared signature takes the
   // whole record, so the stored asset is widened rather than partially faked.
   const target = resolveTimelineTrackForAsset(project.timeline, {

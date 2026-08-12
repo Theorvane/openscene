@@ -11,6 +11,7 @@ import {
 import type { ImageAspectRatio } from '@openvideo/shared/providerSeams';
 import { readKey, type ProviderSlot } from '../lib/credentials';
 import { readProviderConnections } from '../lib/mediaProviders';
+import { saveGeneratedImage } from '../lib/projectStore';
 import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { ModelSelect } from '../components/ModelSelect';
 import { SpendPrompt } from '../components/SpendPrompt';
@@ -32,17 +33,19 @@ const PROVIDER_BINDINGS: Readonly<Record<string, { slot: ProviderSlot; request: 
 type Result =
   | { readonly kind: 'idle' }
   | { readonly kind: 'running' }
-  | { readonly kind: 'done'; readonly image: GeneratedImageData }
+  | { readonly kind: 'done'; readonly image: GeneratedImageData; readonly saved: boolean }
   | { readonly kind: 'failed'; readonly message: string };
 
 export function ImageScreen({
   topInset,
   keyboardOffset,
+  projectId,
   connectionsVersion
 }: {
   readonly topInset: number;
   /** Height of the chrome above this screen; see FormScreen. */
   readonly keyboardOffset: number;
+  readonly projectId: string | null;
   /** Changes when Settings closes, so stored keys are picked up. */
   readonly connectionsVersion: number;
 }) {
@@ -81,7 +84,15 @@ export function ImageScreen({
     try {
       // The same adapter the desktop app calls, over the same shared module.
       const image = await binding.request({ apiKey, modelId: model.id, prompt: prompt.trim(), aspectRatio } as never);
-      setResult({ kind: 'done', image });
+      // Kept before it is shown. A still that only exists on screen is lost the
+      // moment the tab changes, and it was paid for.
+      const saved = saveGeneratedImage(projectId ?? '', {
+        base64: image.base64,
+        mimeType: image.mimeType,
+        prompt: prompt.trim(),
+        modelId: model.id
+      });
+      setResult({ kind: 'done', image, saved: saved !== null });
     } catch (error) {
       setResult({
         kind: 'failed',
@@ -187,7 +198,9 @@ export function ImageScreen({
             source={{ uri: `data:${result.image.mimeType};base64,${result.image.base64}` }}
             accessibilityLabel="Generated image"
           />
-          <Text style={styles.footnote}>{result.image.providerJobId}</Text>
+          <Text style={styles.footnote}>
+            {result.saved ? 'Saved to this project — see the Library tab.' : result.image.providerJobId}
+          </Text>
         </View>
       )}
     </FormScreen>

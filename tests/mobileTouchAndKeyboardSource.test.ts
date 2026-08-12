@@ -169,6 +169,32 @@ describe('mobile touch and keyboard source contract', () => {
     expect(agent).toContain('dismissed this without deciding');
   });
 
+  it('keeps what the project made, and gives it somewhere to be seen', async () => {
+    // A generated shot went straight onto the timeline and a generated still
+    // went nowhere at all, so nothing answered "what have I made?".
+    const store = await readSource('src/lib/projectStore.ts');
+    expect(store).toContain('export function saveGeneratedImage(');
+    // A still has no track, and the rule lives with the timeline rather than in
+    // each caller.
+    expect(store).toContain('export function isPlaceable(');
+    expect(store).toContain('if (!isPlaceable(asset)) return null;');
+
+    // Both things that make a still keep it.
+    expect(await readSource('src/screens/ImageScreen.tsx')).toContain('saveGeneratedImage(');
+    expect(await readSource('src/lib/agentTools.ts')).toContain('saveGeneratedImage(');
+
+    // And it has a home of its own rather than a toggle inside the editor.
+    const app = await readSource('App.tsx');
+    expect(app).toContain("{ id: 'library', label: 'Library', Icon: StackIcon }");
+    expect(app).toContain('<LibraryScreen');
+
+    const library = await readSource('src/screens/LibraryScreen.tsx');
+    expect(library).toContain('appendAssetToTimeline');
+    expect(library).toContain('deleteAsset');
+    // Saying why a still has no Add button beats leaving the gap unexplained.
+    expect(library).toContain('Stills have no track to sit on');
+  });
+
   it('states the reason export is unavailable rather than dimming in silence', async () => {
     // README-native.md describes this note — "export is disabled there, with the
     // reason shown on screen" — and it was not on screen. A dimmed button is

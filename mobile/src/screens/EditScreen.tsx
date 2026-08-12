@@ -9,6 +9,7 @@ import {
   assetUri,
   deleteAsset,
   importAsset,
+  isPlaceable,
   readProject,
   writeProject,
   type MobileAsset
@@ -81,7 +82,8 @@ export function EditScreen({
     setStoredAssets(project.assets);
     loadProject(
       project.timeline,
-      project.assets.map((asset) => ({
+      // Stills live in the project too now, and the editor has no track for one.
+      project.assets.filter(isPlaceable).map((asset) => ({
         id: asset.id,
         uri: assetUri(project.id, asset),
         displayName: asset.displayName,

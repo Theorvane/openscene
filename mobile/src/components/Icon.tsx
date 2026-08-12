@@ -269,6 +269,30 @@ export function SparkIcon({ size = 20, color = theme.text }: IconProps) {
   );
 }
 
+/** Stacked sheets, for the collection of what a project holds. */
+export function StackIcon({ size = 20, color = theme.text }: IconProps) {
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'center' }}>
+      {[0, 1, 2].map((row) => (
+        <View
+          key={row}
+          style={{
+            position: 'absolute',
+            left: size * 0.06 * row,
+            top: size * (0.12 + row * 0.22),
+            width: size * (0.88 - row * 0.12),
+            height: size * 0.2,
+            borderRadius: size * 0.05,
+            borderWidth: row === 2 ? 0 : size * 0.075,
+            borderColor: color,
+            backgroundColor: row === 2 ? color : 'transparent'
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
 /** A pencil, for rename: a diagonal body with a squared-off tip below it. */
 export function PencilIcon({ size = 18, color = theme.textWeak }: IconProps) {
   return (

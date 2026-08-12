@@ -8,11 +8,12 @@ import { timelineDurationMs } from '@openvideo/shared/timelineLogic';
 import { AgentScreen } from './src/screens/AgentScreen';
 import { EditScreen } from './src/screens/EditScreen';
 import { ImageScreen } from './src/screens/ImageScreen';
+import { LibraryScreen } from './src/screens/LibraryScreen';
 import { PlanScreen } from './src/screens/PlanScreen';
 import { ProjectsScreen } from './src/screens/ProjectsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { VoiceScreen } from './src/screens/VoiceScreen';
-import { assetUri, readProject } from './src/lib/projectStore';
+import { assetUri, isPlaceable, readProject } from './src/lib/projectStore';
 import { deliverExport, exportTimeline } from './src/lib/exportComposition';
 import { isExportAvailable } from './modules/video-export';
 import {
@@ -21,6 +22,7 @@ import {
   GearIcon,
   PictureIcon,
   SparkIcon,
+  StackIcon,
   TimelineIcon,
   WaveIcon
 } from './src/components/Icon';
@@ -42,7 +44,9 @@ const PROJECT_TABS = [
   { id: 'video', label: 'Video', Icon: ClapperIcon },
   { id: 'voice', label: 'Voice', Icon: WaveIcon },
   { id: 'image', label: 'Image', Icon: PictureIcon },
-  { id: 'agent', label: 'AI', Icon: SparkIcon }
+  { id: 'agent', label: 'AI', Icon: SparkIcon },
+  // Last, because it is where things end up rather than where work starts.
+  { id: 'library', label: 'Library', Icon: StackIcon }
 ] as const satisfies readonly { id: string; label: string; Icon: ComponentType<{ size?: number; color?: string }> }[];
 
 type ProjectTab = (typeof PROJECT_TABS)[number]['id'];
@@ -121,7 +125,7 @@ function Shell() {
     setExportState({ kind: 'running' });
     const rendered = await exportTimeline({
       timeline: current.timeline,
-      assets: current.assets.map((asset) => ({
+      assets: current.assets.filter(isPlaceable).map((asset) => ({
         id: asset.id,
         uri: assetUri(current.id, asset),
         displayName: asset.displayName,
@@ -222,8 +226,16 @@ function Shell() {
         {tab === 'voice' && (
           <VoiceScreen topInset={0} keyboardOffset={bodyTop} targetSeconds={pictureSeconds} connectionsVersion={connectionsVersion} />
         )}
-        {tab === 'image' && <ImageScreen topInset={0} keyboardOffset={bodyTop} connectionsVersion={connectionsVersion} />}
+        {tab === 'image' && (
+          <ImageScreen
+            topInset={0}
+            keyboardOffset={bodyTop}
+            projectId={route.projectId}
+            connectionsVersion={connectionsVersion}
+          />
+        )}
         {tab === 'agent' && <AgentScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} />}
+        {tab === 'library' && <LibraryScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} />}
       </View>
 
       <View accessibilityRole="tablist" style={[styles.tabBar, { paddingBottom: insets.bottom, height: 60 + insets.bottom }]}>
@@ -290,7 +302,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingTop: 6 },
   // A filled pill behind the selected icon: colour alone is a weak signal at
   // 19pt, and it is the only one for a user who cannot separate the two hues.
-  tabIcon: { width: 44, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  tabIcon: { width: 40, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   tabIconOn: { backgroundColor: `${theme.accent}22` },
   tabLabel: { color: theme.textWeaker, fontSize: 11, fontWeight: '600' },
   tabOn: { color: theme.accent },
