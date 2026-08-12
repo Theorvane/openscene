@@ -109,6 +109,16 @@ export function listProjects(): readonly ProjectSummary[] {
   return summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/** First record per id wins; a repeat is the same file recorded twice. */
+function dedupeAssets(assets: readonly MobileAsset[]): readonly MobileAsset[] {
+  const seen = new Set<string>();
+  return assets.filter((asset) => {
+    if (seen.has(asset.id)) return false;
+    seen.add(asset.id);
+    return true;
+  });
+}
+
 export function readProject(id: string): MobileProject | null {
   const file = projectFile(id);
   if (!file.exists) return null;
@@ -126,7 +136,10 @@ export function readProject(id: string): MobileProject | null {
       name: candidate.name,
       createdAt: candidate.createdAt ?? new Date().toISOString(),
       updatedAt: candidate.updatedAt ?? new Date().toISOString(),
-      assets: Array.isArray(candidate.assets) ? (candidate.assets as MobileAsset[]) : [],
+      // Deduplicated on the way in: projects written before the placement bug
+      // was fixed hold the same asset twice, which renders as duplicate keys and
+      // counts double against the library. The first record wins.
+      assets: dedupeAssets(Array.isArray(candidate.assets) ? (candidate.assets as MobileAsset[]) : []),
       timeline
     };
   } catch {
@@ -280,7 +293,11 @@ export function appendAssetToTimeline(project: MobileProject, asset: MobileAsset
   const next = placeClip(project.timeline, {
     trackId: target.track.id,
     clip: {
-      id: `clip-${asset.id}`,
+      // Unique per placement, the way the editor's own placements are. Deriving
+      // the clip id from the asset alone meant putting the same asset on the
+      // timeline twice produced two clips answering to one id — and the editor
+      // selects, splits, trims and deletes by that id.
+      id: `clip-${asset.id}-${Date.now().toString(36)}`,
       assetId: asset.id,
       timelineStartMs: trackAppendStartMs(target.track),
       sourceStartMs: 0,
@@ -291,7 +308,15 @@ export function appendAssetToTimeline(project: MobileProject, asset: MobileAsset
     }
   });
   if (next === null) return null;
-  const updated: MobileProject = { ...project, assets: [...project.assets, asset], timeline: next };
+  // The asset may already be in the project — the library places one that is
+  // certainly there, and adding it a second time put two records under one id.
+  // React rendered them as duplicate keys and the duplicate went to disk.
+  const known = project.assets.some((entry) => entry.id === asset.id);
+  const updated: MobileProject = {
+    ...project,
+    assets: known ? project.assets : [...project.assets, asset],
+    timeline: next
+  };
   writeProject(updated);
   return updated;
 }

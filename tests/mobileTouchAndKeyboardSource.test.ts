@@ -195,6 +195,23 @@ describe('mobile touch and keyboard source contract', () => {
     expect(library).toContain('Stills have no track to sit on');
   });
 
+  it('places an asset it already holds without recording it twice', async () => {
+    // The library places assets that are certainly already in the project, and
+    // appending unconditionally put two records under one id: React reported
+    // "two children with the same key" and the duplicate went to disk.
+    const store = await readSource('src/lib/projectStore.ts');
+
+    expect(store).toContain('const known = project.assets.some((entry) => entry.id === asset.id);');
+    expect(store).toContain('assets: known ? project.assets : [...project.assets, asset],');
+    // Clip ids are unique per placement, as the editor's own placements are —
+    // the editor selects, splits, trims and deletes by that id.
+    expect(store).toContain('id: `clip-${asset.id}-${Date.now().toString(36)}`');
+    expect(store).not.toContain('id: `clip-${asset.id}`');
+    // And a project already holding the duplicate is repaired when it is read.
+    expect(store).toContain('function dedupeAssets(');
+    expect(store).toContain('assets: dedupeAssets(');
+  });
+
   it('states the reason export is unavailable rather than dimming in silence', async () => {
     // README-native.md describes this note — "export is disabled there, with the
     // reason shown on screen" — and it was not on screen. A dimmed button is
