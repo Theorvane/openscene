@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HISTORY_LIMIT, parseHistory, trimHistory } from '../mobile/src/lib/chatMemory';
+import { dropUnansweredCalls, forStorage, HISTORY_LIMIT, parseHistory, trimHistory } from '../mobile/src/lib/chatMemory';
 import type { ChatMessage } from '../mobile/src/lib/chatMemory';
 
 /**
@@ -72,6 +72,62 @@ describe('chat memory', () => {
     // it, so filtering alone is not enough.
     const stored = [{ role: 'nonsense' }, answering('call-1'), user('still here')];
     expect(parseHistory(stored)).toEqual([user('still here')]);
+  });
+
+  it('cuts the conversation off before a tool call nobody answered', () => {
+    // Quitting while the approval card is up leaves the file ending in
+    // `tool_calls` with no reply. Every provider rejects that, so the saved
+    // conversation could never send again.
+    const history = [user('make me an image'), proposing('call-1')];
+    expect(dropUnansweredCalls(history)).toEqual([user('make me an image')]);
+  });
+
+  it('keeps a call that was answered', () => {
+    const history = [user('what is on it?'), proposing('call-1'), answering('call-1'), assistant('11.9s')];
+    expect(dropUnansweredCalls(history)).toEqual(history);
+  });
+
+  it('drops everything after the first unanswered call, not just the call', () => {
+    // Anything the model said past a call it never got a result for was written
+    // against a history the provider will not accept.
+    const history = [proposing('a'), answering('a'), proposing('b'), assistant('stranded')];
+    expect(dropUnansweredCalls(history)).toEqual([proposing('a'), answering('a')]);
+  });
+
+  it('repairs a wedged transcript on the way back in', () => {
+    expect(parseHistory([user('make me an image'), proposing('call-1')])).toEqual([user('make me an image')]);
+  });
+
+  it('rejects a proposal whose args are null', () => {
+    // `typeof null === 'object'`, so the obvious check passes it, and it reaches
+    // the wire as the string "null" for the provider to reject.
+    const stored = [
+      { role: 'assistant', content: '', proposals: [{ id: 'a', name: 'generate_image', args: null }] },
+      user('after')
+    ];
+    expect(parseHistory(stored)).toEqual([user('after')]);
+  });
+
+  it('drops image bytes on the way to storage but records that there were some', () => {
+    // A generated image is a megabyte or two of base64, and the transcript is
+    // re-read and re-parsed on the render that opens the tab.
+    const withImage: ChatMessage = {
+      role: 'tool',
+      content: 'Generated an image.',
+      toolCallId: 'call-1',
+      toolName: 'generate_image',
+      image: 'data:image/png;base64,AAAA'
+    };
+    const [stored] = forStorage([user('draw a leaf'), withImage]).slice(1);
+
+    expect(stored?.image).toBeUndefined();
+    expect(stored?.imageDropped).toBe(true);
+    expect(stored?.content).toBe('Generated an image.');
+  });
+
+  it('leaves messages without an image untouched on the way to storage', () => {
+    const history = [user('hi'), assistant('hello')];
+    expect(forStorage(history)).toEqual(history);
   });
 
   it('keeps a well-formed stored transcript', () => {

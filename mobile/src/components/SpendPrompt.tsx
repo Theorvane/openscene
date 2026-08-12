@@ -24,16 +24,26 @@ export function SpendPrompt({
   feature,
   headline,
   visible,
-  onDecide
+  onDecide,
+  onDismiss
 }: {
   readonly feature: SpendFeature;
   /** The price, or what will run — whichever the caller is willing to state. */
   readonly headline: string;
   readonly visible: boolean;
   readonly onDecide: (decision: Decision) => void;
+  /**
+   * Backing out, which is not an answer.
+   *
+   * This used to be wired to `onDecide('reject')`, and rejecting is remembered:
+   * one press of the Android back button turned the feature off for good, with
+   * nothing said and only a Settings reset to undo it. A dismissal has to close
+   * the question, not answer it.
+   */
+  readonly onDismiss: () => void;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => onDecide('reject')}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
       <View style={styles.scrim}>
         <View style={styles.card}>
           <Text style={styles.title}>Charge your {LABEL[feature].split(' ')[0]} provider?</Text>

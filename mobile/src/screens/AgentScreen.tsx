@@ -19,6 +19,7 @@ import { customCredentialKey, useCustomProviders } from '../lib/customProviders'
 import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { AGENT_TOOLS, findTool } from '../lib/agentTools';
 import { sendChatTurn, type ChatMessage, type ToolCallProposal } from '../lib/agentChatClient';
+import { trimHistory } from '../lib/chatMemory';
 import { clearChat, readChat, writeChat } from '../lib/chatStore';
 import { SpendPrompt } from '../components/SpendPrompt';
 import { AddCustomProvider } from '../components/AddCustomProvider';
@@ -97,9 +98,19 @@ export function AgentScreen({
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
-  const [images, setImages] = useState<readonly string[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
   const scroller = useRef<ScrollView>(null);
+  /**
+   * Which conversation a turn belongs to.
+   *
+   * A turn takes seconds against a provider and holds the history it started
+   * from. Starting a new conversation, or moving to another project, while one
+   * is in flight used to end with the reply landing on the cleared thread and
+   * putting the whole old transcript back — and the write effect then saved it
+   * again, so the discard silently undid itself. Bumping this abandons anything
+   * still in the air.
+   */
+  const era = useRef(0);
 
   // Providers worth showing: the popular ones, plus any the user has connected —
   // 153 in a phone-sized list is a search problem, not a picker.
@@ -163,8 +174,8 @@ export function AgentScreen({
    * writing on every change keeps it where the tools' subject already is.
    */
   useEffect(() => {
+    era.current += 1;
     setMessages(readChat(projectId));
-    setImages([]);
   }, [projectId]);
 
   useEffect(() => {
@@ -173,14 +184,18 @@ export function AgentScreen({
 
   /** Runs one turn and stops at the first proposal that needs a decision. */
   const advance = async (history: readonly ChatMessage[]): Promise<void> => {
+    const started = era.current;
     setThinking(true);
     setError(null);
     const turn = await sendChatTurn({
       providerId,
       modelId,
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history],
+      // Trimmed here and not only on the way to disk. The cap exists because
+      // every turn re-sends the whole history, and that is this line.
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...trimHistory(history)],
       tools: AGENT_TOOLS
     });
+    if (started !== era.current) return;
     setThinking(false);
 
     if (!turn.ok) {
@@ -220,8 +235,19 @@ export function AgentScreen({
   };
 
   /** Feeds a tool reply back to the model and continues the loop. */
-  const complete = async (history: readonly ChatMessage[], proposal: ToolCallProposal, summary: string): Promise<void> => {
-    const reply: ChatMessage = { role: 'tool', content: summary, toolCallId: proposal.id, toolName: proposal.name };
+  const complete = async (
+    history: readonly ChatMessage[],
+    proposal: ToolCallProposal,
+    summary: string,
+    image?: string
+  ): Promise<void> => {
+    const reply: ChatMessage = {
+      role: 'tool',
+      content: summary,
+      toolCallId: proposal.id,
+      toolName: proposal.name,
+      ...(image === undefined ? {} : { image })
+    };
     const next = [...history, reply];
     setMessages(next);
     await advance(next);
@@ -230,21 +256,34 @@ export function AgentScreen({
   const run = async (history: readonly ChatMessage[], proposal: ToolCallProposal): Promise<void> => {
     const tool = findTool(proposal.name);
     if (tool === undefined) return;
+    const started = era.current;
     setThinking(true);
     try {
       const result = await tool.run(proposal.args, { projectId, onProgress: setProgress });
+      if (started !== era.current) return;
       const image = result.image;
-      if (image !== undefined) {
-        setImages((current) => [...current, `data:${image.mimeType};base64,${image.base64}`]);
-      }
       setProgress(null);
-      await complete(history, proposal, result.summary);
+      await complete(
+        history,
+        proposal,
+        result.summary,
+        image === undefined ? undefined : `data:${image.mimeType};base64,${image.base64}`
+      );
     } catch (failure) {
+      if (started !== era.current) return;
       setProgress(null);
       await complete(history, proposal, failure instanceof Error ? failure.message : 'The tool failed.');
     } finally {
-      setThinking(false);
+      if (started === era.current) setThinking(false);
     }
+  };
+
+  /** Closes the prompt and answers the call, without remembering anything. */
+  const dismiss = (): void => {
+    const request = pending;
+    setPending(null);
+    if (request === null) return;
+    void complete(messages, request.proposal, 'The user dismissed this without deciding. Ask again if it matters.');
   };
 
   const decide = (decision: Decision): void => {
@@ -301,11 +340,13 @@ export function AgentScreen({
             accessibilityRole="button"
             accessibilityLabel="Start a new conversation"
             onPress={() => {
+              era.current += 1;
               clearChat(projectId);
               setMessages([]);
-              setImages([]);
               setError(null);
               setPending(null);
+              setThinking(false);
+              setProgress(null);
             }}
             style={press(styles.newChat)}
           >
@@ -392,6 +433,12 @@ export function AgentScreen({
               <View key={index} style={styles.toolBubble}>
                 <Text style={styles.toolName}>{message.toolName}</Text>
                 <Text style={styles.toolText}>{message.content}</Text>
+                {message.image !== undefined && (
+                  <Image style={styles.image} source={{ uri: message.image }} accessibilityLabel="Generated image" resizeMode="cover" />
+                )}
+                {message.imageDropped === true && (
+                  <Text style={styles.toolNote}>The image is not kept with the transcript. Generate it again to see it.</Text>
+                )}
               </View>
             );
           }
@@ -408,14 +455,6 @@ export function AgentScreen({
             </View>
           );
         })}
-        {/* The picture, not the first 48 characters of its data URI. The agent
-            can generate an image and the user could not see it. */}
-        {images.map((uri, index) => (
-          <View key={`image-${index}`} style={styles.toolBubble}>
-            <Text style={styles.toolName}>generated image</Text>
-            <Image style={styles.image} source={{ uri }} accessibilityLabel="Generated image" resizeMode="cover" />
-          </View>
-        ))}
         {thinking && (
           <View style={styles.working}>
             <ActivityIndicator color={theme.accent} />
@@ -445,7 +484,13 @@ export function AgentScreen({
       )}
 
       {spendTool?.spends != null && (
-        <SpendPrompt feature={spendTool.spends} headline={pending?.cost ?? ''} visible={pending !== null} onDecide={decide} />
+        <SpendPrompt
+          feature={spendTool.spends}
+          headline={pending?.cost ?? ''}
+          visible={pending !== null}
+          onDecide={decide}
+          onDismiss={dismiss}
+        />
       )}
 
       <View style={styles.composer}>
@@ -505,6 +550,7 @@ const styles = StyleSheet.create({
   toolBubble: { alignSelf: 'stretch', padding: 11, borderRadius: 10, borderWidth: 1, borderColor: theme.line, gap: 6 },
   toolName: { color: theme.mint, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
   toolText: { color: theme.textWeak, fontSize: 13, lineHeight: 19 },
+  toolNote: { color: theme.textWeaker, fontSize: 12, lineHeight: 17, fontStyle: 'italic' },
   image: { width: '100%', aspectRatio: 1, borderRadius: 8, backgroundColor: theme.bg },
   working: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 4 },
   error: { color: theme.danger, fontSize: 13, lineHeight: 19 },

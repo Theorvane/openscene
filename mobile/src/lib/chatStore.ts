@@ -1,6 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
-import { parseHistory, trimHistory, type ChatMessage } from './chatMemory';
+import { forStorage, parseHistory, type ChatMessage } from './chatMemory';
 
 /**
  * The assistant's conversation, kept with the project it is about.
@@ -45,7 +45,7 @@ export function writeChat(projectId: string | null, messages: readonly ChatMessa
   try {
     const directory = new Directory(ROOT, projectId);
     if (!directory.exists) return;
-    chatFile(projectId).write(JSON.stringify(trimHistory(messages)));
+    chatFile(projectId).write(JSON.stringify(forStorage(messages)));
   } catch {
     // Losing the transcript is survivable; taking the screen down with it is not.
   }

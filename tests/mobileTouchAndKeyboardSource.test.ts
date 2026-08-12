@@ -105,6 +105,57 @@ describe('mobile touch and keyboard source contract', () => {
     expect(await readSource('src/components/ModelSelect.tsx')).toContain('<KeyboardAwareScroll');
   });
 
+  it('abandons a turn whose conversation was ended while it was in flight', async () => {
+    // A turn takes seconds against a provider and holds the history it started
+    // from, so a reply landing after New put the whole discarded transcript back
+    // — and the write effect saved it again.
+    const agent = await readSource('src/screens/AgentScreen.tsx');
+
+    expect(agent).toContain('const era = useRef(0);');
+    expect(agent).toContain('const started = era.current;');
+    expect(agent).toContain('if (started !== era.current) return;');
+    // Ending a conversation and moving to another project both invalidate it.
+    expect(agent).toMatch(/era\.current \+= 1;[\s\S]{0,80}clearChat\(projectId\);/);
+    expect(agent).toMatch(/era\.current \+= 1;[\s\S]{0,80}setMessages\(readChat\(projectId\)\);/);
+  });
+
+  it('trims the history it sends, not only the copy it saves', async () => {
+    // The cap is justified by "every turn re-sends all of it", and that is the
+    // request — trimming only on the way to disk left the cost uncapped until
+    // the app was next launched.
+    const agent = await readSource('src/screens/AgentScreen.tsx');
+    expect(agent).toContain('...trimHistory(history)');
+  });
+
+  it('keeps a generated image on the message that produced it', async () => {
+    // A list beside the thread put every image after everything else, and
+    // restoring a conversation brought the words back without the pictures.
+    const agent = await readSource('src/screens/AgentScreen.tsx');
+
+    expect(agent).not.toContain('setImages');
+    expect(agent).toContain('message.image !== undefined');
+    expect(agent).toContain('message.imageDropped === true');
+  });
+
+  it('treats backing out of a price prompt as a dismissal, not a refusal', async () => {
+    // `onRequestClose` fires on the Android back button, and it was wired to
+    // `onDecide('reject')` — which is remembered. One back press turned the
+    // feature off for good, silently, undoable only from Settings.
+    const prompt = await readSource('src/components/SpendPrompt.tsx');
+    expect(prompt).toContain('onRequestClose={onDismiss}');
+    expect(prompt).not.toContain("onRequestClose={() => onDecide('reject')}");
+
+    // Every caller has to say what backing out means for it.
+    for (const path of ['src/screens/AgentScreen.tsx', 'src/screens/ImageScreen.tsx', 'src/screens/PlanScreen.tsx']) {
+      expect(await readSource(path), `${path} must handle dismissal`).toContain('onDismiss=');
+    }
+    // The agent still answers the call it left hanging, without recording a
+    // standing choice for it.
+    const agent = await readSource('src/screens/AgentScreen.tsx');
+    expect(agent).toContain('const dismiss = (): void => {');
+    expect(agent).toContain('dismissed this without deciding');
+  });
+
   it('states the reason export is unavailable rather than dimming in silence', async () => {
     // README-native.md describes this note — "export is disabled there, with the
     // reason shown on screen" — and it was not on screen. A dimmed button is

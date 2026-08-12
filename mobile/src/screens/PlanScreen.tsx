@@ -295,7 +295,13 @@ export function PlanScreen({
         )}
       </View>
 
-      <SpendPrompt feature="video-generation" headline={runLine} visible={asking} onDecide={decide} />
+      <SpendPrompt
+        feature="video-generation"
+        headline={runLine}
+        visible={asking}
+        onDecide={decide}
+        onDismiss={() => setAsking(false)}
+      />
     </FormScreen>
   );
 }

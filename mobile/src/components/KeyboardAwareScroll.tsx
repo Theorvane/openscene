@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef } from 'react';
 import { Keyboard, ScrollView } from 'react-native';
+import type { EmitterSubscription } from 'react-native';
 import type { ReactNode } from 'react';
 import type { NativeScrollEvent, NativeSyntheticEvent, ScrollViewProps } from 'react-native';
 
@@ -49,6 +50,19 @@ export function KeyboardAwareScroll({
   const fallbackRef = useRef<ScrollView>(null);
   const scroller = scrollRef ?? fallbackRef;
   const offset = useRef(0);
+  /**
+   * A focus that never produces a keyboard leaves the listener waiting, because
+   * it is what removes itself. Held here so unmounting takes both it and any
+   * settle timer with it rather than leaving a closure over a dead screen.
+   */
+  const pending = useRef<{ subscription?: EmitterSubscription; timer?: ReturnType<typeof setTimeout> }>({});
+  useEffect(
+    () => () => {
+      pending.current.subscription?.remove();
+      if (pending.current.timer !== undefined) clearTimeout(pending.current.timer);
+    },
+    []
+  );
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -83,7 +97,8 @@ export function KeyboardAwareScroll({
        */
       const liftTwice = (): void => {
         lift();
-        setTimeout(lift, SETTLE_MS);
+        if (pending.current.timer !== undefined) clearTimeout(pending.current.timer);
+        pending.current.timer = setTimeout(lift, SETTLE_MS);
       };
       // Focus arrives before the keyboard has a frame to measure against, so on
       // the first field of a screen the work waits for the keyboard itself.
@@ -91,10 +106,13 @@ export function KeyboardAwareScroll({
         liftTwice();
         return;
       }
+      pending.current.subscription?.remove();
       const subscription = Keyboard.addListener('keyboardDidShow', () => {
         subscription.remove();
+        pending.current.subscription = undefined;
         liftTwice();
       });
+      pending.current.subscription = subscription;
     },
     [scroller]
   );

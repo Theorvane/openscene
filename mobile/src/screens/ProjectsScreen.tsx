@@ -53,7 +53,11 @@ export function ProjectsScreen({
   };
 
   const commitRename = (): void => {
-    if (renaming === null) return;
+    // The keyboard's done key reaches this too, and it is not disabled the way
+    // the button is — without the same guard, submitting a blank name closed the
+    // sheet on a rename that `renameProject` had refused, leaving the user
+    // believing it had worked.
+    if (renaming === null || renaming.name.trim().length === 0) return;
     if (renameProject(renaming.project.id, renaming.name) !== null) refresh();
     setRenaming(null);
   };
