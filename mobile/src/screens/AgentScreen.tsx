@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { LLM_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, getLlmCatalogProvider } from '@openvideo/shared/llmProviders';
+import { AGENT_SCOPE_POLICY } from '@openvideo/shared/agentScope';
 
 import { readSlot } from '../lib/credentials';
 import { customCredentialKey, useCustomProviders } from '../lib/customProviders';
@@ -36,7 +37,11 @@ import { MIN_TAP, press } from '../lib/touch';
 const SYSTEM_PROMPT =
   'You are the OpenScene editing assistant on a phone. Be brief — the screen is small. ' +
   'Plan and price before proposing anything that generates media, and say the cost in your own words. ' +
-  'Every tool call is shown to the user for approval before it runs, so never claim something has happened until a tool result says it did.';
+  'Every tool call is shown to the user for approval before it runs, so never claim something has happened until a tool result says it did.' +
+  '\n\n' +
+  // The same scope both surfaces answer to, from the shared core rather than
+  // written twice and left to drift.
+  AGENT_SCOPE_POLICY;
 
 type Pending = { readonly proposal: ToolCallProposal; readonly cost: string };
 

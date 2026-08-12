@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { KeyboardAwareScroll } from './KeyboardAwareScroll';
+
 import { getDomainModels, type AiDomain, type AiDomainModelConfig } from '@openvideo/shared/aiDomainModels';
 
 import { describeProvider, providersForDomain } from '../lib/mediaProviders';
@@ -110,7 +112,7 @@ export function ModelSelect({
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+            <KeyboardAwareScroll contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
               {sheet === 'add' ? (
                 <>
                   <Text style={styles.sheetBlurb}>
@@ -168,7 +170,7 @@ export function ModelSelect({
                   </View>
                 ))
               )}
-            </ScrollView>
+            </KeyboardAwareScroll>
           </View>
         </KeyboardAvoidingView>
       </Modal>

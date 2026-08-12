@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { planVideoStoryboard, supportedShotSeconds, CONTINUITY_KEYS } from '@openvideo/shared/videoStoryboardPlan';
@@ -12,6 +12,7 @@ import { generateShot } from '../lib/videoGeneration';
 import { appendAssetToTimeline, readProject } from '../lib/projectStore';
 import { SpendPrompt } from '../components/SpendPrompt';
 import { FormScreen } from '../components/FormScreen';
+import { useRevealOnFocus } from '../components/KeyboardAwareScroll';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
 
@@ -50,6 +51,8 @@ export function PlanScreen({
   const [continuity, setContinuity] = useState(true);
   const [asking, setAsking] = useState(false);
   const permissions = useSpendPermissions();
+  const reveal = useRevealOnFocus();
+  const promptInput = useRef<TextInput>(null);
 
   // Connection is reported by provider id, which is what the picker keys on.
   const refreshConnections = useCallback((): void => {
@@ -224,6 +227,8 @@ export function PlanScreen({
 
       <Text style={styles.label}>Prompt · used for every shot</Text>
       <TextInput
+        ref={promptInput}
+        onFocus={() => reveal(promptInput.current)}
         style={styles.input}
         value={prompt}
         onChangeText={(value) => setPlan(() => setPrompt(value))}

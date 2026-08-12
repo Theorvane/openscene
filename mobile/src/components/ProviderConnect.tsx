@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { readSlot, writeSlot } from '../lib/credentials';
+import { useRevealOnFocus } from './KeyboardAwareScroll';
 import { isSignedIn, signInWithChatGpt, signOut } from '../lib/openAiSignIn';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
@@ -41,6 +42,8 @@ export function ProviderConnect({
   /** OpenAI alone offers a second way in: a ChatGPT account instead of a key. */
   readonly chatGptSignIn?: boolean;
 }) {
+  const reveal = useRevealOnFocus();
+  const input = useRef<TextInput>(null);
   const [draft, setDraft] = useState('');
   const [note, setNote] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
@@ -89,6 +92,8 @@ export function ProviderConnect({
       {open && (
         <>
           <TextInput
+            ref={input}
+            onFocus={() => reveal(input.current)}
             style={styles.input}
             value={draft}
             onChangeText={setDraft}

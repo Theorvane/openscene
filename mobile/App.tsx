@@ -181,6 +181,22 @@ function Shell() {
         </Pressable>
       </View>
 
+      {/*
+        A build without the renderer says so.
+
+        `README-native.md` describes this note — "export is disabled there, with
+        the reason shown on screen" — and it was not on screen: the button simply
+        dimmed, which is indistinguishable from an empty timeline or an export
+        already running, and reads as a bug rather than a limit. AGENTS.md asks
+        for the opposite, and the Video tab already does it for frame extraction.
+      */}
+      {!isExportAvailable && (
+        <Text style={styles.limit}>
+          Export needs a development build — Expo Go carries only the modules baked into it, and the renderer is this
+          project&apos;s own. Everything else on this screen works.
+        </Text>
+      )}
+
       {/* A result the user can put away. It used to be a line of text that stayed
           until the next export, so a failure from ten minutes ago still sat under
           the toolbar looking like it had just happened. */}
@@ -210,7 +226,7 @@ function Shell() {
         {tab === 'agent' && <AgentScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} />}
       </View>
 
-      <View style={[styles.tabBar, { paddingBottom: insets.bottom, height: 60 + insets.bottom }]}>
+      <View accessibilityRole="tablist" style={[styles.tabBar, { paddingBottom: insets.bottom, height: 60 + insets.bottom }]}>
         {PROJECT_TABS.map(({ id, label, Icon }) => {
           const selected = id === tab;
           return (
@@ -268,6 +284,7 @@ const styles = StyleSheet.create({
   bannerText: { flex: 1, color: theme.mint, fontSize: 13, lineHeight: 18 },
   bannerTextFail: { color: theme.danger },
   bannerDismiss: { color: theme.textWeak, fontSize: 12, fontWeight: '700' },
+  limit: { color: theme.warn, fontSize: 12, lineHeight: 17, paddingHorizontal: 16, paddingTop: 8 },
   body: { flex: 1 },
   tabBar: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.line, backgroundColor: theme.surface },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingTop: 6 },

@@ -1,7 +1,8 @@
 import type { ReactElement, ReactNode } from 'react';
-import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, StyleSheet, View } from 'react-native';
 import type { RefreshControlProps, StyleProp, ViewStyle } from 'react-native';
 
+import { KeyboardAwareScroll } from './KeyboardAwareScroll';
 import { theme } from '../lib/theme';
 
 /**
@@ -19,6 +20,10 @@ import { theme } from '../lib/theme';
  * mandatory from this SDK — the plugin refuses to turn it off — and an
  * edge-to-edge window is not resized for the keyboard. The keyboard simply draws
  * over the app, so the screen has to move its own content on both platforms.
+ *
+ * Avoiding is not revealing, which is why the scroll view is the keyboard-aware
+ * one: shrinking the scrolling area does nothing for a field the user has to
+ * scroll down to reach, and Settings is long enough that most of them are.
  *
  * `keyboardOffset` is not optional dressing. KeyboardAvoidingView measures
  * itself with `onLayout`, which reports a position relative to its parent, and
@@ -44,7 +49,7 @@ export function FormScreen({
 }) {
   return (
     <KeyboardAvoidingView style={styles.root} behavior="padding" keyboardVerticalOffset={keyboardOffset}>
-      <ScrollView
+      <KeyboardAwareScroll
         style={styles.root}
         contentContainerStyle={[styles.content, { paddingTop: topInset + 16 }]}
         keyboardShouldPersistTaps="handled"
@@ -52,7 +57,7 @@ export function FormScreen({
         {...(refreshControl === undefined ? {} : { refreshControl })}
       >
         <View style={[styles.inner, contentStyle]}>{children}</View>
-      </ScrollView>
+      </KeyboardAwareScroll>
     </KeyboardAvoidingView>
   );
 }

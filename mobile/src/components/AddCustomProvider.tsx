@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { addCustomProvider, customCredentialKey } from '../lib/customProviders';
 import { writeSlot } from '../lib/credentials';
+import { useRevealOnFocus } from './KeyboardAwareScroll';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
 
@@ -109,10 +110,14 @@ function Field({
   multiline?: boolean;
   autoCapitalize?: 'none' | 'sentences';
 }) {
+  const reveal = useRevealOnFocus();
+  const input = useRef<TextInput>(null);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
+        ref={input}
+        onFocus={() => reveal(input.current)}
         style={[styles.input, multiline === true && styles.inputMulti]}
         value={value}
         onChangeText={onChange}

@@ -71,6 +71,53 @@ describe('mobile touch and keyboard source contract', () => {
     expect(agent).toContain('keyboardDismissMode="interactive"');
   });
 
+  it('reveals the focused field, not just the scroll area around it', async () => {
+    // Avoiding is not revealing. Shrinking the scrolling area does nothing for a
+    // field the user scrolled down to reach, and the provider list is long
+    // enough that most of them are. Android used to scroll the focused input
+    // into view itself under `adjustResize`; edge-to-edge stopped that too.
+    const aware = await readSource('src/components/KeyboardAwareScroll.tsx');
+
+    expect(aware).toContain('measureInWindow');
+    // Against the live keyboard frame, not a guessed height: keyboards differ by
+    // locale and by whether the suggestion strip is up.
+    expect(aware).toContain('Keyboard.metrics()');
+    // Twice, because the keyboard sliding up and the avoiding view shrinking are
+    // two moving parts, and measuring on the first under-scrolls by the rest.
+    expect(aware).toContain('const liftTwice');
+    expect(aware).toContain('setTimeout(lift, SETTLE_MS)');
+
+    // Every field the user can type a key or a prompt into asks to be revealed.
+    for (const path of [
+      'src/components/ProviderConnect.tsx',
+      'src/components/AddCustomProvider.tsx',
+      'src/screens/PlanScreen.tsx',
+      'src/screens/ImageScreen.tsx',
+      'src/screens/VoiceScreen.tsx'
+    ]) {
+      const body = await readSource(path);
+      expect(body, `${path} must reveal its focused field`).toContain('useRevealOnFocus()');
+      expect(body, `${path} must hand the ref to reveal`).toMatch(/onFocus=\{\(\) => reveal\(\w+\.current\)\}/);
+    }
+
+    // Both scroll containers that hold a field provide it.
+    expect(await readSource('src/components/FormScreen.tsx')).toContain('<KeyboardAwareScroll');
+    expect(await readSource('src/components/ModelSelect.tsx')).toContain('<KeyboardAwareScroll');
+  });
+
+  it('states the reason export is unavailable rather than dimming in silence', async () => {
+    // README-native.md describes this note — "export is disabled there, with the
+    // reason shown on screen" — and it was not on screen. A dimmed button is
+    // indistinguishable from an empty timeline or a run already going, and
+    // AGENTS.md asks for a stated limit rather than a silent one.
+    const app = await readSource('App.tsx');
+
+    expect(app).toContain('{!isExportAvailable && (');
+    expect(app).toContain('Export needs a development build');
+    // The tab bar is a list of tabs, and said so on the tabs but not the bar.
+    expect(app).toContain('accessibilityRole="tablist"');
+  });
+
   it('tells each screen how far down the display it starts', async () => {
     // KeyboardAvoidingView measures itself with onLayout, which is relative to
     // its parent, and compares that against a keyboard position in screen

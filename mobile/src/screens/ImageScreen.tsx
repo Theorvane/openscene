@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { estimateImageCost } from '@openvideo/shared/mediaGenerationPricing';
@@ -16,6 +16,7 @@ import { ModelSelect } from '../components/ModelSelect';
 import { SpendPrompt } from '../components/SpendPrompt';
 import { getDomainModels } from '@openvideo/shared/aiDomainModels';
 import { FormScreen } from '../components/FormScreen';
+import { useRevealOnFocus } from '../components/KeyboardAwareScroll';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
 
@@ -53,6 +54,8 @@ export function ImageScreen({
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<ImageAspectRatio>('1:1');
   const [result, setResult] = useState<Result>({ kind: 'idle' });
+  const reveal = useRevealOnFocus();
+  const promptInput = useRef<TextInput>(null);
 
   const model = catalog.find((entry) => entry.id === modelId) ?? catalog[0];
   const binding = model === undefined ? undefined : PROVIDER_BINDINGS[model.providerId];
@@ -139,6 +142,8 @@ export function ImageScreen({
 
       <Text style={styles.label}>Prompt</Text>
       <TextInput
+        ref={promptInput}
+        onFocus={() => reveal(promptInput.current)}
         style={styles.input}
         value={prompt}
         onChangeText={setPrompt}

@@ -11,6 +11,7 @@ import {
 } from '@langchain/core/messages';
 import type { DynamicStructuredTool } from '@langchain/core/tools';
 import { Annotation, END, MemorySaver, START, StateGraph, interrupt } from '@langchain/langgraph';
+import { AGENT_SCOPE_POLICY } from '../shared/agentScope';
 import type { AgentToolCallProposal, AgentToolApprovalDecision } from '../shared/agentChat';
 import { parseEditAgentProjectContext, type EditAgentContextAsset, type EditAgentProjectContext } from '../shared/editAgentContext';
 import type { OpenAiAuthMode, ReasoningEffort } from '../shared/openAiAuth';
@@ -46,6 +47,8 @@ const AGENT_CHAT_SYSTEM_PROMPT =
   'watchProjectVideo samples frames into the conversation as timestamped images; use them to describe footage ' +
   '(vision-capable model required to see them). ' +
   'Keep replies short. Say what you do before calling a tool.' +
+  '\n\n' +
+  AGENT_SCOPE_POLICY +
   '\n\n' +
   GENERATION_COST_POLICY;
 

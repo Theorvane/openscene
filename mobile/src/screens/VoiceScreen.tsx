@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { checkNarrationFit } from '@openvideo/shared/narrationTiming';
@@ -6,6 +6,7 @@ import { getDomainModels } from '@openvideo/shared/aiDomainModels';
 import { ModelSelect } from '../components/ModelSelect';
 import { readProviderConnections } from '../lib/mediaProviders';
 import { FormScreen } from '../components/FormScreen';
+import { useRevealOnFocus } from '../components/KeyboardAwareScroll';
 import { theme } from '../lib/theme';
 
 /**
@@ -31,6 +32,8 @@ export function VoiceScreen({
   const [modelId, setModelId] = useState<string>(() => catalog.find((entry) => entry.available)?.id ?? '');
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
   const [script, setScript] = useState('');
+  const reveal = useRevealOnFocus();
+  const promptInput = useRef<TextInput>(null);
 
   const refreshConnections = useCallback((): void => {
     void readProviderConnections().then(setConnected);
@@ -61,6 +64,8 @@ export function VoiceScreen({
 
       <Text style={styles.label}>Script · fitting {targetSeconds.toFixed(1)}s of picture</Text>
       <TextInput
+        ref={promptInput}
+        onFocus={() => reveal(promptInput.current)}
         style={styles.input}
         value={script}
         onChangeText={setScript}
