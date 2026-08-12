@@ -234,23 +234,37 @@ export function PictureIcon({ size = 20, color = theme.text }: IconProps) {
   );
 }
 
-/** Two crossed diamonds — a spark, for the assistant. */
+/**
+ * A four-pointed spark, for the assistant.
+ *
+ * Two crossed bars, rounded until the arms taper. The first attempt was a square
+ * with a smaller square rotated 45° on top of it, which is geometry that cancels
+ * itself: at those sizes the diamond's half-diagonal and the square's half-width
+ * came out equal, so the rotated one sat entirely inside the other and the tab
+ * rendered a plain square. Caught on a device, not in review.
+ */
 export function SparkIcon({ size = 20, color = theme.text }: IconProps) {
+  // Four triangles meeting at the centre. Crossed bars were the second attempt
+  // and they do separate into four arms, but a bar has parallel sides: with no
+  // taper the tab drew a plus, which in a tab bar reads as "add". The arms have
+  // to come to a point for the shape to be a spark at all.
+  const half = size / 2;
+  const base = size * 0.17;
+  const clear = { borderColor: 'transparent', backgroundColor: 'transparent', width: 0, height: 0 } as const;
   return (
     <View style={[styles.center, { width: size, height: size }]}>
-      {[0, 45].map((angle, index) => (
-        <View
-          key={angle}
-          style={{
-            position: 'absolute',
-            width: size * (index === 0 ? 0.56 : 0.4),
-            height: size * (index === 0 ? 0.56 : 0.4),
-            borderRadius: size * 0.1,
-            backgroundColor: color,
-            transform: [{ rotate: `${angle}deg` }]
-          }}
-        />
-      ))}
+      <View
+        style={[clear, { position: 'absolute', top: 0, left: half - base, borderLeftWidth: base, borderRightWidth: base, borderBottomWidth: half, borderBottomColor: color }]}
+      />
+      <View
+        style={[clear, { position: 'absolute', top: half, left: half - base, borderLeftWidth: base, borderRightWidth: base, borderTopWidth: half, borderTopColor: color }]}
+      />
+      <View
+        style={[clear, { position: 'absolute', left: 0, top: half - base, borderTopWidth: base, borderBottomWidth: base, borderRightWidth: half, borderRightColor: color }]}
+      />
+      <View
+        style={[clear, { position: 'absolute', left: half, top: half - base, borderTopWidth: base, borderBottomWidth: base, borderLeftWidth: half, borderLeftColor: color }]}
+      />
     </View>
   );
 }

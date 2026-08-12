@@ -133,6 +133,22 @@ describe('mobile touch and keyboard source contract', () => {
     expect(app).toContain('tabIconOn');
   });
 
+  it('resolves no optional native module at import time', async () => {
+    // `expo-media-library` resolves `ExpoMediaLibraryNext`, which a client built
+    // without it cannot provide. A top-level import threw while the module graph
+    // was still loading, so the app died on a red screen before any screen
+    // mounted — not the failed save the fallback below it was written for.
+    // `modules/video-export` already guards against exactly this.
+    const composition = await readSource('src/lib/exportComposition.ts');
+
+    expect(composition).not.toMatch(/^import .*from 'expo-media-library';$/m);
+    expect(composition).toContain('function loadMediaLibrary()');
+    expect(composition).toContain('const mediaLibrary = loadMediaLibrary();');
+
+    const videoExport = await readSource('modules/video-export/index.ts');
+    expect(videoExport).toContain('requireOptionalNativeModule');
+  });
+
   it('leaves no interactive text below 11pt anywhere on the surface', async () => {
     const files = await readAllComponents();
 
