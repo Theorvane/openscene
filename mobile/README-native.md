@@ -52,6 +52,29 @@ screens.
 Native rather than the package, so `AdBanner` asks it first and never touches
 the SDK in a client that lacks it.
 
+## The ads binding is pinned, and why
+
+`react-native-google-mobile-ads` is held at **16.0.0**, not the newest release.
+16.4.0 pulls `play-services-ads:25.4.0`, which is compiled with Kotlin 2.3
+metadata; this project's Kotlin is 2.1, and a compiler cannot read metadata from
+a version newer than itself:
+
+```
+Module was compiled with an incompatible version of Kotlin.
+The binary version of its metadata is 2.3.0, expected version is 2.1.0.
+```
+
+Raising Kotlin instead was tried and is worse. `expo-build-properties`'
+`android.kotlinVersion` moves the stdlib to 2.3 but leaves each module compiling
+at 2.1, so the build then fails in `react-native-safe-area-context` rather than
+in the ads SDK — "the compiler version 2.1.0 can read versions up to 2.2.0".
+Kotlin here comes from Expo's version catalog and moves when Expo moves.
+
+16.0.0 pulls `play-services-ads:24.6.0`, which builds. When Expo's Kotlin
+reaches 2.3, the binding can go forward again — until then, upgrading it breaks
+the Android build outright, which is the sort of thing worth knowing before
+spending twenty minutes on a red Gradle log.
+
 ## Confirming the SDK is actually linked
 
 `ios/` and `android/` are gitignored and regenerated, so this is a check to run
