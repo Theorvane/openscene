@@ -86,11 +86,13 @@ export async function exportTimeline(input: {
     readonly sourceEndMs: number;
   };
 
+  const stillSources = new Set(plan.stillSourceIndexes);
   const withUri = (segment: Placed) => ({
     uri: uris[segment.sourceIndex] as string,
     timelineStartMs: segment.timelineStartMs,
     sourceStartMs: segment.sourceStartMs,
-    sourceEndMs: segment.sourceEndMs
+    sourceEndMs: segment.sourceEndMs,
+    still: stillSources.has(segment.sourceIndex)
   });
 
   try {
