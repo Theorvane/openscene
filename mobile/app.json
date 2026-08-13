@@ -65,7 +65,14 @@
         }
       ],
       "./plugins/withReleaseSigning",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-1548414855954305~3232346149",
+          "iosAppId": "ca-app-pub-1548414855954305~2877122921"
+        }
+      ]
     ]
   }
 }

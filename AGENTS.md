@@ -33,7 +33,13 @@ npm run build
 - Keep `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, `webSecurity: true`, and blocked window navigation.
 - File paths, FFmpeg executable paths, FFmpeg argv, voice sample paths, and generated output paths stay in the main process. The renderer gets typed job status and open or reveal actions.
 - OpenScene stores recordings, projects, imported assets, voice profiles, TTS output, and exports locally under Electron `userData` unless an explicit local override exists.
-- No cloud upload, analytics, account system, crash reporting, auto-update, or provider network calls are implemented.
+- No cloud upload, analytics, account system, crash reporting, or auto-update is
+  implemented on the desktop. `mobile/` calls providers directly — generation runs
+  against the user's own accounts, per operation and behind the spend prompt — and
+  carries the Google Mobile Ads SDK for a banner, which reports device identifiers
+  to Google. Both are deliberate and both are the exception to this line rather
+  than a widening of it: nothing else leaves the device, and neither exists on the
+  desktop.
 - Future hybrid AI support must follow [`docs/hybrid-ai-editor-direction.md`](docs/hybrid-ai-editor-direction.md): local models are user-configured, connected services are selected and authorized per operation, and provider adapters remain behind typed seams until a separately reviewed implementation adds them.
 
 ## Compatibility Identifiers

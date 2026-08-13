@@ -47,6 +47,7 @@
     "src/renderer/src/reasoningEffortPreferences.ts",
     "src/renderer/src/theme.ts",
     "src/shared/**/*.ts",
+    "mobile/src/lib/ads.ts",
     "mobile/src/lib/chatMarkdown.ts",
     "mobile/src/lib/chatMemory.ts",
     "tests/**/*.ts"
