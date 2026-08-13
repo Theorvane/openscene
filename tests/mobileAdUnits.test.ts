@@ -87,8 +87,30 @@ describe('banner ad units', () => {
 
     expect(banner).not.toMatch(/^import .*from 'react-native-google-mobile-ads';$/m);
     expect(banner).toContain("TurboModuleRegistry.get('RNGoogleMobileAdsModule')");
-    expect(banner).toContain('const ads = hasAdsNativeModule() ? loadAds() : null;');
-    expect(banner).toContain('if (ads === null || unitId === null || failed || keyboardUp) return null;');
+    expect(banner).toContain('hasAdsNativeModule() ? loadAds() : null');
+    expect(banner).toContain('if (ads === null || unitId === null || !ready || failed || keyboardUp) return null;');
+  });
+
+  it('checks consent and initialises before it ever requests an ad', async () => {
+    // Google's iOS privacy guidance: "Before requesting ads, use
+    // `canRequestAds` to check if you've obtained consent from the user."
+    // Requesting first and asking later is the compliance failure, not a
+    // rendering one, so nothing on screen would have revealed it.
+    const banner = await readFile(new URL('../mobile/src/components/AdBanner.tsx', import.meta.url), 'utf8');
+
+    expect(banner).toContain('AdsConsent.requestInfoUpdate()');
+    expect(banner).toContain('AdsConsent.loadAndShowConsentFormIfRequired()');
+    expect(banner).toContain('info.canRequestAds !== true) return;');
+    expect(banner).toContain('MobileAds().initialize()');
+    // The gate is on the render, not merely in the effect.
+    expect(banner).toContain('!ready || failed || keyboardUp) return null;');
+  });
+
+  it('treats a no-fill as a moment rather than the rest of the session', async () => {
+    // Collapsing is right; latching it for the life of the screen turned one
+    // bad minute into a session with no ads at all.
+    const banner = await readFile(new URL('../mobile/src/components/AdBanner.tsx', import.meta.url), 'utf8');
+    expect(banner).toContain('setTimeout(() => setFailed(false), RETRY_AFTER_MS)');
   });
 
   it('keeps the banner off the tab bar and out of the keyboard', async () => {

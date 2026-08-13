@@ -31,6 +31,12 @@ type BannerComponent = React.ComponentType<{
 type AdsModule = {
   readonly BannerAd: BannerComponent;
   readonly BannerAdSize: Record<string, string>;
+  readonly MobileAds: () => { initialize(): Promise<unknown> };
+  readonly AdsConsent: {
+    requestInfoUpdate(): Promise<unknown>;
+    loadAndShowConsentFormIfRequired(): Promise<unknown>;
+    getConsentInfo(): Promise<{ canRequestAds?: boolean }>;
+  };
 };
 
 /**
@@ -62,7 +68,12 @@ function loadAds(): AdsModule | null {
     const required: unknown = require('react-native-google-mobile-ads');
     for (const candidate of [required, (required as { default?: unknown } | null)?.default]) {
       const module = candidate as Partial<AdsModule> | undefined;
-      if (typeof module?.BannerAd === 'function' && module.BannerAdSize !== undefined) {
+      if (
+        typeof module?.BannerAd === 'function' &&
+        module.BannerAdSize !== undefined &&
+        typeof module.MobileAds === 'function' &&
+        module.AdsConsent !== undefined
+      ) {
         return module as AdsModule;
       }
     }
@@ -72,12 +83,27 @@ function loadAds(): AdsModule | null {
   }
 }
 
+/** Long enough that a dead network is not retried at cost, short enough to recover. */
+const RETRY_AFTER_MS = 60_000;
+
 export function AdBanner() {
-  const ads = hasAdsNativeModule() ? loadAds() : null;
+  // Resolved once: `require` is cached, but asking on every render made this run
+  // on each keystroke that moved the keyboard.
+  const [ads] = useState(() => (hasAdsNativeModule() ? loadAds() : null));
   const unitId = bannerAdUnitId(Platform.OS, __DEV__);
   /**
+   * Consent first, then initialise, then request. Google's own guidance is
+   * "before requesting ads, use `canRequestAds` to check if you've obtained
+   * consent from the user" — so the banner does not render until that is true.
+   * In regions where no consent is required the form is skipped and this
+   * resolves immediately; where it is required, showing it is the requirement.
+   */
+  const [ready, setReady] = useState(false);
+  /**
    * A banner that failed to fill is not a gap to leave behind. Collapsing keeps
-   * the tab bar where it was rather than leaving a band of empty app above it.
+   * the tab bar where it was rather than leaving a band of empty app above it —
+   * but not forever: a no-fill is usually a moment, and latching it for the life
+   * of the screen turned one bad minute into a session with no ads at all.
    */
   const [failed, setFailed] = useState(false);
   const [keyboardUp, setKeyboardUp] = useState(false);
@@ -91,7 +117,40 @@ export function AdBanner() {
     };
   }, []);
 
-  if (ads === null || unitId === null || failed || keyboardUp) return null;
+  useEffect(() => {
+    if (ads === null) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        // A consent form is shown only where one is required; elsewhere these
+        // resolve without any UI. A failure here is not a reason to give up on
+        // the check that follows, which is the part that actually gates.
+        await ads.AdsConsent.requestInfoUpdate();
+        await ads.AdsConsent.loadAndShowConsentFormIfRequired();
+      } catch {
+        // Fall through: `canRequestAds` still decides.
+      }
+      try {
+        const info = await ads.AdsConsent.getConsentInfo();
+        if (cancelled || info.canRequestAds !== true) return;
+        await ads.MobileAds().initialize();
+        if (!cancelled) setReady(true);
+      } catch {
+        // No consent, or no SDK to initialise: no banner, and nothing said.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ads]);
+
+  useEffect(() => {
+    if (!failed) return;
+    const timer = setTimeout(() => setFailed(false), RETRY_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [failed]);
+
+  if (ads === null || unitId === null || !ready || failed || keyboardUp) return null;
 
   return (
     <View style={styles.root}>
