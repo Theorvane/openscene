@@ -12,6 +12,15 @@ export type NativeSegment = {
   timelineStartMs: number;
   sourceStartMs: number;
   sourceEndMs: number;
+  /**
+   * A still, to be held for the segment rather than read as a movie.
+   *
+   * Sent whether or not the renderer reads it: a build that ignores the field
+   * is exactly the build `supportsStills` reports `false` for, and export
+   * refuses those before they get here. Sending it anyway means the native side
+   * is the only thing left to write.
+   */
+  still?: boolean;
 };
 
 export type NativeExportRequest = {
