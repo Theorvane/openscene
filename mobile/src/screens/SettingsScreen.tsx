@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 
 import { PROVIDER_KEYS, readSlot } from '../lib/credentials';
 import { SPEND_FEATURES, useSpendPermissions } from '../lib/permissions';
@@ -9,6 +10,7 @@ import { AddCustomProvider } from '../components/AddCustomProvider';
 import { customCredentialKey, removeCustomProvider, useCustomProviders } from '../lib/customProviders';
 import { LLM_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, getLlmCatalogProvider } from '@openvideo/shared/llmProviders';
 import { FormScreen } from '../components/FormScreen';
+import { APP_VERSION, DEVELOPER_NAME, DEVELOPER_SITE } from '../lib/about';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
 
@@ -156,11 +158,44 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
           );
         })}
       </View>
+
+      {/*
+        Who made this, and where to find them.
+
+        An app that carries ads is a published thing rather than a personal
+        build, and both the stores and AdMob expect a publisher a user can
+        identify and reach. The site is the place a privacy policy lives, which
+        serving ads also requires.
+      */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>About</Text>
+        <View style={styles.aboutRow}>
+          <Text style={styles.aboutLabel}>Developer</Text>
+          <Text style={styles.aboutValue}>{DEVELOPER_NAME}</Text>
+        </View>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`Open ${DEVELOPER_SITE}`}
+          onPress={() => void WebBrowser.openBrowserAsync(`https://${DEVELOPER_SITE}`)}
+          style={press(styles.aboutRow)}
+        >
+          <Text style={styles.aboutLabel}>Site</Text>
+          <Text style={[styles.aboutValue, styles.aboutLink]}>{DEVELOPER_SITE}</Text>
+        </Pressable>
+        <View style={styles.aboutRow}>
+          <Text style={styles.aboutLabel}>Version</Text>
+          <Text style={styles.aboutValue}>{APP_VERSION}</Text>
+        </View>
+      </View>
     </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  aboutRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: MIN_TAP, borderBottomWidth: 1, borderBottomColor: theme.line },
+  aboutLabel: { flex: 1, color: theme.text, fontSize: 14 },
+  aboutValue: { color: theme.textWeak, fontSize: 13 },
+  aboutLink: { color: theme.accent, fontWeight: '600' },
   h1: { color: theme.text, fontSize: 26, fontWeight: '700' },
   sub: { color: theme.textWeak, fontSize: 13, lineHeight: 19, marginBottom: 6 },
   section: { marginTop: 22, gap: 10 },

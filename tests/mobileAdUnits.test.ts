@@ -39,6 +39,18 @@ describe('banner ad units', () => {
     expect(bannerAdUnitId('web', true)).toBeNull();
   });
 
+  it('names the publisher, and takes the version from the config', async () => {
+    // An app carrying ads is a published thing rather than a personal build, and
+    // both the stores and AdMob expect a publisher a user can identify.
+    const about = await readFile(new URL('../mobile/src/lib/about.ts', import.meta.url), 'utf8');
+    expect(about).toContain("DEVELOPER_NAME = 'sloki9637'");
+    expect(about).toContain("DEVELOPER_SITE = 'sloki9637.com'");
+    // A version written out twice is a version that disagrees with itself at the
+    // worst moment — a bug report against a number no build ever had.
+    expect(about).toContain('appConfig.expo.version');
+    expect(about).not.toMatch(/APP_VERSION[^=]*= '[\d.]+'/);
+  });
+
   it('carries both app ids, and does not confuse them with the units', async () => {
     const config = JSON.parse(await readFile(new URL('../mobile/app.json', import.meta.url), 'utf8'));
     const entry = config.expo.plugins.find(
