@@ -44,11 +44,29 @@ describe('banner ad units', () => {
     // both the stores and AdMob expect a publisher a user can identify.
     const about = await readFile(new URL('../mobile/src/lib/about.ts', import.meta.url), 'utf8');
     expect(about).toContain("DEVELOPER_NAME = 'sloki9637'");
-    expect(about).toContain("DEVELOPER_SITE = 'sloki9637.com'");
+    expect(about).toContain("DEVELOPER_SITE = 'www.sloki9637.com'");
     // A version written out twice is a version that disagrees with itself at the
     // worst moment — a bug report against a number no build ever had.
     expect(about).toContain('appConfig.expo.version');
     expect(about).not.toMatch(/APP_VERSION[^=]*= '[\d.]+'/);
+  });
+
+  it('can reach the privacy policy from inside the app', async () => {
+    // Serving ads requires one — AdMob asks for the URL and the stores ask
+    // again — and it has to be reachable from the app rather than only from a
+    // listing page the user never opens.
+    const about = await readFile(new URL('../mobile/src/lib/about.ts', import.meta.url), 'utf8');
+    expect(about).toContain("PRIVACY_URL = 'https://www.sloki9637.com/privacy'");
+    expect(about).toContain("TERMS_URL = 'https://www.sloki9637.com/terms'");
+
+    // Both live in Settings, and both open rather than sitting there as text.
+    const settings = await readFile(new URL('../mobile/src/screens/SettingsScreen.tsx', import.meta.url), 'utf8');
+    expect(settings).toContain('WebBrowser.openBrowserAsync(PRIVACY_URL)');
+    expect(settings).toContain('WebBrowser.openBrowserAsync(TERMS_URL)');
+
+    // And a way to write to the publisher, which the stores also ask for.
+    expect(about).toContain("CONTACT_EMAIL = 'inquiry@sloki9637.com'");
+    expect(settings).toContain('Linking.openURL(`mailto:${CONTACT_EMAIL}`)');
   });
 
   it('carries both app ids, and does not confuse them with the units', async () => {

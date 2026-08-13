@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
 import { PROVIDER_KEYS, readSlot } from '../lib/credentials';
@@ -10,7 +11,7 @@ import { AddCustomProvider } from '../components/AddCustomProvider';
 import { customCredentialKey, removeCustomProvider, useCustomProviders } from '../lib/customProviders';
 import { LLM_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, getLlmCatalogProvider } from '@openvideo/shared/llmProviders';
 import { FormScreen } from '../components/FormScreen';
-import { APP_VERSION, DEVELOPER_NAME, DEVELOPER_SITE } from '../lib/about';
+import { APP_VERSION, CONTACT_EMAIL, DEVELOPER_NAME, DEVELOPER_SITE, PRIVACY_URL, TERMS_URL } from '../lib/about';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
 
@@ -181,6 +182,33 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
         >
           <Text style={styles.aboutLabel}>Site</Text>
           <Text style={[styles.aboutValue, styles.aboutLink]}>{DEVELOPER_SITE}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`Email ${CONTACT_EMAIL}`}
+          onPress={() => void Linking.openURL(`mailto:${CONTACT_EMAIL}`)}
+          style={press(styles.aboutRow)}
+        >
+          <Text style={styles.aboutLabel}>Contact</Text>
+          <Text style={[styles.aboutValue, styles.aboutLink]}>{CONTACT_EMAIL}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Open the privacy policy"
+          onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
+          style={press(styles.aboutRow)}
+        >
+          <Text style={styles.aboutLabel}>Privacy policy</Text>
+          <Text style={[styles.aboutValue, styles.aboutLink]}>Open</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Open the terms of service"
+          onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
+          style={press(styles.aboutRow)}
+        >
+          <Text style={styles.aboutLabel}>Terms of service</Text>
+          <Text style={[styles.aboutValue, styles.aboutLink]}>Open</Text>
         </Pressable>
         <View style={styles.aboutRow}>
           <Text style={styles.aboutLabel}>Version</Text>
