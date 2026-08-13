@@ -47,6 +47,15 @@ export type CompositionPlan = {
   /** Asset ids in the order the segments index into. */
   readonly sources: readonly string[];
   /**
+   * Indexes into `sources` that are stills.
+   *
+   * A still is held for its clip's length rather than seeked into, and a
+   * renderer that opens one as a movie gets a single frame. The plan is built
+   * from the timeline alone, which does not record what an asset is, so the
+   * caller supplies the kinds and the plan passes on the conclusion.
+   */
+  readonly stillSourceIndexes: readonly number[];
+  /**
    * Bottom layer first. Track order is layer order and the timeline's first
    * track is the topmost, so this is the reverse of document order — the same
    * inversion the FFmpeg overlay chain needs, for the same reason.
@@ -68,6 +77,8 @@ export function buildCompositionPlan(input: {
   readonly width: number;
   readonly height: number;
   readonly frameRate: number;
+  /** Ids of assets that are stills; absent means none, as older projects have. */
+  readonly stillAssetIds?: ReadonlySet<string>;
 }): CompositionPlan {
   const durationMs = timelineDurationMs(input.timeline);
   if (durationMs <= 0) {
@@ -128,6 +139,9 @@ export function buildCompositionPlan(input: {
     frameRate: input.frameRate,
     durationMs,
     sources,
+    stillSourceIndexes: sources
+      .map((assetId, index) => (input.stillAssetIds?.has(assetId) === true ? index : -1))
+      .filter((index) => index !== -1),
     // Bottom row first, so a pipeline that stacks in order puts the timeline's
     // top track on top.
     videoSegments: [...videoLayers].reverse().flat(),

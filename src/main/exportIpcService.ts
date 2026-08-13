@@ -177,6 +177,12 @@ export class ExportIpcService {
       const compiled = compileFfmpegTimeline({
         timeline: input.project.timeline,
         assetPaths: staged.assetPaths,
+        // The compiler works from the timeline, which does not record what an
+        // asset is; the project does. Without this a still is opened as a movie
+        // and contributes one frame instead of its clip's length.
+        stillAssetIds: new Set(
+          input.project.assets.filter((asset) => asset.kind === 'image').map((asset) => asset.id)
+        ),
         outputPath,
         ...this.outputDimensions(input.request, input.project),
         frameRate: input.request.frameRate ?? EXPORT_DEFAULTS.frameRate

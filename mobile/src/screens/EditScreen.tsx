@@ -9,7 +9,7 @@ import {
   assetUri,
   deleteAsset,
   importAsset,
-  isPlaceable,
+  isStillAsset,
   readProject,
   writeProject,
   type MobileAsset
@@ -82,8 +82,7 @@ export function EditScreen({
     setStoredAssets(project.assets);
     loadProject(
       project.timeline,
-      // Stills live in the project too now, and the editor has no track for one.
-      project.assets.filter(isPlaceable).map((asset) => ({
+      project.assets.map((asset) => ({
         id: asset.id,
         uri: assetUri(project.id, asset),
         displayName: asset.displayName,
@@ -129,20 +128,27 @@ export function EditScreen({
     setPlayheadMs(next);
   }, [editor.timeline, editor.playheadMs, setPlayheadMs]);
 
-  // Over a gap there is nothing to play from, so time has to be advanced here or
-  // playback would stall on an empty stretch of timeline.
+  /**
+   * Over a gap there is nothing to play from, so time has to be advanced here or
+   * playback would stall on an empty stretch of timeline.
+   *
+   * A still is the same case wearing a different hat: it is visible, but there
+   * is no decoder reporting progress across it, so without this the playhead
+   * would stop dead on the first still it reached.
+   */
+  const heldFrame = visible === null || visibleAsset?.kind === 'image';
   const gapTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (gapTimer.current !== null) {
       clearInterval(gapTimer.current);
       gapTimer.current = null;
     }
-    if (!playing || visible !== null) return;
+    if (!playing || !heldFrame) return;
     gapTimer.current = setInterval(() => setPlayheadMs((current) => current + 100), 100);
     return () => {
       if (gapTimer.current !== null) clearInterval(gapTimer.current);
     };
-  }, [playing, visible, setPlayheadMs]);
+  }, [playing, heldFrame, setPlayheadMs]);
 
   useEffect(() => {
     if (playing && editor.playheadMs >= editor.durationMs && editor.durationMs > 0) setPlaying(false);
@@ -271,8 +277,9 @@ export function EditScreen({
     <View style={[styles.root, { paddingTop: topInset }]}>
       <PreviewPlayer
         uri={visibleAsset?.uri ?? null}
+        still={visibleAsset?.kind === 'image'}
         sourceTimeMs={visible?.sourceTimeMs ?? 0}
-        playing={playing && visible !== null}
+        playing={playing && visible !== null && visibleAsset?.kind !== 'image'}
         onProgress={onProgress}
         onEnded={onEnded}
       />

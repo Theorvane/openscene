@@ -10,6 +10,16 @@ import type { AudioTimelineTrack, PersistedTimelineClip, TimelineDocument } from
 export type CompileFfmpegTimelineInput = {
   readonly timeline: TimelineDocument;
   readonly assetPaths: ReadonlyMap<string, string>;
+  /**
+   * Which assets are stills, by id.
+   *
+   * A still has no timeline of its own: opened the way a movie is opened it
+   * yields a single frame, and the overlay it feeds runs for that one frame
+   * instead of the length of its clip. `-loop 1 -t` is FFmpeg's way of saying
+   * "hold this". Absent means nothing is a still, which is what every project
+   * written before stills existed means.
+   */
+  readonly stillAssetIds?: ReadonlySet<string>;
   readonly outputPath: string;
   readonly width: number;
   readonly height: number;
@@ -94,6 +104,11 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
   for (const track of input.timeline.tracks) {
     const layer: Array<{ readonly clip: PersistedTimelineClip; readonly inputIndex: number }> = [];
     for (const clip of track.clips) {
+      // The hold has to cover the clip, and the clip cannot run past its source
+      // — which for a still is the hold itself — so the two are the same number.
+      if (input.stillAssetIds?.has(clip.assetId) === true) {
+        args.push('-loop', '1', '-t', seconds(clip.sourceEndMs - clip.sourceStartMs));
+      }
       args.push('-i', requireAssetPath(input.assetPaths, clip.assetId));
       if (track.kind === 'video') {
         if (clip.effects.opacity > 0 && clip.effects.scale > 0) {

@@ -174,10 +174,9 @@ describe('mobile touch and keyboard source contract', () => {
     // went nowhere at all, so nothing answered "what have I made?".
     const store = await readSource('src/lib/projectStore.ts');
     expect(store).toContain('export function saveGeneratedImage(');
-    // A still has no track, and the rule lives with the timeline rather than in
-    // each caller.
-    expect(store).toContain('export function isPlaceable(');
-    expect(store).toContain('if (!isPlaceable(asset)) return null;');
+    // A still is placeable now — on a video track, held rather than played —
+    // and the rule for that lives in the shared core.
+    expect(store).toContain('export function isStillAsset(');
 
     // Both things that make a still keep it.
     expect(await readSource('src/screens/ImageScreen.tsx')).toContain('saveGeneratedImage(');
@@ -191,8 +190,10 @@ describe('mobile touch and keyboard source contract', () => {
     const library = await readSource('src/screens/LibraryScreen.tsx');
     expect(library).toContain('appendAssetToTimeline');
     expect(library).toContain('deleteAsset');
-    // Saying why a still has no Add button beats leaving the gap unexplained.
-    expect(library).toContain('Stills have no track to sit on');
+    // A still is placed like anything else now, and the note says what it did
+    // — a hold the user is expected to trim rather than a length it claims.
+    expect(library).toContain('STILL_DEFAULT_HOLD_MS');
+    expect(library).not.toContain('Stills have no track to sit on');
   });
 
   it('places an asset it already holds without recording it twice', async () => {
@@ -210,6 +211,27 @@ describe('mobile touch and keyboard source contract', () => {
     // And a project already holding the duplicate is repaired when it is read.
     expect(store).toContain('function dedupeAssets(');
     expect(store).toContain('assets: dedupeAssets(');
+  });
+
+  it('places a still, shows it, and refuses to export one it cannot render', async () => {
+    // A still is picture on a video track, held rather than played. The parts
+    // that differ from a clip are all downstream of that.
+    const store = await readSource('src/lib/projectStore.ts');
+    expect(store).toContain('stillClipSource()');
+    expect(store).not.toContain('if (!isPlaceable(asset)) return null;');
+
+    // The player has nothing to open, so it never sees one.
+    const preview = await readSource('src/components/PreviewPlayer.tsx');
+    expect(preview).toContain('const source = still === true ? null : uri;');
+    // And playback has to cross it, since no decoder reports progress over one.
+    const edit = await readSource('src/screens/EditScreen.tsx');
+    expect(edit).toContain("const heldFrame = visible === null || visibleAsset?.kind === 'image';");
+
+    // Exporting a still through a renderer that cannot hold one would drop it to
+    // a single frame, so it is refused with the reason instead.
+    const composition = await readSource('src/lib/exportComposition.ts');
+    expect(composition).toContain('plan.stillSourceIndexes.length > 0 && !areStillsRenderable');
+    expect(await readSource('modules/video-export/index.ts')).toContain('export const areStillsRenderable');
   });
 
   it('states the reason export is unavailable rather than dimming in silence', async () => {

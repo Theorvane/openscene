@@ -1,4 +1,5 @@
 import { clipTimelineEndMs } from './timelineClipGeometry';
+import { trackKindForAsset } from './timelineStills';
 import type { MediaAsset, TimelineDocument, TimelineTrack } from './timelineTypes';
 
 /**
@@ -26,7 +27,8 @@ export function resolveTimelineTrackForAsset(
     if (requested === undefined) {
       return { ok: false, error: `Track ${requestedTrackId} not found. Available tracks: ${describeTracks(timeline)}.` };
     }
-    if (requested.kind !== asset.kind) {
+    // A still asks for a video track, because that is where picture goes.
+    if (requested.kind !== trackKindForAsset(asset.kind)) {
       return {
         ok: false,
         error: `Track ${requestedTrackId} is a ${requested.kind} track but asset ${asset.id} is ${asset.kind}. Available tracks: ${describeTracks(timeline)}.`
@@ -35,11 +37,12 @@ export function resolveTimelineTrackForAsset(
     return { ok: true, track: requested };
   }
 
-  const match = timeline.tracks.find((track) => track.kind === asset.kind);
+  const wanted = trackKindForAsset(asset.kind);
+  const match = timeline.tracks.find((track) => track.kind === wanted);
   if (match === undefined) {
     return {
       ok: false,
-      error: `The project has no ${asset.kind} track for asset ${asset.id}. Available tracks: ${describeTracks(timeline)}.`
+      error: `The project has no ${wanted} track for asset ${asset.id}. Available tracks: ${describeTracks(timeline)}.`
     };
   }
   return { ok: true, track: match };

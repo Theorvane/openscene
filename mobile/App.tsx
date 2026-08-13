@@ -13,7 +13,7 @@ import { PlanScreen } from './src/screens/PlanScreen';
 import { ProjectsScreen } from './src/screens/ProjectsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { VoiceScreen } from './src/screens/VoiceScreen';
-import { assetUri, isPlaceable, readProject } from './src/lib/projectStore';
+import { assetUri, readProject } from './src/lib/projectStore';
 import { deliverExport, exportTimeline } from './src/lib/exportComposition';
 import { isExportAvailable } from './modules/video-export';
 import {
@@ -125,7 +125,7 @@ function Shell() {
     setExportState({ kind: 'running' });
     const rendered = await exportTimeline({
       timeline: current.timeline,
-      assets: current.assets.filter(isPlaceable).map((asset) => ({
+      assets: current.assets.map((asset) => ({
         id: asset.id,
         uri: assetUri(current.id, asset),
         displayName: asset.displayName,
