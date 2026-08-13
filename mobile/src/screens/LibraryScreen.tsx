@@ -6,10 +6,10 @@ import {
   assetByteLength,
   assetUri,
   deleteAsset,
-  isPlaceable,
   readProject,
   type MobileAsset
 } from '../lib/projectStore';
+import { STILL_DEFAULT_HOLD_MS } from '@openvideo/shared/timelineStills';
 import { deliverExport } from '../lib/exportComposition';
 import { FormScreen } from '../components/FormScreen';
 import { CloseIcon } from '../components/Icon';
@@ -85,7 +85,9 @@ export function LibraryScreen({
     setNote(
       appendAssetToTimeline(project, asset) === null
         ? 'No video track would take that clip.'
-        : `${asset.displayName} added to the timeline.`
+        : asset.kind === 'image'
+          ? `${asset.displayName} added, held for ${STILL_DEFAULT_HOLD_MS / 1000}s — trim it on the Edit tab.`
+          : `${asset.displayName} added to the timeline.`
     );
     refresh();
   };
@@ -210,15 +212,9 @@ export function LibraryScreen({
               </View>
 
               <View style={styles.actions}>
-                {isPlaceable(asset) ? (
-                  <Pressable accessibilityRole="button" onPress={() => place(asset)} style={press(styles.action)}>
-                    <Text style={styles.actionText}>Add to timeline</Text>
-                  </Pressable>
-                ) : (
-                  // Said rather than left to be discovered: the tracks are video
-                  // and audio, so there is nowhere for a still to go.
-                  <Text style={styles.cannot}>Stills have no track to sit on</Text>
-                )}
+                <Pressable accessibilityRole="button" onPress={() => place(asset)} style={press(styles.action)}>
+                  <Text style={styles.actionText}>Add to timeline</Text>
+                </Pressable>
                 <Pressable accessibilityRole="button" onPress={() => void keep(asset)} style={press(styles.action)}>
                   <Text style={styles.actionText}>Save or share</Text>
                 </Pressable>
@@ -254,5 +250,4 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   action: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
   actionText: { color: theme.text, fontSize: 13, fontWeight: '600' },
-  cannot: { flex: 1, color: theme.textWeaker, fontSize: 12, lineHeight: 17 }
 });

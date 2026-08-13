@@ -31,6 +31,15 @@ export type NativeFrame = { base64: string; mimeType: string; atMs: number };
 
 type VideoExportModuleType = {
   readonly isSupported: boolean;
+  /**
+   * Whether the renderer can hold a still for a segment.
+   *
+   * A still has no timeline of its own, so a compositor that opens every source
+   * as a movie gets one frame — the export would come out shorter than the cut
+   * and nothing would say why. Absent means no, which is what every build made
+   * before stills existed means.
+   */
+  readonly supportsStills?: boolean;
   exportComposition(request: NativeExportRequest): Promise<NativeExportResult>;
   /** Negative `atMs` means the last frame. */
   extractFrame(uri: string, atMs: number): Promise<NativeFrame>;
@@ -45,6 +54,14 @@ type VideoExportModuleType = {
 const nativeModule = requireOptionalNativeModule<VideoExportModuleType>('VideoExport');
 
 export const isExportAvailable = nativeModule !== null;
+
+/**
+ * Reported by the native side rather than assumed from the module's presence:
+ * a client built before stills can render everything else perfectly well, and
+ * refusing its exports outright would be worse than refusing the ones it would
+ * get wrong.
+ */
+export const areStillsRenderable = nativeModule?.supportsStills === true;
 
 /**
  * Frame extraction landed after export, so a dev client built before it has the

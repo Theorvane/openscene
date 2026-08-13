@@ -1,4 +1,10 @@
-export const MEDIA_KINDS = ['video', 'audio'] as const;
+/**
+ * `image` is a still. It has no timeline of its own and is held rather than
+ * played; see `timelineStills` for what that means to a renderer. Tracks are
+ * still only video and audio — a still is picture and composites with the rest
+ * of the picture, so it lives on a video track.
+ */
+export const MEDIA_KINDS = ['video', 'audio', 'image'] as const;
 export const TIMELINE_SCHEMA_VERSION = 3 as const;
 export const PROJECT_SCHEMA_VERSION = 3 as const;
 export const CLIP_EFFECT_PROPERTIES = ['opacity', 'scale', 'positionX', 'positionY', 'rotation', 'volume'] as const;

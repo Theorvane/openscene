@@ -1,7 +1,7 @@
 import { buildCompositionPlan, CompositionPlanError } from '@openvideo/shared/videoCompositionPlan';
 import type { TimelineDocument } from '@openvideo/shared/timelineTypes';
 import * as Sharing from 'expo-sharing';
-import VideoExport from '../../modules/video-export';
+import VideoExport, { areStillsRenderable } from '../../modules/video-export';
 import type { EditorAsset } from './editorState';
 
 /**
@@ -45,6 +45,9 @@ export async function exportTimeline(input: {
   try {
     plan = buildCompositionPlan({
       timeline: input.timeline,
+      // The plan is built from the timeline, which does not record what an asset
+      // is. Without this the native renderer opens a still as a movie.
+      stillAssetIds: new Set(input.assets.filter((asset) => asset.kind === 'image').map((asset) => asset.id)),
       width: input.width ?? 1920,
       height: input.height ?? 1080,
       frameRate: input.frameRate ?? 30
@@ -53,6 +56,18 @@ export async function exportTimeline(input: {
     return {
       ok: false,
       message: error instanceof CompositionPlanError ? error.message : 'The timeline could not be prepared for export.'
+    };
+  }
+
+  // A renderer that cannot hold a still would open it as a movie and contribute
+  // a single frame, so the export would be shorter than the timeline with
+  // nothing to say why. Refusing names the limit instead.
+  if (plan.stillSourceIndexes.length > 0 && !areStillsRenderable) {
+    return {
+      ok: false,
+      message:
+        `This build cannot render stills — ${plan.stillSourceIndexes.length} on the timeline. ` +
+        'Remove them, or rebuild the development client once still rendering lands.'
     };
   }
 

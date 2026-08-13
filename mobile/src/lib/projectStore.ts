@@ -3,6 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { parseTimelineDocument } from '@openvideo/shared/timelineDocumentValidators';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '@openvideo/shared/timelineClipPlacement';
 import { placeClip } from '@openvideo/shared/timelineClipLogic';
+import { isStill, stillClipSource } from '@openvideo/shared/timelineStills';
 
 import { createInitialTimeline } from '@openvideo/shared/timelineLogic';
 import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, type TimelineDocument } from '@openvideo/shared/timelineTypes';
@@ -57,9 +58,9 @@ export type MobileAsset = {
   readonly origin?: AssetOrigin;
 };
 
-/** Only video and audio have a track to land on, and the editor only takes those. */
-export function isPlaceable(asset: MobileAsset): asset is MobileAsset & { readonly kind: 'video' | 'audio' } {
-  return asset.kind !== 'image';
+/** A still is a picture with no length of its own; see `timelineStills`. */
+export function isStillAsset(asset: MobileAsset): boolean {
+  return isStill(asset.kind);
 }
 
 export type MobileProject = {
@@ -272,10 +273,6 @@ export function importAsset(
  * shot would have gone silently changes the cut.
  */
 export function appendAssetToTimeline(project: MobileProject, asset: MobileAsset): MobileProject | null {
-  // A still has no track to land on, and the shared placement rules have no
-  // answer for one. Refusing here keeps that decision in the one place that
-  // knows the timeline, rather than in each caller.
-  if (!isPlaceable(asset)) return null;
   // Placement only reads the asset's kind, but the shared signature takes the
   // whole record, so the stored asset is widened rather than partially faked.
   const target = resolveTimelineTrackForAsset(project.timeline, {
@@ -300,9 +297,12 @@ export function appendAssetToTimeline(project: MobileProject, asset: MobileAsset
       id: `clip-${asset.id}-${Date.now().toString(36)}`,
       assetId: asset.id,
       timelineStartMs: trackAppendStartMs(target.track),
-      sourceStartMs: 0,
-      sourceEndMs: asset.durationMs,
-      sourceDurationMs: asset.durationMs,
+      // A still has no duration to take a length from, so the shared rule
+      // supplies the hold — and makes the clip's source as long as the hold, so
+      // the ordinary "a clip may not run past its source" check is satisfied.
+      ...(isStillAsset(asset)
+        ? stillClipSource()
+        : { sourceStartMs: 0, sourceEndMs: asset.durationMs, sourceDurationMs: asset.durationMs }),
       effects: { ...DEFAULT_CLIP_EFFECTS },
       keyframes: []
     }

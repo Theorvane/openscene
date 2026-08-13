@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { theme } from '../lib/theme';
@@ -17,12 +17,19 @@ import { theme } from '../lib/theme';
  */
 export function PreviewPlayer({
   uri,
+  still,
   sourceTimeMs,
   playing,
   onProgress,
   onEnded
 }: {
   readonly uri: string | null;
+  /**
+   * A still is picture with no timeline of its own, so there is nothing for a
+   * video player to open. It is shown, and the playhead runs over it the way it
+   * runs over a gap.
+   */
+  readonly still?: boolean;
   readonly sourceTimeMs: number;
   readonly playing: boolean;
   /** Source position, in ms, reported while playing. */
@@ -36,14 +43,17 @@ export function PreviewPlayer({
   const lastSeekMs = useRef(0);
 
   useEffect(() => {
-    if (uri === loadedUri.current) return;
-    loadedUri.current = uri;
+    // A still never reaches the player: expo-video has nothing to open, and the
+    // failed load would clear whatever the player was showing.
+    const source = still === true ? null : uri;
+    if (source === loadedUri.current) return;
+    loadedUri.current = source;
     // replaceAsync rather than replace: on iOS the synchronous form blocks the
     // UI thread while the asset loads, which shows up as a frozen scrub.
-    void player.replaceAsync(uri === null ? null : { uri }).catch(() => {
+    void player.replaceAsync(source === null ? null : { uri: source }).catch(() => {
       loadedUri.current = null;
     });
-  }, [uri, player]);
+  }, [uri, still, player]);
 
   useEffect(() => {
     const target = Math.max(0, sourceTimeMs) / 1000;
@@ -71,7 +81,9 @@ export function PreviewPlayer({
 
   return (
     <View style={styles.root}>
-      {uri === null ? (
+      {uri !== null && still === true ? (
+        <Image style={styles.video} source={{ uri }} resizeMode="contain" accessibilityLabel="Still under the playhead" />
+      ) : uri === null ? (
         // A gap is black on export, so it is black here too rather than showing
         // the last frame that happened to be decoded.
         <View style={styles.empty}>
