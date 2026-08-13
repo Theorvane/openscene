@@ -54,6 +54,28 @@ describe('banner ad units', () => {
     expect(entry[1].androidAppId).toContain('~');
   });
 
+  it('carries the SKAdNetwork identifiers, in the shape Apple requires', async () => {
+    // Without these an ad network cannot be credited with a conversion on
+    // iOS 14+, so attribution fails — which shows up as lower fill and revenue
+    // rather than as an error. Copied from Google's AdMob iOS quick-start; a
+    // wrong or invented entry is worse than an absent one, because it claims an
+    // attribution relationship that does not exist.
+    const config = JSON.parse(await readFile(new URL('../mobile/app.json', import.meta.url), 'utf8'));
+    const entry = config.expo.plugins.find(
+      (plugin: unknown) => Array.isArray(plugin) && plugin[0] === 'react-native-google-mobile-ads'
+    );
+    const items: readonly string[] = entry[1].skAdNetworkItems;
+
+    expect(items.length).toBeGreaterThan(40);
+    expect(new Set(items).size, 'duplicates are silently ignored and hide a bad paste').toBe(items.length);
+    for (const item of items) {
+      expect(item, `${item} is not an SKAdNetwork identifier`).toMatch(/^[a-z0-9]{10}\.skadnetwork$/);
+    }
+    // Google's own network. If the list were ever replaced by something else's,
+    // this is the entry that would go missing.
+    expect(items).toContain('cstr6suwn9.skadnetwork');
+  });
+
   it('asks React Native whether the SDK is there before touching the SDK', async () => {
     // Requiring it and catching does not work, which cost two red screens to
     // learn: the package's entry registers its TurboModules eagerly with

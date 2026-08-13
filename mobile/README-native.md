@@ -81,4 +81,17 @@ npx expo-modules-autolinking react-native-config --platform android --json \
 The iOS pod resolves through `RNGoogleMobileAds.podspec`, which depends on
 `Google-Mobile-Ads-SDK` — that pod is the Google SDK itself.
 
+On iOS the same prebuild should also show fifty `SKAdNetworkIdentifier` entries:
+
+```bash
+grep -c skadnetwork ios/*/Info.plist
+```
+
+Those come from Google's AdMob iOS quick-start, copied on 2026-08-13. They are
+the networks allowed to be credited with a conversion from this app, so the list
+belongs to Google and not to us: when it changes, re-copy it from
+`https://developers.google.com/admob/ios/quick-start` rather than editing
+entries by hand. An invented identifier is worse than a missing one — it claims
+an attribution relationship that does not exist.
+
 Remember to delete `ios/` and `android/` afterwards. They are build output.
