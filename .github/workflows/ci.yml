@@ -17,8 +17,26 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          # Both lockfiles, or the cache key ignores every mobile dependency
+          # change and restores a tree that does not match the install below.
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
       - run: npm ci
+      # The mobile app is a separate install, and the suite needs it for two
+      # reasons. Its own typecheck is required on every change that touches the
+      # app — see "Two Surfaces, One Core" in AGENTS.md — and the tests that
+      # cover mobile rules import those modules directly, which makes esbuild
+      # read `mobile/tsconfig.json`. That file extends `expo/tsconfig.base`, so
+      # without this the transform fails before a single assertion runs and the
+      # failure names a tsconfig rather than the missing install.
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
       - run: brew install ffmpeg
       - run: npm run typecheck
+      - name: Typecheck the mobile app
+        working-directory: mobile
+        run: npm run typecheck
       - run: npm test
       - run: npm run build
