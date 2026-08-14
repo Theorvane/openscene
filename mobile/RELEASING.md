@@ -164,13 +164,27 @@ code. A development build must show a test banner before a store build ships
 one — a release that reaches users with a silently broken banner earns nothing
 and still declares ad collection.
 
-**The interstitial has no live unit yet.** The placement is built and gated:
-it appears only after an export has actually produced a file, never before one
-and never after a failure, and at most once every five minutes. Until interstitial
-ad units exist in the AdMob console for both platforms and are filled into
-`LIVE_INTERSTITIAL_UNITS` in `src/lib/ads.ts`, a production build asks for
-nothing and shows nothing — which is the correct behaviour, not a bug. Test
-builds use Google's own test interstitials.
+**There are two placements, and the interstitial is the one policy is strict
+about.** Reviewed against the AdMob programme policies; what the implementation
+does, and why:
+
+| Policy | What the app does |
+| --- | --- |
+| No ad in front of a user-initiated action | The interstitial is presented after the export has produced a file and the result is on screen — never on the Export tap |
+| No ad over loading content | Nothing is presented while the encoder runs |
+| No ad on an unsuccessful action | A failed export shows nothing and releases the ad loaded for it |
+| No impression the user cannot see | Refused unless `AppState` is `active`; an export can run for minutes and people put the phone down |
+| Not repeatedly, in succession | One every five minutes at most |
+| Consent before the request | UMP `canRequestAds` gates the *request*, not the presentation |
+| Never a live unit in a test build | Resolved in `src/lib/ads.ts`, not at the call site |
+| No accidental clicks | The banner has its own block and a rule above it, clear of the tab bar's five 44pt targets, and is hidden while the keyboard is up |
+| Publisher identifiable, policy reachable | Developer, site, contact, terms and privacy in Settings |
+
+Both interstitial units are live: `.../3993164988` on iOS, `.../9641715519` on
+Android. Four live units across two placements, and each one only ever serves the
+placement it was made for — an interstitial id in a banner slot, or the reverse,
+is a policy violation rather than a rendering bug, so a test asserts all four are
+distinct and correctly shaped.
 
 **Android export is implemented but unverified.** The Media3 Transformer path
 is written, compiles, and installs; no export has been seen to produce a file.

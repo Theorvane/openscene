@@ -35,12 +35,16 @@ const TEST_BANNER_UNITS = {
 /**
  * The interstitial, shown when an export finishes. See `exportInterstitial`.
  *
- * Empty until the units exist in the AdMob console — a banner id does not serve
- * an interstitial request, so there is nothing to borrow and no sensible
- * placeholder. Absent reads as "no interstitial", which is the correct
- * behaviour for a build that has no unit to ask for.
+ * Per platform, like the banner: an iOS unit does not serve on Android and a
+ * banner id does not serve an interstitial request, so there is nothing to
+ * borrow anywhere and no sensible placeholder. Partial rather than complete
+ * because a platform without a unit has to read as "no interstitial here"
+ * rather than fall back to one that belongs to a different placement.
  */
-const LIVE_INTERSTITIAL_UNITS: Partial<Record<Platform, string>> = {};
+const LIVE_INTERSTITIAL_UNITS: Partial<Record<Platform, string>> = {
+  ios: 'ca-app-pub-1548414855954305/3993164988',
+  android: 'ca-app-pub-1548414855954305/9641715519'
+};
 
 const TEST_INTERSTITIAL_UNITS = {
   ios: 'ca-app-pub-3940256099942544/4411468910',

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 import { describe, expect, it } from 'vitest';
 
-import { interstitialAdUnitId } from '../mobile/src/lib/ads';
+import { bannerAdUnitId, interstitialAdUnitId } from '../mobile/src/lib/ads';
 import { INTERSTITIAL_MIN_GAP_MS, decideInterstitial } from '../mobile/src/lib/exportInterstitial';
 
 /**
@@ -18,6 +18,7 @@ const base = {
   exportSucceeded: true,
   unitId: 'ca-app-pub-3940256099942544/1033173712',
   adFilled: true,
+  appActive: true,
   lastShownAt: null,
   now: 10_000_000
 } as const;
@@ -33,9 +34,10 @@ describe('the export interstitial', () => {
     expect(decideInterstitial({ ...base, exportSucceeded: false }).because).toBe('export-failed');
     // And it is refused first, so a build where everything else is in place
     // still cannot show one here.
-    expect(decideInterstitial({ exportSucceeded: false, unitId: null, adFilled: false, lastShownAt: null, now: 0 }).because).toBe(
-      'export-failed'
-    );
+    expect(
+      decideInterstitial({ exportSucceeded: false, unitId: null, adFilled: false, appActive: true, lastShownAt: null, now: 0 })
+        .because
+    ).toBe('export-failed');
   });
 
   it('does not punctuate a working session', () => {
@@ -44,6 +46,13 @@ describe('the export interstitial', () => {
     // Someone exporting three cuts in a row is one person working.
     expect(decideInterstitial({ ...base, lastShownAt: base.now - INTERSTITIAL_MIN_GAP_MS + 1 }).because).toBe('too-soon');
     expect(decideInterstitial({ ...base, lastShownAt: base.now - INTERSTITIAL_MIN_GAP_MS }).show).toBe(true);
+  });
+
+  it('shows nothing to an app the user is not looking at', () => {
+    // An export can take minutes and people put the phone down during one. An ad
+    // presented to a backgrounded app is an impression nobody saw — invalid, and
+    // the account's problem rather than the user's.
+    expect(decideInterstitial({ ...base, appActive: false }).because).toBe('not-foreground');
   });
 
   it('shows nothing when there is no unit and nothing filled', () => {
@@ -59,13 +68,28 @@ describe('the interstitial unit', () => {
     }
   });
 
-  it('asks for nothing where no live unit exists yet', () => {
-    // A banner id does not serve an interstitial request, so there is nothing to
-    // borrow. Absent has to read as "no interstitial" rather than as a fallback
-    // to some other unit, which would be a request against the wrong placement.
-    expect(interstitialAdUnitId('ios', false)).toBeNull();
-    expect(interstitialAdUnitId('android', false)).toBeNull();
+  it('uses the platform own unit in a production build', () => {
+    expect(interstitialAdUnitId('ios', false)).toBe('ca-app-pub-1548414855954305/3993164988');
+    expect(interstitialAdUnitId('android', false)).toBe('ca-app-pub-1548414855954305/9641715519');
+    // Four live units now, and every one of them has to be the placement it is
+    // used for. An interstitial served into a banner slot, or the reverse, is a
+    // policy violation rather than a rendering bug.
+    expect(new Set([
+      interstitialAdUnitId('ios', false),
+      interstitialAdUnitId('android', false),
+      bannerAdUnitId('ios', false),
+      bannerAdUnitId('android', false)
+    ]).size).toBe(4);
+    for (const unit of [interstitialAdUnitId('ios', false), interstitialAdUnitId('android', false)]) {
+      // A unit uses `/`; the `~` form is the app id, and swapping the two fails
+      // only at runtime on a real device, where it is expensive to find.
+      expect(unit).toMatch(/^ca-app-pub-1548414855954305\/\d+$/);
+    }
+  });
+
+  it('asks for nothing on a platform with no unit of its own', () => {
     expect(interstitialAdUnitId('web', true)).toBeNull();
+    expect(interstitialAdUnitId('web', false)).toBeNull();
   });
 });
 
@@ -85,6 +109,7 @@ describe('the export flow', () => {
   it('releases an ad loaded for a moment that did not arrive', async () => {
     const ad = await read('src/lib/exportAd.ts');
     expect(ad).toContain('if (!exportSucceeded) forget();');
+    expect(ad).toContain("appActive: AppState.currentState === 'active'");
     // An interstitial instance is single-use: showing a closed one does nothing,
     // silently, which reads as "the ad stopped working after the first time".
     expect(ad).toMatch(/CLOSED[\s\S]{0,260}forget\(\)/);

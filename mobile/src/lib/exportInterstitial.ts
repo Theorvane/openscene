@@ -31,7 +31,7 @@ export const INTERSTITIAL_MIN_GAP_MS = 5 * 60_000;
 export type InterstitialDecision = {
   readonly show: boolean;
   /** Why not, for the test to name rather than infer from a boolean. */
-  readonly because: 'ready' | 'export-failed' | 'too-soon' | 'no-unit' | 'not-filled';
+  readonly because: 'ready' | 'export-failed' | 'too-soon' | 'no-unit' | 'not-filled' | 'not-foreground';
 };
 
 export type InterstitialContext = {
@@ -43,6 +43,17 @@ export type InterstitialContext = {
    * at presentation would be checking the wrong end.
    */
   readonly adFilled: boolean;
+  /**
+   * Whether the app is the thing the user is looking at.
+   *
+   * An export can take minutes and people put their phone down during one. An ad
+   * presented to a backgrounded app is an impression nobody saw, which is an
+   * invalid impression and the account's problem rather than the user's — and if
+   * it survives to the next foreground it arrives with no connection at all to
+   * anything the user just did, which is the interruption this placement was
+   * chosen to avoid.
+   */
+  readonly appActive: boolean;
   readonly lastShownAt: number | null;
   readonly now: number;
 };
@@ -52,6 +63,7 @@ export function decideInterstitial(context: InterstitialContext): InterstitialDe
   // about the user rather than about the account: a failed export must not be
   // followed by an ad even in a build where everything else is in place.
   if (!context.exportSucceeded) return { show: false, because: 'export-failed' };
+  if (!context.appActive) return { show: false, because: 'not-foreground' };
   if (context.unitId === null) return { show: false, because: 'no-unit' };
   if (!context.adFilled) return { show: false, because: 'not-filled' };
   if (context.lastShownAt !== null && context.now - context.lastShownAt < INTERSTITIAL_MIN_GAP_MS) {

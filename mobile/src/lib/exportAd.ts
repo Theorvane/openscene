@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { interstitialAdUnitId } from './ads';
 import { ensureAdsReady, loadAds, type AdsModule, type InterstitialAdInstance } from './adsModule';
@@ -96,12 +96,15 @@ export async function showExportAd(exportSucceeded: boolean, now = Date.now()): 
     exportSucceeded,
     unitId: unitId(),
     adFilled: filled,
+    appActive: AppState.currentState === 'active',
     lastShownAt,
     now
   });
   if (!decision.show || loaded === null) {
     // A failed export clears the preloaded ad rather than holding it for the
-    // next one: it was requested for a moment that did not arrive.
+    // next one: it was requested for a moment that did not arrive. A
+    // backgrounded app keeps it — the moment did arrive, the user was simply
+    // not there for it, and the next export is a fair place to show it.
     if (!exportSucceeded) forget();
     return false;
   }
