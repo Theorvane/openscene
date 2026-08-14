@@ -93,6 +93,17 @@ function Shell() {
    * an export result is showing.
    */
   const [bodyTop, setBodyTop] = useState(0);
+  /*
+    Above the early return, because it is a hook.
+
+    Reading the project used to be a plain function call, so it sat where it was
+    needed — after the branch that renders the project list. Subscribing made it
+    a hook, and a hook that only runs on one of two routes changes the hook count
+    between renders: opening a project crashed the app outright with "rendered
+    more hooks than during the previous render". A null id is the projects route,
+    where there is no project to read.
+  */
+  const project = useProject(route.name === 'project' ? route.projectId : null);
 
   if (route.name === 'projects') {
     return (
@@ -116,7 +127,6 @@ function Shell() {
   // Subscribed rather than merely read: the import happens in the editor below,
   // so nothing here re-rendered and Export stayed disabled over a ten-second
   // timeline until the user changed tabs and came back.
-  const project = useProject(route.projectId);
   const pictureSeconds = project === null ? 0 : timelineDurationMs(project.timeline) / 1000;
 
   /**

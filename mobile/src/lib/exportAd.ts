@@ -87,16 +87,53 @@ export function prepareExportAd(): void {
 }
 
 /**
+ * How long a finished export waits for the user to come back before giving up
+ * on showing them anything. Long enough to cover a share sheet and a moment's
+ * hesitation; short enough that an ad never arrives detached from the export
+ * that earned it.
+ */
+const RETURN_WINDOW_MS = 30_000;
+
+/**
+ * Resolves once the app is the thing the user is looking at, or false if that
+ * does not happen soon.
+ *
+ * Delivery on Android goes through a share sheet, which is another activity —
+ * so at the instant the delivery promise resolves the app is still `background`
+ * and a foreground check taken right then refuses every single time. That is
+ * not the case the check exists for. It exists for the phone that was put down
+ * during a long export, and the difference between the two is only ever
+ * *whether the user comes back*, which is a question that has to be waited on
+ * rather than sampled.
+ */
+function whenForeground(): Promise<boolean> {
+  if (AppState.currentState === 'active') return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const settle = (value: boolean): void => {
+      clearTimeout(timer);
+      subscription.remove();
+      resolve(value);
+    };
+    const timer = setTimeout(() => settle(false), RETURN_WINDOW_MS);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') settle(true);
+    });
+  });
+}
+
+/**
  * Shown only if the export succeeded, consent allows it, a unit exists, and it
  * has been long enough. Resolves whether anything was shown, so a caller can
  * order its own UI against it.
  */
 export async function showExportAd(exportSucceeded: boolean, now = Date.now()): Promise<boolean> {
+  // Waited on before deciding, not sampled: see `whenForeground`.
+  const appActive = exportSucceeded ? await whenForeground() : false;
   const decision = decideInterstitial({
     exportSucceeded,
     unitId: unitId(),
     adFilled: filled,
-    appActive: AppState.currentState === 'active',
+    appActive,
     lastShownAt,
     now
   });

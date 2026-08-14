@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   deleteClip,
@@ -48,6 +48,8 @@ export function useMobileEditor(persist?: (timeline: TimelineDocument) => void) 
   const [past, setPast] = useState<readonly Snapshot[]>([]);
   const [future, setFuture] = useState<readonly Snapshot[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  /** The last accepted timeline waiting to be written; see the effect below. */
+  const pending = useRef<TimelineDocument | null>(null);
 
   const durationMs = useMemo(() => timelineDurationMs(timeline), [timeline]);
 
@@ -67,15 +69,32 @@ export function useMobileEditor(persist?: (timeline: TimelineDocument) => void) 
         setPast((stack) => [...stack, { timeline: current, label }].slice(-UNDO_DEPTH));
         setFuture([]);
         setMessage(null);
-        // Written on every accepted edit rather than on a save button: a phone
-        // app is backgrounded and killed without warning, and an explicit save
-        // is a thing to forget.
-        persist?.(next);
+        // Handed to the effect below rather than written here. React runs an
+        // updater during render, and this used to write the file and notify
+        // every subscriber from inside one — which updated the shell while
+        // another component was rendering, and would write twice under a double
+        // invocation. A ref is safe to set from an updater because setting it
+        // twice to the same value is the same as setting it once.
+        pending.current = next;
         return next;
       });
     },
     []
   );
+
+  /*
+    Written on every accepted edit rather than on a save button: a phone app is
+    backgrounded and killed without warning, and an explicit save is a thing to
+    forget. After the render rather than during it, and only for an edit that
+    was accepted — persisting on every render would write the empty starting
+    timeline over a stored project the moment the editor mounted.
+  */
+  useEffect(() => {
+    const next = pending.current;
+    if (next === null) return;
+    pending.current = null;
+    persist?.(next);
+  });
 
   const undo = useCallback(() => {
     setPast((stack) => {

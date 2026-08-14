@@ -29,6 +29,18 @@ describe('project change notification', () => {
     expect(store).toContain('export function projectsEpoch');
   });
 
+  it('writes after the render rather than during it', async () => {
+    // `persist` used to be called from inside the `setTimeline` updater, and
+    // React runs an updater during render: the file write and the notification
+    // that follows it updated the shell while another component was rendering,
+    // and a double invocation would have written twice. Only running the app
+    // surfaced it, as a warning rather than a failure.
+    const editor = await read('src/lib/editorState.ts');
+    expect(editor).not.toMatch(/setTimeline\(\(current\)[\s\S]*?persist\?\.\([\s\S]*?\}\);\n {4}\},/);
+    expect(editor).toContain('pending.current = next;');
+    expect(editor).toMatch(/useEffect\(\(\) => \{[\s\S]{0,200}persist\?\.\(next\);/);
+  });
+
   it('gives React a snapshot it can compare', async () => {
     const hook = await read('src/lib/useProject.ts');
     expect(hook).toContain('useSyncExternalStore');
@@ -40,7 +52,25 @@ describe('project change notification', () => {
 
   it('has the shell subscribe rather than read once', async () => {
     const app = await read('App.tsx');
-    expect(app).toContain('const project = useProject(route.projectId);');
+    expect(app).toContain("useProject(route.name === 'project' ? route.projectId : null)");
     expect(app).toContain('pictureSeconds > 0');
+  });
+
+  it('calls the hook above the branch, not inside it', async () => {
+    // Reading the project was a plain call, so it sat where it was needed —
+    // after the branch that renders the project list. Subscribing made it a
+    // hook, and a hook on only one of two routes changes the hook count between
+    // renders: opening a project crashed outright with "rendered more hooks
+    // than during the previous render". Typecheck and unit tests both passed;
+    // only running the app found it.
+    const app = await read('App.tsx');
+    expect(app.indexOf('useProject('), 'the hook must precede the early return').toBeLessThan(
+      app.indexOf("if (route.name === 'projects') {")
+    );
+    // And it has to accept the absence of a project, or the call above the
+    // branch has nothing legitimate to pass.
+    const hook = await read('src/lib/useProject.ts');
+    expect(hook).toContain('id: string | null');
+    expect(hook).toContain('if (id === null) return null;');
   });
 });

@@ -109,10 +109,23 @@ describe('the export flow', () => {
   it('releases an ad loaded for a moment that did not arrive', async () => {
     const ad = await read('src/lib/exportAd.ts');
     expect(ad).toContain('if (!exportSucceeded) forget();');
-    expect(ad).toContain("appActive: AppState.currentState === 'active'");
     // An interstitial instance is single-use: showing a closed one does nothing,
     // silently, which reads as "the ad stopped working after the first time".
     expect(ad).toMatch(/CLOSED[\s\S]{0,260}forget\(\)/);
+  });
+
+  it('waits for the user to come back rather than sampling the moment', async () => {
+    // Delivery on Android goes through a share sheet, which is another
+    // activity — so at the instant the delivery promise resolves the app is
+    // still `background`, and a foreground check taken right then refused every
+    // single time. Running it was the only way to find that: the guard was
+    // right and its timing was wrong.
+    const ad = await read('src/lib/exportAd.ts');
+    expect(ad).toContain('const appActive = exportSucceeded ? await whenForeground() : false;');
+    expect(ad).toContain("AppState.addEventListener('change'");
+    // Bounded, or an ad arrives detached from the export that earned it.
+    expect(ad).toContain('RETURN_WINDOW_MS');
+    expect(ad).toMatch(/setTimeout\(\(\) => settle\(false\), RETURN_WINDOW_MS\)/);
   });
 
   it('checks consent before the request rather than before the presentation', async () => {

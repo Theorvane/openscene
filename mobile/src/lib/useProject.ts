@@ -16,6 +16,11 @@ import { projectsEpoch, readProject, subscribeToProjects, type MobileProject } f
  * `getSnapshot` on every render is an infinite loop, and one that appears only
  * at runtime.
  *
+ * The id is nullable because this is a hook: the shell calls it above the branch
+ * that renders the project list, where there is no project to read. Calling it
+ * only on the branch that has one changes the hook count between renders, which
+ * crashes the app on opening a project rather than merely misbehaving.
+ *
  * The cache is invalidated by the store's own epoch rather than by a listener,
  * so a write that lands while nothing is mounted still invalidates it — and it
  * does not depend on this module's listener happening to run before the ones
@@ -25,9 +30,10 @@ type Entry = { readonly epoch: number; readonly project: MobileProject | null };
 
 const cache = new Map<string, Entry>();
 
-export function useProject(id: string): MobileProject | null {
+export function useProject(id: string | null): MobileProject | null {
   const subscribe = useCallback((onChange: () => void) => subscribeToProjects(onChange), []);
   const getSnapshot = useCallback(() => {
+    if (id === null) return null;
     const cached = cache.get(id);
     if (cached !== undefined && cached.epoch === projectsEpoch()) return cached.project;
     const project = readProject(id);
