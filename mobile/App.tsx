@@ -17,6 +17,7 @@ import { VoiceScreen } from './src/screens/VoiceScreen';
 import { assetUri, readProject } from './src/lib/projectStore';
 import { useProject } from './src/lib/useProject';
 import { deliverExport, exportTimeline } from './src/lib/exportComposition';
+import { prepareExportAd, showExportAd } from './src/lib/exportAd';
 import { isExportAvailable } from './modules/video-export';
 import {
   ChevronLeftIcon,
@@ -128,6 +129,10 @@ function Shell() {
     const current = readProject(route.projectId);
     if (current === null) return;
     setExportState({ kind: 'running' });
+    // Requested while the encoder runs, because that wait is the only window
+    // there is: an interstitial asked for at the moment it is shown either makes
+    // the user wait again or shows nothing.
+    prepareExportAd();
     const rendered = await exportTimeline({
       timeline: current.timeline,
       assets: current.assets.map((asset) => ({
@@ -145,6 +150,7 @@ function Shell() {
     });
     if (!rendered.ok) {
       setExportState({ kind: 'failed', message: rendered.message });
+      void showExportAd(false);
       return;
     }
     const delivery = await deliverExport(rendered.uri);
@@ -153,6 +159,19 @@ function Shell() {
         ? { kind: 'done', where: delivery.how === 'photos' ? 'your photo library' : 'the app you chose' }
         : { kind: 'failed', message: delivery.message }
     );
+    /*
+      After the result is on screen, and only if there is one.
+
+      Before the export would be an ad in front of an action the user just
+      asked for, arriving under a thumb still travelling toward the button they
+      pressed; during it would be an ad over a progress state. Both are what
+      AdMob's interstitial policies are written about. Finishing is the one
+      genuine break this app has.
+
+      A failed export still calls this — with `false`, which shows nothing and
+      releases the ad that was loaded for a moment that did not arrive.
+    */
+    void showExportAd(delivery.ok);
   };
 
   const canExport = isExportAvailable && pictureSeconds > 0 && exportState.kind !== 'running';

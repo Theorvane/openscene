@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, Platform, StyleSheet, TurboModuleRegistry, View } from 'react-native';
+import { Keyboard, Platform, StyleSheet, View } from 'react-native';
 
 import { bannerAdUnitId } from '../lib/ads';
+import { ensureAdsReady, loadAds } from '../lib/adsModule';
 import { theme } from '../lib/theme';
 
 /**
@@ -22,74 +23,13 @@ import { theme } from '../lib/theme';
  * composer and the user's thumb.
  */
 
-type BannerComponent = React.ComponentType<{
-  readonly unitId: string;
-  readonly size: string;
-  readonly onAdFailedToLoad?: (error: unknown) => void;
-}>;
-
-type AdsModule = {
-  readonly BannerAd: BannerComponent;
-  readonly BannerAdSize: Record<string, string>;
-  readonly MobileAds: () => { initialize(): Promise<unknown> };
-  readonly AdsConsent: {
-    requestInfoUpdate(): Promise<unknown>;
-    loadAndShowConsentFormIfRequired(): Promise<unknown>;
-    getConsentInfo(): Promise<{ canRequestAds?: boolean }>;
-  };
-};
-
-/**
- * Whether this binary has the ad SDK in it, asked without touching the SDK.
- *
- * The obvious approach — require it and catch — does not work here, and finding
- * that out cost two red screens. The package's entry registers its TurboModules
- * eagerly with `getEnforcing`, which throws where the native side is missing;
- * the throw escapes a `try` around the `require`, and probing the returned
- * object instead only moves the failure a line later. There is no defensive way
- * to ask the module whether it is there.
- *
- * `TurboModuleRegistry.get` returns null rather than throwing, and it is React
- * Native's own registry rather than the package's — so the question is answered
- * before anything of the SDK is loaded at all.
- */
-function hasAdsNativeModule(): boolean {
-  try {
-    return TurboModuleRegistry.get('RNGoogleMobileAdsModule') != null;
-  } catch {
-    return false;
-  }
-}
-
-/** Only ever called once the native side is known to be present. */
-function loadAds(): AdsModule | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const required: unknown = require('react-native-google-mobile-ads');
-    for (const candidate of [required, (required as { default?: unknown } | null)?.default]) {
-      const module = candidate as Partial<AdsModule> | undefined;
-      if (
-        typeof module?.BannerAd === 'function' &&
-        module.BannerAdSize !== undefined &&
-        typeof module.MobileAds === 'function' &&
-        module.AdsConsent !== undefined
-      ) {
-        return module as AdsModule;
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 /** Long enough that a dead network is not retried at cost, short enough to recover. */
 const RETRY_AFTER_MS = 60_000;
 
 export function AdBanner() {
   // Resolved once: `require` is cached, but asking on every render made this run
   // on each keystroke that moved the keyboard.
-  const [ads] = useState(() => (hasAdsNativeModule() ? loadAds() : null));
+  const [ads] = useState(() => loadAds());
   const unitId = bannerAdUnitId(Platform.OS, __DEV__);
   /**
    * Consent first, then initialise, then request. Google's own guidance is
@@ -121,23 +61,8 @@ export function AdBanner() {
     if (ads === null) return;
     let cancelled = false;
     void (async () => {
-      try {
-        // A consent form is shown only where one is required; elsewhere these
-        // resolve without any UI. A failure here is not a reason to give up on
-        // the check that follows, which is the part that actually gates.
-        await ads.AdsConsent.requestInfoUpdate();
-        await ads.AdsConsent.loadAndShowConsentFormIfRequired();
-      } catch {
-        // Fall through: `canRequestAds` still decides.
-      }
-      try {
-        const info = await ads.AdsConsent.getConsentInfo();
-        if (cancelled || info.canRequestAds !== true) return;
-        await ads.MobileAds().initialize();
-        if (!cancelled) setReady(true);
-      } catch {
-        // No consent, or no SDK to initialise: no banner, and nothing said.
-      }
+      const allowed = await ensureAdsReady(ads);
+      if (!cancelled && allowed) setReady(true);
     })();
     return () => {
       cancelled = true;

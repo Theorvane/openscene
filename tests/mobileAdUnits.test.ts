@@ -113,11 +113,15 @@ describe('banner ad units', () => {
     // probing the returned object only moves the failure a line later.
     // `TurboModuleRegistry.get` returns null instead of throwing and belongs to
     // React Native, so the question is answered before any of the SDK loads.
+    // The seam is shared now that a second placement uses it, so the lesson is
+    // asserted where it lives rather than once per component.
+    const seam = await readFile(new URL('../mobile/src/lib/adsModule.ts', import.meta.url), 'utf8');
     const banner = await readFile(new URL('../mobile/src/components/AdBanner.tsx', import.meta.url), 'utf8');
 
-    expect(banner).not.toMatch(/^import .*from 'react-native-google-mobile-ads';$/m);
-    expect(banner).toContain("TurboModuleRegistry.get('RNGoogleMobileAdsModule')");
-    expect(banner).toContain('hasAdsNativeModule() ? loadAds() : null');
+    expect(seam).not.toMatch(/^import .*from 'react-native-google-mobile-ads';$/m);
+    expect(seam).toContain("TurboModuleRegistry.get('RNGoogleMobileAdsModule')");
+    expect(seam).toContain('if (!hasAdsNativeModule()) return null;');
+    expect(banner).toContain('loadAds()');
     expect(banner).toContain('if (ads === null || unitId === null || !ready || failed || keyboardUp) return null;');
   });
 
@@ -126,13 +130,15 @@ describe('banner ad units', () => {
     // `canRequestAds` to check if you've obtained consent from the user."
     // Requesting first and asking later is the compliance failure, not a
     // rendering one, so nothing on screen would have revealed it.
+    const seam = await readFile(new URL('../mobile/src/lib/adsModule.ts', import.meta.url), 'utf8');
     const banner = await readFile(new URL('../mobile/src/components/AdBanner.tsx', import.meta.url), 'utf8');
 
-    expect(banner).toContain('AdsConsent.requestInfoUpdate()');
-    expect(banner).toContain('AdsConsent.loadAndShowConsentFormIfRequired()');
-    expect(banner).toContain('info.canRequestAds !== true) return;');
-    expect(banner).toContain('MobileAds().initialize()');
+    expect(seam).toContain('AdsConsent.requestInfoUpdate()');
+    expect(seam).toContain('AdsConsent.loadAndShowConsentFormIfRequired()');
+    expect(seam).toContain('info.canRequestAds !== true) return false;');
+    expect(seam).toContain('MobileAds().initialize()');
     // The gate is on the render, not merely in the effect.
+    expect(banner).toContain('await ensureAdsReady(ads)');
     expect(banner).toContain('!ready || failed || keyboardUp) return null;');
   });
 

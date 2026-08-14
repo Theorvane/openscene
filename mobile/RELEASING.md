@@ -164,6 +164,14 @@ code. A development build must show a test banner before a store build ships
 one — a release that reaches users with a silently broken banner earns nothing
 and still declares ad collection.
 
+**The interstitial has no live unit yet.** The placement is built and gated:
+it appears only after an export has actually produced a file, never before one
+and never after a failure, and at most once every five minutes. Until interstitial
+ad units exist in the AdMob console for both platforms and are filled into
+`LIVE_INTERSTITIAL_UNITS` in `src/lib/ads.ts`, a production build asks for
+nothing and shows nothing — which is the correct behaviour, not a bug. Test
+builds use Google's own test interstitials.
+
 **Android export is implemented but unverified.** The Media3 Transformer path
 is written, compiles, and installs; no export has been seen to produce a file.
 Two attempts on an emulator ended with the emulator itself dying, which is a

@@ -32,9 +32,37 @@ const TEST_BANNER_UNITS = {
   android: 'ca-app-pub-3940256099942544/6300978111'
 } as const;
 
+/**
+ * The interstitial, shown when an export finishes. See `exportInterstitial`.
+ *
+ * Empty until the units exist in the AdMob console — a banner id does not serve
+ * an interstitial request, so there is nothing to borrow and no sensible
+ * placeholder. Absent reads as "no interstitial", which is the correct
+ * behaviour for a build that has no unit to ask for.
+ */
+const LIVE_INTERSTITIAL_UNITS: Partial<Record<Platform, string>> = {};
+
+const TEST_INTERSTITIAL_UNITS = {
+  ios: 'ca-app-pub-3940256099942544/4411468910',
+  android: 'ca-app-pub-3940256099942544/1033173712'
+} as const;
+
+type Platform = 'ios' | 'android';
+
+function platformOf(platformOs: string): Platform | null {
+  return platformOs === 'ios' ? 'ios' : platformOs === 'android' ? 'android' : null;
+}
+
 /** Null on a platform with no unit of its own, so nothing asks for someone else's. */
 export function bannerAdUnitId(platformOs: string, isDevelopment: boolean): string | null {
-  const platform = platformOs === 'ios' ? 'ios' : platformOs === 'android' ? 'android' : null;
+  const platform = platformOf(platformOs);
   if (platform === null) return null;
   return isDevelopment ? TEST_BANNER_UNITS[platform] : LIVE_BANNER_UNITS[platform];
+}
+
+/** Null where there is no unit, which is every production build until one exists. */
+export function interstitialAdUnitId(platformOs: string, isDevelopment: boolean): string | null {
+  const platform = platformOf(platformOs);
+  if (platform === null) return null;
+  return isDevelopment ? TEST_INTERSTITIAL_UNITS[platform] : LIVE_INTERSTITIAL_UNITS[platform] ?? null;
 }
