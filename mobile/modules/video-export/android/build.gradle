@@ -12,7 +12,14 @@ android {
   compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 
+def media3Version = '1.8.0'
+
 dependencies {
   implementation project(':expo-modules-core')
   implementation "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
+  // Media3 is Java, so it carries no Kotlin metadata and no version to clash
+  // with the one Expo pins — unlike the ads SDK, which does.
+  implementation "androidx.media3:media3-transformer:${media3Version}"
+  implementation "androidx.media3:media3-effect:${media3Version}"
+  implementation "androidx.media3:media3-common:${media3Version}"
 }

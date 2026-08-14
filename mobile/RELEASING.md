@@ -164,9 +164,21 @@ code. A development build must show a test banner before a store build ships
 one — a release that reaches users with a silently broken banner earns nothing
 and still declares ad collection.
 
-**Android export does not work yet.** It reports that plainly rather than
-failing silently — but a reviewer who taps Export on Android will see it. Either
-ship iOS first, or finish the Media3 Transformer work before submitting Android.
+**Android export is implemented but unverified.** The Media3 Transformer path
+is written, compiles, and installs; no export has been seen to produce a file.
+Two attempts on an emulator ended with the emulator itself dying, which is a
+resource problem rather than evidence either way — but it is not evidence that
+it works.
+
+Run one on a real device before submitting Android: import a clip, tap Export,
+and confirm a playable file arrives in the photo library. If it does not, set
+`isSupported` back to `false` in `VideoExportModule.kt` so the app says so
+plainly rather than handing the user a path to nothing, and ship iOS first.
+
+Overlapping video layers are refused by name on Android — the plan flattens
+every video track into one list, and compositing two sequences is work that is
+not done. A single video track, which is what the app creates by default,
+exports as one sequence.
 
 **Age rating** — user-supplied prompts reach a generative model, so both stores
 treat it as user-generated content. Expect questions about moderation; the
