@@ -175,6 +175,42 @@ export function writeProject(project: MobileProject): void {
   const dir = projectDir(project.id);
   if (!dir.exists) dir.create({ intermediates: true });
   projectFile(project.id).write(JSON.stringify({ ...project, updatedAt: new Date().toISOString() }));
+  announce();
+}
+
+/**
+ * Who to tell when a project changes on disk.
+ *
+ * The screens are siblings: importing happens in the editor, generating happens
+ * in the Video and Image tabs, and the shell around them reads the same project
+ * to decide whether Export has anything to work on. Reading at render is only
+ * correct if something re-renders, and nothing did — importing a ten-second clip
+ * left Export disabled until the user switched tabs and came back, which reads
+ * as a broken button rather than as a stale one.
+ *
+ * The file is the state, so this carries no payload: it says the project changed
+ * and every reader goes back to disk, which is the same thing they would do on
+ * mount. That keeps one writer path — `writeProject` — as the only place that
+ * has to remember to announce anything.
+ */
+const listeners = new Set<() => void>();
+let epoch = 0;
+
+function announce(): void {
+  epoch += 1;
+  for (const listener of [...listeners]) listener();
+}
+
+/** Which generation of the stored projects a reader last saw. */
+export function projectsEpoch(): number {
+  return epoch;
+}
+
+export function subscribeToProjects(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 export function renameProject(id: string, name: string): MobileProject | null {
@@ -190,6 +226,7 @@ export function deleteProject(id: string): void {
   // Deletes only inside the app's own projects directory — never a path the user
   // chose, which is the rule the desktop follows for the same reason.
   if (dir.exists) dir.delete();
+  announce();
 }
 
 /**

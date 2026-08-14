@@ -15,6 +15,7 @@ import { ProjectsScreen } from './src/screens/ProjectsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { VoiceScreen } from './src/screens/VoiceScreen';
 import { assetUri, readProject } from './src/lib/projectStore';
+import { useProject } from './src/lib/useProject';
 import { deliverExport, exportTimeline } from './src/lib/exportComposition';
 import { isExportAvailable } from './modules/video-export';
 import {
@@ -111,7 +112,10 @@ function Shell() {
     );
   }
 
-  const project = readProject(route.projectId);
+  // Subscribed rather than merely read: the import happens in the editor below,
+  // so nothing here re-rendered and Export stayed disabled over a ten-second
+  // timeline until the user changed tabs and came back.
+  const project = useProject(route.projectId);
   const pictureSeconds = project === null ? 0 : timelineDurationMs(project.timeline) / 1000;
 
   /**
