@@ -69,7 +69,21 @@ version skips all release and store-distribution work.
 The iOS job builds an IPA and uploads it to App Store Connect. It never submits
 an app for review: that remains an explicit App Store Connect action after build
 processing and metadata review. The Android job uploads the signed AAB to the
-Google Play **production** track with status `completed`.
+Google Play **production** track with status `completed` — live to every user
+the moment it lands.
+
+**The Android job runs after the iOS one, not beside it.** They are not equally
+reversible, and the irreversible step should be the last one that can fail: Play
+must never publish a release that iOS could not. Run in parallel, an iOS failure
+after Play had already published left the release shipped and untagged, and a
+later push to `main` re-uploaded the same `versionCode`, which Play rejects.
+
+One smaller gap remains, which ordering cannot close. If Play publishes and the
+tagging job then fails, the release is live and unrecorded. Re-running the
+workflow is safe for the tag — it asks origin before pushing — but it re-enters
+the store jobs, and Play refuses a `versionCode` it already has. If that happens,
+raise `version`, `buildNumber` and `versionCode` and release again; the published
+build is fine, only the record of it is missing.
 
 Create the `app-store-production` GitHub Environment, restrict it to the `main`
 branch, and require a reviewer before deploying. Store the following values as

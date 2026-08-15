@@ -16,6 +16,21 @@ import { describe, expect, it } from 'vitest';
  * files failing on a tsconfig in CI.
  */
 
+describe('the release pipeline', () => {
+  it('publishes to Play only after everything that can fail has passed', async () => {
+    // The two store jobs are not equally reversible. The iOS job uploads a
+    // build and submits nothing; the Android job goes live to every user. Run
+    // in parallel, an iOS failure after Play had already published left the
+    // release shipped and untagged, and the retry collided on `versionCode`.
+    const release = await readFile(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
+
+    expect(release).toMatch(/google-play:\n(?:.*\n)*?\s+needs: \[check, build, app-store-connect\]/);
+    // And the tag still waits for both, or a failed upload would be recorded as
+    // a release that shipped.
+    expect(release).toMatch(/release:\n\s+needs: \[check, build, app-store-connect, google-play\]/);
+  });
+});
+
 describe('CI', () => {
   it('installs and typechecks the mobile app', async () => {
     const workflow = await readFile(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
