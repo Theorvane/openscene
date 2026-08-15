@@ -70,3 +70,37 @@ describe.each(VERIFYING_WORKFLOWS)('%s', (workflow) => {
     expect(await read()).toContain('mobile/package-lock.json');
   });
 });
+
+/**
+ * That the iOS signing step asks the profile what it is called.
+ *
+ * The 0.4.0 release failed to archive on
+ * `No profile for team '5H9F8F82WT' matching 'macbook' found`. Not an expiry:
+ * the certificate and the profile were rotated on one day and the variable
+ * naming the profile still held a value from five weeks earlier, which was also
+ * the date of the last release that worked. Two sources for one fact, and the
+ * copy is the one nobody updates.
+ */
+describe('the iOS signing step', () => {
+  const read = () => readFile(new URL('../.github/workflows/ios-app-store-connect.yml', import.meta.url), 'utf8');
+
+  it('takes the profile name from the profile', async () => {
+    const yaml = await read();
+    expect(yaml).toContain('security cms -D -i "$PROFILE_PATH"');
+    expect(yaml).toContain('plutil -extract Name raw');
+    expect(yaml).toContain('PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"');
+    // The variable may still exist, but it must not be what the build signs
+    // with — otherwise the drift simply comes back.
+    expect(yaml).not.toContain('PROVISIONING_PROFILE_SPECIFIER="$APP_STORE_PROFILE_NAME"');
+  });
+
+  it('checks the profile covers this app before spending an archive on it', async () => {
+    // A mismatch used to cost a pod install and a full archive before xcodebuild
+    // mentioned it.
+    const yaml = await read();
+    expect(yaml).toContain('plutil -extract Entitlements.application-identifier raw');
+    expect(yaml).toMatch(/::error::The provisioning profile is for/);
+    // A wildcard profile is legitimate, so it is matched rather than refused.
+    expect(yaml).toMatch(/"\$\{PROFILE_APP_ID%\\\*\}"\*\)/);
+  });
+});

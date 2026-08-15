@@ -89,8 +89,10 @@ Create the `app-store-production` GitHub Environment, restrict it to the `main`
 branch, and require a reviewer before deploying. Store the following values as
 environment configuration (not in the repository):
 
-- Variables: `APPLE_TEAM_ID` (`5H9F8F82WT`) and `APP_STORE_PROFILE_NAME`
-  (`macbook`).
+- Variable: `APPLE_TEAM_ID` (`5H9F8F82WT`). `APP_STORE_PROFILE_NAME` is no
+  longer required — the workflow reads the name out of the profile it installs,
+  so rotating the profile is a one-secret operation. If the variable is still set
+  and disagrees, the build warns and signs with the installed profile anyway.
 - Secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`,
   `APPLE_DISTRIBUTION_CERTIFICATE_BASE64`,
   `APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD`, and

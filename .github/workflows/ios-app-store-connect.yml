@@ -17,8 +17,13 @@ jobs:
     runs-on: macos-26
     environment: app-store-production
     env:
+      # The application identifier, named once: the signing check, the export
+      # options and the app itself all have to agree on it.
+      BUNDLE_ID: com.sloki9637.openscene
       APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-      APP_STORE_PROFILE_NAME: ${{ vars.APP_STORE_PROFILE_NAME }}
+      # Optional. The profile names itself; this is only cross-checked against it,
+      # so a stale value is reported rather than silently signed with.
+      EXPECTED_PROFILE_NAME: ${{ vars.APP_STORE_PROFILE_NAME }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
@@ -48,7 +53,6 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$APPLE_TEAM_ID"
-          test -n "$APP_STORE_PROFILE_NAME"
           test -n "$APPLE_DISTRIBUTION_CERTIFICATE_BASE64"
           test -n "$APPLE_DISTRIBUTION_CERTIFICATE_PASSWORD"
           test -n "$APP_STORE_PROVISIONING_PROFILE_BASE64"
@@ -70,6 +74,48 @@ jobs:
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$(uuidgen).mobileprovision"
 
+          # The profile names itself, so ask it rather than keeping a copy of the
+          # answer in a variable. The copy is the thing nobody updates when the
+          # profile is rotated: this release failed on a name last set five weeks
+          # before the profile that replaced it, and xcodebuild only said so
+          # after a pod install and a full archive.
+          PLIST="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$PROFILE_PATH" > "$PLIST"
+          PROFILE_NAME="$(/usr/bin/plutil -extract Name raw -o - "$PLIST")"
+          PROFILE_APP_ID="$(/usr/bin/plutil -extract Entitlements.application-identifier raw -o - "$PLIST")"
+          echo "Signing with provisioning profile: $PROFILE_NAME"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+
+          # Checked here, where the profile is already open, rather than by
+          # xcodebuild several minutes later. A wildcard profile is legitimate
+          # for an app with no entitlements that require an explicit one, so it
+          # is matched as a prefix rather than rejected for not being identical.
+          case "$PROFILE_APP_ID" in
+            "$APPLE_TEAM_ID.$BUNDLE_ID") ;;
+            *\*)
+              # A wildcard covers the app when the identifier begins with
+              # everything before the star — which is the rule for `TEAM.*` and
+              # `TEAM.com.*` alike, rather than two special cases.
+              case "$APPLE_TEAM_ID.$BUNDLE_ID" in
+                "${PROFILE_APP_ID%\*}"*)
+                  echo "::warning::Signing with the wildcard profile $PROFILE_APP_ID." ;;
+                *)
+                  echo "::error::The provisioning profile covers $PROFILE_APP_ID, which does not include $APPLE_TEAM_ID.$BUNDLE_ID."
+                  exit 1 ;;
+              esac
+              ;;
+            *)
+              echo "::error::The provisioning profile is for $PROFILE_APP_ID, but this app is $APPLE_TEAM_ID.$BUNDLE_ID."
+              exit 1
+              ;;
+          esac
+
+          # A variable that disagrees with the installed profile is a leftover,
+          # and saying so is more use than either ignoring it or failing on it.
+          if [ -n "${EXPECTED_PROFILE_NAME:-}" ] && [ "$EXPECTED_PROFILE_NAME" != "$PROFILE_NAME" ]; then
+            echo "::warning::APP_STORE_PROFILE_NAME is '$EXPECTED_PROFILE_NAME' but the installed profile is '$PROFILE_NAME'. The profile wins; update or delete the variable."
+          fi
+
       - name: Install CocoaPods dependencies
         working-directory: mobile/ios
         run: pod install --repo-update
@@ -86,7 +132,7 @@ jobs:
             -archivePath "$RUNNER_TEMP/OpenScene.xcarchive" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="$APP_STORE_PROFILE_NAME" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             CODE_SIGN_IDENTITY='Apple Distribution' \
             archive
 
@@ -101,7 +147,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :teamID string $APPLE_TEAM_ID" "$EXPORT_OPTIONS"
           /usr/libexec/PlistBuddy -c 'Add :signingStyle string manual' "$EXPORT_OPTIONS"
           /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles dict' "$EXPORT_OPTIONS"
-          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.sloki9637.openscene string $APP_STORE_PROFILE_NAME" "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:$BUNDLE_ID string $PROFILE_NAME" "$EXPORT_OPTIONS"
           xcodebuild \
             -exportArchive \
             -archivePath "$RUNNER_TEMP/OpenScene.xcarchive" \
