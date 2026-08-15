@@ -41,9 +41,24 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
 
       - name: Install dependencies
         if: steps.version.outputs.already-released == 'false'
+        run: npm ci
+
+      # The same install ci.yml needs, for the same two reasons: the mobile app
+      # has a typecheck of its own that every change touching it must pass, and
+      # the tests covering mobile rules import those modules, which makes esbuild
+      # read `mobile/tsconfig.json` and resolve the Expo base it extends. Without
+      # it the suite fails on a tsconfig before a single assertion runs — and it
+      # did, silently passing 773 of 816 tests and calling that a verified
+      # release.
+      - name: Install mobile dependencies
+        if: steps.version.outputs.already-released == 'false'
+        working-directory: mobile
         run: npm ci
 
       # The export and import tests drive a real FFmpeg binary rather than a
@@ -55,12 +70,21 @@ jobs:
 
       # Verified once, on the platform the test suite is developed against.
       # The per-platform jobs below package; they do not re-run the suite.
+      #
+      # This has to verify everything a pull request does. A release gate that
+      # checks less than the branch it is releasing is worse than none: it
+      # reports success for work nothing ever ran.
       - name: Verify the commit being released
         if: steps.version.outputs.already-released == 'false'
         run: |
           npm run typecheck
           npm test
           npm run build
+
+      - name: Typecheck the mobile app
+        if: steps.version.outputs.already-released == 'false'
+        working-directory: mobile
+        run: npm run typecheck
 
   build:
     needs: check

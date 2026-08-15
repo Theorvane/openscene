@@ -31,19 +31,42 @@ describe('the release pipeline', () => {
   });
 });
 
-describe('CI', () => {
-  it('installs and typechecks the mobile app', async () => {
-    const workflow = await readFile(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+/**
+ * Every workflow that claims to verify a commit, not just the one that was
+ * fixed.
+ *
+ * The first version of this asserted `ci.yml` alone, and `release.yml` — which
+ * runs its own verification with its own install steps — kept the identical
+ * gap. It failed the 0.4.0 promotion on the same tsconfig, and before that it
+ * had been passing 773 of 816 tests and calling the result a verified release.
+ *
+ * "The other workflow needs this too" is exactly what a person forgets, so the
+ * list is the assertion.
+ */
+const VERIFYING_WORKFLOWS = ['ci.yml', 'release.yml'] as const;
 
-    expect(workflow).toMatch(/working-directory: mobile\n\s+run: npm ci/);
-    expect(workflow).toMatch(/working-directory: mobile\n\s+run: npm run typecheck/);
-    // The install has to come first, or the tests transform against a tsconfig
-    // whose base is still missing.
-    expect(workflow.indexOf('npm ci'), 'the mobile install must precede the tests').toBeLessThan(
-      workflow.indexOf('npm test')
+describe.each(VERIFYING_WORKFLOWS)('%s', (workflow) => {
+  const read = async () => readFile(new URL(`../.github/workflows/${workflow}`, import.meta.url), 'utf8');
+
+  it('installs the mobile app before running the suite', async () => {
+    const yaml = await read();
+    expect(yaml).toMatch(/working-directory: mobile\n\s+run: npm ci/);
+    // Or the tests transform against a tsconfig whose base is still missing.
+    expect(yaml.indexOf('working-directory: mobile'), 'the mobile install must precede the tests').toBeLessThan(
+      yaml.indexOf('npm test')
     );
-    // A cache keyed on one lockfile restores a tree that does not match the
-    // other, which is a failure that only appears when a dependency changes.
-    expect(workflow).toContain('mobile/package-lock.json');
+  });
+
+  it('typechecks the mobile app', async () => {
+    // Required of every change that touches it — see "Two Surfaces, One Core"
+    // in AGENTS.md — and a release gate must not verify less than a pull
+    // request does.
+    expect(await read()).toMatch(/working-directory: mobile\n\s+run: npm run typecheck/);
+  });
+
+  it('keys the dependency cache on both lockfiles', async () => {
+    // Keyed on one, a mobile dependency change restores a tree that does not
+    // match the install that follows it.
+    expect(await read()).toContain('mobile/package-lock.json');
   });
 });
