@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@openpanel/react-native": "^1.4.1",
     "expo": "~57.0.9",
     "expo-crypto": "~57.0.1",
     "expo-file-system": "~57.0.1",

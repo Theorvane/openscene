@@ -18,6 +18,7 @@ import { assetUri, readProject } from './src/lib/projectStore';
 import { useProject } from './src/lib/useProject';
 import { deliverExport, exportTimeline } from './src/lib/exportComposition';
 import { prepareExportAd, showExportAd } from './src/lib/exportAd';
+import { track } from './src/lib/analyticsClient';
 import { isExportAvailable } from './modules/video-export';
 import {
   ChevronLeftIcon,
@@ -139,6 +140,9 @@ function Shell() {
     const current = readProject(route.projectId);
     if (current === null) return;
     setExportState({ kind: 'running' });
+    // Counts and a duration, never what was in the cut.
+    track('export_started', { seconds: pictureSeconds, clips: current.timeline.tracks.reduce((n, t) => n + t.clips.length, 0) });
+    const startedAt = Date.now();
     // Requested while the encoder runs, because that wait is the only window
     // there is: an interstitial asked for at the moment it is shown either makes
     // the user wait again or shows nothing.
@@ -160,6 +164,9 @@ function Shell() {
     });
     if (!rendered.ok) {
       setExportState({ kind: 'failed', message: rendered.message });
+      // No message: a failure reason is written for the person reading it and
+      // can name a file or a path.
+      track('export_failed', { seconds: pictureSeconds });
       void showExportAd(false);
       return;
     }
@@ -181,6 +188,11 @@ function Shell() {
       A failed export still calls this — with `false`, which shows nothing and
       releases the ad that was loaded for a moment that did not arrive.
     */
+    track(delivery.ok ? 'export_finished' : 'export_failed', {
+      seconds: pictureSeconds,
+      tookMs: Date.now() - startedAt,
+      toPhotos: delivery.ok ? delivery.how === 'photos' : null
+    });
     void showExportAd(delivery.ok);
   };
 

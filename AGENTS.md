@@ -34,12 +34,19 @@ npm run build
 - File paths, FFmpeg executable paths, FFmpeg argv, voice sample paths, and generated output paths stay in the main process. The renderer gets typed job status and open or reveal actions.
 - OpenScene stores recordings, projects, imported assets, voice profiles, TTS output, and exports locally under Electron `userData` unless an explicit local override exists.
 - No cloud upload, analytics, account system, crash reporting, or auto-update is
-  implemented on the desktop. `mobile/` calls providers directly — generation runs
-  against the user's own accounts, per operation and behind the spend prompt — and
-  carries the Google Mobile Ads SDK for a banner, which reports device identifiers
-  to Google. Both are deliberate and both are the exception to this line rather
-  than a widening of it: nothing else leaves the device, and neither exists on the
-  desktop.
+  implemented on the desktop. `mobile/` has three deliberate exceptions, none of
+  which exists on the desktop: it calls providers directly — generation runs
+  against the user's own accounts, per operation and behind the spend prompt — it
+  carries the Google Mobile Ads SDK for a banner and an interstitial, which
+  reports device identifiers to Google, and it reports anonymous usage counts to
+  the publisher's own OpenPanel instance.
+- Each is an exception to that line rather than a widening of it. Usage reporting
+  in particular is bounded by `mobile/src/lib/analytics.ts`: a closed list of
+  event names, property values restricted to numbers, booleans and null, and no
+  profile ever identified. A prompt, a file name, a path or a key is not a thing
+  that list can express. Adding an event means adding it there and deciding
+  whether it belongs, and the switch is in Settings, on by default and stated in
+  the app rather than only in a policy.
 - Future hybrid AI support must follow [`docs/hybrid-ai-editor-direction.md`](docs/hybrid-ai-editor-direction.md): local models are user-configured, connected services are selected and authorized per operation, and provider adapters remain behind typed seams until a separately reviewed implementation adds them.
 
 ## Compatibility Identifiers

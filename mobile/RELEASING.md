@@ -158,6 +158,18 @@ policy, which is published at `https://www.sloki9637.com/privacy` and linked fro
 Settings. Prompts and generated media go to the provider the user chose; nothing
 else about the user's editing leaves the device, and there is no account.
 
+**The app reports anonymous usage counts.** They go to the publisher's own
+OpenPanel instance at `panel.sanhouse.kr`, not to a third party, and there is no
+account or profile to attach them to — the only identifier is the device-scoped
+anonymous one the SDK keeps. Data Safety and App Privacy still have to say so:
+declare app interactions / diagnostics, collected by the developer, used for
+analytics, not linked to identity and not used for tracking. It is on by default
+with a switch in Settings, so it is disclosed rather than consented to; if this
+app ever needs GDPR consent for it, it belongs behind the same UMP flow the ads
+already use. What is sent is bounded by `src/lib/analytics.ts` — a closed list of
+event names and property values that can only be numbers, booleans or null,
+which is why no prompt, file name, path or key can reach it.
+
 **The app shows ads, and that changes the privacy answers.** The Google Mobile
 Ads SDK is in the binary and reports device identifiers to Google. Both stores
 ask about this directly and the answers are no longer "none":

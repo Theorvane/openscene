@@ -216,7 +216,10 @@ VIDEO_TOOL_RECORDINGS_DIR=/absolute/path/to/recordings npm run dev
 
 The renderer talks to the main process through a narrow typed `window.videoTool` bridge. Raw `ipcRenderer`, FFmpeg executable paths and arguments, stored credentials, and OAuth tokens stay outside it. Some safe display paths and an API key entered in Settings cross through explicit typed operations; a picked reference image, for example, crosses as bytes, never as a path.
 
-- **No account, no telemetry.** No analytics, crash reporting, or usage tracking.
+- **No account, no crash reporting.** The desktop app sends nothing about you anywhere.
+  The mobile app reports anonymous usage counts — which screens are opened, whether an
+  export ran and finished — to the publisher's own server, never to a third party, and
+  never carrying prompts, projects, media, file names or keys. It is a switch in Settings.
 - **No background network calls.** The app talks to a provider only when you ask it to, using a provider you connected.
 - **Capture is scoped.** Window capture grants access to the single source you select.
 - **Removable.** Projects can be removed from the list — a folder you chose is only unregistered, never deleted recursively — and conversations can be deleted.

@@ -99,8 +99,15 @@ describe('the export flow', () => {
   it('requests during the encode and presents after the result', async () => {
     const app = await read('App.tsx');
     // Requested while the user is already waiting, or there is nothing to show
-    // when the wait ends.
-    expect(app).toMatch(/setExportState\(\{ kind: 'running' \}\);[\s\S]{0,300}prepareExportAd\(\);/);
+    // when the wait ends. Stated as an order rather than a proximity: what
+    // matters is that it sits between the export starting and the encoder being
+    // handed the work, not how many lines away it happens to be.
+    const running = app.indexOf("setExportState({ kind: 'running' })");
+    const prepare = app.indexOf('prepareExportAd();');
+    const encoding = app.indexOf('await exportTimeline(');
+    expect(running).toBeGreaterThan(-1);
+    expect(prepare, 'the ad is requested after the export starts').toBeGreaterThan(running);
+    expect(prepare, 'and before the encoder is handed the work').toBeLessThan(encoding);
     // Presented after the result is on screen, never in front of the action.
     expect(app).toMatch(/setExportState\(\s*\n?\s*delivery\.ok[\s\S]*?showExportAd\(delivery\.ok\)/);
     expect(app).not.toMatch(/showExportAd\([^)]*\);[\s\S]{0,80}await exportTimeline/);

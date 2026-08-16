@@ -4,6 +4,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
 import { PROVIDER_KEYS, readSlot } from '../lib/credentials';
+import { useAnalyticsPreference } from '../lib/analyticsClient';
 import { SPEND_FEATURES, useSpendPermissions } from '../lib/permissions';
 import { describeProvider, providersForDomain } from '../lib/mediaProviders';
 import { ProviderConnect } from '../components/ProviderConnect';
@@ -54,6 +55,7 @@ function chatRows(): readonly Row[] {
 export function SettingsScreen({ topInset }: { readonly topInset: number }) {
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
   const permissions = useSpendPermissions();
+  const analytics = useAnalyticsPreference();
   const { providers: customProviders, refresh: refreshCustom } = useCustomProviders();
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -158,6 +160,34 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
             </View>
           );
         })}
+      </View>
+
+      {/*
+        Usage reporting, and the switch for it.
+
+        Sits above About rather than buried in it, because a thing that sends
+        data should be as easy to find as the policy describing it. On by
+        default and stated plainly: the counts are how the publisher knows which
+        parts of the app are worth working on, and nothing about what the user
+        writes or edits is in them.
+      */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Usage reporting</Text>
+        <Text style={styles.sectionBlurb}>
+          Anonymous counts — how often an export runs or finishes, and which screens get used — sent to the developer’s own
+          server rather than to a third party. Never your prompts, projects, media, file names, or keys, and there is no
+          account to attach any of it to.
+        </Text>
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: analytics.enabled }}
+          accessibilityLabel="Send anonymous usage counts"
+          onPress={() => analytics.set(!analytics.enabled)}
+          style={press(styles.permRow)}
+        >
+          <Text style={styles.permLabel}>Send anonymous usage counts</Text>
+          <Text style={[styles.permValue, analytics.enabled && styles.aboutLink]}>{analytics.enabled ? 'on' : 'off'}</Text>
+        </Pressable>
       </View>
 
       {/*
