@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sloki9637.openscene",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "OpenScene reads the videos you pick so you can put them on a timeline. It copies the ones you choose into the project and never scans your library on its own.",
         "NSPhotoLibraryAddUsageDescription": "OpenScene saves a finished export to your photo library when you ask it to.",
