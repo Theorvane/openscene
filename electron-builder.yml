@@ -55,6 +55,19 @@ deb:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  # Named without spaces, or Windows cannot update itself.
+  #
+  # The default is `${productName} Setup ${version}.${ext}`, which produces
+  # `OpenScene Setup 0.4.0.exe`. Two things then disagree about that file:
+  # electron-builder writes the URL into `latest.yml` with the spaces replaced by
+  # hyphens, while GitHub replaces them with dots when the asset is uploaded. The
+  # updater reads the manifest, asks for the hyphenated name, and gets a 404 —
+  # which is how every Windows release since the first one has behaved.
+  #
+  # electron-builder's own GitHub publisher reconciles the two; this repository
+  # uploads with `gh release upload`, which does not. Removing the spaces removes
+  # the disagreement rather than papering over either side of it.
+  artifactName: OpenScene-Setup-${version}.${ext}
 linux:
   icon: build/icon.png
   # The deb package name, the binary, and the artifact filename all default to
