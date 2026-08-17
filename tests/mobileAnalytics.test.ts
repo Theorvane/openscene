@@ -137,5 +137,10 @@ describe('the claims about it', () => {
     expect(screen).toContain('useAnalyticsPreference');
     expect(screen).toContain('accessibilityRole="switch"');
     expect(screen).toContain('Usage reporting');
+    // Not the spend rows' label style: that one capitalises, because those rows
+    // render a feature id rather than a sentence, and reusing it here produced
+    // "Send Anonymous Usage Counts".
+    expect(screen).toContain('styles.switchLabel');
+    expect(screen).toMatch(/switchLabel: \{(?![^}]*textTransform)[^}]*\}/);
   });
 });

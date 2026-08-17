@@ -185,7 +185,7 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
           onPress={() => analytics.set(!analytics.enabled)}
           style={press(styles.permRow)}
         >
-          <Text style={styles.permLabel}>Send anonymous usage counts</Text>
+          <Text style={styles.switchLabel}>Send anonymous usage counts</Text>
           <Text style={[styles.permValue, analytics.enabled && styles.aboutLink]}>{analytics.enabled ? 'on' : 'off'}</Text>
         </Pressable>
       </View>
@@ -263,7 +263,11 @@ const styles = StyleSheet.create({
   removeCustom: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: MIN_TAP, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
   removeCustomText: { color: theme.textWeaker, fontSize: 13, fontWeight: '600' },
   permRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.line },
+  // Capitalised because the spend rows render a feature id — "image", "video" —
+  // rather than a sentence. A label that is already a sentence needs its own
+  // style, or it comes out as "Send Anonymous Usage Counts".
   permLabel: { flex: 1, color: theme.text, fontSize: 14, textTransform: 'capitalize' },
+  switchLabel: { flex: 1, color: theme.text, fontSize: 14 },
   permValue: { color: theme.textWeak, fontSize: 13 },
   permReset: { justifyContent: 'center', minHeight: MIN_TAP, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
   permResetText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' }
