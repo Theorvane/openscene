@@ -62,7 +62,7 @@ export type AnalyticsProperties = Readonly<Record<string, AnalyticsValue>>;
  * mistake this guards against is not a wrong type, it is someone reaching for
  * the obvious name while adding a field in a hurry.
  */
-const FORBIDDEN_KEYS = [
+const FORBIDDEN_KEYS: readonly string[] = [
   'prompt',
   'text',
   'name',
@@ -79,12 +79,44 @@ const FORBIDDEN_KEYS = [
   'title',
   'message',
   'query',
-  'content'
+  'content',
+  // Plurals and the spellings the same idea arrives under, because the match is
+  // now exact and an exact match is only as good as the list.
+  'prompts',
+  'files',
+  'paths',
+  'uris',
+  'urls',
+  'keys',
+  'tokens',
+  'secrets',
+  'emails',
+  'titles',
+  'messages',
+  'queries',
+  'names'
 ];
 
+/**
+ * Whole words, not substrings.
+ *
+ * Matching on a substring dropped `keyframes` for containing "key", which is a
+ * count with nothing to do with credentials — and it dropped it silently, so the
+ * dashboard would simply have been missing a number nobody could explain. The
+ * key is split on camel case and separators instead, and a segment has to *be* a
+ * forbidden word rather than merely contain one.
+ *
+ * `pathCount` and `contentClips` are still refused, and that is the intended
+ * answer rather than a leftover: a numeric field whose name contains the word
+ * "path" or "content" wants renaming, not permission.
+ */
 function forbidden(key: string): boolean {
-  const normalised = key.toLowerCase().replace(/[^a-z]/g, '');
-  return FORBIDDEN_KEYS.some((banned) => normalised.includes(banned));
+  const words = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^a-zA-Z]+/)
+    .map((word) => word.toLowerCase())
+    .filter((word) => word.length > 0);
+  return words.some((word) => FORBIDDEN_KEYS.includes(word));
 }
 
 /**

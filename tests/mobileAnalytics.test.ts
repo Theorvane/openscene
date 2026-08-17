@@ -46,6 +46,19 @@ describe('analytics properties', () => {
     }
   });
 
+  it('matches whole words, so an innocent name survives', () => {
+    // Substring matching dropped `keyframes` for containing "key" — a count with
+    // nothing to do with credentials, vanishing silently, leaving a dashboard
+    // missing a number nobody could explain.
+    expect(sanitiseProperties({ keyframes: 12, clips: 3, tookMs: 40 })).toEqual({ keyframes: 12, clips: 3, tookMs: 40 });
+    // Still refused, and that is the intended answer rather than a leftover: a
+    // numeric field whose name contains the word "path" or "content" wants
+    // renaming, not permission.
+    expect(sanitiseProperties({ pathCount: 2, contentClips: 3 })).toEqual({});
+    // The match is exact now, so the list has to carry the plurals too.
+    expect(sanitiseProperties({ fileNames: 2, apiKeys: 1, prompts: 4 })).toEqual({});
+  });
+
   it('rounds numbers rather than reporting them exactly', () => {
     // Precision is what makes a number identifying; nobody is asking a question
     // that needs a duration to the fraction of a millisecond.
@@ -92,10 +105,16 @@ describe('the OpenPanel client', () => {
     expect(client).toContain("require('@openpanel/react-native')");
   });
 
-  it('treats an unreadable preference as off', async () => {
-    // Off is the side that cannot be wrong about someone's wishes.
+  it('treats an unreadable preference as off, and an absent one as on', async () => {
+    // The two "no preference" paths resolve opposite ways on purpose, which
+    // looks like an inconsistency until it is written down: no file is nobody
+    // having touched the switch, an unreadable file is a decision that exists
+    // and cannot be read, and overriding a "no" because the file was corrupt is
+    // the one outcome that must not happen.
     const client = await read('src/lib/analyticsClient.ts');
-    expect(client).toMatch(/catch \{[\s\S]{0,220}return false;/);
+    expect(client).toContain('if (!FILE.exists) return true;');
+    expect(client).toMatch(/catch \{\s*\n\s*return false;/);
+    expect(client).toContain('cannot be wrong about someone');
   });
 
   it('identifies nobody', async () => {

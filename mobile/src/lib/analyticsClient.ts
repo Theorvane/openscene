@@ -27,14 +27,21 @@ const FILE = new File(new Directory(Paths.document), 'analytics.json');
 
 type Stored = { readonly enabled?: boolean };
 
-/** Absent reads as on. The switch records a decision; no decision is the default. */
+/**
+ * Absent reads as on. The switch records a decision; no decision is the default.
+ *
+ * The two "no preference" paths deliberately resolve opposite ways, which is
+ * worth saying out loud because it looks like an inconsistency. **No file** means
+ * nobody has ever touched the switch — the default, and the default is on.
+ * **An unreadable file** means somebody's decision exists and cannot be read, and
+ * the one thing that must not happen is overriding a "no" because the file was
+ * corrupt. Off is the only side that cannot be wrong about someone's wishes.
+ */
 export function analyticsEnabled(): boolean {
   try {
     if (!FILE.exists) return true;
     return (JSON.parse(FILE.textSync()) as Stored).enabled !== false;
   } catch {
-    // An unreadable preference is not consent to ignore it. Off is the side that
-    // cannot be wrong about someone's wishes.
     return false;
   }
 }

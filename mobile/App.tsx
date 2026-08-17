@@ -140,7 +140,10 @@ function Shell() {
     const current = readProject(route.projectId);
     if (current === null) return;
     setExportState({ kind: 'running' });
-    // Counts and a duration, never what was in the cut.
+    // Counts and a duration, never what was in the cut. `clips` is every clip on
+    // the timeline rather than the number of distinct sources behind them: the
+    // question it answers is how big a cut people export, and one clip used
+    // four times is four pieces of work.
     track('export_started', { seconds: pictureSeconds, clips: current.timeline.tracks.reduce((n, t) => n + t.clips.length, 0) });
     const startedAt = Date.now();
     // Requested while the encoder runs, because that wait is the only window
