@@ -231,6 +231,10 @@ VIDEO_TOOL_RECORDINGS_DIR=/absolute/path/to/recordings npm run dev
 
 The renderer talks to the main process through a narrow typed `window.videoTool` bridge. Raw `ipcRenderer`, FFmpeg executable paths and arguments, stored credentials, and OAuth tokens stay outside it. Some safe display paths and an API key entered in Settings cross through explicit typed operations; a picked reference image, for example, crosses as bytes, never as a path.
 
+- **The mobile app carries ads; the desktop does not.** The Google Mobile Ads SDK is in the
+  mobile binary and reports device identifiers to Google — a banner above the tab bar and one
+  interstitial after a finished export. Consent is gathered through Google's UMP before any ad is
+  requested. There is no switch for this one; it is how the mobile app is paid for.
 - **No account, no crash reporting.** The desktop app sends nothing about you anywhere.
   The mobile app reports anonymous usage counts — which screens are opened, whether an
   export ran and finished — to the publisher's own server, never to a third party, and
@@ -244,9 +248,9 @@ The renderer talks to the main process through a narrow typed `window.videoTool`
 | Works today | Not yet |
 | --- | --- |
 | Selected-window capture to local WebM | Full-screen capture; mic or system-audio mix in the recorder |
-| Local projects, media, timeline editing, undo/redo | A published mobile build — the app exists, the store listing does not |
+| Local projects, media, timeline editing, undo/redo | Holding a still image in an iOS export — the app refuses those there rather than dropping the picture |
 | Local H.264/AAC MP4 export | Other export formats; frame-perfect multitrack mastering guarantees |
-| Signed installers and auto-update on all three desktop platforms | Cloud sync, hosted rendering, accounts |
+| Signed installers and auto-update on all three desktop platforms, and the mobile app on the App Store and Google Play | Cloud sync, hosted rendering, accounts |
 | Agent-driven editing, generation, and export | Unattended operation — changes ask for approval |
 | Veo image-to-video via a reference image | Sora reference images (needs a multipart upload path this build does not send) |
 
