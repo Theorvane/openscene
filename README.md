@@ -24,8 +24,13 @@
   <a href="https://github.com/Theorvane/openscene/issues"><img alt="Open issues" src="https://img.shields.io/github/issues/Theorvane/openscene?style=flat-square" /></a>
 </p>
 
+<p align="center">
+  <a href="https://apps.apple.com/us/app/openscene-ai-video-editor/id6796586657"><img alt="Download on the App Store" src="https://img.shields.io/badge/App_Store-OpenScene-0d96f6?style=flat-square&logo=apple&logoColor=white" /></a>
+  <a href="https://play.google.com/store/apps/details?id=com.sloki9637.openscene"><img alt="Get it on Google Play" src="https://img.shields.io/badge/Google_Play-OpenScene-01875f?style=flat-square&logo=googleplay&logoColor=white" /></a>
+</p>
+
 > [!IMPORTANT]
-> **Early.** There are signed installers on the [releases page](https://github.com/Theorvane/openscene/releases) for macOS, Windows and Linux, and the app updates itself once installed. Running from source is still the fastest way to follow `dev`. The hero and screenshots below show the real interface.
+> **Early.** There are signed installers on the [releases page](https://github.com/Theorvane/openscene/releases) for macOS, Windows and Linux, and the app updates itself once installed. The mobile app is on the [App Store](https://apps.apple.com/us/app/openscene-ai-video-editor/id6796586657) and [Google Play](https://play.google.com/store/apps/details?id=com.sloki9637.openscene). Running from source is still the fastest way to follow `dev`. The hero and screenshots below show the real interface.
 >
 > The desktop app was called **OpenVideo** through 0.2.0. Because the rename changes the application id, an existing OpenVideo install will not update itself to OpenScene — download 0.3.0 once and the old one can be removed.
 
@@ -141,6 +146,10 @@ operation — placing, trimming, splitting, moving, what plays at a given moment
 composites — is a pure function in `src/shared/`, imported by both. Neither reimplements a rule, which
 is what stops a project behaving one way on a laptop and another on a phone.
 
+It is published on both stores:
+[**App Store**](https://apps.apple.com/us/app/openscene-ai-video-editor/id6796586657) ·
+[**Google Play**](https://play.google.com/store/apps/details?id=com.sloki9637.openscene).
+
 Projects live inside the app rather than in a folder you file away, because a phone user has no
 filesystem they think in. Export hands you the finished MP4 through the share sheet.
 
@@ -152,8 +161,14 @@ filesystem they think in. Export hands you the finished MP4 through the share sh
   every video, and they do not cost the same
 - Multi-shot video that continues each shot from the last frame of the one before
 
-Export renders natively with AVFoundation on iOS. **On Android it is not implemented yet and says
-so** — editing, generation and frame extraction all work there; only the render does not.
+Export renders natively on both: AVFoundation on iOS, Media3 Transformer on Android. Where a
+surface genuinely cannot do something it says so rather than failing quietly — holding a still image
+in the composition is not implemented on iOS yet, so the app refuses those exports there instead of
+producing a video with the picture missing.
+
+The mobile app carries a banner and an interstitial after a finished export, and reports anonymous
+usage counts to the publisher's own server. Neither exists on the desktop. Both are described under
+[your data](#where-your-data-lives); the usage counts have a switch in Settings, the ads do not.
 
 ```bash
 cd mobile
