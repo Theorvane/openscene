@@ -40,3 +40,51 @@ jobs:
         run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # The Swift is compiled, not just written.
+  #
+  # The iOS export module was changed twice without anything ever building it:
+  # the suite is TypeScript, the Android module is compiled by its own Gradle
+  # build, and Swift had no equivalent — so "it typechecks and the tests pass"
+  # said nothing at all about half the native code. Review asked for exact-head
+  # evidence and was right to.
+  #
+  # A simulator build with signing off needs no certificate, profile or secret,
+  # which is what makes this runnable on every pull request rather than only on
+  # a release.
+  ios-module:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Generate the iOS project
+        working-directory: mobile
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Install CocoaPods dependencies
+        working-directory: mobile/ios
+        run: pod install --repo-update
+
+      # `build`, not `archive`: the question is whether the module compiles, and
+      # an archive would drag in signing this job deliberately does not have.
+      - name: Build the iOS app for the simulator
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace ios/OpenScene.xcworkspace \
+            -scheme OpenScene \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build

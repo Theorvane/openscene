@@ -104,3 +104,31 @@ describe('the iOS signing step', () => {
     expect(yaml).toMatch(/"\$\{PROFILE_APP_ID%\\\*\}"\*\)/);
   });
 });
+
+/**
+ * That the Swift is compiled by something.
+ *
+ * The iOS export module was changed twice without anything ever building it.
+ * The suite is TypeScript, the Android module is compiled by its own Gradle
+ * build, and Swift had no equivalent — so a green CI said nothing at all about
+ * half the native code, and a review had to point that out rather than a check.
+ */
+describe('the iOS module', () => {
+  const read = () => readFile(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+
+  it('is built on every pull request', async () => {
+    const yaml = await read();
+    expect(yaml).toContain('ios-module:');
+    expect(yaml).toContain('npx expo prebuild --platform ios');
+    expect(yaml).toMatch(/xcodebuild[\s\S]{0,400}build/);
+  });
+
+  it('builds without needing a signing identity', async () => {
+    // Certificates and profiles belong to a release, not to "does this
+    // compile" — requiring them would make this run only where the secrets
+    // are, which is exactly where it is least useful.
+    const yaml = await read();
+    expect(yaml).toContain('CODE_SIGNING_ALLOWED=NO');
+    expect(yaml).not.toMatch(/ios-module:[\s\S]*?APPLE_DISTRIBUTION_CERTIFICATE/);
+  });
+});
