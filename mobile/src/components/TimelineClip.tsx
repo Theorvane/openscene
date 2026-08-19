@@ -123,10 +123,19 @@ export function TimelineClip({
         <Text style={styles.label} numberOfLines={1}>
           {label}
         </Text>
+        {/*
+          Drawn at the width they actually respond to, not a 5px hint.
+
+          A 5px bar over a 22pt target taught the wrong place to press: people
+          aimed at the line, missed the zone, and moved the clip when they meant
+          to trim it. Showing the real extent makes the control honest, and a
+          clip too narrow for handles shows none — which is also true, since
+          there are none.
+        */}
         {selected && handle > 0 && (
           <>
-            <View pointerEvents="none" style={[styles.handleLeft, { width: Math.min(5, handle) }]} />
-            <View pointerEvents="none" style={[styles.handleRight, { width: Math.min(5, handle) }]} />
+            <View pointerEvents="none" style={[styles.handleLeft, { width: handle }]} />
+            <View pointerEvents="none" style={[styles.handleRight, { width: handle }]} />
           </>
         )}
       </Animated.View>
@@ -148,6 +157,8 @@ const styles = StyleSheet.create({
   audio: { backgroundColor: theme.mint },
   selected: { borderWidth: 2, borderColor: theme.text },
   label: { color: theme.bg, fontSize: 11, fontWeight: '700' },
-  handleLeft: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: theme.text },
-  handleRight: { position: 'absolute', right: 0, top: 0, bottom: 0, backgroundColor: theme.text }
+  // Translucent, because at full width an opaque bar would hide the clip rather
+  // than mark its edge.
+  handleLeft: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: theme.text, opacity: 0.35 },
+  handleRight: { position: 'absolute', right: 0, top: 0, bottom: 0, backgroundColor: theme.text, opacity: 0.35 }
 });

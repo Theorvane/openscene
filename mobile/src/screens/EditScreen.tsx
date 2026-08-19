@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -66,6 +66,8 @@ export function EditScreen({
   const [inspecting, setInspecting] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [zooming, setZooming] = useState(false);
+  /** A third of the screen: enough for three steppers, never enough to swallow the lanes. */
+  const inspectorMaxHeight = Math.round(Dimensions.get('window').height / 3);
   /*
     The lane scroller's own gesture, named so a clip drag can outrank it.
 
@@ -415,64 +417,6 @@ export function EditScreen({
         />
       )}
 
-      {inspecting && selected !== null && (
-        <View style={styles.inspector}>
-          <Text style={styles.inspectorTitle}>Selected clip</Text>
-          <Stepper
-            label="Opacity"
-            value={`${Math.round(selected.clip.effects.opacity * 100)}%`}
-            onDown={() => editor.setSelectedEffects({ opacity: Math.max(0, selected.clip.effects.opacity - 0.1) })}
-            onUp={() => editor.setSelectedEffects({ opacity: Math.min(1, selected.clip.effects.opacity + 0.1) })}
-          />
-          <Stepper
-            label="Scale"
-            value={`${Math.round(selected.clip.effects.scale * 100)}%`}
-            onDown={() => editor.setSelectedEffects({ scale: Math.max(0.1, selected.clip.effects.scale - 0.1) })}
-            onUp={() => editor.setSelectedEffects({ scale: Math.min(4, selected.clip.effects.scale + 0.1) })}
-          />
-          {/*
-            Length and start as numbers, because the handles are not always
-            reachable.
-
-            Trimming was only ever possible by grabbing a 22pt edge, and zooming
-            in to place a cut precisely is exactly what pushes that edge off
-            screen — so the more precisely someone wanted to trim, the less able
-            they were to. A tenth of a second per press is the resolution the
-            readout already shows.
-          */}
-          <Stepper
-            label="Start"
-            value={formatMs(selected.clip.timelineStartMs)}
-            onDown={() => editor.moveClipTo(selected.clip.id, selected.trackId, selected.clip.timelineStartMs - 100)}
-            onUp={() => editor.moveClipTo(selected.clip.id, selected.trackId, selected.clip.timelineStartMs + 100)}
-          />
-          <Stepper
-            label="Length"
-            value={formatMs(selected.clip.sourceEndMs - selected.clip.sourceStartMs)}
-            onDown={() =>
-              editor.trimClipTo(
-                selected.clip.id,
-                'right',
-                selected.clip.timelineStartMs + (selected.clip.sourceEndMs - selected.clip.sourceStartMs) - 100
-              )
-            }
-            onUp={() =>
-              editor.trimClipTo(
-                selected.clip.id,
-                'right',
-                selected.clip.timelineStartMs + (selected.clip.sourceEndMs - selected.clip.sourceStartMs) + 100
-              )
-            }
-          />
-          <Stepper
-            label="Volume"
-            value={`${Math.round(selected.clip.effects.volume * 100)}%`}
-            onDown={() => editor.setSelectedEffects({ volume: Math.max(0, selected.clip.effects.volume - 0.1) })}
-            onUp={() => editor.setSelectedEffects({ volume: Math.min(2, selected.clip.effects.volume + 0.1) })}
-          />
-        </View>
-      )}
-
       <ScrollView
         style={styles.timelineVertical}
         contentContainerStyle={styles.timelineRow}
@@ -600,6 +544,75 @@ export function EditScreen({
           )
         )}
       </ScrollView>
+      {inspecting && selected !== null && (
+        /*
+          Scrolls, and is capped.
+
+          Five steppers pushed the lanes down behind the ad banner, leaving a
+          strip of timeline too short to work in — the panel took the space from
+          the thing it was meant to be adjusting. Now it takes at most a third
+          of the screen and scrolls inside that, so the timeline keeps its room.
+        */
+        <ScrollView
+          style={[styles.inspector, { maxHeight: inspectorMaxHeight }]}
+          contentContainerStyle={styles.inspectorContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.inspectorTitle}>Selected clip</Text>
+          <Stepper
+            label="Opacity"
+            value={`${Math.round(selected.clip.effects.opacity * 100)}%`}
+            onDown={() => editor.setSelectedEffects({ opacity: Math.max(0, selected.clip.effects.opacity - 0.1) })}
+            onUp={() => editor.setSelectedEffects({ opacity: Math.min(1, selected.clip.effects.opacity + 0.1) })}
+          />
+          <Stepper
+            label="Scale"
+            value={`${Math.round(selected.clip.effects.scale * 100)}%`}
+            onDown={() => editor.setSelectedEffects({ scale: Math.max(0.1, selected.clip.effects.scale - 0.1) })}
+            onUp={() => editor.setSelectedEffects({ scale: Math.min(4, selected.clip.effects.scale + 0.1) })}
+          />
+          {/*
+            Length and start as numbers, because the handles are not always
+            reachable.
+
+            Trimming was only ever possible by grabbing a 22pt edge, and zooming
+            in to place a cut precisely is exactly what pushes that edge off
+            screen — so the more precisely someone wanted to trim, the less able
+            they were to. A tenth of a second per press is the resolution the
+            readout already shows.
+          */}
+          <Stepper
+            label="Start"
+            value={formatMs(selected.clip.timelineStartMs)}
+            onDown={() => editor.moveClipTo(selected.clip.id, selected.trackId, selected.clip.timelineStartMs - 100)}
+            onUp={() => editor.moveClipTo(selected.clip.id, selected.trackId, selected.clip.timelineStartMs + 100)}
+          />
+          <Stepper
+            label="Length"
+            value={formatMs(selected.clip.sourceEndMs - selected.clip.sourceStartMs)}
+            onDown={() =>
+              editor.trimClipTo(
+                selected.clip.id,
+                'right',
+                selected.clip.timelineStartMs + (selected.clip.sourceEndMs - selected.clip.sourceStartMs) - 100
+              )
+            }
+            onUp={() =>
+              editor.trimClipTo(
+                selected.clip.id,
+                'right',
+                selected.clip.timelineStartMs + (selected.clip.sourceEndMs - selected.clip.sourceStartMs) + 100
+              )
+            }
+          />
+          <Stepper
+            label="Volume"
+            value={`${Math.round(selected.clip.effects.volume * 100)}%`}
+            onDown={() => editor.setSelectedEffects({ volume: Math.max(0, selected.clip.effects.volume - 0.1) })}
+            onUp={() => editor.setSelectedEffects({ volume: Math.min(2, selected.clip.effects.volume + 0.1) })}
+          />
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -625,6 +638,7 @@ function Stepper({
       <Pressable accessibilityRole="button" accessibilityLabel={`Increase ${label}`} onPress={onUp} hitSlop={STEPPER_SLOP} style={press(styles.stepperButton)}>
         <Text style={styles.stepperButtonText}>+</Text>
       </Pressable>
+
     </View>
   );
 }
@@ -668,7 +682,24 @@ const styles = StyleSheet.create({
   toolText: { color: theme.text, fontSize: 14, fontWeight: '600' },
   toolDangerText: { color: theme.danger },
   message: { color: theme.warn, fontSize: 13, paddingHorizontal: 16, paddingBottom: 8 },
-  inspector: { paddingHorizontal: 16, paddingBottom: 10, gap: 6 },
+  /*
+    Floats over the lanes rather than pushing them down.
+
+    Five rows of controls left the timeline a strip too short to work in — the
+    panel took its space from the thing it was adjusting. Over it, the lanes keep
+    their height and the panel is dismissed with the same button that opened it.
+  */
+  inspector: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexGrow: 0,
+    backgroundColor: theme.bg,
+    borderTopWidth: 1,
+    borderTopColor: theme.line
+  },
+  inspectorContent: { paddingHorizontal: 16, paddingBottom: 10, gap: 6 },
   inspectorTitle: { color: theme.textWeak, fontSize: 12, fontWeight: '700', letterSpacing: 0.6 },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
   stepperLabel: { flex: 1, color: theme.text, fontSize: 14 },

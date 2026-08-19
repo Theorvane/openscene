@@ -18,6 +18,12 @@ struct SegmentInput: Record {
   @Field var sourceStartMs: Double = 0
   @Field var sourceEndMs: Double = 0
   @Field var gain: Double = 1
+  /// What Adjust set. Defaults are "unchanged", so an older caller still renders.
+  @Field var opacity: Double = 1
+  @Field var scale: Double = 1
+  @Field var offsetX: Double = 0
+  @Field var offsetY: Double = 0
+  @Field var rotationDegrees: Double = 0
 }
 
 struct ExportRequest: Record {
@@ -111,13 +117,47 @@ public final class VideoExportModule: Module {
       try track.insertTimeRange(range, of: sourceTrack, at: time(segment.timelineStartMs))
 
       let instruction = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
-      instruction.setTransform(try await sourceTrack.load(.preferredTransform), at: .zero)
+
+      /*
+       What Adjust set, in the order the desktop's filter graph applies it:
+       scale, then rotate, then place. These used to be dropped — the shared plan
+       computed them and nothing on a phone read them — so opacity and scale
+       changed a stored number and nothing anyone could see.
+
+       Scale and rotation are taken about the clip's own centre rather than the
+       origin, or enlarging a clip would also walk it off the frame; the clip is
+       then centred in the render size and offset from there, which is what
+       `overlay=(main_w-overlay_w)/2+x` means on the desktop.
+       */
+      let preferred = try await sourceTrack.load(.preferredTransform)
+      let oriented = try await sourceTrack.load(.naturalSize).applying(preferred)
+      let halfWidth = abs(oriented.width) / 2
+      let halfHeight = abs(oriented.height) / 2
+      let radians = CGFloat(segment.rotationDegrees) * .pi / 180
+      let scale = CGFloat(max(0, segment.scale))
+
+      var transform = preferred
+      transform = transform.concatenating(CGAffineTransform(translationX: -halfWidth, y: -halfHeight))
+      transform = transform.concatenating(CGAffineTransform(scaleX: scale, y: scale))
+      transform = transform.concatenating(CGAffineTransform(rotationAngle: radians))
+      transform = transform.concatenating(
+        CGAffineTransform(
+          translationX: renderSize.width / 2 + CGFloat(segment.offsetX),
+          y: renderSize.height / 2 + CGFloat(segment.offsetY)
+        )
+      )
+      instruction.setTransform(transform, at: .zero)
+      instruction.setOpacity(Float(min(1, max(0, segment.opacity))), at: .zero)
+
       // The plan hands layers bottom-first, and AVFoundation draws the first
       // layer instruction on top — so the order is reversed when they are
       // assembled below rather than here.
       layerInstructions.append(instruction)
     }
 
+    // Gain was read only as "is this audible at all"; the value itself was
+    // dropped, so every clip played at full volume however it was set.
+    var audioParameters: [AVMutableAudioMixInputParameters] = []
     for segment in request.audioSegments where segment.gain > 0 {
       guard let url = URL(string: segment.uri) ?? URL(string: "file://\(segment.uri)") else { continue }
       let asset = AVURLAsset(url: url)
@@ -125,6 +165,12 @@ public final class VideoExportModule: Module {
       guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
       let range = CMTimeRange(start: time(segment.sourceStartMs), end: time(segment.sourceEndMs))
       try track.insertTimeRange(range, of: sourceTrack, at: time(segment.timelineStartMs))
+
+      if segment.gain != 1 {
+        let parameters = AVMutableAudioMixInputParameters(track: track)
+        parameters.setVolume(Float(segment.gain), at: .zero)
+        audioParameters.append(parameters)
+      }
     }
 
     let instruction = AVMutableVideoCompositionInstruction()
@@ -146,6 +192,13 @@ public final class VideoExportModule: Module {
     session.outputFileType = .mp4
     if !layerInstructions.isEmpty {
       session.videoComposition = videoComposition
+    }
+    // Built above and attached here: an audio mix that is never given to the
+    // session is the same as no mix at all, which is how the gain went missing.
+    if !audioParameters.isEmpty {
+      let mix = AVMutableAudioMix()
+      mix.inputParameters = audioParameters
+      session.audioMix = mix
     }
 
     await session.export()
