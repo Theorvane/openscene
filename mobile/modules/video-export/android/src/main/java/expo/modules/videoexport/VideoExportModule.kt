@@ -17,7 +17,9 @@ import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextureOverlay
+import androidx.media3.effect.Crop
 import androidx.media3.effect.Presentation
+import androidx.media3.effect.RgbAdjustment
 import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -222,6 +224,21 @@ class VideoExportModule : Module() {
   private fun sequenceOf(segments: List<Segment>, frameRate: Int, removeAudio: Boolean): EditedMediaItemSequence? {
     if (segments.isEmpty()) return null
     val builder = EditedMediaItemSequence.Builder()
+
+    /*
+      A sequence that opens with silence has to say what kind of silence.
+
+      Media3 refuses a leading gap outright — "If the first item in the sequence
+      is a Gap, then forceAudioTrack or forceVideoTrack flag must be set" —
+      because a gap on its own does not say whether the track it is padding
+      carries pictures or sound. Every timeline whose first clip does not start
+      at zero hit this, which is most of them the moment anyone moves a clip.
+    */
+    if (segments.first().timelineStartMs > 0) {
+      if (removeAudio) builder.experimentalSetForceVideoTrack(true)
+      else builder.experimentalSetForceAudioTrack(true)
+    }
+
     var cursorMs = 0L
     for (segment in segments) {
       if (segment.timelineStartMs > cursorMs) {
@@ -249,17 +266,45 @@ class VideoExportModule : Module() {
   private fun itemOf(segment: Segment, frameRate: Int, removeAudio: Boolean): EditedMediaItem {
     val lengthMs = segment.sourceEndMs - segment.sourceStartMs
     val video = buildList {
-      if (segment.scale != 1f || segment.rotationDegrees != 0f) {
+      if (segment.rotationDegrees != 0f) {
+        add(ScaleAndRotateTransformation.Builder().setRotationDegrees(segment.rotationDegrees).build())
+      }
+
+      /*
+        Scale is a crop, not a scale.
+
+        `ScaleAndRotateTransformation.setScale` resizes the frame, and the
+        `Presentation` that fixes the output size then fits it straight back —
+        so the picture came out exactly as it went in and the control looked
+        dead. Cropping to `1/scale` of the frame and letting the same
+        Presentation fill the output is the zoom the user asked for, expressed
+        where it survives. Values past the edge pad rather than crop, which is
+        what scaling below 100% should do.
+      */
+      if (segment.scale != 1f && segment.scale > 0f) {
+        val half = 1f / segment.scale
+        add(Crop(-half, half, -half, half))
+      }
+
+      /*
+        Opacity is a multiply, not an alpha.
+
+        `AlphaScale` sets a channel the encoder then discards: with one sequence
+        there is nothing to composite against, so the frame arrived at full
+        strength. Compositing over black at alpha `a` *is* multiplying RGB by
+        `a`, which is also what the desktop's `colorchannelmixer=aa` produces
+        once its `overlay` lands on a black base.
+      */
+      if (segment.opacity != 1f) {
+        val level = max(0f, min(1f, segment.opacity))
         add(
-          ScaleAndRotateTransformation.Builder()
-            .setScale(segment.scale, segment.scale)
-            .setRotationDegrees(segment.rotationDegrees)
+          RgbAdjustment.Builder()
+            .setRedScale(level)
+            .setGreenScale(level)
+            .setBlueScale(level)
             .build()
         )
       }
-      // Fading comes after the geometry, the way `colorchannelmixer` follows
-      // `scale` and `rotate` in the desktop's filter graph.
-      if (segment.opacity != 1f) add(AlphaScale(max(0f, min(1f, segment.opacity))))
     }
     // Gain, as a mixing matrix scaled by it — Media3's way of saying "quieter".
     val audio = buildList {

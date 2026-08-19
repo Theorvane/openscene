@@ -62,11 +62,26 @@ describe('the native renderers', () => {
     const kotlin = await read(
       'modules/video-export/android/src/main/java/expo/modules/videoexport/VideoExportModule.kt'
     );
-    expect(kotlin).toContain('AlphaScale');
+    // Opacity is a multiply, not an alpha: `AlphaScale` sets a channel the
+    // encoder discards when there is a single sequence with nothing to
+    // composite against, so the picture came out at full strength. Compositing
+    // over black at alpha `a` is multiplying RGB by `a`.
+    expect(kotlin).toContain('RgbAdjustment.Builder()');
+    expect(kotlin).not.toContain('AlphaScale(');
+    // Scale is a crop, not a scale: `setScale` resizes the frame and the
+    // `Presentation` fixing the output size fits it straight back, so the
+    // picture came out exactly as it went in.
+    expect(kotlin).toContain('Crop(-half, half, -half, half)');
+    expect(kotlin).not.toMatch(/setScale\(segment\.scale/);
     expect(kotlin).toContain('ScaleAndRotateTransformation');
     expect(kotlin).toContain('ChannelMixingAudioProcessor');
     // An offset it cannot honour is named rather than rendered centred.
     expect(kotlin).toContain('ERR_UNSUPPORTED_OFFSET');
+    // A sequence that opens with silence has to say what kind: Media3 refuses a
+    // leading gap outright, so every timeline whose first clip does not start
+    // at zero failed to export at all.
+    expect(kotlin).toContain('experimentalSetForceVideoTrack');
+    expect(kotlin).toContain('experimentalSetForceAudioTrack');
   });
 
   it('applies them on iOS', async () => {
