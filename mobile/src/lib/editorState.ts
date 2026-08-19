@@ -12,10 +12,16 @@ import {
 import { addTrack, createInitialTimeline, removeTrack, timelineDurationMs } from '@openvideo/shared/timelineLogic';
 import { updateAudioTrackMix } from '@openvideo/shared/timelineMetadataLogic';
 import { resolveVisibleClip } from '@openvideo/shared/timelinePlayback';
+import {
+  cutNearest,
+  removeTransitionAtCut,
+  setTransitionAtCut,
+  transitionForCut
+} from '@openvideo/shared/timelineTransitionLogic';
 import type { ClipEffects } from '@openvideo/shared/timelineTypes';
 import { DEFAULT_CLIP_EFFECTS } from '@openvideo/shared/timelineTypes';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '@openvideo/shared/timelineClipPlacement';
-import type { MediaAsset, TimelineDocument } from '@openvideo/shared/timelineTypes';
+import type { MediaAsset, TimelineDocument, TransitionType } from '@openvideo/shared/timelineTypes';
 
 /**
  * The editing model is the desktop's, unchanged — every operation below is a
@@ -354,6 +360,37 @@ export function useMobileEditor(persist?: (timeline: TimelineDocument) => void) 
         'Remove track',
         (current) => removeTrack(current, trackId),
         'A timeline keeps at least one video and one audio track.'
-      )
+      ),
+
+    /*
+      Transitions.
+
+      Between two clips, so nothing on the lanes can be tapped to mean one — the
+      playhead near a cut is the whole address. A phone gets a wider tolerance
+      than a mouse would need, because a finger is worth tens of milliseconds.
+    */
+    cutAtPlayhead: cutNearest(timeline, playheadMs, 500),
+
+    transitionAtPlayhead: (() => {
+      const cut = cutNearest(timeline, playheadMs, 500);
+      return cut === null ? null : transitionForCut(timeline, cut);
+    })(),
+
+    setTransition: (type: TransitionType, durationMs?: number) => {
+      const cut = cutNearest(timeline, playheadMs, 500);
+      if (cut === null) return;
+      apply(
+        'Transition',
+        (current) =>
+          setTransitionAtCut(current, cut, durationMs === undefined ? { type } : { type, durationMs }),
+        'A transition has to fit inside both of the clips it joins.'
+      );
+    },
+
+    removeTransition: () => {
+      const cut = cutNearest(timeline, playheadMs, 500);
+      if (cut === null) return;
+      apply('Remove transition', (current) => removeTransitionAtCut(current, cut), 'That transition could not be removed.');
+    }
   };
 }

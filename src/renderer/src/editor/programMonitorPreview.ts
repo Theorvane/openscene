@@ -1,5 +1,6 @@
 import { clipTimelineEndMs } from '../../../shared/timelineLogic';
 import { isClipActiveAt, sourceTimeForClip } from '../../../shared/timelinePlayback';
+import { dipToBlackOpacityAt, transitionAlphaForClip } from '../../../shared/timelineTransitionLogic';
 import { CLIP_EFFECT_PROPERTIES, DEFAULT_AUDIO_TRACK_MIX, DEFAULT_CLIP_EFFECTS } from '../../../shared/timelineTypes';
 import type {
   AudioTrackMix,
@@ -45,15 +46,6 @@ export type ProgramMonitorPreview = {
   readonly primaryVisualLayer: ProgramMonitorVisualLayer | null;
 };
 
-type TransitionWindow = {
-  readonly cutMs: number;
-  readonly descriptor: TransitionDescriptor;
-  readonly fromClip: PersistedTimelineClip;
-  readonly halfDurationMs: number;
-  readonly playheadMs: number;
-  readonly progress: number;
-  readonly toClip: PersistedTimelineClip;
-};
 
 const NO_PREVIEW: ProgramMonitorPreview = Object.freeze({
   audioLayers: [],
@@ -129,61 +121,22 @@ function findClipById(timeline: TimelineDocument, clipId: string): PersistedTime
   return null;
 }
 
-function transitionWindow(timeline: TimelineDocument, playheadMs: number): TransitionWindow | null {
-  for (const descriptor of timeline.transitions) {
-    const fromClip = findClipById(timeline, descriptor.fromClipId);
-    const toClip = findClipById(timeline, descriptor.toClipId);
-    if (fromClip === null || toClip === null) continue;
 
-    const cutMs = toClip.timelineStartMs;
-    const halfDurationMs = descriptor.durationMs / 2;
-    const startMs = cutMs - halfDurationMs;
-    const endMs = cutMs + halfDurationMs;
-    if (descriptor.durationMs <= 0 || playheadMs < startMs || playheadMs > endMs) continue;
-    return { cutMs, descriptor, fromClip, halfDurationMs, playheadMs, progress: clamp((playheadMs - startMs) / descriptor.durationMs, 0, 1), toClip };
-  }
-  return null;
+function applyTransitionToEffects(
+  effects: ClipEffects,
+  timeline: TimelineDocument,
+  activeClipId: string,
+  playheadMs: number
+): ClipEffects {
+  // The rule itself lives in shared, because the phone preview and the FFmpeg
+  // graph have to produce the same picture as this does. What used to be here
+  // was the only implementation there was, which is how transitions came to be
+  // visible in the editor and absent from every export.
+  const alpha = transitionAlphaForClip(timeline, activeClipId, playheadMs);
+  return alpha === 1 ? effects : { ...effects, opacity: effects.opacity * alpha };
 }
 
-function visualTransitionOpacity(window: TransitionWindow, activeClipId: string): number {
-  if (activeClipId === window.fromClip.id) {
-    return clamp((window.cutMs - window.playheadMs) / window.halfDurationMs, 0, 1);
-  }
-  if (activeClipId === window.toClip.id) {
-    return clamp((window.playheadMs - window.cutMs) / window.halfDurationMs, 0, 1);
-  }
-  return 1;
-}
 
-function applyTransitionToEffects(effects: ClipEffects, window: TransitionWindow | null, activeClipId: string): ClipEffects {
-  if (window === null) return effects;
-
-  switch (window.descriptor.type) {
-    case 'fade': {
-      return { ...effects, opacity: effects.opacity * visualTransitionOpacity(window, activeClipId) };
-    }
-    case 'crossfade': {
-      return { ...effects, opacity: effects.opacity * visualTransitionOpacity(window, activeClipId) };
-    }
-    case 'dipToBlack':
-      return effects;
-    default:
-      return assertNever(window.descriptor.type);
-  }
-}
-
-function blackOpacityForTransition(window: TransitionWindow | null): number {
-  if (window === null) return 0;
-  switch (window.descriptor.type) {
-    case 'fade':
-    case 'crossfade':
-      return 0;
-    case 'dipToBlack':
-      return 1 - Math.abs(window.progress - 0.5) * 2;
-    default:
-      return assertNever(window.descriptor.type);
-  }
-}
 
 function gainFromDb(db: number): number {
   return 10 ** (db / 20);
@@ -201,7 +154,6 @@ function audioPanGains(volume: number, mix: AudioTrackMix): Pick<ProgramMonitorA
 
 export function buildProgramMonitorPreview(input: ProgramMonitorPreviewInput): ProgramMonitorPreview {
   const assetById = new Map(input.assets.map((asset) => [asset.id, asset]));
-  const transition = transitionWindow(input.timeline, input.playheadMs);
   let primaryVisualLayer: ProgramMonitorVisualLayer | null = null;
   const audioLayers: ProgramMonitorAudioLayer[] = [];
 
@@ -217,7 +169,7 @@ export function buildProgramMonitorPreview(input: ProgramMonitorPreviewInput): P
           primaryVisualLayer = {
             asset: assetById.get(activeClip.assetId) ?? null,
             clip: activeClip,
-            effects: applyTransitionToEffects(effects, transition, activeClip.id),
+            effects: applyTransitionToEffects(effects, input.timeline, activeClip.id, input.playheadMs),
             sourceTimeMs,
             trackId: track.id
           };
@@ -244,7 +196,7 @@ export function buildProgramMonitorPreview(input: ProgramMonitorPreviewInput): P
   if (primaryVisualLayer === null && audioLayers.length === 0) return NO_PREVIEW;
   return {
     audioLayers,
-    blackOpacity: blackOpacityForTransition(transition),
+    blackOpacity: dipToBlackOpacityAt(input.timeline, input.playheadMs),
     meterLeft: clamp(audioLayers.reduce((total, layer) => total + layer.leftGain, 0), 0, 1),
     meterRight: clamp(audioLayers.reduce((total, layer) => total + layer.rightGain, 0), 0, 1),
     primaryVisualLayer

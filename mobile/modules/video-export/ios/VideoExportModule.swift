@@ -26,6 +26,12 @@ struct SegmentInput: Record {
   @Field var rotationDegrees: Double = 0
 }
 
+/// A transition, as the black it puts over the picture: total at the midpoint.
+struct DipInput: Record {
+  @Field var startMs: Double = 0
+  @Field var durationMs: Double = 0
+}
+
 struct ExportRequest: Record {
   @Field var width: Int = 1920
   @Field var height: Int = 1080
@@ -33,6 +39,7 @@ struct ExportRequest: Record {
   @Field var durationMs: Double = 0
   @Field var videoSegments: [SegmentInput] = []
   @Field var audioSegments: [SegmentInput] = []
+  @Field var dips: [DipInput] = []
 }
 
 private func time(_ milliseconds: Double) -> CMTime {
@@ -147,7 +154,44 @@ public final class VideoExportModule: Module {
         )
       )
       instruction.setTransform(transform, at: .zero)
-      instruction.setOpacity(Float(min(1, max(0, segment.opacity))), at: .zero)
+      let baseOpacity = Float(min(1, max(0, segment.opacity)))
+      instruction.setOpacity(baseOpacity, at: .zero)
+
+      /*
+       Transitions, as opacity ramps on the clips either side of a cut.
+
+       There is no cross-dissolve to do: the timeline refuses overlapping clips,
+       so at no instant are there two pictures to mix. The outgoing clip going to
+       nothing over black and the incoming one arriving is what the desktop draws
+       and what the FFmpeg graph renders, and `setOpacityRamp` says exactly that.
+
+       Clamped to the segment's own span, so a dip that reaches past the end of a
+       clip ramps only over the part of it that exists.
+       */
+      let segmentStartMs = segment.timelineStartMs
+      let segmentEndMs = segment.timelineStartMs + (segment.sourceEndMs - segment.sourceStartMs)
+      for dip in request.dips where dip.durationMs > 0 {
+        let midMs = dip.startMs + dip.durationMs / 2
+        let endMs = dip.startMs + dip.durationMs
+
+        let outStart = max(dip.startMs, segmentStartMs)
+        if outStart < min(midMs, segmentEndMs) {
+          instruction.setOpacityRamp(
+            fromStartOpacity: baseOpacity,
+            toEndOpacity: 0,
+            timeRange: CMTimeRange(start: time(outStart), end: time(min(midMs, segmentEndMs)))
+          )
+        }
+
+        let inEnd = min(endMs, segmentEndMs)
+        if max(midMs, segmentStartMs) < inEnd {
+          instruction.setOpacityRamp(
+            fromStartOpacity: 0,
+            toEndOpacity: baseOpacity,
+            timeRange: CMTimeRange(start: time(max(midMs, segmentStartMs)), end: time(inEnd))
+          )
+        }
+      }
 
       // The plan hands layers bottom-first, and AVFoundation draws the first
       // layer instruction on top — so the order is reversed when they are

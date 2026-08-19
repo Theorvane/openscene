@@ -5,7 +5,7 @@
  * binding without the composition logic being written twice.
  */
 import { timelineDurationMs } from './timelineLogic';
-import type { AudioTimelineTrack, PersistedTimelineClip, TimelineDocument } from './timelineTypes';
+import type { AudioTimelineTrack, PersistedTimelineClip, TimelineDocument, TransitionDescriptor } from './timelineTypes';
 
 export type CompileFfmpegTimelineInput = {
   readonly timeline: TimelineDocument;
@@ -51,6 +51,18 @@ function seconds(milliseconds: number): string {
   return Number((milliseconds / 1_000).toFixed(6)).toString();
 }
 
+function findClip(timeline: TimelineDocument, clipId: string): PersistedTimelineClip | null {
+  for (const track of timeline.tracks) {
+    const clip = track.clips.find((candidate) => candidate.id === clipId);
+    if (clip !== undefined) return clip;
+  }
+  return null;
+}
+
+function clipEndMs(clip: PersistedTimelineClip): number {
+  return clip.timelineStartMs + (clip.sourceEndMs - clip.sourceStartMs);
+}
+
 function requireAssetPath(assetPaths: ReadonlyMap<string, string>, assetId: string): string {
   const path = assetPaths.get(assetId);
   if (path === undefined || path.includes('\0')) {
@@ -59,7 +71,12 @@ function requireAssetPath(assetPaths: ReadonlyMap<string, string>, assetId: stri
   return path;
 }
 
-function videoFilter(clip: PersistedTimelineClip, inputIndex: number, outputLabel: string): string {
+function videoFilter(
+  clip: PersistedTimelineClip,
+  inputIndex: number,
+  outputLabel: string,
+  fades: readonly string[] = []
+): string {
   const start = seconds(clip.sourceStartMs);
   const end = seconds(clip.sourceEndMs);
   const offset = seconds(clip.timelineStartMs);
@@ -70,8 +87,11 @@ function videoFilter(clip: PersistedTimelineClip, inputIndex: number, outputLabe
     `scale=w='iw*${clip.effects.scale}':h='ih*${clip.effects.scale}'`,
     'format=rgba',
     `rotate=${rotation}:fillcolor=black@0`,
-    `colorchannelmixer=aa=${clip.effects.opacity}[${outputLabel}]`
-  ].join(',');
+    // The transition ramps come after the clip's own opacity, so they scale it
+    // rather than replace it: a clip held at 50% still dips to nothing.
+    `colorchannelmixer=aa=${clip.effects.opacity}`,
+    ...fades
+  ].join(',') + `[${outputLabel}]`;
 }
 
 /**
@@ -94,6 +114,70 @@ function videoAudioFilter(clip: PersistedTimelineClip, inputIndex: number, outpu
     'aformat=channel_layouts=stereo',
     `adelay=${clip.timelineStartMs}:all=1[${outputLabel}]`
   ].join(',');
+}
+
+/**
+ * The alpha ramps a transition puts on the clips either side of a cut.
+ *
+ * Timed the way the program monitor times them: the window is the cut plus and
+ * minus half the duration, the outgoing clip fades to nothing over the first
+ * half, and the incoming clip arrives over the second. The base layer is black,
+ * so what a viewer sees is a dip through black — which is what adjacent clips
+ * can honestly do. They do not overlap on the timeline (the rules refuse it), so
+ * there is no instant where both have a picture to dissolve between.
+ *
+ * `fade` rather than `colorchannelmixer`, because the mixer takes a constant and
+ * a transition is the one thing here that is not one. The timestamps are
+ * timeline time: `setpts` has already offset the clip by then.
+ */
+function transitionFades(clip: PersistedTimelineClip, transitions: readonly TransitionDescriptor[]): readonly string[] {
+  const fades: string[] = [];
+  for (const transition of transitions) {
+    // A dip to black is drawn as its own layer over the finished picture, the
+    // way the preview draws it — the clips keep their own opacity.
+    if (transition.type === 'dipToBlack') continue;
+    const halfMs = transition.durationMs / 2;
+    if (halfMs <= 0) continue;
+    if (transition.fromClipId === clip.id) {
+      const startMs = clipEndMs(clip) - halfMs;
+      fades.push(`fade=t=out:st=${seconds(startMs)}:d=${seconds(halfMs)}:alpha=1`);
+    }
+    if (transition.toClipId === clip.id) {
+      fades.push(`fade=t=in:st=${seconds(clip.timelineStartMs)}:d=${seconds(halfMs)}:alpha=1`);
+    }
+  }
+  return fades;
+}
+
+/**
+ * A dip to black, as a black layer that arrives and leaves.
+ *
+ * Over everything rather than inside one clip: the preview draws it as a scrim
+ * across the whole frame, so a second video track underneath dips too. Matching
+ * that matters more than the fact that a per-clip fade would have been shorter
+ * to write — an export that disagrees with the preview is the bug this whole
+ * change exists to fix.
+ */
+function dipToBlackFilters(
+  transition: TransitionDescriptor,
+  cutMs: number,
+  input: { readonly width: number; readonly height: number; readonly frameRate: number },
+  inputLabel: string,
+  sourceLabel: string,
+  outputLabel: string
+): readonly string[] {
+  const halfMs = transition.durationMs / 2;
+  const startMs = cutMs - halfMs;
+  return [
+    [
+      `color=c=black:s=${input.width}x${input.height}:r=${input.frameRate}:d=${seconds(transition.durationMs)}`,
+      'format=rgba',
+      `fade=t=in:st=0:d=${seconds(halfMs)}:alpha=1`,
+      `fade=t=out:st=${seconds(halfMs)}:d=${seconds(halfMs)}:alpha=1`,
+      `setpts=PTS-STARTPTS+${seconds(startMs)}/TB[${sourceLabel}]`
+    ].join(','),
+    `[${inputLabel}][${sourceLabel}]overlay=x=0:y=0:enable='between(t,${seconds(startMs)},${seconds(cutMs + halfMs)})':eof_action=pass[${outputLabel}]`
+  ];
 }
 
 function trackGain(track: AudioTimelineTrack, clip: PersistedTimelineClip): number {
@@ -177,13 +261,26 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
   videoClips.forEach(({ clip, inputIndex: clipInputIndex }, index) => {
     const clipLabel = `video-clip-${index}`;
     const nextLabel = `video-layer-${index}`;
-    filters.push(videoFilter(clip, clipInputIndex, clipLabel));
+    filters.push(videoFilter(clip, clipInputIndex, clipLabel, transitionFades(clip, input.timeline.transitions)));
     const endMs = clip.timelineStartMs + clip.sourceEndMs - clip.sourceStartMs;
     const x = `(main_w-overlay_w)/2+${clip.effects.positionX}`;
     const y = `(main_h-overlay_h)/2+${clip.effects.positionY}`;
     filters.push(`[${currentVideoLabel}][${clipLabel}]overlay=x='${x}':y='${y}':enable='between(t,${seconds(clip.timelineStartMs)},${seconds(endMs)})':eof_action=pass[${nextLabel}]`);
     currentVideoLabel = nextLabel;
   });
+  // Dips to black go over the finished picture, in cut order so two of them
+  // cannot fight over the same label.
+  const dips = input.timeline.transitions.filter((transition) => transition.type === 'dipToBlack');
+  dips.forEach((transition, index) => {
+    const toClip = findClip(input.timeline, transition.toClipId);
+    if (toClip === null) return;
+    const nextLabel = `video-dip-${index}`;
+    filters.push(
+      ...dipToBlackFilters(transition, toClip.timelineStartMs, input, currentVideoLabel, `dip-source-${index}`, nextLabel)
+    );
+    currentVideoLabel = nextLabel;
+  });
+
   filters.push(`[${currentVideoLabel}]format=yuv420p[video-out]`);
 
   const audioLabels: string[] = [];

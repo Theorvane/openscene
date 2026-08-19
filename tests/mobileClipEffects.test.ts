@@ -42,7 +42,10 @@ describe('the preview', () => {
 
   it('is given the effects by the editor', async () => {
     const screen = await read('src/screens/EditScreen.tsx');
-    expect(screen).toContain('opacity: visible.clip.effects.opacity');
+    // The clip's own opacity reaches the preview. It is multiplied by the
+    // transition ramp now, which is why this matches a prefix rather than a
+    // whole line — what must not happen is the value being dropped.
+    expect(screen).toContain('visible.clip.effects.opacity');
   });
 });
 

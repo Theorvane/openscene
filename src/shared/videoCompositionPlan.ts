@@ -1,4 +1,5 @@
 import { timelineDurationMs } from './timelineLogic';
+import { cuts, transitionForCut } from './timelineTransitionLogic';
 import type { TimelineDocument } from './timelineTypes';
 
 /**
@@ -62,6 +63,25 @@ export type CompositionPlan = {
    */
   readonly videoSegments: readonly CompositionSegment[];
   readonly audioSegments: readonly AudioSegment[];
+  /**
+   * Transitions, reduced to what a renderer actually has to draw: a dip through
+   * black, centred on a cut.
+   *
+   * All three types collapse to the same thing here, and that is not a
+   * shortcut. The timeline refuses overlapping clips, so at no instant do two
+   * pictures exist to dissolve between — the outgoing clip going to nothing and
+   * the incoming one arriving *is* a dip through the black underneath. The
+   * desktop program monitor has always drawn it that way; this hands the native
+   * renderers the same conclusion instead of making each of them derive it.
+   */
+  readonly dips: readonly CompositionDip[];
+};
+
+export type CompositionDip = {
+  /** When the black starts arriving. */
+  readonly startMs: number;
+  /** Black is total at the midpoint and gone again at the end. */
+  readonly durationMs: number;
 };
 
 export class CompositionPlanError extends Error {
@@ -70,6 +90,17 @@ export class CompositionPlanError extends Error {
 
 function decibelsToGain(gainDb: number): number {
   return 10 ** (gainDb / 20);
+}
+
+/** Each transition, as the black it puts on the frame. */
+function dipsFor(timeline: TimelineDocument): readonly CompositionDip[] {
+  const dips: CompositionDip[] = [];
+  for (const cut of cuts(timeline)) {
+    const transition = transitionForCut(timeline, cut);
+    if (transition === null || transition.durationMs <= 0) continue;
+    dips.push({ startMs: Math.max(0, cut.cutMs - transition.durationMs / 2), durationMs: transition.durationMs });
+  }
+  return dips;
 }
 
 export function buildCompositionPlan(input: {
@@ -184,6 +215,7 @@ export function buildCompositionPlan(input: {
     // Bottom row first, so a pipeline that stacks in order puts the timeline's
     // top track on top.
     videoSegments: [...videoLayers].reverse().flat(),
-    audioSegments
+    audioSegments,
+    dips: dipsFor(input.timeline)
   };
 }

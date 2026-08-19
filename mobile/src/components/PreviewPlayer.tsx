@@ -23,7 +23,8 @@ export function PreviewPlayer({
   onProgress,
   onEnded,
   effects,
-  frameWidth
+  frameWidth,
+  dimOpacity
 }: {
   readonly uri: string | null;
   /**
@@ -58,6 +59,14 @@ export function PreviewPlayer({
    * mean two different distances.
    */
   readonly frameWidth?: number;
+  /**
+   * Black over the whole frame, for a dip-to-black transition.
+   *
+   * Separate from the clip's own opacity because it is a different thing: the
+   * clip keeps what it was given and the dip is drawn on top, which is how the
+   * desktop draws it and how the FFmpeg graph renders it.
+   */
+  readonly dimOpacity?: number;
   readonly sourceTimeMs: number;
   readonly playing: boolean;
   /** Source position, in ms, reported while playing. */
@@ -95,7 +104,10 @@ export function PreviewPlayer({
     alpha gives the same result the export does, because the export composites
     the clip over black too.
   */
-  const dim = effects === undefined ? 0 : 1 - Math.max(0, Math.min(1, effects.opacity));
+  const clipDim = effects === undefined ? 0 : 1 - Math.max(0, Math.min(1, effects.opacity));
+  // Whichever is darker wins: they are two ways of hiding the same picture, and
+  // adding them would take a half-faded clip to black too early.
+  const dim = Math.max(clipDim, Math.max(0, Math.min(1, dimOpacity ?? 0)));
 
   const player = useVideoPlayer(null, (instance) => {
     instance.timeUpdateEventInterval = 0.05;

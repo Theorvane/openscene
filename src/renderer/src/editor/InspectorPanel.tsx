@@ -1,6 +1,7 @@
 import { useState, type ReactElement, type ReactNode } from 'react';
 
-import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS } from '../../../shared/timelineTypes';
+import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, TRANSITION_TYPES } from '../../../shared/timelineTypes';
+import type { TransitionType } from '../../../shared/timelineTypes';
 import { formatDuration, formatTimestamp } from '../format';
 import { Button, MetadataList, PanelHeading, TabPanel, Tabs } from '../ui';
 import type { TabDefinition } from '../ui';
@@ -63,6 +64,73 @@ function PropertyRow({ label, children }: PropertyRowProps): ReactElement {
       <span className="property-row__label">{label}</span>
       <div className="property-row__value">{children}</div>
     </div>
+  );
+}
+
+/*
+  Transitions.
+
+  Between two clips, so there is nothing to select and the playhead is the only
+  thing that can point at one. Park it near a cut and these controls apply to
+  that cut; away from every cut they say so rather than disappearing, because a
+  control that vanishes reads as a broken build.
+*/
+const TRANSITION_LABELS: Readonly<Record<TransitionType, string>> = {
+  fade: 'Fade',
+  crossfade: 'Crossfade',
+  dipToBlack: 'Dip to black'
+};
+
+function TransitionControls({ editor }: InspectorContentProps): ReactElement {
+  const cut = editor.cutAtPlayhead;
+  const transition = editor.transitionAtPlayhead;
+
+  return (
+    <PropertyGroup title="Transition">
+      {cut === null ? (
+        <div className="empty-slate">
+          Move the playhead to a cut — where two clips touch — to put a transition on it.
+        </div>
+      ) : (
+        <>
+          <div className="inspector-action-grid" role="toolbar" aria-label="Transition controls">
+            {TRANSITION_TYPES.map((type) => (
+              <Button
+                key={type}
+                className="inspector-action"
+                variant={transition?.type === type ? 'primary' : 'default'}
+                onClick={() => editor.setTransitionAtPlayhead(type)}
+              >
+                {TRANSITION_LABELS[type]}
+              </Button>
+            ))}
+            {transition !== null && (
+              <Button className="inspector-action" variant="stop" onClick={editor.removeTransitionAtPlayhead}>
+                Remove
+              </Button>
+            )}
+          </div>
+
+          <PropertyRow label="At"><span className="property-value-chip">{formatDuration(cut.cutMs)}</span></PropertyRow>
+
+          {transition !== null && (
+            <PropertyRow label="Length">
+              <input
+                className="property-number-input"
+                type="number"
+                aria-label="Transition length in milliseconds"
+                value={transition.durationMs}
+                min={100}
+                step={100}
+                onChange={(event) =>
+                  editor.setTransitionAtPlayhead(transition.type, Number(event.currentTarget.value))
+                }
+              />
+            </PropertyRow>
+          )}
+        </>
+      )}
+    </PropertyGroup>
   );
 }
 
@@ -189,6 +257,8 @@ function SelectionInspector({ editor }: InspectorContentProps): ReactElement {
           </PropertyGroup>
         </>
       )}
+
+      {editor.project !== null && <TransitionControls editor={editor} />}
 
       {editor.activePlaybackClip !== null && (
         <PropertyGroup title="Playback">

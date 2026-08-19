@@ -14,7 +14,22 @@ import {
   trimClipRight,
   updateClipEffects
 } from '../../../shared/timelineLogic';
-import type { ClipEffects, LocalProjectSnapshot, LocalProjectSummary, MediaAsset, MediaKind, TimelineDocument } from '../../../shared/timelineTypes';
+import {
+  cutNearest,
+  removeTransitionAtCut,
+  setTransitionAtCut,
+  transitionForCut,
+  type TimelineCut
+} from '../../../shared/timelineTransitionLogic';
+import type {
+  ClipEffects,
+  LocalProjectSnapshot,
+  LocalProjectSummary,
+  MediaAsset,
+  MediaKind,
+  TimelineDocument,
+  TransitionType
+} from '../../../shared/timelineTypes';
 import { errorMessage, type StatusMessage } from '../appTypes';
 import { createTimelineHistory, pushTimelineHistory, redoTimelineHistory, undoTimelineHistory, type TimelineHistory } from './editorTimelineHistory';
 import { clampPlayheadMs, findClipSelection, findFirstCompatibleTrack, insertionStartForTrack, nextTrackName, placeReadyAssetOnTimeline } from './editorTimelineView';
@@ -195,6 +210,41 @@ export function useTimelineEditor() {
     setStatusMessage({ tone: 'neutral', text: successText });
     return timeline;
   }, [playback, project]);
+
+  /*
+    Transitions.
+
+    Addressed by the playhead, like a title and for a sharper reason: a
+    transition lives *between* two clips, and there is nothing between two clips
+    to select. Park the playhead near a cut and the controls apply to that cut.
+  */
+  const cutAtPlayhead = useMemo<TimelineCut | null>(
+    () => (project === null ? null : cutNearest(project.timeline, playback.playheadMs)),
+    [playback.playheadMs, project]
+  );
+
+  const transitionAtPlayhead = useMemo(
+    () => (project === null || cutAtPlayhead === null ? null : transitionForCut(project.timeline, cutAtPlayhead)),
+    [cutAtPlayhead, project]
+  );
+
+  const setTransitionAtPlayhead = useCallback(
+    (type: TransitionType, durationMs?: number) => {
+      if (cutAtPlayhead === null) return;
+      replaceTimeline(
+        (timeline) =>
+          setTransitionAtCut(timeline, cutAtPlayhead, durationMs === undefined ? { type } : { type, durationMs }),
+        'Set the transition.',
+        'A transition has to fit inside both of the clips it joins.'
+      );
+    },
+    [cutAtPlayhead, replaceTimeline]
+  );
+
+  const removeTransitionAtPlayhead = useCallback(() => {
+    if (cutAtPlayhead === null) return;
+    replaceTimeline((timeline) => removeTransitionAtCut(timeline, cutAtPlayhead), 'Removed the transition.');
+  }, [cutAtPlayhead, replaceTimeline]);
 
   const placeSelectedAsset = useCallback(() => {
     if (project === null || selectedAsset === null || selectedAsset.metadata === null) return;
@@ -455,6 +505,7 @@ export function useTimelineEditor() {
   return {
     addTimelineTrack, removeTimelineTrack, renameTimelineTrack, insertTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
+    cutAtPlayhead, transitionAtPlayhead, setTransitionAtPlayhead, removeTransitionAtPlayhead,
     openProject, openProjectFolder, renameProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
     clearSelection, goToTimelineEnd, goToTimelineStart, selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,
     setNewProjectName, setSelectedAssetId, setSelectedClipId: selectClip,

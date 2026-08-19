@@ -21,6 +21,16 @@ import { MediaLibrary } from '../components/MediaLibrary';
 import { TimelineRuler } from '../components/TimelineRuler';
 import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from '../components/Icon';
 import { press, slopFor } from '../lib/touch';
+import { dipToBlackOpacityAt, transitionAlphaForClip } from '@openvideo/shared/timelineTransitionLogic';
+import { TRANSITION_TYPES } from '@openvideo/shared/timelineTypes';
+import type { TransitionDescriptor, TransitionType } from '@openvideo/shared/timelineTypes';
+
+/** Named here rather than at the buttons, so the two surfaces read the same. */
+const TRANSITION_LABELS: Readonly<Record<TransitionType, string>> = {
+  fade: 'Fade',
+  crossfade: 'Crossfade',
+  dipToBlack: 'Dip to black'
+};
 
 const TRACK_HEIGHT = { video: 60, audio: 44 } as const;
 const RAIL = 92;
@@ -64,6 +74,7 @@ export function EditScreen({
   const [playing, setPlaying] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [inspecting, setInspecting] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [zooming, setZooming] = useState(false);
   /** A third of the screen: enough for three steppers, never enough to swallow the lanes. */
@@ -303,7 +314,12 @@ export function EditScreen({
           visible === null
             ? undefined
             : {
-                opacity: visible.clip.effects.opacity,
+                // The transition ramp multiplies the clip's own opacity, which
+                // is what the export does — the preview has to agree with the
+                // file or the control is a lie.
+                opacity:
+                  visible.clip.effects.opacity *
+                  transitionAlphaForClip(editor.timeline, visible.clip.id, editor.playheadMs),
                 scale: visible.clip.effects.scale,
                 positionX: visible.clip.effects.positionX,
                 positionY: visible.clip.effects.positionY,
@@ -311,6 +327,8 @@ export function EditScreen({
               }
         }
         frameWidth={1920}
+        // A dip to black sits over everything, the way it does on the desktop.
+        dimOpacity={dipToBlackOpacityAt(editor.timeline, editor.playheadMs)}
       />
 
       <View style={styles.transport}>
@@ -392,6 +410,19 @@ export function EditScreen({
         <Tool label="Split" onPress={editor.splitAtPlayhead} disabled={selected === null} />
         <Tool label="Adjust" onPress={() => setInspecting((open) => !open)} disabled={selected === null} />
         <Tool label="Delete" tone="danger" onPress={editor.deleteSelected} disabled={selected === null} />
+        {/*
+          Disabled away from a cut rather than hidden, and the panel says what a
+          cut is — a control that appears and disappears as the playhead moves
+          reads as a glitch, not as a rule.
+        */}
+        <Tool
+          label="Transition"
+          onPress={() => {
+            setTransitioning((open) => !open);
+            setInspecting(false);
+          }}
+          disabled={editor.cutAtPlayhead === null}
+        />
         <Tool label="Undo" onPress={editor.undo} disabled={!editor.canUndo} />
         <Tool label="Redo" onPress={editor.redo} disabled={!editor.canRedo} />
         <Tool label="Media" onPress={() => setMediaOpen((open) => !open)} disabled={projectId === null} />
@@ -544,6 +575,19 @@ export function EditScreen({
           )
         )}
       </ScrollView>
+      {transitioning && editor.cutAtPlayhead !== null && (
+        <TransitionPanel
+          cutMs={editor.cutAtPlayhead.cutMs}
+          transition={editor.transitionAtPlayhead}
+          maxHeight={inspectorMaxHeight}
+          onSet={(type, durationMs) => editor.setTransition(type, durationMs)}
+          onRemove={() => {
+            editor.removeTransition();
+            setTransitioning(false);
+          }}
+          onClose={() => setTransitioning(false)}
+        />
+      )}
       {inspecting && selected !== null && (
         /*
           Scrolls, and is capped.
@@ -614,6 +658,77 @@ export function EditScreen({
         </ScrollView>
       )}
     </View>
+  );
+}
+
+/**
+ * The transition on the cut nearest the playhead.
+ *
+ * Three buttons and a length, because that is the whole feature. What matters
+ * on a phone is that the cut being edited is named — the playhead is thin and a
+ * timeline zoomed out puts two cuts within a thumb of each other, so the panel
+ * says which moment it is talking about.
+ */
+function TransitionPanel({
+  cutMs,
+  transition,
+  maxHeight,
+  onSet,
+  onRemove,
+  onClose
+}: {
+  cutMs: number;
+  transition: TransitionDescriptor | null;
+  maxHeight: number;
+  onSet: (type: TransitionType, durationMs?: number) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <ScrollView
+      style={[styles.inspector, { maxHeight }]}
+      contentContainerStyle={styles.inspectorContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.panelHeader}>
+        <Text style={styles.inspectorTitle}>Transition at {formatMs(cutMs)}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close the transition panel" onPress={onClose} hitSlop={SMALL_SLOP}>
+          <Text style={styles.smallText}>×</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.choiceRow}>
+        {TRANSITION_TYPES.map((type) => (
+          <Pressable
+            key={type}
+            accessibilityRole="button"
+            accessibilityState={{ selected: transition?.type === type }}
+            onPress={() => onSet(type)}
+            style={press([styles.choice, transition?.type === type && styles.choiceOn])}
+          >
+            <Text style={[styles.choiceText, transition?.type === type && styles.choiceTextOn]}>
+              {TRANSITION_LABELS[type]}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {transition === null ? (
+        <Text style={styles.panelNote}>No transition here yet. Pick one and it lands on this cut.</Text>
+      ) : (
+        <>
+          <Stepper
+            label="Length"
+            value={formatMs(transition.durationMs)}
+            onDown={() => onSet(transition.type, transition.durationMs - 100)}
+            onUp={() => onSet(transition.type, transition.durationMs + 100)}
+          />
+          <Pressable accessibilityRole="button" onPress={onRemove} style={press([styles.tool, styles.toolDanger])}>
+            <Text style={[styles.toolText, styles.toolDangerText]}>Remove transition</Text>
+          </Pressable>
+        </>
+      )}
+    </ScrollView>
   );
 }
 
@@ -701,6 +816,13 @@ const styles = StyleSheet.create({
   },
   inspectorContent: { paddingHorizontal: 16, paddingBottom: 10, gap: 6 },
   inspectorTitle: { color: theme.textWeak, fontSize: 12, fontWeight: '700', letterSpacing: 0.6 },
+  panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  panelNote: { color: theme.textWeaker, fontSize: 13 },
+  choiceRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  choice: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  choiceOn: { borderColor: theme.accent, backgroundColor: theme.accent },
+  choiceText: { color: theme.text, fontSize: 14, fontWeight: '600' },
+  choiceTextOn: { color: theme.bg },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
   stepperLabel: { flex: 1, color: theme.text, fontSize: 14 },
   stepperButton: { width: 36, height: 36, borderRadius: 9, borderWidth: 1, borderColor: theme.line, alignItems: 'center', justifyContent: 'center' },

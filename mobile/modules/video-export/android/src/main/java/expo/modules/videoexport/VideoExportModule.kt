@@ -1,6 +1,7 @@
 package expo.modules.videoexport
 
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Handler
@@ -12,6 +13,10 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.audio.ChannelMixingAudioProcessor
 import androidx.media3.common.audio.ChannelMixingMatrix
 import androidx.media3.effect.AlphaScale
+import androidx.media3.effect.BitmapOverlay
+import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.StaticOverlaySettings
+import androidx.media3.effect.TextureOverlay
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.transformer.Composition
@@ -158,6 +163,62 @@ class VideoExportModule : Module() {
    * a clip starting at four seconds after one ending at two would simply follow
    * it immediately unless the two seconds between them are declared.
    */
+  private data class Dip(val startMs: Long, val durationMs: Long)
+
+  @Suppress("UNCHECKED_CAST")
+  private fun dipsOf(request: Map<String, Any?>): List<Dip> {
+    val raw = request["dips"] as? List<Map<String, Any?>> ?: emptyList()
+    return raw
+      .map { Dip(startMs = ms(it["startMs"]), durationMs = ms(it["durationMs"])) }
+      .filter { it.durationMs > 0 }
+  }
+
+  /**
+   * A transition, as black arriving over the whole picture and leaving again.
+   *
+   * Media3 has no cross-dissolve between two items in a sequence, and it does
+   * not need one here: the timeline refuses overlapping clips, so there are
+   * never two pictures to dissolve between. What the desktop draws — and what
+   * the FFmpeg graph renders — is a dip through the black underneath, and a
+   * black overlay whose alpha rises and falls is exactly that.
+   *
+   * A one-pixel bitmap, stretched over the frame by the overlay settings. The
+   * alpha lives in `getOverlaySettings`, which Media3 calls per frame; the
+   * bitmap never changes, which is deliberate — a bitmap that changes size or
+   * disappears is what takes the frame processor down.
+   */
+  private fun dipOverlay(dip: Dip, black: Bitmap): TextureOverlay {
+    val midMs = dip.startMs + dip.durationMs / 2
+
+    return object : BitmapOverlay() {
+      override fun getBitmap(presentationTimeUs: Long): Bitmap = black
+
+      override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings {
+        val ms = presentationTimeUs / 1_000L
+        val halfMs = dip.durationMs / 2f
+        val distance = kotlin.math.abs(ms - midMs)
+        // Total at the midpoint, nothing at either end, nothing outside.
+        val alpha = if (halfMs <= 0f) 0f else max(0f, 1f - distance / halfMs)
+        return StaticOverlaySettings.Builder().setAlphaScale(alpha).build()
+      }
+    }
+  }
+
+  /**
+   * The black an overlay draws, at the size of the frame.
+   *
+   * A one-pixel bitmap scaled by the settings looked like the economical way to
+   * do this and rendered nothing at all: an overlay is placed at its own pixel
+   * size, so one pixel of black over a 1920-wide frame is one pixel of black.
+   * The export finished, the file was the right length, and the cut did not dim
+   * — a failure with nothing in the log to find. Measuring the frame found it.
+   */
+  private fun blackFrame(width: Int, height: Int): Bitmap {
+    val bitmap = Bitmap.createBitmap(max(1, width), max(1, height), Bitmap.Config.ARGB_8888)
+    bitmap.eraseColor(Color.BLACK)
+    return bitmap
+  }
+
   private fun sequenceOf(segments: List<Segment>, frameRate: Int, removeAudio: Boolean): EditedMediaItemSequence? {
     if (segments.isEmpty()) return null
     val builder = EditedMediaItemSequence.Builder()
@@ -285,15 +346,20 @@ class VideoExportModule : Module() {
       sequenceOf(video, frameRate, removeAudio = true),
       sequenceOf(audible, frameRate, removeAudio = false)
     )
-    val composition = Composition.Builder(sequences)
+    // Transitions are composition effects: a dip belongs over the finished
+    // picture rather than inside one of the clips it joins.
+    val dips = dipsOf(request)
+    // One bitmap for every dip: they are all the same black, and a frame-sized
+    // ARGB bitmap is not something to allocate once per cut.
+    val dipOverlays = if (dips.isEmpty()) emptyList() else blackFrame(width, height).let { black -> dips.map { dipOverlay(it, black) } }
+    val compositionEffects = buildList {
       // The plan's width and height are the frame the whole cut is rendered
       // into, so it belongs on the composition rather than on any one item.
-      .setEffects(
-        Effects(
-          emptyList(),
-          listOf(Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT))
-        )
-      )
+      add(Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT))
+      if (dipOverlays.isNotEmpty()) add(OverlayEffect(dipOverlays))
+    }
+    val composition = Composition.Builder(sequences)
+      .setEffects(Effects(emptyList(), compositionEffects))
       .build()
 
     val output = File(hostContext.cacheDir, "openvideo-export-${System.currentTimeMillis()}.mp4")

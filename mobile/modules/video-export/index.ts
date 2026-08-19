@@ -31,6 +31,15 @@ export type NativeExportRequest = {
   /** Bottom layer first. */
   videoSegments: NativeSegment[];
   audioSegments: (NativeSegment & { gain: number })[];
+  /**
+   * Transitions, as black over the finished picture: total at the midpoint,
+   * gone at either end.
+   *
+   * Older builds of the native module ignore a key they do not know, which is
+   * the right way for this to degrade — an export without the dip rather than
+   * no export at all.
+   */
+  dips?: { startMs: number; durationMs: number }[];
 };
 
 export type NativeExportResult = { uri: string; durationMs: number };

@@ -128,7 +128,11 @@ export async function exportTimeline(input: {
       frameRate: plan.frameRate,
       durationMs: plan.durationMs,
       videoSegments: plan.videoSegments.map(withEffects),
-      audioSegments: plan.audioSegments.map((segment) => ({ ...withUri(segment), gain: segment.gain }))
+      audioSegments: plan.audioSegments.map((segment) => ({ ...withUri(segment), gain: segment.gain })),
+      // Transitions, already reduced by the plan to the black they put on the
+      // frame. Forwarded rather than derived here: the bridge dropping what the
+      // plan computed is exactly how the clip effects went missing.
+      dips: plan.dips.map((dip) => ({ startMs: dip.startMs, durationMs: dip.durationMs }))
     });
     return { ok: true, uri: result.uri };
   } catch (error) {
