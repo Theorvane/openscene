@@ -79,6 +79,21 @@ export function buildCompositionPlan(input: {
   readonly frameRate: number;
   /** Ids of assets that are stills; absent means none, as older projects have. */
   readonly stillAssetIds?: ReadonlySet<string>;
+  /**
+   * Ids of assets that carry an audio stream.
+   *
+   * A video clip's own sound is part of the clip, so it is placed like any other
+   * audio — but only when there is some. The plan is a pure function and cannot
+   * open a file to ask, so the caller says, the way it already says which assets
+   * are stills.
+   *
+   * Absent means "do not place any", which is what every project exported before
+   * this did. That is the safe direction: emitting a segment for a silent source
+   * breaks the render outright — FFmpeg's graph fails on a missing `[i:a]`, and
+   * Media3 handed a video-only source with the video removed has nothing left to
+   * encode — whereas omitting one loses sound that was already being lost.
+   */
+  readonly audibleAssetIds?: ReadonlySet<string>;
 }): CompositionPlan {
   const durationMs = timelineDurationMs(input.timeline);
   if (durationMs <= 0) {
@@ -116,6 +131,30 @@ export function buildCompositionPlan(input: {
         });
       }
       videoLayers.push(layer);
+
+      /*
+        A video clip's own sound.
+
+        It used to be dropped: this branch took the video and moved on, so an
+        exported cut was silent unless someone had separately placed an audio
+        clip on an audio track. `effects.volume` has been on every clip the whole
+        time, and the Adjust panel has been offering it, for something that never
+        happened.
+
+        A video track has no mix of its own, so the clip's volume is the whole
+        gain — there is no track fader to fold in.
+      */
+      for (const clip of track.clips) {
+        if (input.audibleAssetIds?.has(clip.assetId) !== true) continue;
+        if (clip.effects.volume <= 0) continue;
+        audioSegments.push({
+          sourceIndex: sourceIndexFor(clip.assetId),
+          timelineStartMs: clip.timelineStartMs,
+          sourceStartMs: clip.sourceStartMs,
+          sourceEndMs: clip.sourceEndMs,
+          gain: clip.effects.volume
+        });
+      }
       continue;
     }
 

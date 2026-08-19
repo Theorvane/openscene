@@ -1,3 +1,6 @@
+import { spawn } from 'node:child_process';
+
+import { audioProbeArgs, probeSaysAudible } from '../shared/audibleAssets';
 import type { ApiResponse } from '../shared/models';
 import { EXPORT_DEFAULTS, type LocalExportJob, type LocalFfmpegRuntimeStatus, type StartExportJobInput } from '../shared/exportTypes';
 import { parseExportJobActionInput, parseStartExportJobInput } from '../shared/exportValidators';
@@ -164,6 +167,36 @@ export class ExportIpcService {
     }
   }
 
+  /**
+   * Asks FFmpeg which of these files actually have sound.
+   *
+   * One invocation per asset that maps the first audio stream and decodes none
+   * of it, so the cost is a process start rather than a decode. Anything that
+   * does not exit cleanly is taken as silent — losing the audio of a file
+   * nothing could read costs a track that was already unreachable, while
+   * guessing the other way costs the export.
+   */
+  private async audibleAssets(
+    executablePath: string,
+    assetPaths: ReadonlyMap<string, string>
+  ): Promise<ReadonlySet<string>> {
+    const audible = new Set<string>();
+    await Promise.all(
+      [...assetPaths].map(
+        async ([assetId, assetPath]) =>
+          new Promise<void>((resolve) => {
+            const probe = spawn(executablePath, [...audioProbeArgs(assetPath)], { stdio: 'ignore' });
+            probe.on('error', () => resolve());
+            probe.on('close', (code) => {
+              if (probeSaysAudible(code)) audible.add(assetId);
+              resolve();
+            });
+          })
+      )
+    );
+    return audible;
+  }
+
   private async prepareExport(input: PrepareExportInput): Promise<PreparedExport> {
     const outputPath = await prepareExportOutputPath(this.dependencies.exportsRoot, input.jobId);
     let staged: StagedExportAssets | null = null;
@@ -183,6 +216,14 @@ export class ExportIpcService {
         stillAssetIds: new Set(
           input.project.assets.filter((asset) => asset.kind === 'image').map((asset) => asset.id)
         ),
+        // Which assets have sound of their own. A video clip's audio used to be
+        // dropped entirely, so a cut came out silent unless somebody had
+        // separately placed an audio clip.
+        //
+        // Probed rather than assumed from the kind: a silent recording is an
+        // ordinary thing to have on a timeline, and `[i:a:0]` on a source with
+        // no audio stream fails the whole graph.
+        audibleAssetIds: await this.audibleAssets(input.executablePath, staged.assetPaths),
         outputPath,
         ...this.outputDimensions(input.request, input.project),
         frameRate: input.request.frameRate ?? EXPORT_DEFAULTS.frameRate

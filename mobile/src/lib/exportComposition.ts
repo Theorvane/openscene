@@ -49,6 +49,13 @@ export async function exportTimeline(input: {
       // The plan is built from the timeline, which does not record what an asset
       // is. Without this the native renderer opens a still as a movie.
       stillAssetIds: new Set(input.assets.filter((asset) => asset.kind === 'image').map((asset) => asset.id)),
+      // A video clip's own sound, which used to be dropped: a cut came out
+      // silent unless someone had separately placed an audio clip.
+      //
+      // This is a kind, and a video can perfectly well be silent — so it is a
+      // proposal rather than a fact. The native renderer checks each file before
+      // using its audio, which is the only place the answer actually lives.
+      audibleAssetIds: new Set(input.assets.filter((asset) => asset.kind !== 'image').map((asset) => asset.id)),
       width: input.width ?? 1920,
       height: input.height ?? 1080,
       frameRate: input.frameRate ?? 30

@@ -20,6 +20,18 @@ export type CompileFfmpegTimelineInput = {
    * written before stills existed means.
    */
   readonly stillAssetIds?: ReadonlySet<string>;
+  /**
+   * Ids of assets that carry an audio stream.
+   *
+   * A video clip's own sound is part of the clip and is placed like any other
+   * audio — but only where there is some. `[i:a:0]` on a source without an audio
+   * stream fails the whole graph, and a still never has one, so a clip whose
+   * asset is not named here contributes picture only.
+   *
+   * Absent means none, which is what every export before this did: a cut came
+   * out silent unless somebody had separately placed an audio clip.
+   */
+  readonly audibleAssetIds?: ReadonlySet<string>;
   readonly outputPath: string;
   readonly width: number;
   readonly height: number;
@@ -62,6 +74,28 @@ function videoFilter(clip: PersistedTimelineClip, inputIndex: number, outputLabe
   ].join(',');
 }
 
+/**
+ * A video clip's own sound, which has no track fader behind it.
+ *
+ * An audio track carries a mix — gain, pan, mute — and a video track does not,
+ * so the clip's own volume is the whole story. Written as its own function
+ * rather than a null-check inside the other, because "there is no mix" is a
+ * different fact from "the mix is neutral".
+ */
+function clipOnlyGain(clip: PersistedTimelineClip): number {
+  return Number(clip.effects.volume.toFixed(8));
+}
+
+function videoAudioFilter(clip: PersistedTimelineClip, inputIndex: number, outputLabel: string): string {
+  return [
+    `[${inputIndex}:a:0]atrim=start=${seconds(clip.sourceStartMs)}:end=${seconds(clip.sourceEndMs)}`,
+    'asetpts=PTS-STARTPTS',
+    `volume=${clipOnlyGain(clip)}`,
+    'aformat=channel_layouts=stereo',
+    `adelay=${clip.timelineStartMs}:all=1[${outputLabel}]`
+  ].join(',');
+}
+
 function trackGain(track: AudioTimelineTrack, clip: PersistedTimelineClip): number {
   if (track.mix.muted) {
     return 0;
@@ -97,6 +131,8 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
   const filters: string[] = [];
   const videoClips: Array<{ readonly clip: PersistedTimelineClip; readonly inputIndex: number }> = [];
   const audioClips: Array<{ readonly track: AudioTimelineTrack; readonly clip: PersistedTimelineClip; readonly inputIndex: number }> = [];
+  /** Video clips that carry sound of their own; see `audibleAssetIds`. */
+  const videoAudioClips: Array<{ readonly clip: PersistedTimelineClip; readonly inputIndex: number }> = [];
   let inputIndex = 0;
   // Inputs are declared in timeline order so -i indexes stay stable and
   // predictable; layer order is decided separately, below.
@@ -113,6 +149,11 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
       if (track.kind === 'video') {
         if (clip.effects.opacity > 0 && clip.effects.scale > 0) {
           layer.push({ clip, inputIndex });
+        }
+        // Sound is placed whatever the picture is doing: a clip faded to nothing
+        // still carries its voice, which is how a cutaway works.
+        if (input.audibleAssetIds?.has(clip.assetId) === true && clip.effects.volume > 0) {
+          videoAudioClips.push({ clip, inputIndex });
         }
       } else {
         audioClips.push({ track, clip, inputIndex });
@@ -149,6 +190,11 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
   audioClips.forEach(({ track, clip, inputIndex: clipInputIndex }, index) => {
     const label = `audio-clip-${index}`;
     filters.push(audioFilter(track, clip, clipInputIndex, label));
+    audioLabels.push(`[${label}]`);
+  });
+  videoAudioClips.forEach(({ clip, inputIndex: clipInputIndex }, index) => {
+    const label = `video-audio-${index}`;
+    filters.push(videoAudioFilter(clip, clipInputIndex, label));
     audioLabels.push(`[${label}]`);
   });
   if (audioLabels.length > 0) {

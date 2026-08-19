@@ -122,6 +122,32 @@ class VideoExportModule : Module() {
 
   private fun ms(value: Any?): Long = ((value as? Number)?.toDouble() ?: 0.0).roundToLong()
 
+  /**
+   * Whether a source actually has sound, asked of the file rather than believed.
+   *
+   * The caller says which assets it thinks are audible, but it is working from a
+   * kind — "this is a video" — and a video can perfectly well be silent. Handing
+   * Media3 a source with no audio track and asking it to keep only the audio
+   * leaves nothing to encode, so the renderer checks the one thing it can check
+   * directly. A file it cannot open is treated as silent, which loses sound that
+   * was already unreachable rather than failing the export.
+   */
+  private fun hasAudio(uri: String): Boolean {
+    val retriever = MediaMetadataRetriever()
+    return try {
+      retriever.setDataSource(hostContext, normalise(uri))
+      retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) == "yes"
+    } catch (error: Exception) {
+      false
+    } finally {
+      try {
+        retriever.release()
+      } catch (error: Exception) {
+        // Nothing to release, or already gone.
+      }
+    }
+  }
+
   /** Absent means "leave it alone" rather than zero, which would erase the clip. */
   private fun num(value: Any?, fallback: Float): Float = (value as? Number)?.toFloat() ?: fallback
 
@@ -253,9 +279,11 @@ class VideoExportModule : Module() {
       )
     }
 
+    // Checked against the files, not against what the caller believed.
+    val audible = audio.filter { hasAudio(it.uri) }
     val sequences = listOfNotNull(
       sequenceOf(video, frameRate, removeAudio = true),
-      sequenceOf(audio, frameRate, removeAudio = false)
+      sequenceOf(audible, frameRate, removeAudio = false)
     )
     val composition = Composition.Builder(sequences)
       // The plan's width and height are the frame the whole cut is rendered
