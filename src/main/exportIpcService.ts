@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
+import { access } from 'node:fs/promises';
 
 import { audioProbeArgs, probeSaysAudible } from '../shared/audibleAssets';
+import { FILTER_LIST_ARGS, escapeFontPath, fontCandidates, supportsDrawtext } from '../shared/titleFont';
 import type { ApiResponse } from '../shared/models';
 import { EXPORT_DEFAULTS, type LocalExportJob, type LocalFfmpegRuntimeStatus, type StartExportJobInput } from '../shared/exportTypes';
 import { parseExportJobActionInput, parseStartExportJobInput } from '../shared/exportValidators';
@@ -197,6 +199,40 @@ export class ExportIpcService {
     return audible;
   }
 
+  /**
+   * A font `drawtext` can use, or a refusal that names what is missing.
+   *
+   * Two things have to hold and neither is guaranteed by an FFmpeg the user
+   * supplied: the build has to carry libfreetype, and the machine has to have a
+   * font where one is expected. Saying which of the two failed is the difference
+   * between a fixable message and a mysterious export.
+   */
+  private async titleFont(executablePath: string): Promise<string> {
+    const filters = await new Promise<string>((resolve) => {
+      let listing = '';
+      const probe = spawn(executablePath, [...FILTER_LIST_ARGS]);
+      probe.stdout?.on('data', (chunk: Buffer) => {
+        listing += chunk.toString();
+      });
+      probe.on('error', () => resolve(''));
+      probe.on('close', () => resolve(listing));
+    });
+    if (!supportsDrawtext(filters)) {
+      throw new ExportAssetStagingError(
+        'This FFmpeg build cannot draw text — it was compiled without libfreetype, so titles cannot be rendered.'
+      );
+    }
+    for (const candidate of fontCandidates(process.platform)) {
+      try {
+        await access(candidate);
+        return escapeFontPath(candidate);
+      } catch {
+        // Try the next one; a machine without this face is ordinary.
+      }
+    }
+    throw new ExportAssetStagingError('No font could be found on this machine to draw titles with.');
+  }
+
   private async prepareExport(input: PrepareExportInput): Promise<PreparedExport> {
     const outputPath = await prepareExportOutputPath(this.dependencies.exportsRoot, input.jobId);
     let staged: StagedExportAssets | null = null;
@@ -224,6 +260,11 @@ export class ExportIpcService {
         // ordinary thing to have on a timeline, and `[i:a:0]` on a source with
         // no audio stream fails the whole graph.
         audibleAssetIds: await this.audibleAssets(input.executablePath, staged.assetPaths),
+        // Only looked for when there is something to draw: an export with no
+        // titles must not fail because the machine has an unusual font layout.
+        ...((input.project.timeline.titles ?? []).length > 0
+          ? { titleFontPath: await this.titleFont(input.executablePath) }
+          : {}),
         outputPath,
         ...this.outputDimensions(input.request, input.project),
         frameRate: input.request.frameRate ?? EXPORT_DEFAULTS.frameRate

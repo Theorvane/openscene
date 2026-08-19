@@ -137,7 +137,18 @@ export async function exportTimeline(input: {
       // Transitions, already reduced by the plan to the black they put on the
       // frame. Forwarded rather than derived here: the bridge dropping what the
       // plan computed is exactly how the clip effects went missing.
-      dips: plan.dips.map((dip) => ({ startMs: dip.startMs, durationMs: dip.durationMs }))
+      dips: plan.dips.map((dip) => ({ startMs: dip.startMs, durationMs: dip.durationMs })),
+      // Words over the finished picture. Already in output-frame pixels and
+      // timeline milliseconds, so there is nothing to convert.
+      titles: plan.titles.map((title) => ({
+        text: title.text,
+        timelineStartMs: title.timelineStartMs,
+        timelineEndMs: title.timelineEndMs,
+        sizePx: title.sizePx,
+        color: title.color,
+        positionX: title.positionX,
+        positionY: title.positionY
+      }))
     });
     return { ok: true, uri: result.uri };
   } catch (error) {

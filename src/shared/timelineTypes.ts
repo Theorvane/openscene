@@ -144,10 +144,48 @@ export type AudioTimelineTrack = TimelineTrackBase & {
 
 export type TimelineTrack = VideoTimelineTrack | AudioTimelineTrack;
 
+/**
+ * Words on the picture.
+ *
+ * A title is not an asset — there is no file to import — so it does not fit the
+ * clip model, which is a range of a source. It belongs to the document: what it
+ * says, when it says it, and where.
+ *
+ * The geometry is in output-frame pixels rather than fractions, matching
+ * `ClipEffects.positionX/Y`, so a title placed against a 1920-wide render means
+ * the same distance to every renderer. `positionX/Y` are offsets from the centre
+ * of the frame, which is where a title sits when nobody has moved it.
+ */
+export type TimelineTitle = {
+  readonly id: string;
+  readonly text: string;
+  readonly timelineStartMs: number;
+  readonly timelineEndMs: number;
+  /** Cap height in output-frame pixels. */
+  readonly sizePx: number;
+  /** `#rrggbb`. Validators refuse anything else, because every renderer parses it differently. */
+  readonly color: string;
+  readonly positionX: number;
+  readonly positionY: number;
+};
+
+export const DEFAULT_TITLE: Omit<TimelineTitle, 'id' | 'timelineStartMs' | 'timelineEndMs'> = {
+  text: 'Title',
+  sizePx: 72,
+  color: '#ffffff',
+  positionX: 0,
+  positionY: 0
+};
+
 export type TimelineDocument = {
   readonly schemaVersion: typeof TIMELINE_SCHEMA_VERSION;
   readonly tracks: readonly TimelineTrack[];
   readonly transitions: readonly TransitionDescriptor[];
+  /**
+   * Optional, because every project written before titles existed has none and
+   * must still open. Absent and empty mean the same thing.
+   */
+  readonly titles?: readonly TimelineTitle[];
 };
 
 export type LocalProjectSnapshot = {

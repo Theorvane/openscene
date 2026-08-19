@@ -1,7 +1,7 @@
 import { timelineDurationMs } from './timelineLogic';
 import { cuts, transitionForCut } from './timelineTransitionLogic';
 import { clipSpeed } from './timelineClipGeometry';
-import type { TimelineDocument } from './timelineTypes';
+import type { TimelineDocument, TimelineTitle } from './timelineTypes';
 
 /**
  * A platform-neutral description of what a timeline renders to.
@@ -80,6 +80,14 @@ export type CompositionPlan = {
    * renderers the same conclusion instead of making each of them derive it.
    */
   readonly dips: readonly CompositionDip[];
+  /**
+   * Words drawn over the finished picture.
+   *
+   * Passed through rather than transformed: a title is already expressed in
+   * output-frame pixels and timeline milliseconds, which is what every renderer
+   * wants, so there is nothing for the plan to decide.
+   */
+  readonly titles: readonly TimelineTitle[];
 };
 
 export type CompositionDip = {
@@ -224,6 +232,7 @@ export function buildCompositionPlan(input: {
     // top track on top.
     videoSegments: [...videoLayers].reverse().flat(),
     audioSegments,
-    dips: dipsFor(input.timeline)
+    dips: dipsFor(input.timeline),
+    titles: input.timeline.titles ?? []
   };
 }

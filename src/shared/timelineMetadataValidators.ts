@@ -11,6 +11,7 @@ import type {
   PersistedTimelineClip,
   TimelineTrack,
   TransitionDescriptor,
+  TimelineTitle,
   TransitionType
 } from './timelineTypes';
 import { TIMELINE_VALIDATION_LIMITS, getOpaqueId, hasAllowedKeys, isPlainRecord, isUnknownArray } from './timelineValidationPrimitives';
@@ -132,4 +133,48 @@ export function parseTransitions(value: unknown, tracks: readonly TimelineTrack[
   }
   transitions.sort((left, right) => left.fromClipId.localeCompare(right.fromClipId) || left.toClipId.localeCompare(right.toClipId));
   return transitionsAreValid(transitions, tracks) ? transitions : null;
+}
+
+/** `#rrggbb` only: every renderer parses a colour differently, and a shared document cannot afford that. */
+function isHexColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
+/**
+ * Titles, or nothing if any one of them is malformed.
+ *
+ * Absent is the same as none: every project written before titles existed has no
+ * such key and must still open rather than be reported as corrupt. One bad title
+ * rejects the document, the way one bad clip does — a half-read timeline is
+ * worse than a refused one, because the half that survived gets written back
+ * over the whole.
+ */
+export function parseTitles(value: unknown): readonly TimelineTitle[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return null;
+  const titles: TimelineTitle[] = [];
+  for (const candidate of value) {
+    if (typeof candidate !== 'object' || candidate === null) return null;
+    const title = candidate as Partial<TimelineTitle>;
+    if (typeof title.id !== 'string' || title.id.length === 0) return null;
+    if (typeof title.text !== 'string') return null;
+    if (!Number.isFinite(title.timelineStartMs) || Number(title.timelineStartMs) < 0) return null;
+    if (!Number.isFinite(title.timelineEndMs)) return null;
+    // A title with no length is not a title; it is a value nothing can render.
+    if (Number(title.timelineEndMs) <= Number(title.timelineStartMs)) return null;
+    if (!Number.isFinite(title.sizePx) || Number(title.sizePx) <= 0) return null;
+    if (!Number.isFinite(title.positionX) || !Number.isFinite(title.positionY)) return null;
+    if (!isHexColor(title.color)) return null;
+    titles.push({
+      id: title.id,
+      text: title.text,
+      timelineStartMs: Number(title.timelineStartMs),
+      timelineEndMs: Number(title.timelineEndMs),
+      sizePx: Number(title.sizePx),
+      color: title.color,
+      positionX: Number(title.positionX),
+      positionY: Number(title.positionY)
+    });
+  }
+  return titles;
 }

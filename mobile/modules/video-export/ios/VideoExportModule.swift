@@ -32,6 +32,35 @@ struct SegmentInput: Record {
 struct DipInput: Record {
   @Field var startMs: Double = 0
   @Field var durationMs: Double = 0
+struct TitleInput: Record {
+  @Field var text: String = ""
+  @Field var timelineStartMs: Double = 0
+  @Field var timelineEndMs: Double = 0
+  @Field var sizePx: Double = 72
+  /// `#rrggbb`.
+  @Field var color: String = "#ffffff"
+  @Field var positionX: Double = 0
+  @Field var positionY: Double = 0
+}
+
+/**
+ A `#rrggbb` string as a colour, falling back to white.
+
+ A title in the wrong colour is a visible, fixable mistake; a refused export over
+ one is not.
+ */
+private func parseHexColor(_ value: String) -> CGColor {
+  var hex = value
+  if hex.hasPrefix("#") { hex.removeFirst() }
+  guard hex.count == 6, let rgb = UInt32(hex, radix: 16) else {
+    return UIColor.white.cgColor
+  }
+  return UIColor(
+    red: CGFloat((rgb >> 16) & 0xff) / 255,
+    green: CGFloat((rgb >> 8) & 0xff) / 255,
+    blue: CGFloat(rgb & 0xff) / 255,
+    alpha: 1
+  ).cgColor
 }
 
 struct ExportRequest: Record {
@@ -42,6 +71,7 @@ struct ExportRequest: Record {
   @Field var videoSegments: [SegmentInput] = []
   @Field var audioSegments: [SegmentInput] = []
   @Field var dips: [DipInput] = []
+  @Field var titles: [TitleInput] = []
 }
 
 private func time(_ milliseconds: Double) -> CMTime {
@@ -257,6 +287,58 @@ public final class VideoExportModule: Module {
     videoComposition.renderSize = renderSize
     videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(1, request.frameRate)))
     videoComposition.instructions = [instruction]
+
+    /*
+     Titles, over the finished picture.
+
+     Core Animation is how AVFoundation draws anything that is not a track, and a
+     layer that is not in the tree for the whole composition needs its own
+     timing: `beginTime` and `duration` on the layer, with the animation clock
+     told not to run, so it appears exactly for its range and holds still.
+
+     `AVCoreAnimationBeginTimeAtZero` rather than zero, because a Core Animation
+     `beginTime` of zero means "now" and would place every title at the start.
+     */
+    if !request.titles.isEmpty {
+      let parent = CALayer()
+      parent.frame = CGRect(origin: .zero, size: renderSize)
+      let videoLayer = CALayer()
+      videoLayer.frame = parent.frame
+      parent.addSublayer(videoLayer)
+
+      for title in request.titles where !title.text.isEmpty && title.timelineEndMs > title.timelineStartMs {
+        let text = CATextLayer()
+        text.string = title.text
+        text.fontSize = CGFloat(title.sizePx)
+        text.foregroundColor = parseHexColor(title.color)
+        text.alignmentMode = .center
+        text.isWrapped = true
+        text.contentsScale = 1
+        // Centred, then offset, the way every other placement in the plan works.
+        // Core Animation's y grows upward and the plan's grows downward.
+        let height = CGFloat(title.sizePx) * 1.6
+        text.frame = CGRect(
+          x: 0,
+          y: renderSize.height / 2 - height / 2 - CGFloat(title.positionY),
+          width: renderSize.width,
+          height: height
+        )
+        text.position = CGPoint(x: renderSize.width / 2 + CGFloat(title.positionX), y: text.position.y)
+
+        text.beginTime = AVCoreAnimationBeginTimeAtZero + title.timelineStartMs / 1000
+        text.duration = (title.timelineEndMs - title.timelineStartMs) / 1000
+        text.isHidden = false
+        text.speed = 0
+        text.timeOffset = 0
+        text.fillMode = .both
+        parent.addSublayer(text)
+      }
+
+      videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
+        postProcessingAsVideoLayer: videoLayer,
+        in: parent
+      )
+    }
 
     let output = FileManager.default.temporaryDirectory
       .appendingPathComponent("openvideo-export-\(Int(Date().timeIntervalSince1970)).mp4")

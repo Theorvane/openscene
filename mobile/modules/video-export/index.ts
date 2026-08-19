@@ -40,6 +40,25 @@ export type NativeExportRequest = {
    * no export at all.
    */
   dips?: { startMs: number; durationMs: number }[];
+  /**
+   * Words over the finished picture.
+   *
+   * Geometry is in output-frame pixels measured from the centre, the same
+   * convention a clip's `offsetX/Y` uses, so a number means the same distance
+   * whichever renderer draws it.
+   */
+  titles: NativeTitle[];
+};
+
+export type NativeTitle = {
+  text: string;
+  timelineStartMs: number;
+  timelineEndMs: number;
+  sizePx: number;
+  /** `#rrggbb`. */
+  color: string;
+  positionX: number;
+  positionY: number;
 };
 
 export type NativeExportResult = { uri: string; durationMs: number };

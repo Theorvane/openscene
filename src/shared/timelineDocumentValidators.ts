@@ -1,6 +1,6 @@
 import { clipTimelineEndMs } from './timelineClipGeometry';
 import { parseTimelineClip, parseTimelineClipV1, parseTimelineClipV2 } from './timelineClipValidators';
-import { parseAudioTrackMix, parseTransitions } from './timelineMetadataValidators';
+import { parseAudioTrackMix, parseTitles, parseTransitions } from './timelineMetadataValidators';
 import type { MediaKind, PersistedTimelineClip, TimelineDocument, TimelineTrack } from './timelineTypes';
 import { DEFAULT_AUDIO_TRACK_MIX, TIMELINE_SCHEMA_VERSION } from './timelineTypes';
 import {
@@ -88,7 +88,10 @@ function parseDocument(
   schemaVersion: number,
   parseTrackValue: (track: unknown) => TimelineTrack | null
 ): TimelineDocument | null {
-  const allowedKeys = schemaVersion === TIMELINE_SCHEMA_VERSION ? ['schemaVersion', 'tracks', 'transitions'] : ['schemaVersion', 'tracks'];
+  const allowedKeys =
+    schemaVersion === TIMELINE_SCHEMA_VERSION
+      ? ['schemaVersion', 'tracks', 'transitions', 'titles']
+      : ['schemaVersion', 'tracks'];
   if (!isPlainRecord(value) || !hasAllowedKeys(value, allowedKeys) || value.schemaVersion !== schemaVersion) return null;
   const rawTracks = value.tracks;
   if (!isUnknownArray(rawTracks) || rawTracks.length > TIMELINE_VALIDATION_LIMITS.tracks) return null;
@@ -109,7 +112,18 @@ function parseDocument(
     tracks.push(track);
   }
   const transitions = schemaVersion === TIMELINE_SCHEMA_VERSION ? parseTransitions(value.transitions, tracks) : [];
-  return transitions === null ? null : { schemaVersion: TIMELINE_SCHEMA_VERSION, tracks, transitions };
+  if (transitions === null) return null;
+  // Absent is the same as none: every project written before titles existed has
+  // no such key, and must still open rather than be reported as corrupt.
+  const titles = schemaVersion === TIMELINE_SCHEMA_VERSION ? parseTitles(value.titles) : [];
+  if (titles === null) return null;
+  // The key is left off when there is nothing in it, so a document that had no
+  // titles is written back exactly as it came: absent and empty already mean the
+  // same thing to every reader, and inventing the key would rewrite files that
+  // did not change.
+  return titles.length === 0
+    ? { schemaVersion: TIMELINE_SCHEMA_VERSION, tracks, transitions }
+    : { schemaVersion: TIMELINE_SCHEMA_VERSION, tracks, transitions, titles };
 }
 
 export function parseTimelineDocument(value: unknown): TimelineDocument | null {

@@ -6,7 +6,13 @@
  */
 import { timelineDurationMs } from './timelineLogic';
 import { clipSourceSpanMs, clipSpeed, clipTimelineEndMs } from './timelineClipGeometry';
-import type { AudioTimelineTrack, PersistedTimelineClip, TimelineDocument, TransitionDescriptor } from './timelineTypes';
+import type {
+  AudioTimelineTrack,
+  PersistedTimelineClip,
+  TimelineDocument,
+  TimelineTitle,
+  TransitionDescriptor
+} from './timelineTypes';
 
 export type CompileFfmpegTimelineInput = {
   readonly timeline: TimelineDocument;
@@ -33,6 +39,14 @@ export type CompileFfmpegTimelineInput = {
    * out silent unless somebody had separately placed an audio clip.
    */
   readonly audibleAssetIds?: ReadonlySet<string>;
+  /**
+   * A font file for `drawtext`, which cannot draw without one.
+   *
+   * The desktop renders with whichever FFmpeg the user has, so neither the
+   * filter nor a font is guaranteed. Absent with titles present is refused by
+   * name rather than discovered as a failed export.
+   */
+  readonly titleFontPath?: string;
   readonly outputPath: string;
   readonly width: number;
   readonly height: number;
@@ -210,6 +224,38 @@ function dipToBlackFilters(
   ];
 }
 
+/**
+ * Escapes a string for `drawtext`'s `text=` option.
+ *
+ * The filter graph is one string, so a colon ends an option, a backslash escapes
+ * and a single quote ends the quoting — a title containing any of them would
+ * otherwise rewrite the command rather than appear in the picture.
+ */
+export function escapeDrawtext(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/:/g, '\\:')
+    .replace(/'/g, "\\'")
+    .replace(/%/g, '\\%')
+    .replace(/\n/g, ' ');
+}
+
+function titleFilter(title: TimelineTitle, fontPath: string, inputLabel: string, outputLabel: string): string {
+  // Centred, then offset — the same convention `overlay` uses for a clip, so a
+  // number means the same distance wherever it is applied.
+  const x = `(w-text_w)/2+${Math.round(title.positionX)}`;
+  const y = `(h-text_h)/2+${Math.round(title.positionY)}`;
+  return [
+    `[${inputLabel}]drawtext=fontfile='${fontPath}'`,
+    `text='${escapeDrawtext(title.text)}'`,
+    `fontsize=${Math.round(title.sizePx)}`,
+    `fontcolor=${title.color}`,
+    `x=${x}`,
+    `y=${y}`,
+    `enable='between(t,${seconds(title.timelineStartMs)},${seconds(title.timelineEndMs)})'[${outputLabel}]`
+  ].join(':');
+}
+
 function trackGain(track: AudioTimelineTrack, clip: PersistedTimelineClip): number {
   if (track.mix.muted) {
     return 0;
@@ -315,6 +361,25 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
     );
     currentVideoLabel = nextLabel;
   });
+  /*
+    Titles last, over everything.
+
+    They are drawn after the clip overlays because a title belongs on top of the
+    picture rather than in it — a caption under a cutaway is still a caption.
+  */
+  const titles = input.timeline.titles ?? [];
+  if (titles.length > 0) {
+    if (input.titleFontPath === undefined || input.titleFontPath.length === 0) {
+      throw new FfmpegTimelineError(
+        'This timeline has titles, and no font was supplied to draw them with.'
+      );
+    }
+    titles.forEach((title, index) => {
+      const next = `title-${index}`;
+      filters.push(titleFilter(title, input.titleFontPath as string, currentVideoLabel, next));
+      currentVideoLabel = next;
+    });
+  }
 
   filters.push(`[${currentVideoLabel}]format=yuv420p[video-out]`);
 
