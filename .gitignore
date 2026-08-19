@@ -19,3 +19,9 @@ pnpm-debug.log*
 window-loom*.png
 video-qa*.png
 *-snapshot.md
+
+# `ffmpeg -report` writes one of these into the working directory, named for the
+# machine and the minute. One reached a pull request as a committed file, which
+# is how this line came to exist: a measurement is worth keeping as an assertion
+# or a written result, never as somebody's verbose runtime output.
+ffmpeg-*.log
