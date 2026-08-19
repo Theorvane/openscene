@@ -1,28 +1,29 @@
 import { useMemo, useRef } from 'react';
-import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 
 import type { PersistedTimelineClip } from '@openvideo/shared/timelineTypes';
+import { handleWidthFor, MIN_CLIP_WIDTH } from '../lib/timelineHandles';
 import { theme } from '../lib/theme';
 
 /**
  * A clip you drag, rather than nudge.
  *
- * The handles are 22pt wide — under a fingertip, a 4px edge like the desktop's
- * is unhittable, and a miss trims when the user meant to move. Everything is
- * previewed with a transform and committed once on release: the shared rules can
- * reject an intermediate position mid-drag, and re-rendering the document at
- * finger rate would fight the gesture.
+ * The gesture is declared to the gesture handler rather than negotiated through
+ * `PanResponder`, because the two answers were not the same twice. Inside a
+ * horizontal `ScrollView`, the responder system and Android's native scroll
+ * interception each decided who won the drag, and the outcome varied between
+ * identical gestures: one drag moved the clip, the next scrolled the timeline
+ * and left the clip alone. In an editor that is fatal — a drag meant to trim
+ * scrolls the view, and a drag meant to scroll edits the cut.
  *
- * Only a *selected* clip takes the gesture. The timeline scrolls horizontally and
- * so do these drags, so one of them has to yield: if clips always claimed the
- * touch, a timeline wider than the screen could not be scrolled by dragging over
- * the very clips that fill it. Tap to select, then drag — and the capture phase
- * is used, because otherwise the enclosing ScrollView claims the pan first and
- * the clip never sees it.
+ * `blocksExternalGesture` states the precedence once: while this pan is active,
+ * the scroller does not move. Nothing is left to arbitration.
+ *
+ * Everything is previewed with a transform and committed once on release: the
+ * shared rules can reject an intermediate position mid-drag, and re-rendering
+ * the document at finger rate would fight the gesture.
  */
-
-const HANDLE_WIDTH = 22;
-const MIN_WIDTH = 26;
 
 export function TimelineClip({
   clip,
@@ -30,6 +31,7 @@ export function TimelineClip({
   kind,
   selected,
   pxPerMs,
+  scrollGesture,
   onSelect,
   onMove,
   onTrim,
@@ -40,6 +42,8 @@ export function TimelineClip({
   readonly kind: 'video' | 'audio';
   readonly selected: boolean;
   readonly pxPerMs: number;
+  /** The lane scroller's gesture, so a drag on a clip can state that it outranks scrolling. */
+  readonly scrollGesture: GestureType;
   readonly onSelect: () => void;
   readonly onMove: (timelineStartMs: number) => void;
   readonly onTrim: (edge: 'left' | 'right', timelineMs: number) => void;
@@ -47,87 +51,86 @@ export function TimelineClip({
   readonly onDragStateChange: (dragging: boolean) => void;
 }) {
   const lengthMs = clip.sourceEndMs - clip.sourceStartMs;
-  const width = Math.max(MIN_WIDTH, lengthMs * pxPerMs);
+  const width = Math.max(MIN_CLIP_WIDTH, lengthMs * pxPerMs);
+  const handle = handleWidthFor(width);
 
-  // Transforms during the gesture; the document is the source of truth again the
-  // moment the finger lifts.
-  const dragX = useRef(new Animated.Value(0)).current;
-  const trimLeft = useRef(new Animated.Value(0)).current;
-  const trimRight = useRef(new Animated.Value(0)).current;
-  const gesture = useRef<'move' | 'left' | 'right'>('move');
+  /*
+    Plain `Animated`, driven from the gesture's callbacks.
 
-  // Recreated when selection changes, because the responder callbacks close over
-  // it and a stale closure would keep refusing the gesture after a tap.
-  const responder = useMemo(
+    Without Reanimated installed the gesture handler runs its callbacks on the JS
+    thread, which is where these values live anyway — and a second native
+    dependency for a preview transform is not a trade worth making.
+  */
+  const offset = useRef(new Animated.Value(0)).current;
+  const stretch = useRef(new Animated.Value(0)).current;
+  const edge = useRef<'move' | 'left' | 'right'>('move');
+
+  const tap = useMemo(() => Gesture.Tap().onEnd(() => onSelect()), [onSelect]);
+
+  const pan = useMemo(
     () =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => selected,
-      // A tap must stay a tap: selection is the common action, so a gesture only
-      // becomes a drag once it has clearly travelled.
-      onMoveShouldSetPanResponder: (_event, state) => selected && Math.abs(state.dx) > 4,
-      onMoveShouldSetPanResponderCapture: (_event, state) => selected && Math.abs(state.dx) > 4,
-      onPanResponderGrant: (event) => {
-        onSelect();
-        onDragStateChange(true);
-        const x = event.nativeEvent.locationX;
-        const currentWidth = Math.max(MIN_WIDTH, (clip.sourceEndMs - clip.sourceStartMs) * pxPerMs);
-        gesture.current = x < HANDLE_WIDTH ? 'left' : x > currentWidth - HANDLE_WIDTH ? 'right' : 'move';
-      },
-      onPanResponderMove: (_event, state) => {
-        if (gesture.current === 'move') dragX.setValue(state.dx);
-        else if (gesture.current === 'left') trimLeft.setValue(state.dx);
-        else trimRight.setValue(state.dx);
-      },
-      onPanResponderRelease: (_event, state) => {
-        onDragStateChange(false);
-        const deltaMs = state.dx / pxPerMs;
-        dragX.setValue(0);
-        trimLeft.setValue(0);
-        trimRight.setValue(0);
-        if (Math.abs(state.dx) < 4) return;
-        if (gesture.current === 'move') onMove(clip.timelineStartMs + deltaMs);
-        else if (gesture.current === 'left') onTrim('left', clip.timelineStartMs + deltaMs);
-        else onTrim('right', clip.timelineStartMs + lengthMs + deltaMs);
-      },
-      onPanResponderTerminate: () => {
-        onDragStateChange(false);
-        dragX.setValue(0);
-        trimLeft.setValue(0);
-        trimRight.setValue(0);
-      }
-    }),
-    [selected, pxPerMs, clip, lengthMs, onSelect, onMove, onTrim, onDragStateChange, dragX, trimLeft, trimRight]
+      Gesture.Pan()
+        // Only a selected clip takes the drag. The timeline scrolls sideways and
+        // so do these drags, so tap to select is what says which one is meant.
+        .enabled(selected)
+        .blocksExternalGesture(scrollGesture)
+        // A tap must stay a tap: selection is the common action, so a gesture
+        // only becomes a drag once it has clearly travelled.
+        .activeOffsetX([-6, 6])
+        .runOnJS(true)
+        .onBegin((event) => {
+          edge.current = event.x < handle ? 'left' : event.x > width - handle ? 'right' : 'move';
+          onDragStateChange(true);
+        })
+        .onUpdate((event) => {
+          if (edge.current === 'move') offset.setValue(event.translationX);
+          else stretch.setValue(event.translationX);
+        })
+        .onEnd((event) => {
+          const deltaMs = event.translationX / pxPerMs;
+          if (edge.current === 'move') onMove(clip.timelineStartMs + deltaMs);
+          else if (edge.current === 'left') onTrim('left', clip.timelineStartMs + deltaMs);
+          else onTrim('right', clip.timelineStartMs + lengthMs + deltaMs);
+        })
+        .onFinalize(() => {
+          offset.setValue(0);
+          stretch.setValue(0);
+          onDragStateChange(false);
+        }),
+    [selected, scrollGesture, handle, width, pxPerMs, clip.timelineStartMs, lengthMs, onMove, onTrim, onDragStateChange, edge, offset, stretch]
   );
 
+  const gesture = useMemo(() => Gesture.Race(pan, tap), [pan, tap]);
+
+  // A left trim moves the visible edge; a right trim only changes the width, so
+  // the preview transform is the same either way and the commit differs.
+  const animated = { transform: [{ translateX: Animated.add(offset, stretch) }] };
+
   return (
-    <Animated.View
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${label}, ${(lengthMs / 1000).toFixed(1)} seconds`}
-      {...responder.panHandlers}
-      style={[
-        styles.clip,
-        {
-          left: clip.timelineStartMs * pxPerMs,
-          width,
-          transform: [{ translateX: Animated.add(dragX, trimLeft) }],
-          opacity: Math.max(0.35, clip.effects.opacity)
-        },
-        kind === 'audio' && styles.audio,
-        selected && styles.selected
-      ]}
-    >
-      <Text style={styles.label} numberOfLines={1}>
-        {label}
-      </Text>
-      {selected && (
-        <>
-          <View style={styles.handleLeft} pointerEvents="none" />
-          <View style={styles.handleRight} pointerEvents="none" />
-        </>
-      )}
-    </Animated.View>
+    <GestureDetector gesture={gesture}>
+      <Animated.View
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={`${label}, ${(lengthMs / 1000).toFixed(1)} seconds`}
+        style={[
+          styles.clip,
+          { left: clip.timelineStartMs * pxPerMs, width, opacity: Math.max(0.35, clip.effects.opacity) },
+          kind === 'audio' && styles.audio,
+          selected && styles.selected,
+          animated
+        ]}
+      >
+        <Text style={styles.label} numberOfLines={1}>
+          {label}
+        </Text>
+        {selected && handle > 0 && (
+          <>
+            <View pointerEvents="none" style={[styles.handleLeft, { width: Math.min(5, handle) }]} />
+            <View pointerEvents="none" style={[styles.handleRight, { width: Math.min(5, handle) }]} />
+          </>
+        )}
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -145,6 +148,6 @@ const styles = StyleSheet.create({
   audio: { backgroundColor: theme.mint },
   selected: { borderWidth: 2, borderColor: theme.text },
   label: { color: theme.bg, fontSize: 11, fontWeight: '700' },
-  handleLeft: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 5, backgroundColor: theme.text },
-  handleRight: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 5, backgroundColor: theme.text }
+  handleLeft: { position: 'absolute', left: 0, top: 0, bottom: 0, backgroundColor: theme.text },
+  handleRight: { position: 'absolute', right: 0, top: 0, bottom: 0, backgroundColor: theme.text }
 });

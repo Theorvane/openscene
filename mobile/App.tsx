@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { timelineDurationMs } from '@openvideo/shared/timelineLogic';
 import { AgentScreen } from './src/screens/AgentScreen';
@@ -59,9 +60,13 @@ type ExportState = { kind: 'idle' } | { kind: 'running' } | { kind: 'done'; wher
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <Shell />
-    </SafeAreaProvider>
+    // Required by the gesture handler on Android: without it the timeline's
+    // gestures never reach the handler and the editor is back to guessing.
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <Shell />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

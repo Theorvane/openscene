@@ -1,4 +1,5 @@
 import { buildCompositionPlan, CompositionPlanError } from '@openvideo/shared/videoCompositionPlan';
+import type { CompositionSegment } from '@openvideo/shared/videoCompositionPlan';
 import type { TimelineDocument } from '@openvideo/shared/timelineTypes';
 import * as Sharing from 'expo-sharing';
 import VideoExport, { areStillsRenderable } from '../../modules/video-export';
@@ -95,13 +96,31 @@ export async function exportTimeline(input: {
     still: stillSources.has(segment.sourceIndex)
   });
 
+  /*
+    What Adjust set, carried through to the renderer.
+
+    The shared plan computes these and the desktop honours all of them, but this
+    bridge used to forward position and timing only — so opacity and scale were
+    dropped here, before any native module could have applied them. A control
+    that changes a stored number and nothing a user can see is worse than one
+    that is absent, and this is where the values were being lost.
+  */
+  const withEffects = (segment: CompositionSegment) => ({
+    ...withUri(segment),
+    opacity: segment.opacity,
+    scale: segment.scale,
+    offsetX: segment.offsetX,
+    offsetY: segment.offsetY,
+    rotationDegrees: segment.rotationDegrees
+  });
+
   try {
     const result = await VideoExport.exportComposition({
       width: plan.width,
       height: plan.height,
       frameRate: plan.frameRate,
       durationMs: plan.durationMs,
-      videoSegments: plan.videoSegments.map(withUri),
+      videoSegments: plan.videoSegments.map(withEffects),
       audioSegments: plan.audioSegments.map((segment) => ({ ...withUri(segment), gain: segment.gain }))
     });
     return { ok: true, uri: result.uri };

@@ -9,7 +9,11 @@ import android.util.Base64
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.audio.ChannelMixingAudioProcessor
+import androidx.media3.common.audio.ChannelMixingMatrix
+import androidx.media3.effect.AlphaScale
 import androidx.media3.effect.Presentation
+import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -25,6 +29,7 @@ import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToLong
 
 /**
@@ -80,7 +85,14 @@ class VideoExportModule : Module() {
     val timelineStartMs: Long,
     val sourceStartMs: Long,
     val sourceEndMs: Long,
-    val still: Boolean
+    val still: Boolean,
+    /** What Adjust set. Defaults are "unchanged", so an older caller still renders. */
+    val opacity: Float = 1f,
+    val scale: Float = 1f,
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
+    val rotationDegrees: Float = 0f,
+    val gain: Float = 1f
   ) {
     val timelineEndMs: Long get() = timelineStartMs + (sourceEndMs - sourceStartMs)
   }
@@ -95,7 +107,13 @@ class VideoExportModule : Module() {
           timelineStartMs = ms(it["timelineStartMs"]),
           sourceStartMs = ms(it["sourceStartMs"]),
           sourceEndMs = ms(it["sourceEndMs"]),
-          still = it["still"] as? Boolean ?: false
+          still = it["still"] as? Boolean ?: false,
+          opacity = num(it["opacity"], 1f),
+          scale = num(it["scale"], 1f),
+          offsetX = num(it["offsetX"], 0f),
+          offsetY = num(it["offsetY"], 0f),
+          rotationDegrees = num(it["rotationDegrees"], 0f),
+          gain = num(it["gain"], 1f)
         )
       }
       .filter { it.uri.isNotEmpty() && it.sourceEndMs > it.sourceStartMs }
@@ -103,6 +121,9 @@ class VideoExportModule : Module() {
   }
 
   private fun ms(value: Any?): Long = ((value as? Number)?.toDouble() ?: 0.0).roundToLong()
+
+  /** Absent means "leave it alone" rather than zero, which would erase the clip. */
+  private fun num(value: Any?, fallback: Float): Float = (value as? Number)?.toFloat() ?: fallback
 
   /**
    * One sequence, with the holes stated.
@@ -125,14 +146,56 @@ class VideoExportModule : Module() {
     return builder.build()
   }
 
+  /**
+   * What Adjust set, as Media3 effects.
+   *
+   * These used to be dropped: the shared plan computed them, the desktop honoured
+   * them, and nothing on a phone applied them — so opacity and scale changed a
+   * stored number and nothing anyone could see. The order matches the filter
+   * graph the desktop builds: scale and rotate the picture, then fade it.
+   *
+   * `offsetX/Y` are deliberately absent. Media3 has no single-effect equivalent
+   * of the desktop's `overlay=x:y`, and a clip silently rendered centred when the
+   * user moved it is the failure this whole change is about — so an export that
+   * would need one is refused by name instead.
+   */
   private fun itemOf(segment: Segment, frameRate: Int, removeAudio: Boolean): EditedMediaItem {
     val lengthMs = segment.sourceEndMs - segment.sourceStartMs
+    val video = buildList {
+      if (segment.scale != 1f || segment.rotationDegrees != 0f) {
+        add(
+          ScaleAndRotateTransformation.Builder()
+            .setScale(segment.scale, segment.scale)
+            .setRotationDegrees(segment.rotationDegrees)
+            .build()
+        )
+      }
+      // Fading comes after the geometry, the way `colorchannelmixer` follows
+      // `scale` and `rotate` in the desktop's filter graph.
+      if (segment.opacity != 1f) add(AlphaScale(max(0f, min(1f, segment.opacity))))
+    }
+    // Gain, as a mixing matrix scaled by it — Media3's way of saying "quieter".
+    val audio = buildList {
+      if (segment.gain != 1f) {
+        add(
+          ChannelMixingAudioProcessor().apply {
+            for (channels in 1..2) {
+              putChannelMixingMatrix(
+                ChannelMixingMatrix.create(channels, channels).scaleBy(max(0f, segment.gain))
+              )
+            }
+          }
+        )
+      }
+    }
+
     if (segment.still) {
       // An image has no timeline to clip, so the length is the hold and the
       // frame rate is what turns one picture into that many frames.
       return EditedMediaItem.Builder(MediaItem.fromUri(normalise(segment.uri)))
         .setDurationUs(lengthMs * 1_000L)
         .setFrameRate(max(1, frameRate))
+        .setEffects(Effects(audio, video))
         .build()
     }
     val media = MediaItem.Builder()
@@ -147,6 +210,7 @@ class VideoExportModule : Module() {
     return EditedMediaItem.Builder(media)
       .setRemoveAudio(removeAudio)
       .setRemoveVideo(!removeAudio)
+      .setEffects(Effects(audio, video))
       .build()
   }
 
@@ -167,6 +231,18 @@ class VideoExportModule : Module() {
 
     if (video.isEmpty() && audio.isEmpty()) {
       throw CodedException("ERR_EMPTY_COMPOSITION", "The timeline has no media to export.", null)
+    }
+    // Said out loud rather than rendered wrong. A clip the user moved off centre
+    // that comes back centred is exactly the silent-no-op this change exists to
+    // remove, so it is refused where it can still be explained.
+    val offset = video.firstOrNull { it.offsetX != 0f || it.offsetY != 0f }
+    if (offset != null) {
+      throw CodedException(
+        "ERR_UNSUPPORTED_OFFSET",
+        "A clip is positioned off centre, which this Android renderer cannot do yet. " +
+          "Reset the clip's position, or export on the desktop.",
+        null
+      )
     }
     if (overlaps(video)) {
       throw CodedException(
