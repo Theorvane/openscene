@@ -88,9 +88,16 @@ export function TimelineClip({
   const pan = useMemo(
     () =>
       Gesture.Pan()
-        // Only a selected clip takes the drag. The timeline scrolls sideways and
-        // so do these drags, so tap to select is what says which one is meant.
-        .enabled(selected)
+        /*
+          Any clip takes the drag, selected or not.
+
+          Tap-to-select-then-drag existed because the gesture was contested: if
+          clips always claimed the touch, a timeline wider than the screen could
+          not be scrolled by dragging over the clips filling it. Precedence is
+          declared now, so the finger that lands on a clip moves that clip —
+          which is what a phone editor does — and scrolling is the drag that
+          starts anywhere else.
+        */
         .blocksExternalGesture(scrollGesture)
         // A tap must stay a tap: selection is the common action, so a gesture
         // only becomes a drag once it has clearly travelled.
@@ -98,6 +105,9 @@ export function TimelineClip({
         .runOnJS(true)
         .onBegin((event) => {
           edge.current = event.x < handle ? 'left' : event.x > width - handle ? 'right' : 'move';
+          // Dragging a clip is also a way of choosing it, so the panels above
+          // follow the finger rather than waiting for a separate tap.
+          if (!selected) onSelect();
           onDragStateChange(true);
         })
         .onUpdate((event) => {
@@ -115,7 +125,7 @@ export function TimelineClip({
           stretch.setValue(0);
           onDragStateChange(false);
         }),
-    [selected, scrollGesture, handle, width, pxPerMs, clip.timelineStartMs, lengthMs, onMove, onTrim, onDragStateChange, edge, offset, stretch]
+    [selected, onSelect, scrollGesture, handle, width, pxPerMs, clip.timelineStartMs, lengthMs, onMove, onTrim, onDragStateChange, edge, offset, stretch]
   );
 
   const gesture = useMemo(() => Gesture.Race(pan, tap), [pan, tap]);

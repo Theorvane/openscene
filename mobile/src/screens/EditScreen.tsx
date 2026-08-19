@@ -20,7 +20,7 @@ import { TimelineClip } from '../components/TimelineClip';
 import { MediaLibrary } from '../components/MediaLibrary';
 import { TimelineRuler } from '../components/TimelineRuler';
 import { PauseIcon, PlayIcon, SkipBackIcon, SkipForwardIcon } from '../components/Icon';
-import { press, slopFor } from '../lib/touch';
+import { MIN_TAP, press, slopFor } from '../lib/touch';
 import { dipToBlackOpacityAt, transitionAlphaForClip } from '@openvideo/shared/timelineTransitionLogic';
 import { TRANSITION_TYPES } from '@openvideo/shared/timelineTypes';
 import type { TransitionDescriptor, TransitionType } from '@openvideo/shared/timelineTypes';
@@ -33,7 +33,16 @@ const TRANSITION_LABELS: Readonly<Record<TransitionType, string>> = {
 };
 
 const TRACK_HEIGHT = { video: 60, audio: 44 } as const;
-const RAIL = 92;
+/*
+  A chip, not a rail.
+
+  92pt of track headers is a quarter of a phone's width spent repeating
+  "Video 1" and "Audio 1". Identity is worth keeping — a clip on the wrong track
+  is a real mistake — but it is worth two characters, not a column. Track-level
+  actions move to a sheet the chip opens, which is where a phone editor puts
+  things that apply to the thing you just touched.
+*/
+const RAIL = 36;
 /** Matches `TimelineRuler`'s own height, so the two columns stay in step. */
 const RULER_HEIGHT = 29;
 
@@ -48,6 +57,17 @@ const STEPPER_SLOP = slopFor(36);
 // horizontal slop on both would overlap and the taps would land on whichever
 // happened to be drawn last.
 const RAIL_SLOP = { top: 11, bottom: 11, left: 2, right: 2 } as const;
+
+/**
+ * "Video 1" in the width of a chip.
+ *
+ * The number is what distinguishes one track from another; the word is the same
+ * on every row and can be carried by a letter.
+ */
+function shortTrackName(name: string, kind: 'video' | 'audio'): string {
+  const digits = name.match(/\d+/)?.[0] ?? '';
+  return `${kind === 'video' ? 'V' : 'A'}${digits}`;
+}
 
 function formatMs(ms: number): string {
   const total = Math.max(0, Math.round(ms / 100) / 10);
@@ -77,6 +97,10 @@ export function EditScreen({
   const [transitioning, setTransitioning] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [zooming, setZooming] = useState(false);
+  /** Which track's actions are open, if any. */
+  const [trackSheet, setTrackSheet] = useState<string | null>(null);
+  /** The tools that are not the four anyone reaches for. */
+  const [moreOpen, setMoreOpen] = useState(false);
   /** A third of the screen: enough for three steppers, never enough to swallow the lanes. */
   const inspectorMaxHeight = Math.round(Dimensions.get('window').height / 3);
   /*
@@ -411,8 +435,10 @@ export function EditScreen({
         <Tool label="Adjust" onPress={() => setInspecting((open) => !open)} disabled={selected === null} />
         <Tool label="Delete" tone="danger" onPress={editor.deleteSelected} disabled={selected === null} />
         {/*
-          Disabled away from a cut rather than hidden, and the panel says what a
-          cut is — a control that appears and disappears as the playhead moves
+          Transition earns a place in the toolbar rather than the More sheet: it
+          is an edit you make while looking at a cut, and a sheet closes the
+          timeline you were looking at. Disabled away from a cut rather than
+          hidden — a control that appears and disappears as the playhead moves
           reads as a glitch, not as a rule.
         */}
         <Tool
@@ -423,11 +449,7 @@ export function EditScreen({
           }}
           disabled={editor.cutAtPlayhead === null}
         />
-        <Tool label="Undo" onPress={editor.undo} disabled={!editor.canUndo} />
-        <Tool label="Redo" onPress={editor.redo} disabled={!editor.canRedo} />
-        <Tool label="Media" onPress={() => setMediaOpen((open) => !open)} disabled={projectId === null} />
-        <Tool label="+ Video" onPress={() => editor.addTrack('video')} />
-        <Tool label="+ Audio" onPress={() => editor.addTrack('audio')} />
+        <Tool label="More" onPress={() => setMoreOpen((open) => !open)} />
       </ScrollView>
 
       {editor.message !== null && <Text style={styles.message}>{editor.message}</Text>}
@@ -467,35 +489,23 @@ export function EditScreen({
         <View style={styles.railColumn}>
           <View style={styles.rulerRail} />
           {editor.timeline.tracks.map((track) => (
-            <View key={track.id} style={[styles.rail, { minHeight: TRACK_HEIGHT[track.kind] }]}>
-              <Text style={styles.railName} numberOfLines={1}>
-                {track.name}
+            <Pressable
+              key={track.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${track.name} options`}
+              onPress={() => setTrackSheet(track.id)}
+              style={press([styles.rail, { minHeight: TRACK_HEIGHT[track.kind] }])}
+            >
+              {/*
+                Muting is shown by dimming the label rather than by a second,
+                smaller word. Text small enough to fit under this one would be
+                below the size anything on this surface is allowed to be, and a
+                label nobody can read is not a label.
+              */}
+              <Text style={[styles.railName, track.kind === 'audio' && track.mix.muted && styles.railMuted]}>
+                {shortTrackName(track.name, track.kind)}
               </Text>
-              <View style={styles.railRow}>
-                {track.kind === 'audio' && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${track.mix.muted ? 'Unmute' : 'Mute'} ${track.name}`}
-                    onPress={() => editor.setTrackMuted(track.id, !track.mix.muted)}
-                    hitSlop={RAIL_SLOP}
-                    style={press(styles.railButton)}
-                  >
-                    <Text style={[styles.railButtonText, track.mix.muted && styles.railMuted]}>
-                      {track.mix.muted ? 'muted' : 'live'}
-                    </Text>
-                  </Pressable>
-                )}
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove ${track.name}`}
-                  onPress={() => editor.removeTrack(track.id)}
-                  hitSlop={RAIL_SLOP}
-                  style={press(styles.railButton)}
-                >
-                  <Text style={styles.railButtonText}>✕</Text>
-                </Pressable>
-              </View>
-            </View>
+            </Pressable>
           ))}
         </View>
 
@@ -590,6 +600,90 @@ export function EditScreen({
           onClose={() => setTransitioning(false)}
         />
       )}
+      {/*
+        Track actions, where the track was touched.
+
+        They used to be two buttons crammed into a 92pt rail on every row; most
+        of that column existed to hold them. A sheet costs a tap and gives the
+        width back to the thing being edited.
+      */}
+      {/*
+        The rest of the tools, behind one.
+
+        Nine in a horizontal scroll meant four or five on screen and the others
+        behind a bar that does not look scrollable — undo and redo among them,
+        which is not where a person expects to hunt. The four that carry an edit
+        stay out; the rest are a tap away and, being a list, are all visible at
+        once when they are.
+      */}
+      {moreOpen && (
+        <View style={styles.trackSheet}>
+          <Text style={styles.inspectorTitle}>More</Text>
+          <Pressable accessibilityRole="button" disabled={!editor.canUndo} onPress={editor.undo} style={press(styles.sheetRow)}>
+            <Text style={[styles.sheetRowText, !editor.canUndo && styles.sheetDisabled]}>Undo</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" disabled={!editor.canRedo} onPress={editor.redo} style={press(styles.sheetRow)}>
+            <Text style={[styles.sheetRowText, !editor.canRedo && styles.sheetDisabled]}>Redo</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={projectId === null}
+            onPress={() => {
+              setMediaOpen((open) => !open);
+              setMoreOpen(false);
+            }}
+            style={press(styles.sheetRow)}
+          >
+            <Text style={[styles.sheetRowText, projectId === null && styles.sheetDisabled]}>Media bin</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => editor.addTrack('video')} style={press(styles.sheetRow)}>
+            <Text style={styles.sheetRowText}>Add a video track</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => editor.addTrack('audio')} style={press(styles.sheetRow)}>
+            <Text style={styles.sheetRowText}>Add an audio track</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => setMoreOpen(false)} style={press(styles.sheetRow)}>
+            <Text style={styles.sheetRowText}>Close</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {trackSheet !== null && (
+        <View style={styles.trackSheet}>
+          {(() => {
+            const track = editor.timeline.tracks.find((candidate) => candidate.id === trackSheet);
+            if (track === undefined) return null;
+            return (
+              <>
+                <Text style={styles.inspectorTitle}>{track.name}</Text>
+                {track.kind === 'audio' && (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => editor.setTrackMuted(track.id, !track.mix.muted)}
+                    style={press(styles.sheetRow)}
+                  >
+                    <Text style={styles.sheetRowText}>{track.mix.muted ? 'Unmute this track' : 'Mute this track'}</Text>
+                  </Pressable>
+                )}
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    editor.removeTrack(track.id);
+                    setTrackSheet(null);
+                  }}
+                  style={press(styles.sheetRow)}
+                >
+                  <Text style={[styles.sheetRowText, styles.sheetDanger]}>Remove this track</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" onPress={() => setTrackSheet(null)} style={press(styles.sheetRow)}>
+                  <Text style={styles.sheetRowText}>Close</Text>
+                </Pressable>
+              </>
+            );
+          })()}
+        </View>
+      )}
+
       {inspecting && selected !== null && (
         /*
           Scrolls, and is capped.
@@ -806,6 +900,21 @@ const styles = StyleSheet.create({
     panel took its space from the thing it was adjusting. Over it, the lanes keep
     their height and the panel is dismissed with the same button that opened it.
   */
+  trackSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: theme.bg,
+    borderTopWidth: 1,
+    borderTopColor: theme.line,
+    paddingHorizontal: 16,
+    paddingVertical: 8
+  },
+  sheetRow: { minHeight: MIN_TAP, justifyContent: 'center' },
+  sheetRowText: { color: theme.text, fontSize: 15 },
+  sheetDanger: { color: theme.danger },
+  sheetDisabled: { color: theme.textWeaker },
   inspector: {
     position: 'absolute',
     left: 0,
@@ -843,8 +952,8 @@ const styles = StyleSheet.create({
   lanes: { position: 'relative' },
   rulerRail: { height: RULER_HEIGHT, borderBottomWidth: 1, borderBottomColor: theme.line },
   rulerLane: { height: RULER_HEIGHT },
-  rail: { paddingHorizontal: 10, justifyContent: 'center', gap: 3, borderBottomWidth: 1, borderBottomColor: theme.line },
-  railName: { color: theme.text, fontSize: 12, fontWeight: '600' },
+  rail: { alignItems: 'center', justifyContent: 'center', gap: 2, borderBottomWidth: 1, borderBottomColor: theme.line },
+  railName: { color: theme.text, fontSize: 12, fontWeight: '700' },
   railRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   railButton: { minHeight: 22, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, borderColor: theme.line },
   railButtonText: { color: theme.textWeaker, fontSize: 11, fontWeight: '700' },
