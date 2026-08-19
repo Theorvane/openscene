@@ -266,34 +266,44 @@ class VideoExportModule : Module() {
   /**
    * A title, drawn only while it is meant to be on screen.
    *
-   * `createStaticTextOverlay` is exactly that — static — so the timing lives in
-   * `getText`, which Media3 calls per frame: outside the range it returns
-   * nothing, and an empty overlay draws nothing. That is the hook the abstract
-   * class exists for, rather than a trick.
+   * The timing is alpha, not text. The obvious way to hide a caption outside its
+   * range is to return an empty string from `getText` — and it does hide it, for
+   * about two seconds, after which the export dies with "Video frame processing
+   * error" and leaves a truncated file behind. Empty text is a zero-sized
+   * bitmap, and the frame processor cannot draw one.
+   *
+   * So the text never changes and the *settings* do: `getOverlaySettings` is
+   * called per frame, and outside the range it returns the same overlay at zero
+   * alpha. The bitmap stays valid, and nothing is drawn because nothing is
+   * opaque. Found by exporting on a device rather than by reading the API — the
+   * failure is invisible to a typecheck and to every test in the suite.
    */
   private fun overlayFor(title: Title, width: Int, height: Int): TextureOverlay {
     val span = SpannableString(title.text)
     span.setSpan(ForegroundColorSpan(title.color), 0, span.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
     span.setSpan(AbsoluteSizeSpan(title.sizePx), 0, span.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-    val blank = SpannableString("")
-
     // Anchors are fractions of the frame from its centre, and the offsets are
     // pixels of the output — so they are divided by half the frame to speak the
     // same units the rest of the plan does.
-    val settings = StaticOverlaySettings.Builder()
-      .setBackgroundFrameAnchor(
-        if (width > 0) title.offsetX / (width / 2f) else 0f,
-        if (height > 0) -title.offsetY / (height / 2f) else 0f
-      )
-      .build()
+    fun settingsAt(alpha: Float): StaticOverlaySettings =
+      StaticOverlaySettings.Builder()
+        .setBackgroundFrameAnchor(
+          if (width > 0) title.offsetX / (width / 2f) else 0f,
+          if (height > 0) -title.offsetY / (height / 2f) else 0f
+        )
+        .setAlphaScale(alpha)
+        .build()
+
+    val shown = settingsAt(1f)
+    val hidden = settingsAt(0f)
 
     return object : TextOverlay() {
-      override fun getText(presentationTimeUs: Long): SpannableString {
-        val ms = presentationTimeUs / 1_000L
-        return if (ms in title.startMs until title.endMs) span else blank
-      }
+      override fun getText(presentationTimeUs: Long): SpannableString = span
 
-      override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings = settings
+      override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings {
+        val ms = presentationTimeUs / 1_000L
+        return if (ms in title.startMs until title.endMs) shown else hidden
+      }
     }
   }
 

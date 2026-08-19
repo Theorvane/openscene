@@ -33,6 +33,7 @@ import type {
   TransitionType
 } from '../../../shared/timelineTypes';
 import { clipDurationMs, clipTimelineEndMs } from '../../../shared/timelineClipGeometry';
+import { addTitle, removeTitle, titleAt, updateTitle } from '../../../shared/timelineTitleLogic';
 import { errorMessage, type StatusMessage } from '../appTypes';
 import { createTimelineHistory, pushTimelineHistory, redoTimelineHistory, undoTimelineHistory, type TimelineHistory } from './editorTimelineHistory';
 import { clampPlayheadMs, findClipSelection, findFirstCompatibleTrack, insertionStartForTrack, nextTrackName, placeReadyAssetOnTimeline } from './editorTimelineView';
@@ -248,6 +249,45 @@ export function useTimelineEditor() {
     if (cutAtPlayhead === null) return;
     replaceTimeline((timeline) => removeTransitionAtCut(timeline, cutAtPlayhead), 'Removed the transition.');
   }, [cutAtPlayhead, replaceTimeline]);
+
+  /*
+    Titles.
+
+    They are not clips, so they do not go through the placement rules — a title
+    overlaps whatever it likes, which is the point of a caption. What they do
+    share is the undo history and the "rejected, and here is why" path, because
+    a rule that refuses silently is the thing this editor keeps being caught by.
+  */
+  const addTitleAtPlayhead = useCallback(() => {
+    replaceTimeline(
+      (timeline) => addTitle(timeline, { id: createOpaqueId('title'), atMs: playback.playheadMs }),
+      'Added a title.'
+    );
+  }, [playback.playheadMs, replaceTimeline]);
+
+  const editTitle = useCallback(
+    (id: string, changes: Parameters<typeof updateTitle>[2]) => {
+      replaceTimeline(
+        (timeline) => updateTitle(timeline, id, changes),
+        'Updated the title.',
+        'That change would leave the title with nothing to draw.'
+      );
+    },
+    [replaceTimeline]
+  );
+
+  const deleteTitle = useCallback(
+    (id: string) => {
+      replaceTimeline((timeline) => removeTitle(timeline, id), 'Removed the title.');
+    },
+    [replaceTimeline]
+  );
+
+  /** The title under the playhead, which is the one an inspector should be showing. */
+  const titleAtPlayhead = useMemo(
+    () => (project === null ? null : titleAt(project.timeline, playback.playheadMs)),
+    [playback.playheadMs, project]
+  );
 
   const placeSelectedAsset = useCallback(() => {
     if (project === null || selectedAsset === null || selectedAsset.metadata === null) return;
@@ -524,6 +564,7 @@ export function useTimelineEditor() {
     addTimelineTrack, removeTimelineTrack, renameTimelineTrack, insertTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
     cutAtPlayhead, transitionAtPlayhead, setTransitionAtPlayhead, removeTransitionAtPlayhead,
+    addTitleAtPlayhead, editTitle, deleteTitle, titleAtPlayhead,
     openProject, openProjectFolder, renameProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
     clearSelection, goToTimelineEnd, goToTimelineStart, selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,
     setNewProjectName, setSelectedAssetId, setSelectedClipId: selectClip,

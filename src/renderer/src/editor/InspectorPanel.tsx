@@ -135,6 +135,106 @@ function TransitionControls({ editor }: InspectorContentProps): ReactElement {
   );
 }
 
+/*
+  Titles.
+
+  Addressed by the playhead rather than by selection, because a title is not a
+  clip and there is nothing on the timeline to click. Park the playhead where
+  the words should be, add one, and the group edits whichever title covers that
+  moment — which is also the one the program monitor is drawing, so the numbers
+  and the picture always describe each other.
+*/
+function TitleControls({ editor }: InspectorContentProps): ReactElement {
+  const title = editor.titleAtPlayhead;
+
+  return (
+    <PropertyGroup title="Titles">
+      <div className="inspector-action-grid" role="toolbar" aria-label="Title controls">
+        <Button className="inspector-action" onClick={editor.addTitleAtPlayhead}>Add title</Button>
+        {title !== null && (
+          <Button className="inspector-action" variant="stop" onClick={() => editor.deleteTitle(title.id)}>
+            Delete title
+          </Button>
+        )}
+      </div>
+
+      {title === null ? (
+        <div className="empty-slate">No title at the playhead. Add one to caption this moment.</div>
+      ) : (
+        <>
+          <PropertyRow label="Text">
+            <input
+              className="property-text-input"
+              type="text"
+              aria-label="Title text"
+              value={title.text}
+              onChange={(event) => editor.editTitle(title.id, { text: event.currentTarget.value })}
+            />
+          </PropertyRow>
+          <PropertyRow label="Size">
+            <input
+              className="property-number-input"
+              type="number"
+              aria-label="Title size"
+              value={title.sizePx}
+              min={8}
+              max={512}
+              onChange={(event) => editor.editTitle(title.id, { sizePx: Number(event.currentTarget.value) })}
+            />
+          </PropertyRow>
+          <PropertyRow label="Colour">
+            <input
+              className="property-color-input"
+              type="color"
+              aria-label="Title colour"
+              value={title.color}
+              onChange={(event) => editor.editTitle(title.id, { color: event.currentTarget.value })}
+            />
+          </PropertyRow>
+          <PropertyRow label="Position">
+            <span className="property-axis-label" aria-hidden="true">X</span>
+            <input
+              className="property-number-input"
+              type="number"
+              aria-label="Title position X"
+              value={title.positionX}
+              onChange={(event) => editor.editTitle(title.id, { positionX: Number(event.currentTarget.value) })}
+            />
+            <span className="property-axis-label" aria-hidden="true">Y</span>
+            <input
+              className="property-number-input"
+              type="number"
+              aria-label="Title position Y"
+              value={title.positionY}
+              onChange={(event) => editor.editTitle(title.id, { positionY: Number(event.currentTarget.value) })}
+            />
+          </PropertyRow>
+          <PropertyRow label="Start">
+            <span className="property-value-chip">{formatDuration(title.timelineStartMs)}</span>
+          </PropertyRow>
+          <PropertyRow label="End">
+            <span className="property-value-chip">{formatDuration(title.timelineEndMs)}</span>
+          </PropertyRow>
+          <div className="inspector-action-grid" role="toolbar" aria-label="Title timing controls">
+            <Button
+              className="inspector-action"
+              onClick={() => editor.editTitle(title.id, { timelineEndMs: title.timelineEndMs - 500 })}
+            >
+              Shorten -0.5s
+            </Button>
+            <Button
+              className="inspector-action"
+              onClick={() => editor.editTitle(title.id, { timelineEndMs: title.timelineEndMs + 500 })}
+            >
+              Lengthen +0.5s
+            </Button>
+          </div>
+        </>
+      )}
+    </PropertyGroup>
+  );
+}
+
 function SelectionInspector({ editor }: InspectorContentProps): ReactElement {
   const clip = editor.selectedClip;
   const effects = clip?.clip.effects ?? DEFAULT_CLIP_EFFECTS;
@@ -283,6 +383,7 @@ function SelectionInspector({ editor }: InspectorContentProps): ReactElement {
       )}
 
       {editor.project !== null && <TransitionControls editor={editor} />}
+      {editor.project !== null && <TitleControls editor={editor} />}
 
       {editor.activePlaybackClip !== null && (
         <PropertyGroup title="Playback">

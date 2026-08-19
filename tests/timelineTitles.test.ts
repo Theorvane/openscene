@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+
 import { describe, expect, it } from 'vitest';
 
 import { compileFfmpegTimeline, escapeDrawtext } from '../src/shared/ffmpegTimelineCompiler';
@@ -178,5 +180,40 @@ describe('editing titles', () => {
     const one = addTitle(empty, { id: 't1', atMs: 0 });
     expect(removeTitle(one, 't1')?.titles).toEqual([]);
     expect(removeTitle(one, 'missing')).toBeNull();
+  });
+});
+
+/**
+ * The half of titles that only a device can check.
+ *
+ * The first Android build hid a title outside its window by returning empty
+ * text from the overlay, which is the obvious reading of the API and drew the
+ * caption correctly — for two seconds. Then the export died with "Video frame
+ * processing error" and left a truncated file, because empty text is a
+ * zero-sized bitmap the frame processor cannot draw. Nothing in this suite saw
+ * it; exporting on an emulator did.
+ *
+ * So the shape of the fix is asserted here: the text is constant and the alpha
+ * is what changes. It is a source assertion rather than a behavioural one, which
+ * is weak — but it is the difference between the next person having to
+ * rediscover this by watching an export fail, and reading why in a test.
+ */
+describe('the titles the native modules draw', () => {
+  const read = (path: string) => readFile(new URL(`../mobile/${path}`, import.meta.url), 'utf8');
+
+  it('hides an Android title with alpha rather than with empty text', async () => {
+    const kotlin = await read(
+      'modules/video-export/android/src/main/java/expo/modules/videoexport/VideoExportModule.kt'
+    );
+    expect(kotlin).toContain('setAlphaScale(alpha)');
+    expect(kotlin).toContain('override fun getText(presentationTimeUs: Long): SpannableString = span');
+    // The zero-sized bitmap that truncated the export.
+    expect(kotlin).not.toContain('SpannableString("")');
+  });
+
+  it('draws them on iOS over the finished picture', async () => {
+    const swift = await read('modules/video-export/ios/VideoExportModule.swift');
+    expect(swift).toContain('CATextLayer');
+    expect(swift).toContain('AVVideoCompositionCoreAnimationTool');
   });
 });

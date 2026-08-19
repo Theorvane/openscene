@@ -23,7 +23,8 @@ import { clipDurationMs } from '@openvideo/shared/timelineClipGeometry';
 import type { ClipEffects } from '@openvideo/shared/timelineTypes';
 import { DEFAULT_CLIP_EFFECTS } from '@openvideo/shared/timelineTypes';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '@openvideo/shared/timelineClipPlacement';
-import type { MediaAsset, TimelineDocument, TransitionType } from '@openvideo/shared/timelineTypes';
+import { addTitle, removeTitle, titleAt, updateTitle } from '@openvideo/shared/timelineTitleLogic';
+import type { MediaAsset, TimelineDocument, TimelineTitle, TransitionType } from '@openvideo/shared/timelineTypes';
 
 /**
  * The editing model is the desktop's, unchanged — every operation below is a
@@ -408,6 +409,33 @@ export function useMobileEditor(persist?: (timeline: TimelineDocument) => void) 
       const cut = cutNearest(timeline, playheadMs, 500);
       if (cut === null) return;
       apply('Remove transition', (current) => removeTransitionAtCut(current, cut), 'That transition could not be removed.');
-    }
+    },
+
+    /*
+      Titles.
+
+      Addressed by the playhead, not by selection: a title is not a clip and has
+      nothing on the lanes to tap. Park the playhead where the words belong and
+      the panel edits whichever title covers that moment — the same one the
+      preview is drawing.
+    */
+    addTitleAtPlayhead: () =>
+      apply(
+        'Add title',
+        (current) => addTitle(current, { id: `title-${Date.now().toString(36)}`, atMs: playheadMs }),
+        'That title could not be added.'
+      ),
+
+    editTitle: (id: string, changes: Partial<Omit<TimelineTitle, 'id'>>) =>
+      apply(
+        'Edit title',
+        (current) => updateTitle(current, id, changes),
+        'That change would leave the title with nothing to draw.'
+      ),
+
+    removeTitle: (id: string) =>
+      apply('Remove title', (current) => removeTitle(current, id), 'That title could not be removed.'),
+
+    titleAtPlayhead: titleAt(timeline, playheadMs)
   };
 }

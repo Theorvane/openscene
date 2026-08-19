@@ -3,6 +3,8 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { theme } from '../lib/theme';
+import { titlePreviewLayout } from '@openvideo/shared/titlePreviewLayout';
+import type { TimelineTitle } from '@openvideo/shared/timelineTypes';
 
 /**
  * The program monitor.
@@ -24,7 +26,8 @@ export function PreviewPlayer({
   onEnded,
   effects,
   frameWidth,
-  dimOpacity
+  dimOpacity,
+  titles
 }: {
   readonly uri: string | null;
   /**
@@ -67,6 +70,14 @@ export function PreviewPlayer({
    * desktop draws it and how the FFmpeg graph renders it.
    */
   readonly dimOpacity?: number;
+  /**
+   * The titles covering the playhead.
+   *
+   * Drawn over the scrim rather than under it, because the export burns them in
+   * after the clip is composited: a clip faded to 10% does not take its caption
+   * down with it, and the preview must not claim otherwise.
+   */
+  readonly titles?: readonly TimelineTitle[];
   readonly sourceTimeMs: number;
   readonly playing: boolean;
   /** Source position, in ms, reported while playing. */
@@ -171,6 +182,31 @@ export function PreviewPlayer({
         <VideoView style={[styles.video, composited]} player={player} contentFit="contain" nativeControls={false} />
       )}
       {dim > 0 && <View pointerEvents="none" style={[styles.scrim, { opacity: dim }]} />}
+      {(titles ?? []).map((title) => {
+        // The frame is 16:9 here and 16:9 on export, so height follows width and
+        // the shared layout returns the one scale both dimensions share.
+        const layout = titlePreviewLayout(
+          title,
+          { width: viewWidth, height: (viewWidth * 9) / 16 },
+          { width: frameWidth ?? 1920, height: ((frameWidth ?? 1920) * 9) / 16 }
+        );
+        return (
+          <View key={title.id} pointerEvents="none" style={styles.titleLayer}>
+            <Text
+              style={[
+                styles.title,
+                {
+                  color: title.color,
+                  fontSize: layout.fontSizePx,
+                  transform: [{ translateX: layout.offsetXPx }, { translateY: layout.offsetYPx }]
+                }
+              ]}
+            >
+              {title.text}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -180,6 +216,10 @@ const styles = StyleSheet.create({
   // by it, exactly as the export crops it — not to paint over the title bar.
   root: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000000', overflow: 'hidden' },
   scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000' },
+  titleLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  // The shadow stands in for "readable over any picture", which is what the
+  // export gets for free by burning the words into the frame.
+  title: { fontWeight: '700', textAlign: 'center', paddingHorizontal: 12, textShadowColor: 'rgba(0,0,0,0.65)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   video: { width: '100%', height: '100%' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: theme.textWeaker, fontSize: 12 }

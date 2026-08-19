@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 
 import { nextVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
 import { clipDurationMs, clipTimelineEndMs } from '@openvideo/shared/timelineClipGeometry';
+import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
 import { theme } from '../lib/theme';
 import { useMobileEditor, type EditorAsset } from '../lib/editorState';
 import {
@@ -33,6 +34,16 @@ const TRANSITION_LABELS: Readonly<Record<TransitionType, string>> = {
   dipToBlack: 'Dip to black'
 };
 import { CLIP_EFFECT_RANGES } from '@openvideo/shared/timelineTypes';
+import type { TimelineTitle } from '@openvideo/shared/timelineTypes';
+
+/**
+ * The colours a title may be, as swatches.
+ *
+ * A hex field on a touch keyboard is a way to type `#fffff` and be told no, so
+ * the choice is made from a row instead — white and black for captions over any
+ * picture, and the app's own accents for the rest.
+ */
+const TITLE_COLORS = ['#ffffff', '#000000', theme.accent, theme.mint, theme.warn, theme.danger] as const;
 
 const TRACK_HEIGHT = { video: 60, audio: 44 } as const;
 /*
@@ -97,6 +108,9 @@ export function EditScreen({
   const [reloadToken, setReloadToken] = useState(0);
   const [inspecting, setInspecting] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
+  const [titling, setTitling] = useState(false);
+  /** The title covering the playhead, which is the one the panel and preview both show. */
+  const activeTitle = editor.titleAtPlayhead;
   const [dragging, setDragging] = useState(false);
   const [zooming, setZooming] = useState(false);
   /** Which track's actions are open, if any. */
@@ -355,6 +369,7 @@ export function EditScreen({
         frameWidth={1920}
         // A dip to black sits over everything, the way it does on the desktop.
         dimOpacity={dipToBlackOpacityAt(editor.timeline, editor.playheadMs)}
+        titles={titlesAt(editor.timeline.titles, editor.playheadMs)}
       />
 
       <View style={styles.transport}>
@@ -450,6 +465,24 @@ export function EditScreen({
             setInspecting(false);
           }}
           disabled={editor.cutAtPlayhead === null}
+        />
+        {/*
+          One button for two things, because on a phone they are the same
+          intention: caption this moment. If a title already covers the
+          playhead it opens for editing; if none does, one is made first, so
+          the words appear without a second tap on a second control.
+
+          In the toolbar rather than the More sheet, for the reason Transition
+          is: it is an edit you make while looking at the picture, and a sheet
+          covers what you were looking at.
+        */}
+        <Tool
+          label="Title"
+          onPress={() => {
+            if (editor.titleAtPlayhead === null) editor.addTitleAtPlayhead();
+            setTitling(true);
+            setInspecting(false);
+          }}
         />
         <Tool label="More" onPress={() => setMoreOpen((open) => !open)} />
       </ScrollView>
@@ -686,6 +719,18 @@ export function EditScreen({
         </View>
       )}
 
+      {titling && activeTitle !== null && (
+        <TitlePanel
+          title={activeTitle}
+          maxHeight={inspectorMaxHeight}
+          onChange={(changes) => editor.editTitle(activeTitle.id, changes)}
+          onRemove={() => {
+            editor.removeTitle(activeTitle.id);
+            setTitling(false);
+          }}
+          onClose={() => setTitling(false)}
+        />
+      )}
       {inspecting && selected !== null && (
         /*
           Scrolls, and is capped.
@@ -849,6 +894,92 @@ function TransitionPanel({
   );
 }
 
+/**
+ * Editing the words on a cut, on a phone.
+ *
+ * A text field and steppers, because those are the two things a thumb is good
+ * at — and the colours are a row of swatches rather than a picker, since a hex
+ * field on a touch keyboard is a way to type `#fffff` and get a rejection.
+ *
+ * The panel floats over the lanes and is capped like the clip inspector, for the
+ * same reason: it must not take the timeline's height away while you work.
+ */
+function TitlePanel({
+  title,
+  maxHeight,
+  onChange,
+  onRemove,
+  onClose
+}: {
+  title: TimelineTitle;
+  maxHeight: number;
+  onChange: (changes: Partial<Omit<TimelineTitle, 'id'>>) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}) {
+  const lengthMs = title.timelineEndMs - title.timelineStartMs;
+  return (
+    <ScrollView
+      style={[styles.inspector, { maxHeight }]}
+      contentContainerStyle={styles.inspectorContent}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.titleHeader}>
+        <Text style={styles.inspectorTitle}>Title</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close the title panel" onPress={onClose} hitSlop={SMALL_SLOP}>
+          <Text style={styles.smallText}>×</Text>
+        </Pressable>
+      </View>
+      <TextInput
+        accessibilityLabel="Title text"
+        style={styles.titleInput}
+        value={title.text}
+        placeholder="Title"
+        placeholderTextColor={theme.textWeaker}
+        onChangeText={(text) => onChange({ text })}
+      />
+      <View style={styles.swatchRow}>
+        {TITLE_COLORS.map((color) => (
+          <Pressable
+            key={color}
+            accessibilityRole="button"
+            accessibilityLabel={`Title colour ${color}`}
+            onPress={() => onChange({ color })}
+            style={press([styles.swatch, { backgroundColor: color }, title.color === color && styles.swatchOn])}
+          />
+        ))}
+      </View>
+      <Stepper
+        label="Size"
+        value={`${Math.round(title.sizePx)}px`}
+        onDown={() => onChange({ sizePx: Math.max(8, title.sizePx - 8) })}
+        onUp={() => onChange({ sizePx: Math.min(512, title.sizePx + 8) })}
+      />
+      <Stepper
+        label="Up/Down"
+        value={`${Math.round(title.positionY)}px`}
+        onDown={() => onChange({ positionY: title.positionY - 20 })}
+        onUp={() => onChange({ positionY: title.positionY + 20 })}
+      />
+      <Stepper
+        label="Left/Right"
+        value={`${Math.round(title.positionX)}px`}
+        onDown={() => onChange({ positionX: title.positionX - 20 })}
+        onUp={() => onChange({ positionX: title.positionX + 20 })}
+      />
+      <Stepper
+        label="Length"
+        value={formatMs(lengthMs)}
+        onDown={() => onChange({ timelineEndMs: title.timelineEndMs - 200 })}
+        onUp={() => onChange({ timelineEndMs: title.timelineEndMs + 200 })}
+      />
+      <Pressable accessibilityRole="button" onPress={onRemove} style={press([styles.tool, styles.toolDanger])}>
+        <Text style={[styles.toolText, styles.toolDangerText]}>Remove title</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
 function Stepper({
   label,
   value,
@@ -955,6 +1086,12 @@ const styles = StyleSheet.create({
   choiceOn: { borderColor: theme.accent, backgroundColor: theme.accent },
   choiceText: { color: theme.text, fontSize: 14, fontWeight: '600' },
   choiceTextOn: { color: theme.bg },
+  titleHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  // 44 tall because it is typed into, and 16pt because iOS zooms a smaller field.
+  titleInput: { minHeight: 44, borderWidth: 1, borderColor: theme.line, borderRadius: 10, paddingHorizontal: 12, color: theme.text, fontSize: 16, backgroundColor: theme.bg },
+  swatchRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  swatch: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: theme.line },
+  swatchOn: { borderWidth: 3, borderColor: theme.text },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
   stepperLabel: { flex: 1, color: theme.text, fontSize: 14 },
   stepperButton: { width: 36, height: 36, borderRadius: 9, borderWidth: 1, borderColor: theme.line, alignItems: 'center', justifyContent: 'center' },
