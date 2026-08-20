@@ -3,8 +3,11 @@ import { resolve as resolvePath, sep } from 'node:path';
 import { getMcpServerDefinition, McpResource, McpServer, McpTool } from '@theorvane/type-mcp';
 import { z } from 'zod';
 import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, type ClipEffects, type TimelineTrack } from '../shared/timelineTypes';
-import { deleteClip, placeClip } from '../shared/timelineClipLogic';
-import { clipDurationMs } from '../shared/timelineClipGeometry';
+import { deleteClip, placeClip, splitClip, updateClipEffects as applyClipEffects } from '../shared/timelineClipLogic';
+import { isValidClipEffects } from '../shared/timelineEffects';
+import { addTitle, removeTitle, updateTitle } from '../shared/timelineTitleLogic';
+import { cutNearest, removeTransitionAtCut, setTransitionAtCut } from '../shared/timelineTransitionLogic';
+import { clipDurationMs, clipTimelineEndMs } from '../shared/timelineClipGeometry';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '../shared/timelineClipPlacement';
 import type { ExportIpcService } from './exportIpcService';
 import type { ResultAssetImportService } from './resultAssetImportService';
@@ -416,9 +419,21 @@ export class OpenVideoMcpServer {
                 assetId: clip.assetId,
                 timelineStartMs: clip.timelineStartMs,
                 sourceStartMs: clip.sourceStartMs,
-                sourceEndMs: clip.sourceEndMs
+                sourceEndMs: clip.sourceEndMs,
+                /*
+                  How long it actually occupies, which stopped being the source
+                  window when clips gained a speed — and the effects themselves,
+                  because an agent asked to slow a clip down cannot tell whether
+                  it already is.
+                */
+                timelineEndMs: clipTimelineEndMs(clip),
+                effects: clip.effects ?? DEFAULT_CLIP_EFFECTS
               }))
-            }))
+            })),
+            // Both were invisible: an agent asked about a caption could not tell
+            // one existed, let alone edit it.
+            titles: project.timeline.titles ?? [],
+            transitions: project.timeline.transitions
           }
         }
       };
@@ -647,7 +662,15 @@ export class OpenVideoMcpServer {
         positionX: z.number().finite().min(CLIP_EFFECT_RANGES.positionX.min).max(CLIP_EFFECT_RANGES.positionX.max).optional(),
         positionY: z.number().finite().min(CLIP_EFFECT_RANGES.positionY.min).max(CLIP_EFFECT_RANGES.positionY.max).optional(),
         rotation: z.number().finite().min(CLIP_EFFECT_RANGES.rotation.min).max(CLIP_EFFECT_RANGES.rotation.max).optional(),
-        volume: z.number().finite().min(CLIP_EFFECT_RANGES.volume.min).max(CLIP_EFFECT_RANGES.volume.max).optional()
+        volume: z.number().finite().min(CLIP_EFFECT_RANGES.volume.min).max(CLIP_EFFECT_RANGES.volume.max).optional(),
+        speed: z.number().finite().min(CLIP_EFFECT_RANGES.speed.min).max(CLIP_EFFECT_RANGES.speed.max).optional()
+          .describe('Playback rate. 2 is twice as fast and half as long on the timeline, so it can be refused for running into the next clip.'),
+        brightness: z.number().finite().min(CLIP_EFFECT_RANGES.brightness.min).max(CLIP_EFFECT_RANGES.brightness.max).optional()
+          .describe('Added. 0 is neutral.'),
+        contrast: z.number().finite().min(CLIP_EFFECT_RANGES.contrast.min).max(CLIP_EFFECT_RANGES.contrast.max).optional()
+          .describe('Multiplied. 1 is neutral.'),
+        saturation: z.number().finite().min(CLIP_EFFECT_RANGES.saturation.min).max(CLIP_EFFECT_RANGES.saturation.max).optional()
+          .describe('Multiplied. 1 is neutral, 0 is black and white.')
       }).refine((effects) => Object.keys(effects).length > 0, 'At least one effect must be provided.')
     })
   })
@@ -664,21 +687,199 @@ export class OpenVideoMcpServer {
     try {
       const project = await this.projectStore.open(params.projectId);
       if (!project) return { success: false, error: `Project ${params.projectId} not found.` };
-      let found = false;
-      const tracks: TimelineTrack[] = project.timeline.tracks.map((track) => ({
-        ...track,
-        clips: track.clips.map((clip) => {
-          if (clip.id !== params.clipId) return clip;
-          found = true;
-          return { ...clip, effects: { ...(clip.effects ?? DEFAULT_CLIP_EFFECTS), ...params.effects } };
-        })
-      }));
-      if (!found) return { success: false, error: `Clip ${params.clipId} not found in project ${params.projectId}.` };
-      await this.projectStore.saveTimeline(params.projectId, { ...project.timeline, tracks });
+      const exists = project.timeline.tracks.some((track) => track.clips.some((clip) => clip.id === params.clipId));
+      if (!exists) return { success: false, error: `Clip ${params.clipId} not found in project ${params.projectId}.` };
+
+      /*
+        Through the shared rule, not written straight into the track.
+
+        Writing directly was harmless while no effect changed a clip's length.
+        Speed does: the phone produced a project it could not reopen that way —
+        a transition survived on a cut whose clips no longer touched, and the
+        validator refused the whole document on the next read. `updateClipEffects`
+        prunes what an edit invalidates and refuses what it cannot do.
+      */
+      const next = applyClipEffects(project.timeline, { clipId: params.clipId, effects: params.effects });
+      if (next === null) {
+        // Which rule refused: "out of range" and "it would not fit" are
+        // different problems for whoever is holding the tool.
+        const clip = project.timeline.tracks.flatMap((track) => track.clips).find((candidate) => candidate.id === params.clipId);
+        const merged = { ...DEFAULT_CLIP_EFFECTS, ...(clip?.effects ?? {}), ...params.effects };
+        return {
+          success: false,
+          error: isValidClipEffects(merged)
+            ? 'That change would put the clip on top of its neighbour. Move the next clip along first, or choose a smaller change.'
+            : 'One of those values is outside what the effect accepts.'
+        };
+      }
+      await this.projectStore.saveTimeline(params.projectId, next);
       this.notifyProjectTimelineChanged?.(params.projectId);
       return { success: true, projectId: params.projectId, clipId: params.clipId, effects: params.effects };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : `Failed to update effects for clip ${params.clipId}` };
+    }
+  }
+
+  @McpTool({
+    description:
+      'Split one timeline clip in two at a moment inside it. The split is where the cut goes; both halves ' +
+      'keep the same source, so nothing is re-encoded. Fails if the moment is at or outside the clip\'s ' +
+      'own span. This changes a saved project and requires explicit user approval.',
+    input: z.object({
+      projectId: z.string().min(1),
+      clipId: z.string().min(1),
+      atSeconds: z.number().min(0).describe('Timeline position, not an offset into the clip.')
+    })
+  })
+  async splitTimelineClip(params: { projectId: string; clipId: string; atSeconds: number }) {
+    if (!this.projectStore) return { success: false, error: 'ProjectStore service is not available.' };
+    try {
+      const project = await this.projectStore.open(params.projectId);
+      if (!project) return { success: false, error: `Project ${params.projectId} not found.` };
+      const rightClipId = `clip-split-${randomUUID()}`;
+      const next = splitClip(project.timeline, {
+        clipId: params.clipId,
+        atMs: Math.round(params.atSeconds * 1_000),
+        rightClipId
+      });
+      if (next === null) {
+        return {
+          success: false,
+          error: `Clip ${params.clipId} cannot be split there: the moment has to be strictly inside it.`
+        };
+      }
+      await this.projectStore.saveTimeline(params.projectId, next);
+      this.notifyProjectTimelineChanged?.(params.projectId);
+      return { success: true, projectId: params.projectId, leftClipId: params.clipId, rightClipId };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : `Failed to split clip ${params.clipId}` };
+    }
+  }
+
+  @McpTool({
+    description:
+      'Put words on the picture for a stretch of the timeline. Geometry is output-frame pixels measured ' +
+      'from the centre, and the colour is #rrggbb — anything else is refused rather than guessed at. ' +
+      'This changes a saved project and requires explicit user approval.',
+    input: z.object({
+      projectId: z.string().min(1),
+      text: z.string().min(1),
+      atSeconds: z.number().min(0),
+      lengthSeconds: z.number().min(0.1).optional().describe('Defaults to three seconds.'),
+      sizePx: z.number().min(8).max(512).optional(),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      positionX: z.number().optional(),
+      positionY: z.number().optional()
+    })
+  })
+  async addTimelineTitle(params: {
+    projectId: string;
+    text: string;
+    atSeconds: number;
+    lengthSeconds?: number;
+    sizePx?: number;
+    color?: string;
+    positionX?: number;
+    positionY?: number;
+  }) {
+    if (!this.projectStore) return { success: false, error: 'ProjectStore service is not available.' };
+    try {
+      const project = await this.projectStore.open(params.projectId);
+      if (!project) return { success: false, error: `Project ${params.projectId} not found.` };
+      const id = `title-${randomUUID()}`;
+      const atMs = Math.round(params.atSeconds * 1_000);
+      const added = addTitle(project.timeline, { id, atMs, text: params.text });
+
+      // The optional parts go through the same update rule the editors use, so
+      // a colour or a size this renderer cannot draw is refused here rather
+      // than discovered at export.
+      const changes: Record<string, number | string> = {};
+      if (params.lengthSeconds !== undefined) changes.timelineEndMs = atMs + Math.round(params.lengthSeconds * 1_000);
+      if (params.sizePx !== undefined) changes.sizePx = params.sizePx;
+      if (params.color !== undefined) changes.color = params.color;
+      if (params.positionX !== undefined) changes.positionX = params.positionX;
+      if (params.positionY !== undefined) changes.positionY = params.positionY;
+      const next = Object.keys(changes).length === 0 ? added : updateTitle(added, id, changes);
+      if (next === null) return { success: false, error: 'Those title settings would leave nothing to draw.' };
+
+      await this.projectStore.saveTimeline(params.projectId, next);
+      this.notifyProjectTimelineChanged?.(params.projectId);
+      return { success: true, projectId: params.projectId, titleId: id };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Failed to add a title' };
+    }
+  }
+
+  @McpTool({
+    description:
+      'Remove one title by id. Read the project first if you do not have the id. This changes a saved ' +
+      'project and requires explicit user approval.',
+    input: z.object({ projectId: z.string().min(1), titleId: z.string().min(1) })
+  })
+  async removeTimelineTitle(params: { projectId: string; titleId: string }) {
+    if (!this.projectStore) return { success: false, error: 'ProjectStore service is not available.' };
+    try {
+      const project = await this.projectStore.open(params.projectId);
+      if (!project) return { success: false, error: `Project ${params.projectId} not found.` };
+      const next = removeTitle(project.timeline, params.titleId);
+      if (next === null) return { success: false, error: `Title ${params.titleId} is not in project ${params.projectId}.` };
+      await this.projectStore.saveTimeline(params.projectId, next);
+      this.notifyProjectTimelineChanged?.(params.projectId);
+      return { success: true, projectId: params.projectId, titleId: params.titleId };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Failed to remove a title' };
+    }
+  }
+
+  @McpTool({
+    description:
+      'Put a transition on the cut nearest a moment, or take one off. A transition needs two clips that ' +
+      'touch on the same video track, and has to fit inside both — it is refused otherwise rather than ' +
+      'shortened silently. All three kinds render as a dip through black, because clips do not overlap. ' +
+      'This changes a saved project and requires explicit user approval.',
+    input: z.object({
+      projectId: z.string().min(1),
+      atSeconds: z.number().min(0).describe('A moment near the cut; the nearest cut within half a second is used.'),
+      type: z.enum(['fade', 'crossfade', 'dipToBlack']).optional().describe('Omit to remove the transition there.'),
+      lengthSeconds: z.number().min(0.1).optional()
+    })
+  })
+  async setTimelineTransition(params: {
+    projectId: string;
+    atSeconds: number;
+    type?: 'fade' | 'crossfade' | 'dipToBlack';
+    lengthSeconds?: number;
+  }) {
+    if (!this.projectStore) return { success: false, error: 'ProjectStore service is not available.' };
+    try {
+      const project = await this.projectStore.open(params.projectId);
+      if (!project) return { success: false, error: `Project ${params.projectId} not found.` };
+      const atMs = Math.round(params.atSeconds * 1_000);
+      const cut = cutNearest(project.timeline, atMs, 500);
+      if (cut === null) {
+        return {
+          success: false,
+          error: `No cut within half a second of ${params.atSeconds}s. A transition goes where two clips touch.`
+        };
+      }
+      if (params.type === undefined) {
+        const cleared = removeTransitionAtCut(project.timeline, cut);
+        await this.projectStore.saveTimeline(params.projectId, cleared);
+        this.notifyProjectTimelineChanged?.(params.projectId);
+        return { success: true, projectId: params.projectId, cutSeconds: cut.cutMs / 1_000, removed: true };
+      }
+      const next = setTransitionAtCut(project.timeline, cut, {
+        type: params.type,
+        ...(params.lengthSeconds === undefined ? {} : { durationMs: Math.round(params.lengthSeconds * 1_000) })
+      });
+      if (next === null) {
+        return { success: false, error: 'A transition has to fit inside both of the clips it joins.' };
+      }
+      await this.projectStore.saveTimeline(params.projectId, next);
+      this.notifyProjectTimelineChanged?.(params.projectId);
+      return { success: true, projectId: params.projectId, cutSeconds: cut.cutMs / 1_000, type: params.type };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Failed to set a transition' };
     }
   }
 
