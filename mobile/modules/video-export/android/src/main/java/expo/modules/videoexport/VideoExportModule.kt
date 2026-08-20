@@ -318,7 +318,7 @@ class VideoExportModule : Module() {
     }
   }
 
-  private fun sequenceOf(segments: List<Segment>, frameRate: Int, removeAudio: Boolean): EditedMediaItemSequence? {
+  private fun sequenceOf(segments: List<Segment>, frameRate: Int, removeAudio: Boolean, width: Int, height: Int): EditedMediaItemSequence? {
     if (segments.isEmpty()) return null
     val builder = EditedMediaItemSequence.Builder()
 
@@ -341,7 +341,7 @@ class VideoExportModule : Module() {
       if (segment.timelineStartMs > cursorMs) {
         builder.addGap((segment.timelineStartMs - cursorMs) * 1_000L)
       }
-      builder.addItem(itemOf(segment, frameRate, removeAudio))
+      builder.addItem(itemOf(segment, frameRate, removeAudio, width, height))
       cursorMs = segment.timelineEndMs
     }
     return builder.build()
@@ -360,7 +360,15 @@ class VideoExportModule : Module() {
    * user moved it is the failure this whole change is about — so an export that
    * would need one is refused by name instead.
    */
-  private fun itemOf(segment: Segment, frameRate: Int, removeAudio: Boolean): EditedMediaItem {
+  private fun itemOf(
+    segment: Segment,
+    frameRate: Int,
+    removeAudio: Boolean,
+    // The output frame, because an offset measured in its pixels cannot be
+    // turned into normalised coordinates without knowing how big it is.
+    width: Int,
+    height: Int
+  ): EditedMediaItem {
     val lengthMs = segment.sourceEndMs - segment.sourceStartMs
     val video = buildList {
       if (segment.rotationDegrees != 0f) {
@@ -378,9 +386,26 @@ class VideoExportModule : Module() {
         where it survives. Values past the edge pad rather than crop, which is
         what scaling below 100% should do.
       */
-      if (segment.scale != 1f && segment.scale > 0f) {
-        val half = 1f / segment.scale
-        add(Crop(-half, half, -half, half))
+      /*
+        Scale and offset are one crop, because they are one question: which part
+        of the frame ends up filling the output.
+
+        Media3 has no translate effect. Moving the crop window is the same thing
+        read the other way round — select a window centred left of the middle and
+        the picture lands right of it — and the padding that makes scaling below
+        100% work is what makes an offset past the edge work too.
+
+        The plan measures offsets in output pixels with y growing downward, the
+        way `overlay` does on the desktop; NDC is half-frames with y growing up.
+        Hence the division by half the frame, and the sign flip on y.
+      */
+      val scale = if (segment.scale > 0f) segment.scale else 1f
+      val halfX = 1f / scale
+      val halfY = 1f / scale
+      val shiftX = if (width > 0) segment.offsetX / (width / 2f) else 0f
+      val shiftY = if (height > 0) segment.offsetY / (height / 2f) else 0f
+      if (scale != 1f || shiftX != 0f || shiftY != 0f) {
+        add(Crop(-halfX - shiftX, halfX - shiftX, -halfY + shiftY, halfY + shiftY))
       }
 
       /*
@@ -497,18 +522,6 @@ class VideoExportModule : Module() {
     if (video.isEmpty() && audio.isEmpty()) {
       throw CodedException("ERR_EMPTY_COMPOSITION", "The timeline has no media to export.", null)
     }
-    // Said out loud rather than rendered wrong. A clip the user moved off centre
-    // that comes back centred is exactly the silent-no-op this change exists to
-    // remove, so it is refused where it can still be explained.
-    val offset = video.firstOrNull { it.offsetX != 0f || it.offsetY != 0f }
-    if (offset != null) {
-      throw CodedException(
-        "ERR_UNSUPPORTED_OFFSET",
-        "A clip is positioned off centre, which this Android renderer cannot do yet. " +
-          "Reset the clip's position, or export on the desktop.",
-        null
-      )
-    }
     if (overlaps(video)) {
       throw CodedException(
         "ERR_LAYERED_VIDEO",
@@ -521,8 +534,8 @@ class VideoExportModule : Module() {
     // Checked against the files, not against what the caller believed.
     val audible = audio.filter { hasAudio(it.uri) }
     val sequences = listOfNotNull(
-      sequenceOf(video, frameRate, removeAudio = true),
-      sequenceOf(audible, frameRate, removeAudio = false)
+      sequenceOf(video, frameRate, removeAudio = true, width = width, height = height),
+      sequenceOf(audible, frameRate, removeAudio = false, width = width, height = height)
     )
     // Transitions are composition effects: a dip belongs over the finished
     // picture rather than inside one of the clips it joins.

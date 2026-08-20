@@ -73,13 +73,17 @@ describe('the native renderers', () => {
     expect(kotlin).not.toMatch(/\bAlphaScale\(/);
     // Scale is a crop, not a scale: `setScale` resizes the frame and the
     // `Presentation` fixing the output size fits it straight back, so the
-    // picture came out exactly as it went in.
-    expect(kotlin).toContain('Crop(-half, half, -half, half)');
+    // picture came out exactly as it went in. Offset moved into the same crop
+    // once Android learned to render one, so the window is the scale and the
+    // position at once.
+    expect(kotlin).toMatch(/Crop\(-halfX[^)]*\)/);
     expect(kotlin).not.toMatch(/setScale\(segment\.scale/);
     expect(kotlin).toContain('ScaleAndRotateTransformation');
     expect(kotlin).toContain('ChannelMixingAudioProcessor');
-    // An offset it cannot honour is named rather than rendered centred.
-    expect(kotlin).toContain('ERR_UNSUPPORTED_OFFSET');
+    // An offset used to be refused by name — the honest answer while nothing
+    // could render one. It is rendered now, and `tests/mobileClipPlacement`
+    // holds the conversion.
+    expect(kotlin).not.toContain('ERR_UNSUPPORTED_OFFSET');
     // A sequence that opens with silence has to say what kind: Media3 refuses a
     // leading gap outright, so every timeline whose first clip does not start
     // at zero failed to export at all.

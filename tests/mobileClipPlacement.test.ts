@@ -51,3 +51,37 @@ describe('the phone can place a clip in the frame', () => {
     expect(CLIP_EFFECT_RANGES.positionX.max).toBeGreaterThan(0);
   });
 });
+
+/**
+ * The renderer that had to catch up.
+ *
+ * Adding the control turned up a refusal: Android threw
+ * `ERR_UNSUPPORTED_OFFSET` for any clip moved off centre, so the new control
+ * guaranteed a failed export. Refusing loudly was right while nothing could
+ * render it; shipping a control that always ends in that refusal is not.
+ *
+ * Media3 has no translate effect, and it does not need one. Scale was already
+ * expressed as a crop — the window that ends up filling the output — and moving
+ * that window is the same statement read the other way round.
+ */
+describe('an offset clip on Android', () => {
+  const readKotlin = () =>
+    readFile(
+      new URL('../mobile/modules/video-export/android/src/main/java/expo/modules/videoexport/VideoExportModule.kt', import.meta.url),
+      'utf8'
+    );
+
+  it('is rendered rather than refused', async () => {
+    const kotlin = await readKotlin();
+    expect(kotlin).not.toContain('ERR_UNSUPPORTED_OFFSET');
+    expect(kotlin).toContain('Crop(-halfX - shiftX, halfX - shiftX, -halfY + shiftY, halfY + shiftY)');
+  });
+
+  it('converts output pixels into the coordinates the effect takes', async () => {
+    // The plan measures offsets in output pixels with y growing downward, the
+    // way `overlay` does on the desktop; NDC is half-frames with y growing up.
+    const kotlin = await readKotlin();
+    expect(kotlin).toContain('segment.offsetX / (width / 2f)');
+    expect(kotlin).toContain('segment.offsetY / (height / 2f)');
+  });
+});
