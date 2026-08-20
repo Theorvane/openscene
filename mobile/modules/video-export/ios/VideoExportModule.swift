@@ -71,6 +71,10 @@ public final class VideoExportModule: Module {
     AsyncFunction("extractFrame") { (uri: String, atMs: Double) -> [String: Any] in
       try await Self.extractFrame(uri: uri, atMs: atMs)
     }
+
+    AsyncFunction("readAudioPeaks") { (uri: String, startMs: Double, endMs: Double, bars: Int) -> [Double] in
+      await AudioPeaks.read(uri: uri, startMs: startMs, endMs: endMs, bars: bars)
+    }
   }
 
   /**
