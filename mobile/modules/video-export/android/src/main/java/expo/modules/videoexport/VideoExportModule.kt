@@ -39,6 +39,7 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
@@ -511,7 +512,13 @@ class VideoExportModule : Module() {
       .setEffects(Effects(emptyList(), compositionEffects))
       .build()
 
-    val output = File(hostContext.cacheDir, "openvideo-export-${System.currentTimeMillis()}.mp4")
+    // Unique rather than merely timestamped, for the reason iOS is: a name that
+    // is only a clock reading collides when two exports land in the same tick,
+    // and the second one fails for no reason a user can see.
+    val output = File(
+      hostContext.cacheDir,
+      "openvideo-export-${System.currentTimeMillis()}-${UUID.randomUUID().toString().take(8)}.mp4"
+    )
     val done = CountDownLatch(1)
     var failure: Exception? = null
 

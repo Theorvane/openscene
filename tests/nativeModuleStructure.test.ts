@@ -55,3 +55,29 @@ describe('the native sources are structurally whole', () => {
     expect(declared).toContain('ExportRequest');
   });
 });
+
+/**
+ * An export must not collide with the one before it.
+ *
+ * Both modules named their output after the clock — iOS in whole seconds, which
+ * meant two exports finishing in the same second produced the same path.
+ * `AVAssetExportSession` does not overwrite; it fails with "Cannot Save", which
+ * reads like a permissions problem and is not one. The first CI run of the
+ * composer tests found it, because those export four times in a few seconds.
+ * A phone finds it by exporting twice quickly.
+ */
+describe('the exported file name', () => {
+  const read = (path: string) => readFile(new URL(`../mobile/${path}`, import.meta.url), 'utf8');
+
+  it('is unique on iOS, not merely a clock reading', async () => {
+    const swift = await read('modules/video-export/ios/VideoComposer.swift');
+    expect(swift).toMatch(/openvideo-export-[^\n]*UUID\(\)/);
+  });
+
+  it('is unique on Android for the same reason', async () => {
+    const kotlin = await read(
+      'modules/video-export/android/src/main/java/expo/modules/videoexport/VideoExportModule.kt'
+    );
+    expect(kotlin).toMatch(/openvideo-export-[\s\S]{0,80}UUID\.randomUUID/);
+  });
+});

@@ -377,7 +377,17 @@ public enum VideoComposer {
     }
 
     let output = FileManager.default.temporaryDirectory
-      .appendingPathComponent("openvideo-export-\(Int(Date().timeIntervalSince1970)).mp4")
+      /*
+        Unique, not merely timestamped.
+
+        The name used to be the Unix time in *seconds*, so two exports finished
+        within the same second collided — and `AVAssetExportSession` does not
+        overwrite: it fails with "Cannot Save", which reads like a permissions
+        problem and is not one. Found on the first CI run of these tests, which
+        export four times in a few seconds; a phone hits it by exporting twice
+        quickly, and the second one fails for no reason the user can see.
+      */
+      .appendingPathComponent("openvideo-export-\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString.prefix(8)).mp4")
 
     guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
       throw ComposerError.exportUnavailable
