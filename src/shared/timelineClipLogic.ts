@@ -1,4 +1,4 @@
-import { clipTimelineEndMs, sortTimelineClips } from './timelineClipGeometry';
+import { clipTimelineEndMs, sortTimelineClips, sourceTimeMsAt } from './timelineClipGeometry';
 import { clipEffectsEqual, hasOnlyClipEffectKeys, isValidClipEffects, normalizeClipEffects } from './timelineEffects';
 import { pruneInvalidTransitions } from './timelineMetadataLogic';
 import { parseClipKeyframes } from './timelineMetadataValidators';
@@ -128,11 +128,14 @@ export function trimClipLeft(timeline: TimelineDocument, input: TrimClipLeftInpu
   const located = findClip(timeline, input.clipId);
   if (located === null || !isFiniteNonNegative(input.timelineStartMs)) return null;
   if (located.clip.timelineStartMs === input.timelineStartMs) return timeline;
-  const deltaMs = input.timelineStartMs - located.clip.timelineStartMs;
+  // Timeline milliseconds, converted into the source's own. At 1× these are
+  // the same number, which is why the difference went unnoticed until a clip
+  // could be retimed: dragging the head of a 2× clip by a second has to consume
+  // two seconds of the file.
   return replaceClip(timeline, located, {
     ...located.clip,
     timelineStartMs: input.timelineStartMs,
-    sourceStartMs: located.clip.sourceStartMs + deltaMs
+    sourceStartMs: sourceTimeMsAt(located.clip, input.timelineStartMs)
   });
 }
 
@@ -143,7 +146,7 @@ export function trimClipRight(timeline: TimelineDocument, input: TrimClipRightIn
   if (currentEndMs === input.timelineEndMs) return timeline;
   return replaceClip(timeline, located, {
     ...located.clip,
-    sourceEndMs: located.clip.sourceEndMs + input.timelineEndMs - currentEndMs
+    sourceEndMs: sourceTimeMsAt(located.clip, input.timelineEndMs)
   });
 }
 
@@ -153,14 +156,21 @@ export function updateClipEffects(timeline: TimelineDocument, input: UpdateClipE
   const effects = { ...located.clip.effects, ...input.effects };
   if (!isValidClipEffects(effects)) return null;
   if (clipEffectsEqual(effects, located.clip.effects)) return timeline;
-  return {
-    ...timeline,
-    tracks: timeline.tracks.map((track) =>
-      track.id === located.track.id
-        ? { ...track, clips: track.clips.map((clip) => clip.id === located.clip.id ? { ...clip, effects } : clip) }
-        : track
-    )
-  };
+  /*
+    Through `replaceClip`, not around it.
+
+    Every other effect leaves the clip exactly where it was, so writing the new
+    effects straight into the track was harmless — and speed broke that. A
+    retimed clip is a different length, which can put it on top of its
+    neighbour, and can pull it away from a cut a transition was sitting on.
+
+    Skipping the shared path once produced a project the app could not reopen:
+    the file was written with a transition whose two clips no longer touched,
+    the validator refused the whole document on the next read, and the editor
+    came back with no project at all. Overlap and transition pruning both live
+    in `replaceClip`, so this asks it rather than repeating it.
+  */
+  return replaceClip(timeline, located, { ...located.clip, effects });
 }
 
 export function splitClip(timeline: TimelineDocument, input: SplitClipInput): TimelineDocument | null {
@@ -173,7 +183,7 @@ export function splitClip(timeline: TimelineDocument, input: SplitClipInput): Ti
     input.atMs <= located.clip.timelineStartMs ||
     input.atMs >= clipTimelineEndMs(located.clip)
   ) return null;
-  const sourceSplitMs = located.clip.sourceStartMs + input.atMs - located.clip.timelineStartMs;
+  const sourceSplitMs = sourceTimeMsAt(located.clip, input.atMs);
   const leftClip = {
     ...located.clip,
     sourceEndMs: sourceSplitMs,

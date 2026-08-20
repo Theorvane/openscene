@@ -18,6 +18,9 @@ export const CLIP_EFFECT_RANGES = {
   positionY: { min: -10_000, max: 10_000 },
   rotation: { min: 0, max: 360 },
   volume: { min: 0, max: 1 },
+  // Slower than a quarter is a slideshow of held frames, and faster than four
+  // is a source read faster than it can be decoded on a phone.
+  speed: { min: 0.25, max: 4 },
   volumeDb: { min: -40, max: 0 }
 } as const;
 
@@ -33,6 +36,18 @@ export type ClipEffects = {
   readonly positionY: number;
   readonly rotation: number;
   readonly volume: number;
+  /**
+   * Playback rate. 2 is twice as fast and half as long on the timeline.
+   *
+   * Optional, because every project written before speed existed has no such
+   * key and must still open unchanged. Absent means 1 everywhere, and
+   * `clipSpeed` is the only place that decides that.
+   *
+   * Unlike every other effect this one changes how much room the clip takes,
+   * which is why the timeline length and the source window are now two separate
+   * questions rather than the same subtraction.
+   */
+  readonly speed?: number;
 };
 
 export const DEFAULT_CLIP_EFFECTS: ClipEffects = Object.freeze({
@@ -42,6 +57,8 @@ export const DEFAULT_CLIP_EFFECTS: ClipEffects = Object.freeze({
   positionY: 0,
   rotation: 0,
   volume: 1
+  // No `speed`. Absent is 1, and leaving the key off keeps every document
+  // written before speed existed byte-identical when it is opened and saved.
 });
 
 export type ClipEffectProperty = (typeof CLIP_EFFECT_PROPERTIES)[number];

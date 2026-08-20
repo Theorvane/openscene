@@ -1,4 +1,4 @@
-import { clipTimelineEndMs } from './timelineClipGeometry';
+import { clipTimelineEndMs, sourceTimeMsAt } from './timelineClipGeometry';
 import type { PersistedTimelineClip, TimelineDocument } from './timelineTypes';
 
 /**
@@ -22,7 +22,9 @@ export function isClipActiveAt(clip: PersistedTimelineClip, playheadMs: number):
 
 /** Where in the source file the playhead is sitting, honouring the clip's trim. */
 export function sourceTimeForClip(clip: PersistedTimelineClip, playheadMs: number): number {
-  return clip.sourceStartMs + playheadMs - clip.timelineStartMs;
+  // Converted rather than added: a clip at 2× is halfway through its source when
+  // the playhead is a quarter of the way across it.
+  return sourceTimeMsAt(clip, playheadMs);
 }
 
 export type ActiveClip = {

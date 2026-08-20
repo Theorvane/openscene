@@ -12,6 +12,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.audio.ChannelMixingAudioProcessor
 import androidx.media3.common.audio.ChannelMixingMatrix
+import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.StaticOverlaySettings
@@ -20,6 +21,7 @@ import androidx.media3.effect.Crop
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.RgbAdjustment
 import androidx.media3.effect.ScaleAndRotateTransformation
+import androidx.media3.effect.SpeedChangeEffect
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -98,9 +100,13 @@ class VideoExportModule : Module() {
     val offsetX: Float = 0f,
     val offsetY: Float = 0f,
     val rotationDegrees: Float = 0f,
-    val gain: Float = 1f
+    val gain: Float = 1f,
+    /** Playback rate. 2 is twice as fast and half as long on the timeline. */
+    val speed: Float = 1f
   ) {
-    val timelineEndMs: Long get() = timelineStartMs + (sourceEndMs - sourceStartMs)
+    // Length on the timeline, which at anything but 1× is not the length of the
+    // source window. Everything that places or overlaps segments asks this.
+    val timelineEndMs: Long get() = timelineStartMs + ((sourceEndMs - sourceStartMs) / max(0.01f, speed)).toLong()
   }
 
   @Suppress("UNCHECKED_CAST")
@@ -119,7 +125,8 @@ class VideoExportModule : Module() {
           offsetX = num(it["offsetX"], 0f),
           offsetY = num(it["offsetY"], 0f),
           rotationDegrees = num(it["rotationDegrees"], 0f),
-          gain = num(it["gain"], 1f)
+          gain = num(it["gain"], 1f),
+          speed = num(it["speed"], 1f)
         )
       }
       .filter { it.uri.isNotEmpty() && it.sourceEndMs > it.sourceStartMs }
@@ -304,9 +311,20 @@ class VideoExportModule : Module() {
             .build()
         )
       }
+      // Retiming last, so the geometry above is applied to the frames rather
+      // than to a stream whose timestamps have already been rewritten.
+      //
+      // No `AlphaScale` here: opacity is a multiply now, because the encoder
+      // discards an alpha channel it has nothing to composite against. That fix
+      // arrived separately and the rebase tried to bring the old line back.
+      if (segment.speed != 1f) add(SpeedChangeEffect(max(0.01f, segment.speed)))
     }
     // Gain, as a mixing matrix scaled by it — Media3's way of saying "quieter".
     val audio = buildList {
+      // Sound follows the picture: a clip at 2× whose audio still runs at 1× is
+      // a sync bug that reads as a broken export. Sonic resamples rather than
+      // resampling the pitch with it, which is what an editor means by speed.
+      if (segment.speed != 1f) add(SonicAudioProcessor().apply { setSpeed(max(0.01f, segment.speed)) })
       if (segment.gain != 1f) {
         add(
           ChannelMixingAudioProcessor().apply {

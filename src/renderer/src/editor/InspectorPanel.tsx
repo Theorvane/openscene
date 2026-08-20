@@ -2,6 +2,7 @@ import { useState, type ReactElement, type ReactNode } from 'react';
 
 import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, TRANSITION_TYPES } from '../../../shared/timelineTypes';
 import type { TransitionType } from '../../../shared/timelineTypes';
+import { clipDurationMs } from '../../../shared/timelineClipGeometry';
 import { formatDuration, formatTimestamp } from '../format';
 import { Button, MetadataList, PanelHeading, TabPanel, Tabs } from '../ui';
 import type { TabDefinition } from '../ui';
@@ -172,6 +173,29 @@ function SelectionInspector({ editor }: InspectorContentProps): ReactElement {
                 { term: 'Source out', description: formatDuration(clip.clip.sourceEndMs) }
               ]}
             />
+          </PropertyGroup>
+
+          {/*
+            Speed sits with timing rather than with the transform: it is the one
+            control here that changes how much room the clip takes, and putting
+            it beside opacity would suggest otherwise.
+          */}
+          <PropertyGroup title="Speed">
+            <PropertyRow label="Rate">
+              <input
+                className="property-number-input"
+                type="number"
+                aria-label="Clip speed"
+                value={effects.speed ?? 1}
+                min={CLIP_EFFECT_RANGES.speed.min}
+                max={CLIP_EFFECT_RANGES.speed.max}
+                step={0.25}
+                onChange={(event) => editor.updateSelectedClipEffects({ speed: Number(event.currentTarget.value) })}
+              />
+            </PropertyRow>
+            <PropertyRow label="Length">
+              <span className="property-value-chip">{formatDuration(clipDurationMs(clip.clip))}</span>
+            </PropertyRow>
           </PropertyGroup>
 
           <PropertyGroup title="Transform">

@@ -5,6 +5,7 @@
  * binding without the composition logic being written twice.
  */
 import { timelineDurationMs } from './timelineLogic';
+import { clipSourceSpanMs, clipSpeed, clipTimelineEndMs } from './timelineClipGeometry';
 import type { AudioTimelineTrack, PersistedTimelineClip, TimelineDocument, TransitionDescriptor } from './timelineTypes';
 
 export type CompileFfmpegTimelineInput = {
@@ -59,10 +60,6 @@ function findClip(timeline: TimelineDocument, clipId: string): PersistedTimeline
   return null;
 }
 
-function clipEndMs(clip: PersistedTimelineClip): number {
-  return clip.timelineStartMs + (clip.sourceEndMs - clip.sourceStartMs);
-}
-
 function requireAssetPath(assetPaths: ReadonlyMap<string, string>, assetId: string): string {
   const path = assetPaths.get(assetId);
   if (path === undefined || path.includes('\0')) {
@@ -80,10 +77,13 @@ function videoFilter(
   const start = seconds(clip.sourceStartMs);
   const end = seconds(clip.sourceEndMs);
   const offset = seconds(clip.timelineStartMs);
+  const speed = clipSpeed(clip);
   const rotation = Number((clip.effects.rotation * Math.PI / 180).toFixed(8));
   return [
     `[${inputIndex}:v:0]trim=start=${start}:end=${end}`,
-    `setpts=PTS-STARTPTS+${offset}/TB`,
+    // Retimed before it is offset, so the clip lands where the timeline says
+    // rather than where its original length would have put it.
+    `setpts=(PTS-STARTPTS)/${speed}+${offset}/TB`,
     `scale=w='iw*${clip.effects.scale}':h='ih*${clip.effects.scale}'`,
     'format=rgba',
     `rotate=${rotation}:fillcolor=black@0`,
@@ -106,10 +106,37 @@ function clipOnlyGain(clip: PersistedTimelineClip): number {
   return Number(clip.effects.volume.toFixed(8));
 }
 
+/**
+ * `atempo`, chained, because one of them only spans half to double.
+ *
+ * FFmpeg's tempo filter refuses anything outside 0.5–2.0, and the honest way to
+ * reach a quarter or four times is to apply it more than once — 4× is two
+ * doublings. Written as a list so a rate inside the range still costs exactly
+ * one filter.
+ */
+function tempoFilters(speed: number): readonly string[] {
+  if (speed === 1) return [];
+  const filters: string[] = [];
+  let remaining = speed;
+  while (remaining > 2) {
+    filters.push('atempo=2');
+    remaining /= 2;
+  }
+  while (remaining < 0.5) {
+    filters.push('atempo=0.5');
+    remaining *= 2;
+  }
+  filters.push(`atempo=${Number(remaining.toFixed(6))}`);
+  return filters;
+}
+
 function videoAudioFilter(clip: PersistedTimelineClip, inputIndex: number, outputLabel: string): string {
   return [
     `[${inputIndex}:a:0]atrim=start=${seconds(clip.sourceStartMs)}:end=${seconds(clip.sourceEndMs)}`,
     'asetpts=PTS-STARTPTS',
+    // Sound follows the picture. A clip at 2× whose audio still runs at 1× is a
+    // sync bug that reads as a broken export.
+    ...tempoFilters(clipSpeed(clip)),
     `volume=${clipOnlyGain(clip)}`,
     'aformat=channel_layouts=stereo',
     `adelay=${clip.timelineStartMs}:all=1[${outputLabel}]`
@@ -139,7 +166,10 @@ function transitionFades(clip: PersistedTimelineClip, transitions: readonly Tran
     const halfMs = transition.durationMs / 2;
     if (halfMs <= 0) continue;
     if (transition.fromClipId === clip.id) {
-      const startMs = clipEndMs(clip) - halfMs;
+      // The clip's end on the *timeline*: a retimed clip finishes earlier than
+      // its source span would suggest, and a fade timed from the wrong end runs
+      // after the picture has already gone.
+      const startMs = clipTimelineEndMs(clip) - halfMs;
       fades.push(`fade=t=out:st=${seconds(startMs)}:d=${seconds(halfMs)}:alpha=1`);
     }
     if (transition.toClipId === clip.id) {
@@ -194,6 +224,7 @@ function audioFilter(track: AudioTimelineTrack, clip: PersistedTimelineClip, inp
   return [
     `[${inputIndex}:a:0]atrim=start=${seconds(clip.sourceStartMs)}:end=${seconds(clip.sourceEndMs)}`,
     'asetpts=PTS-STARTPTS',
+    ...tempoFilters(clipSpeed(clip)),
     `volume=${trackGain(track, clip)}`,
     'aformat=channel_layouts=stereo',
     `pan=stereo|c0=${left}*c0|c1=${right}*c1`,
@@ -227,7 +258,10 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
       // The hold has to cover the clip, and the clip cannot run past its source
       // — which for a still is the hold itself — so the two are the same number.
       if (input.stillAssetIds?.has(clip.assetId) === true) {
-        args.push('-loop', '1', '-t', seconds(clip.sourceEndMs - clip.sourceStartMs));
+        // The *source* span, not the timeline length: the frames are trimmed
+        // and then retimed, so a still played at 2× still needs the material
+        // the trim asks for before `setpts` compresses it.
+        args.push('-loop', '1', '-t', seconds(clipSourceSpanMs(clip)));
       }
       args.push('-i', requireAssetPath(input.assetPaths, clip.assetId));
       if (track.kind === 'video') {
@@ -262,7 +296,8 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
     const clipLabel = `video-clip-${index}`;
     const nextLabel = `video-layer-${index}`;
     filters.push(videoFilter(clip, clipInputIndex, clipLabel, transitionFades(clip, input.timeline.transitions)));
-    const endMs = clip.timelineStartMs + clip.sourceEndMs - clip.sourceStartMs;
+    // Timeline end, which at anything but 1× is not the source span.
+    const endMs = clipTimelineEndMs(clip);
     const x = `(main_w-overlay_w)/2+${clip.effects.positionX}`;
     const y = `(main_h-overlay_h)/2+${clip.effects.positionY}`;
     filters.push(`[${currentVideoLabel}][${clipLabel}]overlay=x='${x}':y='${y}':enable='between(t,${seconds(clip.timelineStartMs)},${seconds(endMs)})':eof_action=pass[${nextLabel}]`);

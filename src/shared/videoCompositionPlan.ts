@@ -1,5 +1,6 @@
 import { timelineDurationMs } from './timelineLogic';
 import { cuts, transitionForCut } from './timelineTransitionLogic';
+import { clipSpeed } from './timelineClipGeometry';
 import type { TimelineDocument } from './timelineTypes';
 
 /**
@@ -29,6 +30,8 @@ export type CompositionSegment = {
   readonly offsetX: number;
   readonly offsetY: number;
   readonly rotationDegrees: number;
+  /** Playback rate. 1 is the rate it was shot at, and what every older plan meant. */
+  readonly speed: number;
 };
 
 export type AudioSegment = {
@@ -38,6 +41,8 @@ export type AudioSegment = {
   readonly sourceEndMs: number;
   /** Linear gain, already folded from the track mix and the clip's volume. */
   readonly gain: number;
+  /** Playback rate, so sound is retimed with the picture rather than left behind it. */
+  readonly speed: number;
 };
 
 export type CompositionPlan = {
@@ -158,7 +163,8 @@ export function buildCompositionPlan(input: {
           scale: clip.effects.scale,
           offsetX: clip.effects.positionX,
           offsetY: clip.effects.positionY,
-          rotationDegrees: clip.effects.rotation
+          rotationDegrees: clip.effects.rotation,
+          speed: clipSpeed(clip)
         });
       }
       videoLayers.push(layer);
@@ -183,7 +189,8 @@ export function buildCompositionPlan(input: {
           timelineStartMs: clip.timelineStartMs,
           sourceStartMs: clip.sourceStartMs,
           sourceEndMs: clip.sourceEndMs,
-          gain: clip.effects.volume
+          gain: clip.effects.volume,
+          speed: clipSpeed(clip)
         });
       }
       continue;
@@ -198,7 +205,8 @@ export function buildCompositionPlan(input: {
         sourceEndMs: clip.sourceEndMs,
         // Muting the track wins over the clip's own volume, as it does in the
         // editor: a muted track is a decision about the whole track.
-        gain: track.mix.muted ? 0 : trackGain * clip.effects.volume
+        gain: track.mix.muted ? 0 : trackGain * clip.effects.volume,
+        speed: clipSpeed(clip)
       });
     }
   }

@@ -18,6 +18,7 @@ import {
   setTransitionAtCut,
   transitionForCut
 } from '@openvideo/shared/timelineTransitionLogic';
+import { clipDurationMs } from '@openvideo/shared/timelineClipGeometry';
 import type { ClipEffects } from '@openvideo/shared/timelineTypes';
 import { DEFAULT_CLIP_EFFECTS } from '@openvideo/shared/timelineTypes';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '@openvideo/shared/timelineClipPlacement';
@@ -256,7 +257,7 @@ export function useMobileEditor(persist?: (timeline: TimelineDocument) => void) 
           const at = edge === 'left'
             ? selectedClip.clip.timelineStartMs + deltaMs
             : selectedClip.clip.timelineStartMs +
-              (selectedClip.clip.sourceEndMs - selectedClip.clip.sourceStartMs) +
+              clipDurationMs(selectedClip.clip) +
               deltaMs;
           return edge === 'left'
             ? trimClipLeft(current, { clipId: selectedClip.clip.id, timelineStartMs: at })

@@ -4,6 +4,7 @@ import { Gesture, GestureDetector, ScrollView as GestureScrollView } from 'react
 import * as ImagePicker from 'expo-image-picker';
 
 import { nextVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
+import { clipDurationMs, clipTimelineEndMs } from '@openvideo/shared/timelineClipGeometry';
 import { theme } from '../lib/theme';
 import { useMobileEditor, type EditorAsset } from '../lib/editorState';
 import {
@@ -31,6 +32,7 @@ const TRANSITION_LABELS: Readonly<Record<TransitionType, string>> = {
   crossfade: 'Crossfade',
   dipToBlack: 'Dip to black'
 };
+import { CLIP_EFFECT_RANGES } from '@openvideo/shared/timelineTypes';
 
 const TRACK_HEIGHT = { video: 60, audio: 44 } as const;
 /*
@@ -263,7 +265,7 @@ export function EditScreen({
     }
     const edges = editor.timeline.tracks
       .filter((track) => track.kind === 'video')
-      .flatMap((track) => track.clips.flatMap((clip) => [clip.timelineStartMs, clip.sourceEndMs - clip.sourceStartMs + clip.timelineStartMs]))
+      .flatMap((track) => track.clips.flatMap((clip) => [clip.timelineStartMs, clipTimelineEndMs(clip)]))
       .filter((edge) => edge < editor.playheadMs - 1);
     setPlayheadMs(edges.length === 0 ? 0 : Math.max(...edges));
   };
@@ -729,20 +731,39 @@ export function EditScreen({
           />
           <Stepper
             label="Length"
-            value={formatMs(selected.clip.sourceEndMs - selected.clip.sourceStartMs)}
+            value={formatMs(clipDurationMs(selected.clip))}
             onDown={() =>
               editor.trimClipTo(
                 selected.clip.id,
                 'right',
-                selected.clip.timelineStartMs + (selected.clip.sourceEndMs - selected.clip.sourceStartMs) - 100
+                clipTimelineEndMs(selected.clip) - 100
               )
             }
             onUp={() =>
               editor.trimClipTo(
                 selected.clip.id,
                 'right',
-                selected.clip.timelineStartMs + (selected.clip.sourceEndMs - selected.clip.sourceStartMs) + 100
+                clipTimelineEndMs(selected.clip) + 100
               )
+            }
+          />
+          {/*
+            Speed changes how much room the clip takes, so the Length readout
+            above it moves as this does — which is the clearest way to say what
+            retiming actually means.
+          */}
+          <Stepper
+            label="Speed"
+            value={`${(selected.clip.effects.speed ?? 1).toFixed(2)}×`}
+            onDown={() =>
+              editor.setSelectedEffects({
+                speed: Math.max(CLIP_EFFECT_RANGES.speed.min, Number(((selected.clip.effects.speed ?? 1) - 0.25).toFixed(2)))
+              })
+            }
+            onUp={() =>
+              editor.setSelectedEffects({
+                speed: Math.min(CLIP_EFFECT_RANGES.speed.max, Number(((selected.clip.effects.speed ?? 1) + 0.25).toFixed(2)))
+              })
             }
           />
           <Stepper

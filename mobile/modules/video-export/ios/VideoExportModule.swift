@@ -24,6 +24,8 @@ struct SegmentInput: Record {
   @Field var offsetX: Double = 0
   @Field var offsetY: Double = 0
   @Field var rotationDegrees: Double = 0
+  /// Playback rate. 1 is the rate it was shot at, and what an older caller means.
+  @Field var speed: Double = 1
 }
 
 /// A transition, as the black it puts over the picture: total at the midpoint.
@@ -123,6 +125,24 @@ public final class VideoExportModule: Module {
       let range = CMTimeRange(start: time(segment.sourceStartMs), end: time(segment.sourceEndMs))
       try track.insertTimeRange(range, of: sourceTrack, at: time(segment.timelineStartMs))
 
+      /*
+       Retiming, as a scale on what was just inserted.
+
+       AVFoundation has no speed property; it has "make this range last that
+       long", which is the same statement read the other way round. The range
+       scaled is the one in *composition* time — where the clip was inserted,
+       not where it came from — so it is built from the insertion point rather
+       than from the source window.
+       */
+      let rate = max(0.01, segment.speed)
+      if rate != 1 {
+        let sourceSpan = segment.sourceEndMs - segment.sourceStartMs
+        track.scaleTimeRange(
+          CMTimeRange(start: time(segment.timelineStartMs), duration: time(sourceSpan)),
+          toDuration: time(sourceSpan / rate)
+        )
+      }
+
       let instruction = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
 
       /*
@@ -209,6 +229,18 @@ public final class VideoExportModule: Module {
       guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
       let range = CMTimeRange(start: time(segment.sourceStartMs), end: time(segment.sourceEndMs))
       try track.insertTimeRange(range, of: sourceTrack, at: time(segment.timelineStartMs))
+
+      // Sound follows the picture, scaled the same way it is. AVFoundation
+      // resamples the audio rather than leaving it two seconds long behind a
+      // picture that has already finished.
+      let audioRate = max(0.01, segment.speed)
+      if audioRate != 1 {
+        let sourceSpan = segment.sourceEndMs - segment.sourceStartMs
+        track.scaleTimeRange(
+          CMTimeRange(start: time(segment.timelineStartMs), duration: time(sourceSpan)),
+          toDuration: time(sourceSpan / audioRate)
+        )
+      }
 
       if segment.gain != 1 {
         let parameters = AVMutableAudioMixInputParameters(track: track)

@@ -13,7 +13,8 @@ export function hasOnlyClipEffectKeys(effects: Partial<ClipEffects>): boolean {
       key === 'positionX' ||
       key === 'positionY' ||
       key === 'rotation' ||
-      key === 'volume'
+      key === 'volume' ||
+      key === 'speed'
   );
 }
 
@@ -24,7 +25,11 @@ export function isValidClipEffects(effects: ClipEffects): boolean {
     isBounded(effects.positionX, CLIP_EFFECT_RANGES.positionX.min, CLIP_EFFECT_RANGES.positionX.max) &&
     isBounded(effects.positionY, CLIP_EFFECT_RANGES.positionY.min, CLIP_EFFECT_RANGES.positionY.max) &&
     isBounded(effects.rotation, CLIP_EFFECT_RANGES.rotation.min, CLIP_EFFECT_RANGES.rotation.max) &&
-    isBounded(effects.volume, CLIP_EFFECT_RANGES.volume.min, CLIP_EFFECT_RANGES.volume.max)
+    isBounded(effects.volume, CLIP_EFFECT_RANGES.volume.min, CLIP_EFFECT_RANGES.volume.max) &&
+    // Absent is 1, so a clip that has never been retimed is valid without
+    // carrying the key. Present but outside the range is refused, not clamped:
+    // a rate this cannot render is a rate it must not claim to have.
+    (effects.speed === undefined || isBounded(effects.speed, CLIP_EFFECT_RANGES.speed.min, CLIP_EFFECT_RANGES.speed.max))
   );
 }
 
@@ -43,6 +48,7 @@ export function clipEffectsEqual(left: ClipEffects, right: ClipEffects): boolean
     left.positionX === right.positionX &&
     left.positionY === right.positionY &&
     left.rotation === right.rotation &&
-    left.volume === right.volume
+    left.volume === right.volume &&
+    (left.speed ?? 1) === (right.speed ?? 1)
   );
 }

@@ -30,6 +30,7 @@ import type {
   TimelineDocument,
   TransitionType
 } from '../../../shared/timelineTypes';
+import { clipDurationMs, clipTimelineEndMs } from '../../../shared/timelineClipGeometry';
 import { errorMessage, type StatusMessage } from '../appTypes';
 import { createTimelineHistory, pushTimelineHistory, redoTimelineHistory, undoTimelineHistory, type TimelineHistory } from './editorTimelineHistory';
 import { clampPlayheadMs, findClipSelection, findFirstCompatibleTrack, insertionStartForTrack, nextTrackName, placeReadyAssetOnTimeline } from './editorTimelineView';
@@ -362,7 +363,7 @@ export function useTimelineEditor() {
     if (selectedClip === null) return;
     replaceTimeline((timeline) => edge === 'left'
       ? trimClipLeft(timeline, { clipId: selectedClip.clip.id, timelineStartMs: selectedClip.clip.timelineStartMs + deltaMs })
-      : trimClipRight(timeline, { clipId: selectedClip.clip.id, timelineEndMs: selectedClip.clip.timelineStartMs + selectedClip.clip.sourceEndMs - selectedClip.clip.sourceStartMs + deltaMs }), 'Trimmed selected clip.');
+      : trimClipRight(timeline, { clipId: selectedClip.clip.id, timelineEndMs: clipTimelineEndMs(selectedClip.clip) + deltaMs }), 'Trimmed selected clip.');
   }, [replaceTimeline, selectedClip]);
 
   const trimClipTo = useCallback((clipId: string, edge: 'left' | 'right', timelineMs: number) => {
@@ -374,7 +375,7 @@ export function useTimelineEditor() {
 
   const splitSelectedClip = useCallback(() => {
     if (selectedClip === null) return;
-    const midpointMs = selectedClip.clip.timelineStartMs + Math.round((selectedClip.clip.sourceEndMs - selectedClip.clip.sourceStartMs) / 2);
+    const midpointMs = selectedClip.clip.timelineStartMs + Math.round(clipDurationMs(selectedClip.clip) / 2);
     replaceTimeline((timeline) => splitClip(timeline, { clipId: selectedClip.clip.id, atMs: midpointMs, rightClipId: createOpaqueId('clip') }), 'Split selected clip at its midpoint.');
   }, [replaceTimeline, selectedClip]);
 
@@ -390,7 +391,7 @@ export function useTimelineEditor() {
   const duplicateSelectedClip = useCallback(() => {
     if (selectedClip === null) return;
     const source = selectedClip.clip;
-    const duplicatedStartMs = source.timelineStartMs + (source.sourceEndMs - source.sourceStartMs);
+    const duplicatedStartMs = clipTimelineEndMs(source);
     const timeline = replaceTimeline(
       (current) => placeClip(current, {
         trackId: selectedClip.track.id,

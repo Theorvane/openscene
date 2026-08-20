@@ -118,7 +118,10 @@ export async function exportTimeline(input: {
     scale: segment.scale,
     offsetX: segment.offsetX,
     offsetY: segment.offsetY,
-    rotationDegrees: segment.rotationDegrees
+    rotationDegrees: segment.rotationDegrees,
+    // Retiming reaches the native modules the same way the other effects do —
+    // through this bridge, which is where opacity and scale were once dropped.
+    speed: segment.speed
   });
 
   try {
@@ -128,7 +131,9 @@ export async function exportTimeline(input: {
       frameRate: plan.frameRate,
       durationMs: plan.durationMs,
       videoSegments: plan.videoSegments.map(withEffects),
-      audioSegments: plan.audioSegments.map((segment) => ({ ...withUri(segment), gain: segment.gain })),
+      // Sound carries the clip's own rate, so it is retimed with the picture
+      // rather than left running behind it.
+      audioSegments: plan.audioSegments.map((segment) => ({ ...withUri(segment), gain: segment.gain, speed: segment.speed })),
       // Transitions, already reduced by the plan to the black they put on the
       // frame. Forwarded rather than derived here: the bridge dropping what the
       // plan computed is exactly how the clip effects went missing.

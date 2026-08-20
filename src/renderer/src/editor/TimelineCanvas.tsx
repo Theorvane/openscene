@@ -5,6 +5,7 @@ import { buildTimelineView, clientXToTimelineMs } from './editorTimelineView';
 import { buildRulerTicks } from './timelineRulerTicks';
 import { useClipThumbnails } from './clipThumbnails';
 import type { ThumbnailClip } from '../../../shared/clipThumbnails';
+import { clipDurationMs } from '../../../shared/timelineClipGeometry';
 import type { TimelineEditorController } from './useTimelineEditor';
 
 type TimelineCanvasProps = {
@@ -876,7 +877,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                       }}
                       style={{ left: `${block.leftPercent}%`, width: `${Math.max(block.widthPercent, 2)}%`, cursor: activeTool === 'razor' ? 'crosshair' : undefined }}
                       title={`${block.assetName} starts at ${formatDuration(block.clip.timelineStartMs)}`}
-                      aria-label={`${block.assetName}, ${block.kind} clip from ${formatDuration(block.clip.timelineStartMs)} for ${formatDuration(block.clip.sourceEndMs - block.clip.sourceStartMs)}`}
+                      aria-label={`${block.assetName}, ${block.kind} clip from ${formatDuration(block.clip.timelineStartMs)} for ${formatDuration(clipDurationMs(block.clip))}`}
                     >
                       {track.kind === 'video' && editor.project !== null && (
                         <ClipFilmstrip
@@ -889,7 +890,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                       )}
                       <span className="timeline-clip__handle timeline-clip__handle--left" draggable={!lockedTracks[track.id] && activeTool === 'select'} onDragStart={(event) => writeTimelineDrag(event, { kind: 'trim', clipId: block.clip.id, edge: 'left' })} aria-hidden="true" />
                       <strong>{block.assetName}</strong>
-                      <small>{formatDuration(block.clip.sourceEndMs - block.clip.sourceStartMs)}</small>
+                      <small>{formatDuration(clipDurationMs(block.clip))}</small>
                       <span className="timeline-clip__handle timeline-clip__handle--right" draggable={!lockedTracks[track.id] && activeTool === 'select'} onDragStart={(event) => writeTimelineDrag(event, { kind: 'trim', clipId: block.clip.id, edge: 'right' })} aria-hidden="true" />
                     </button>
                   ))}

@@ -3,6 +3,7 @@ import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 
 import type { PersistedTimelineClip } from '@openvideo/shared/timelineTypes';
+import { clipDurationMs } from '@openvideo/shared/timelineClipGeometry';
 import { handleWidthFor, MIN_CLIP_WIDTH } from '../lib/timelineHandles';
 import { useClipThumbnails } from '../lib/thumbnails';
 import { theme } from '../lib/theme';
@@ -57,7 +58,9 @@ export function TimelineClip({
   /** Lets the screen freeze the scroll view for the duration of a drag. */
   readonly onDragStateChange: (dragging: boolean) => void;
 }) {
-  const lengthMs = clip.sourceEndMs - clip.sourceStartMs;
+  // How long it sits on the timeline, which at anything but 1× is not the
+  // same as how much source it uses.
+  const lengthMs = clipDurationMs(clip);
   const width = Math.max(MIN_CLIP_WIDTH, lengthMs * pxPerMs);
   const handle = handleWidthFor(width);
   /*

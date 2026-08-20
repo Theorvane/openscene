@@ -4,6 +4,7 @@ import { getMcpServerDefinition, McpResource, McpServer, McpTool } from '@theorv
 import { z } from 'zod';
 import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, type ClipEffects, type TimelineTrack } from '../shared/timelineTypes';
 import { deleteClip, placeClip } from '../shared/timelineClipLogic';
+import { clipDurationMs } from '../shared/timelineClipGeometry';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '../shared/timelineClipPlacement';
 import type { ExportIpcService } from './exportIpcService';
 import type { ResultAssetImportService } from './resultAssetImportService';
@@ -762,7 +763,7 @@ export class OpenVideoMcpServer {
         trackId: targetTrack.id,
         assetId: params.assetId,
         startOffsetSeconds: timelineStartMs / 1000,
-        durationSeconds: (newClip.sourceEndMs - newClip.sourceStartMs) / 1000,
+        durationSeconds: clipDurationMs(newClip) / 1000,
         message: `Added clip ${clipId} to track ${targetTrack.id} in project ${params.projectId}`
       };
     } catch (err) {
