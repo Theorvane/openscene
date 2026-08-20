@@ -14,6 +14,7 @@ import {
   trimClipRight,
   updateClipEffects
 } from '../../../shared/timelineLogic';
+import { isValidClipEffects } from '../../../shared/timelineEffects';
 import {
   cutNearest,
   removeTransitionAtCut,
@@ -21,6 +22,7 @@ import {
   transitionForCut,
   type TimelineCut
 } from '../../../shared/timelineTransitionLogic';
+import { DEFAULT_CLIP_EFFECTS } from '../../../shared/timelineTypes';
 import type {
   ClipEffects,
   LocalProjectSnapshot,
@@ -404,7 +406,22 @@ export function useTimelineEditor() {
 
   const updateSelectedClipEffects = useCallback((effects: Partial<ClipEffects>) => {
     if (selectedClip === null) return;
-    replaceTimeline((timeline) => updateClipEffects(timeline, { clipId: selectedClip.clip.id, effects }), 'Updated selected clip effects.');
+    /*
+      Two ways this can be refused, and the generic message fits only one.
+
+      Until speed, an effect could only be out of range. Speed changes how much
+      room the clip takes, so slowing one down can also be refused for running
+      into its neighbour — and the shared rule returns `null` either way. If the
+      values themselves are fine, the refusal was about where the clip lands.
+    */
+    const next: ClipEffects = { ...DEFAULT_CLIP_EFFECTS, ...selectedClip.clip.effects, ...effects };
+    replaceTimeline(
+      (timeline) => updateClipEffects(timeline, { clipId: selectedClip.clip.id, effects }),
+      'Updated selected clip effects.',
+      isValidClipEffects(next)
+        ? 'A slower clip needs more room — move the next clip along first.'
+        : undefined
+    );
   }, [replaceTimeline, selectedClip]);
 
   const undoTimeline = useCallback(() => {

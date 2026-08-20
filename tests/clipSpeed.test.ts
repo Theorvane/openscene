@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { compileFfmpegTimeline } from '../src/shared/ffmpegTimelineCompiler';
 import { splitClip, trimClipLeft, trimClipRight, updateClipEffects } from '../src/shared/timelineClipLogic';
+import { isValidClipEffects } from '../src/shared/timelineEffects';
 import { clipDurationMs, clipSourceSpanMs, clipSpeed, sourceTimeMsAt } from '../src/shared/timelineClipGeometry';
 import { createInitialTimeline } from '../src/shared/timelineLogic';
 import { parseTimelineDocument } from '../src/shared/timelineDocumentValidators';
@@ -181,6 +182,71 @@ describe('a transition on a retimed clip', () => {
     });
     const graph = args[args.indexOf('-filter_complex') + 1] ?? '';
     expect(graph).toContain('fade=t=out:st=1.75:d=0.25:alpha=1');
+  });
+});
+
+describe('why a retime is refused', () => {
+  /*
+    Speed is the first effect that can be refused for a reason that has nothing
+    to do with its value.
+
+    Slowing a clip makes it longer, which can run it into its neighbour, and the
+    shared rule answers `null` to that exactly as it answers `null` to a rate
+    out of range. Being told "that value is outside what the effect accepts"
+    while looking at 1.75×, which is plainly inside the range, is the editor
+    lying about its own rules — so both surfaces work out which refusal it was.
+  */
+  it('refuses a slower clip that would collide, while the rate itself is valid', () => {
+    const base = timelineWithSpeed(2);
+    const timeline: TimelineDocument = {
+      ...base,
+      tracks: base.tracks.map((track) =>
+        track.kind !== 'video'
+          ? track
+          : {
+              ...track,
+              // Clip A occupies 0–2000 at 2×; the next clip starts right after.
+              clips: [
+                track.clips[0]!,
+                { ...track.clips[0]!, id: 'clip-b', timelineStartMs: 2_100, sourceStartMs: 0, sourceEndMs: 4_000 }
+              ]
+            }
+      )
+    } as TimelineDocument;
+
+    const slower = { ...DEFAULT_CLIP_EFFECTS, speed: 1.75 };
+    // The values are fine...
+    expect(isValidClipEffects(slower)).toBe(true);
+    // ...and the edit is still refused, because 4s at 1.75× is 2.29s and the
+    // neighbour is 2.1s away.
+    expect(updateClipEffects(timeline, { clipId: 'clip-a', effects: { speed: 1.75 } })).toBeNull();
+  });
+
+  it('accepts the same rate once there is room', () => {
+    const base = timelineWithSpeed(2);
+    const timeline: TimelineDocument = {
+      ...base,
+      tracks: base.tracks.map((track) =>
+        track.kind !== 'video'
+          ? track
+          : {
+              ...track,
+              clips: [
+                track.clips[0]!,
+                { ...track.clips[0]!, id: 'clip-b', timelineStartMs: 6_000, sourceStartMs: 0, sourceEndMs: 4_000 }
+              ]
+            }
+      )
+    } as TimelineDocument;
+    expect(updateClipEffects(timeline, { clipId: 'clip-a', effects: { speed: 1.75 } })).not.toBeNull();
+  });
+
+  it('is said out loud on both surfaces', async () => {
+    const room = 'A slower clip needs more room';
+    const mobile = await readFile(new URL('../mobile/src/lib/editorState.ts', import.meta.url), 'utf8');
+    const desktop = await readFile(new URL('../src/renderer/src/editor/useTimelineEditor.ts', import.meta.url), 'utf8');
+    expect(mobile).toContain(room);
+    expect(desktop).toContain(room);
   });
 });
 

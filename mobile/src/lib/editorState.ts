@@ -10,6 +10,7 @@ import {
   updateClipEffects
 } from '@openvideo/shared/timelineClipLogic';
 import { addTrack, createInitialTimeline, removeTrack, timelineDurationMs } from '@openvideo/shared/timelineLogic';
+import { isValidClipEffects } from '@openvideo/shared/timelineEffects';
 import { updateAudioTrackMix } from '@openvideo/shared/timelineMetadataLogic';
 import { resolveVisibleClip } from '@openvideo/shared/timelinePlayback';
 import {
@@ -307,18 +308,33 @@ export function useMobileEditor(persist?: (timeline: TimelineDocument) => void) 
         'That trim would make the clip shorter than a frame.'
       ),
 
-    setSelectedEffects: (effects: Partial<ClipEffects>) =>
+    setSelectedEffects: (effects: Partial<ClipEffects>) => {
+      /*
+        Two ways this can be refused, and they read nothing alike.
+
+        Until speed, an effect could only ever be out of range, so one message
+        covered it. Speed changes how much room the clip takes, so slowing one
+        down can also be refused for running into its neighbour — and being told
+        "that value is outside what the effect accepts" while looking at 1.75×,
+        which is plainly inside the range, is the editor lying about its own
+        rules. The shared rule returns `null` either way, so the difference is
+        worked out here: if the values themselves are fine, the refusal was
+        about where the clip would land.
+      */
+      const next = selectedClip === null ? null : { ...selectedClip.clip.effects, ...effects };
+      const rejection =
+        next !== null && isValidClipEffects(next)
+          ? 'A slower clip needs more room — move the next clip along first.'
+          : 'That value is outside what the effect accepts.';
       apply(
         'Adjust',
         (current) =>
-          selectedClip === null
+          selectedClip === null || next === null
             ? null
-            : updateClipEffects(current, {
-                clipId: selectedClip.clip.id,
-                effects: { ...selectedClip.clip.effects, ...effects }
-              }),
-        'That value is outside what the effect accepts.'
-      ),
+            : updateClipEffects(current, { clipId: selectedClip.clip.id, effects: next }),
+        rejection
+      );
+    },
 
     setTrackMuted: (trackId: string, muted: boolean) =>
       apply(
