@@ -57,6 +57,26 @@ const FRAME_LABELS: Readonly<Record<FramePreference, string>> = {
  */
 const COLOUR_IS_RENDERED = Platform.OS !== 'ios';
 
+/**
+ * A quarter turn, wrapped.
+ *
+ * The stored range is 0–360 and 360 is the same picture as 0, so turning past
+ * either end comes back round rather than stopping — a control that refuses the
+ * fourth tap after three would read as broken.
+ */
+function turn(rotation: number, by: number): number {
+  return (Math.round(rotation) + by + 360) % 360;
+}
+
+/** How far one tap moves a clip, in output-frame pixels. */
+const POSITION_STEP_PX = 40;
+
+/** A nudge, held inside what the renderers accept. */
+function nudge(value: number, delta: number): number {
+  const range = CLIP_EFFECT_RANGES.positionX;
+  return Math.min(range.max, Math.max(range.min, Math.round(value) + delta));
+}
+
 /** One step of a colour control, held inside what the renderers accept. */
 function stepColour(value: number, delta: number, key: 'brightness' | 'contrast' | 'saturation'): number {
   const range = CLIP_EFFECT_RANGES[key];
@@ -829,6 +849,36 @@ export function EditScreen({
             value={`${Math.round(selected.clip.effects.scale * 100)}%`}
             onDown={() => editor.setSelectedEffects({ scale: Math.max(0.1, selected.clip.effects.scale - 0.1) })}
             onUp={() => editor.setSelectedEffects({ scale: Math.min(4, selected.clip.effects.scale + 0.1) })}
+          />
+          {/*
+            Straightening a clip, and moving it in the frame.
+
+            Quarter turns rather than a fine angle: what a phone actually needs
+            is a clip filmed sideways set upright, and a degree at a time on a
+            stepper is a control nobody finishes using. The odd angle stays a
+            desktop job.
+
+            The position steps are output-frame pixels — the units the plan and
+            all three renderers already mean — so 40 is the same distance here
+            as it is in an exported file.
+          */}
+          <Stepper
+            label="Rotate"
+            value={`${Math.round(selected.clip.effects.rotation)}°`}
+            onDown={() => editor.setSelectedEffects({ rotation: turn(selected.clip.effects.rotation, -90) })}
+            onUp={() => editor.setSelectedEffects({ rotation: turn(selected.clip.effects.rotation, 90) })}
+          />
+          <Stepper
+            label="Left/Right"
+            value={`${Math.round(selected.clip.effects.positionX)}px`}
+            onDown={() => editor.setSelectedEffects({ positionX: nudge(selected.clip.effects.positionX, -POSITION_STEP_PX) })}
+            onUp={() => editor.setSelectedEffects({ positionX: nudge(selected.clip.effects.positionX, POSITION_STEP_PX) })}
+          />
+          <Stepper
+            label="Up/Down"
+            value={`${Math.round(selected.clip.effects.positionY)}px`}
+            onDown={() => editor.setSelectedEffects({ positionY: nudge(selected.clip.effects.positionY, -POSITION_STEP_PX) })}
+            onUp={() => editor.setSelectedEffects({ positionY: nudge(selected.clip.effects.positionY, POSITION_STEP_PX) })}
           />
           {/*
             Length and start as numbers, because the handles are not always
