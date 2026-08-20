@@ -48,7 +48,7 @@ public enum AudioPeaks {
     guard reader.startReading() else { return [] }
 
     var peaks = [Double](repeating: 0, count: wanted)
-    var readSeconds = 0.0
+    let startSeconds = startMs / 1_000
 
     while let sample = output.copyNextSampleBuffer() {
       guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
@@ -57,22 +57,38 @@ public enum AudioPeaks {
       guard CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: &length, dataPointerOut: &pointer) == noErr,
             let bytes = pointer else { continue }
 
+      /*
+       Each sample goes in the bucket its own moment falls in.
+
+       One bucket per buffer put a whole buffer's loudest sample wherever that
+       buffer started, so chunks straddling a boundary smeared the tone back
+       across the silence — CI read 0.36 in a half that was meant to be silent.
+       A sample's moment is its buffer's timestamp plus its offset at the
+       sampling rate, and that is what decides where it lands.
+       */
+      let format = CMSampleBufferGetFormatDescription(sample)
+      let basic = format.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee }
+      let rate = basic?.mSampleRate ?? 44_100
+      let channels = Double(basic?.mChannelsPerFrame ?? 1)
+      let bufferStart = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample)) - startSeconds
       let count = length / MemoryLayout<Int16>.size
-      let bucket = min(wanted - 1, max(0, Int((readSeconds / spanSeconds) * Double(wanted))))
-      var loudest = 0.0
+
       bytes.withMemoryRebound(to: Int16.self, capacity: count) { samples in
         // Every fiftieth sample: a peak does not move meaningfully between
         // neighbours, and reading them all is the difference between a waveform
         // that appears and one that arrives late.
         var index = 0
         while index < count {
-          let value = abs(Double(samples[index])) / 32_768
-          if value > loudest { loudest = value }
+          let frame = Double(index) / max(1, channels)
+          let position = (bufferStart + frame / rate) / spanSeconds
+          if position >= 0, position < 1 {
+            let bucket = min(wanted - 1, max(0, Int(position * Double(wanted))))
+            let value = abs(Double(samples[index])) / 32_768
+            if value > peaks[bucket] { peaks[bucket] = value }
+          }
           index += 50
         }
       }
-      if loudest > peaks[bucket] { peaks[bucket] = loudest }
-      readSeconds += CMTimeGetSeconds(CMSampleBufferGetDuration(sample))
     }
 
     return reader.status == .failed ? [] : peaks

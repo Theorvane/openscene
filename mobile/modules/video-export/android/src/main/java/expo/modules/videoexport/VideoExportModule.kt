@@ -689,20 +689,35 @@ class VideoExportModule : Module() {
         if (out >= 0) {
           val buffer = codec.getOutputBuffer(out)
           if (buffer != null && info.size > 0) {
-            val positionUs = info.presentationTimeUs - (startMs * 1_000).toLong()
-            val bucket = ((positionUs.toDouble() / spanUs) * wanted).toInt().coerceIn(0, wanted - 1)
+            /*
+              Each sample goes in the bucket its own moment falls in.
+
+              One bucket per buffer puts a whole buffer's loudest sample
+              wherever that buffer started, so a chunk straddling a boundary
+              smears a loud passage back over a quiet one. The iOS reader had
+              the same fault and CI measured it: a third of full scale in a half
+              that was meant to be silent.
+            */
+            val outputFormat = codec.outputFormat
+            val rate = outputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE, 44_100).toDouble()
+            val channels = outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT, 1).coerceAtLeast(1)
+            val bufferStartUs = info.presentationTimeUs - (startMs * 1_000).toLong()
             val shorts = buffer.order(ByteOrder.nativeOrder()).asShortBuffer()
-            var loudest = 0.0
             // Every fiftieth sample: a peak does not move meaningfully between
             // neighbours, and reading them all is the difference between a
             // waveform that appears and one that arrives late.
             var index = 0
             while (index < shorts.limit()) {
-              val value = abs(shorts.get(index).toInt()) / 32_768.0
-              if (value > loudest) loudest = value
+              val frame = index / channels
+              val positionUs = bufferStartUs + (frame * 1_000_000.0 / rate)
+              val position = positionUs / spanUs
+              if (position >= 0 && position < 1) {
+                val bucket = (position * wanted).toInt().coerceIn(0, wanted - 1)
+                val value = abs(shorts.get(index).toInt()) / 32_768.0
+                if (value > peaks[bucket]) peaks[bucket] = value
+              }
               index += 50
             }
-            if (loudest > peaks[bucket]) peaks[bucket] = loudest
           }
           codec.releaseOutputBuffer(out, false)
           if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) sawOutput = true
