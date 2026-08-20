@@ -32,6 +32,9 @@ struct SegmentInput: Record {
 struct DipInput: Record {
   @Field var startMs: Double = 0
   @Field var durationMs: Double = 0
+}
+
+/// Words over the finished picture, in output-frame pixels from the centre.
 struct TitleInput: Record {
   @Field var text: String = ""
   @Field var timelineStartMs: Double = 0
