@@ -198,11 +198,37 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: theme.accent,
     paddingHorizontal: 8,
-    justifyContent: 'center',
-    overflow: 'hidden'
+    justifyContent: 'center'
+    // No `overflow: 'hidden'` here: see `filmstrip`. The label is kept inside
+    // by the layout — a fixed-width flex parent and `numberOfLines={1}` — and
+    // not by clipping.
   },
   audio: { backgroundColor: theme.mint },
-  filmstrip: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row' },
+  /*
+    The strip does the clipping, not the clip.
+
+    `overflow: 'hidden'` on the clip container — the obvious place for it, and
+    where it used to be — stopped the clip's children from painting after any
+    *other* clip re-rendered. The frames and the label vanished, leaving a bare
+    coloured block whose children were still in the view tree; touching that clip
+    brought it back and blanked the one before it. Only ever one clip drawn at a
+    time, which is the opposite of what a filmstrip is for.
+
+    Plain views inside the same clipped container painted fine, so it is the
+    images that get lost. Moving the clip to the strip keeps the rounded corners
+    and keeps every clip drawn. Found by bisecting the styles on a device; there
+    was nothing to read in a log.
+  */
+  filmstrip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    borderRadius: 6,
+    overflow: 'hidden'
+  },
   // Each frame takes an equal share of the clip, so the strip stays even as the
   // timeline zooms and the count changes.
   frame: { flex: 1, height: '100%' },
