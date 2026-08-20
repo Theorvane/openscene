@@ -1,0 +1,8 @@
+Editing on a phone that behaves like editing.
+
+• Drag a clip to move it, drag its ends to trim, pinch to zoom the timeline
+• Adjust panel for opacity, scale, start, length and volume — and what you set is what gets exported
+• A clip's own sound now goes into the export instead of being dropped
+• Steppers for start and length, so a precise cut no longer depends on grabbing a 22-point edge
+
+Fixes: exported clips now carry the effects the editor shows, and a timeline that starts with a gap exports instead of failing.
