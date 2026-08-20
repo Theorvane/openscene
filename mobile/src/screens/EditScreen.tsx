@@ -520,6 +520,8 @@ export function EditScreen({
                     pxPerMs={pxPerMs}
                     selected={clip.id === editor.selectedClipId}
                     label={editor.assetFor(clip.assetId)?.displayName ?? clip.assetId}
+                    assetUri={editor.assetFor(clip.assetId)?.uri ?? null}
+                    still={editor.assetFor(clip.assetId)?.kind === 'image'}
                     onSelect={() => editor.setSelectedClipId(clip.id)}
                     onMove={(startMs) => editor.moveClipTo(clip.id, track.id, startMs)}
                     onTrim={(edge, atMs) => editor.trimClipTo(clip.id, edge, atMs)}

@@ -1,9 +1,10 @@
 import { useMemo, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 
 import type { PersistedTimelineClip } from '@openvideo/shared/timelineTypes';
 import { handleWidthFor, MIN_CLIP_WIDTH } from '../lib/timelineHandles';
+import { useClipThumbnails } from '../lib/thumbnails';
 import { theme } from '../lib/theme';
 
 /**
@@ -29,6 +30,8 @@ export function TimelineClip({
   clip,
   label,
   kind,
+  assetUri,
+  still,
   selected,
   pxPerMs,
   scrollGesture,
@@ -40,6 +43,10 @@ export function TimelineClip({
   readonly clip: PersistedTimelineClip;
   readonly label: string;
   readonly kind: 'video' | 'audio';
+  /** Where the clip's media lives, for the frames drawn along it. Null while it loads. */
+  readonly assetUri?: string | null;
+  /** A still has no frames to decode — it is already the picture. */
+  readonly still?: boolean;
   readonly selected: boolean;
   readonly pxPerMs: number;
   /** The lane scroller's gesture, so a drag on a clip can state that it outranks scrolling. */
@@ -53,6 +60,17 @@ export function TimelineClip({
   const lengthMs = clip.sourceEndMs - clip.sourceStartMs;
   const width = Math.max(MIN_CLIP_WIDTH, lengthMs * pxPerMs);
   const handle = handleWidthFor(width);
+  /*
+    Audio has no picture, and a still is already one — decoding a PNG to show it
+    to itself is work for nothing, so the image is drawn directly.
+  */
+  const decoded = useClipThumbnails({
+    assetId: clip.assetId,
+    uri: kind === 'video' && still !== true ? assetUri ?? null : null,
+    clip,
+    widthPx: width
+  });
+  const thumbnails = kind === 'video' && still === true && assetUri != null ? [assetUri] : decoded;
 
   /*
     Plain `Animated`, driven from the gesture's callbacks.
@@ -120,7 +138,23 @@ export function TimelineClip({
           animated
         ]}
       >
-        <Text style={styles.label} numberOfLines={1}>
+        {/*
+          The frames, under everything else.
+
+          A clip used to be a coloured rectangle with a filename on it, which on
+          a phone made two clips from one source impossible to tell apart —
+          finding a shot meant scrubbing the playhead and watching the preview.
+          The strip is decorative in the strict sense: it never blocks an edit,
+          and a source that will not decode leaves the clip exactly as it was.
+        */}
+        {thumbnails.length > 0 && (
+          <View pointerEvents="none" style={styles.filmstrip}>
+            {thumbnails.map((uri, index) => (
+              <Image key={`${uri.length}-${index}`} source={{ uri }} style={styles.frame} resizeMode="cover" />
+            ))}
+          </View>
+        )}
+        <Text style={[styles.label, thumbnails.length > 0 && styles.labelOverFrames]} numberOfLines={1}>
           {label}
         </Text>
         {/*
@@ -155,6 +189,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden'
   },
   audio: { backgroundColor: theme.mint },
+  filmstrip: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row' },
+  // Each frame takes an equal share of the clip, so the strip stays even as the
+  // timeline zooms and the count changes.
+  frame: { flex: 1, height: '100%' },
+  // Over frames the label needs its own ground; on the bare block it does not.
+  labelOverFrames: {
+    color: theme.text,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    overflow: 'hidden'
+  },
   selected: { borderWidth: 2, borderColor: theme.text },
   label: { color: theme.bg, fontSize: 11, fontWeight: '700' },
   // Translucent, because at full width an opaque bar would hide the clip rather

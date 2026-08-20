@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { formatDuration } from '../format';
 import { buildTimelineView, clientXToTimelineMs } from './editorTimelineView';
 import { buildRulerTicks } from './timelineRulerTicks';
+import { useClipThumbnails } from './clipThumbnails';
+import type { ThumbnailClip } from '../../../shared/clipThumbnails';
 import type { TimelineEditorController } from './useTimelineEditor';
 
 type TimelineCanvasProps = {
@@ -137,6 +139,60 @@ function trackToggleStyle(isOn: boolean, tone: 'danger' | 'warning' | 'primary')
   };
 }
 
+/**
+ * The frames drawn inside a clip.
+ *
+ * Its own component because it holds state — the frames arrive after a decode —
+ * and a clip that re-rendered the whole canvas each time one landed would make
+ * the timeline stutter while it filled in.
+ *
+ * Width comes from the lane, because the clip is sized as a percentage of it and
+ * how many frames fit is a question about pixels.
+ */
+function ClipFilmstrip({
+  assetId,
+  clip,
+  laneWidthPx,
+  projectId,
+  widthPercent
+}: {
+  readonly assetId: string;
+  // Only the source window matters here — which frames to show is a question
+  // about the clip's window into its media, not about its effects.
+  readonly clip: ThumbnailClip;
+  readonly laneWidthPx: number;
+  readonly projectId: string;
+  readonly widthPercent: number;
+}): ReactElement | null {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void window.videoTool.getAssetPlaybackUrl({ projectId, assetId }).then((response) => {
+      if (live && response.ok) setUrl(response.value.url);
+    });
+    return () => {
+      live = false;
+    };
+  }, [assetId, projectId]);
+
+  const frames = useClipThumbnails({
+    assetId,
+    url,
+    clip,
+    widthPx: (laneWidthPx * widthPercent) / 100
+  });
+  if (frames.length === 0) return null;
+
+  return (
+    <span aria-hidden="true" className="timeline-clip__filmstrip">
+      {frames.map((frame: string, index: number) => (
+        <img key={`${index}-${frame.length}`} src={frame} alt="" />
+      ))}
+    </span>
+  );
+}
+
 export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElement {
   const project = editor.project;
   const view = project === null ? null : buildTimelineView(project.timeline, project.assets);
@@ -201,6 +257,15 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
   // the pointer stays anchored while the content width scales. Plain and shift
   // wheel keep native scrolling. Attached natively so preventDefault is honored.
   const stackRef = useRef<HTMLDivElement | null>(null);
+  /*
+    The lane's width in pixels, watched rather than assumed.
+
+    Clips are laid out as percentages of the lane, but how many frames fit
+    inside one is a question about pixels — and the answer changes with every
+    splitter drag and zoom step, so a value read once is wrong for the rest of
+    the session.
+  */
+  const [laneWidthPx, setLaneWidthPx] = useState(0);
   const zoomAnchorRef = useRef<{ anchorX: number; scrollLeft: number; previousZoom: number } | null>(null);
   const zoomLevelRef = useRef(zoomLevel);
   zoomLevelRef.current = zoomLevel;
@@ -463,7 +528,10 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
       ) : (
         <div
           className="timeline-stack"
-          ref={stackRef}
+          ref={(element) => {
+            stackRef.current = element;
+            if (element !== null) setLaneWidthPx(element.clientWidth);
+          }}
           onPointerDown={onStackPointerDown}
           onPointerMove={onStackPointerMove}
           onPointerUp={onStackPointerUp}
@@ -810,6 +878,15 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                       title={`${block.assetName} starts at ${formatDuration(block.clip.timelineStartMs)}`}
                       aria-label={`${block.assetName}, ${block.kind} clip from ${formatDuration(block.clip.timelineStartMs)} for ${formatDuration(block.clip.sourceEndMs - block.clip.sourceStartMs)}`}
                     >
+                      {track.kind === 'video' && editor.project !== null && (
+                        <ClipFilmstrip
+                          assetId={block.clip.assetId}
+                          clip={block.clip}
+                          laneWidthPx={laneWidthPx}
+                          projectId={editor.project.id}
+                          widthPercent={block.widthPercent}
+                        />
+                      )}
                       <span className="timeline-clip__handle timeline-clip__handle--left" draggable={!lockedTracks[track.id] && activeTool === 'select'} onDragStart={(event) => writeTimelineDrag(event, { kind: 'trim', clipId: block.clip.id, edge: 'left' })} aria-hidden="true" />
                       <strong>{block.assetName}</strong>
                       <small>{formatDuration(block.clip.sourceEndMs - block.clip.sourceStartMs)}</small>

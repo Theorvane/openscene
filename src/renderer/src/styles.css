@@ -6118,3 +6118,45 @@ button {
     flex-direction: column;
   }
 }
+
+/*
+  Frames along a clip.
+
+  Behind the label and the handles, and never in the way of them: a filmstrip is
+  there to say which shot this is, and the controls still have to be readable
+  over it. `pointer-events: none` because the whole clip is one button — a strip
+  that swallowed a drag would break trimming.
+*/
+.timeline-clip__filmstrip {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+  opacity: 0.85;
+}
+
+.timeline-clip__filmstrip img {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Over frames, the text needs its own ground to stay legible. */
+.timeline-clip:has(.timeline-clip__filmstrip) > strong,
+.timeline-clip:has(.timeline-clip__filmstrip) > small {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+  padding: 0 4px;
+  border-radius: var(--radius-xs);
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+}
+
+.timeline-clip__handle {
+  z-index: 2;
+}
