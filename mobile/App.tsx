@@ -157,6 +157,10 @@ function Shell() {
     prepareExportAd();
     const rendered = await exportTimeline({
       timeline: current.timeline,
+      // The project's own choice, and absent means the footage decides — a cut
+      // of one upright clip comes out upright rather than pillarboxed inside a
+      // landscape frame, which is what this used to do to every phone video.
+      ...(current.frame === undefined ? {} : { frame: current.frame }),
       assets: current.assets.map((asset) => ({
         id: asset.id,
         uri: assetUri(current.id, asset),

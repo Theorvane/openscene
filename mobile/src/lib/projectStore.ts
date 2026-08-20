@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
 import { parseTimelineDocument } from '@openvideo/shared/timelineDocumentValidators';
+import type { FramePreference } from '@openvideo/shared/outputFrame';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '@openvideo/shared/timelineClipPlacement';
 import { placeClip } from '@openvideo/shared/timelineClipLogic';
 import { isStill, stillClipSource } from '@openvideo/shared/timelineStills';
@@ -71,9 +72,22 @@ export type MobileProject = {
   readonly updatedAt: string;
   readonly assets: readonly MobileAsset[];
   readonly timeline: TimelineDocument;
+  /**
+   * The frame this project exports into.
+   *
+   * Kept beside the project rather than inside the timeline: it is a decision
+   * about a destination, not about the cut, and a timeline that carried it
+   * would have to explain itself to the desktop, which derives the frame from
+   * the footage already. Absent means the footage decides.
+   */
+  readonly frame?: FramePreference;
 };
 
 export type ProjectSummary = { readonly id: string; readonly name: string; readonly updatedAt: string };
+
+function isFramePreference(value: unknown): value is FramePreference {
+  return value === 'source' || value === 'landscape' || value === 'portrait' || value === 'square';
+}
 
 function ensureRoot(): void {
   if (!ROOT.exists) ROOT.create({ intermediates: true });
@@ -141,7 +155,10 @@ export function readProject(id: string): MobileProject | null {
       // was fixed hold the same asset twice, which renders as duplicate keys and
       // counts double against the library. The first record wins.
       assets: dedupeAssets(Array.isArray(candidate.assets) ? (candidate.assets as MobileAsset[]) : []),
-      timeline
+      timeline,
+      // A stored preference nobody recognises reads as absent, which is the
+      // footage deciding — the same answer a project written before this had.
+      ...(isFramePreference(candidate.frame) ? { frame: candidate.frame } : {})
     };
   } catch {
     // An unreadable project is reported as absent rather than crashing the list;

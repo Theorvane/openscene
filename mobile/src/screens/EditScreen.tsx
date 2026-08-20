@@ -34,6 +34,17 @@ const TRANSITION_LABELS: Readonly<Record<TransitionType, string>> = {
   dipToBlack: 'Dip to black'
 };
 import { CLIP_EFFECT_RANGES } from '@openvideo/shared/timelineTypes';
+import { outputFrameFor, type FramePreference } from '@openvideo/shared/outputFrame';
+
+/** In the order the row cycles: the common answer first. */
+const FRAME_ORDER = ['source', 'portrait', 'landscape', 'square'] as const;
+
+const FRAME_LABELS: Readonly<Record<FramePreference, string>> = {
+  source: 'Source',
+  portrait: 'Portrait',
+  landscape: 'Landscape',
+  square: 'Square'
+};
 
 /**
  * Whether this phone's renderer applies a grade.
@@ -126,6 +137,36 @@ export function EditScreen({
   const [inspecting, setInspecting] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [titling, setTitling] = useState(false);
+  const [framePreference, setFramePreference] = useState<FramePreference>('source');
+
+  // Read once per project: the choice belongs to the project, not to this screen.
+  useEffect(() => {
+    if (projectId === null) return;
+    setFramePreference(readProject(projectId)?.frame ?? 'source');
+  }, [projectId, reloadToken]);
+
+  /*
+    What this cut would export as, so the row shows a size rather than a word.
+
+    From the editor's own assets rather than the media bin's list: the bin is
+    loaded when the project opens and is stale the moment something is imported,
+    which had this row claiming 1920×1080 over a clip that was plainly upright.
+    The editor's list is the one the timeline is drawn from, so it is the one
+    that agrees with what the export will do.
+  */
+  const exportFrame = outputFrameFor({
+    timeline: editor.timeline,
+    assets: editor.assets,
+    preference: framePreference
+  });
+
+  const cycleFrame = useCallback(() => {
+    if (projectId === null) return;
+    const next = FRAME_ORDER[(FRAME_ORDER.indexOf(framePreference) + 1) % FRAME_ORDER.length] as FramePreference;
+    setFramePreference(next);
+    const project = readProject(projectId);
+    if (project !== null) writeProject({ ...project, frame: next });
+  }, [framePreference, projectId]);
   /** The title covering the playhead, which is the one the panel and preview both show. */
   const activeTitle = editor.titleAtPlayhead;
   const [dragging, setDragging] = useState(false);
@@ -693,6 +734,20 @@ export function EditScreen({
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => editor.addTrack('audio')} style={press(styles.sheetRow)}>
             <Text style={styles.sheetRowText}>Add an audio track</Text>
+          </Pressable>
+          {/*
+            The shape the export comes out.
+
+            One row that cycles rather than four that sit there: the answer is
+            usually "the footage", and the other three exist for a cut made for
+            somewhere in particular. The frame it would use right now is shown
+            beside the choice, because "Source" on its own tells you nothing
+            about what you are going to get.
+          */}
+          <Pressable accessibilityRole="button" onPress={cycleFrame} style={press(styles.sheetRow)}>
+            <Text style={styles.sheetRowText}>
+              {`Frame: ${FRAME_LABELS[framePreference]} · ${exportFrame.width}×${exportFrame.height}`}
+            </Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => setMoreOpen(false)} style={press(styles.sheetRow)}>
             <Text style={styles.sheetRowText}>Close</Text>

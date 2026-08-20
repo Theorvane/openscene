@@ -1,3 +1,4 @@
+import { outputFrameFor, type FramePreference } from '@openvideo/shared/outputFrame';
 import { buildCompositionPlan, CompositionPlanError } from '@openvideo/shared/videoCompositionPlan';
 import type { CompositionSegment } from '@openvideo/shared/videoCompositionPlan';
 import type { TimelineDocument } from '@openvideo/shared/timelineTypes';
@@ -38,8 +39,11 @@ export type ExportOutcome =
 export async function exportTimeline(input: {
   readonly timeline: TimelineDocument;
   readonly assets: readonly EditorAsset[];
-  readonly width?: number;
-  readonly height?: number;
+  /**
+   * The frame to render into. Absent means the footage decides — a cut of one
+   * upright clip comes out upright, which is what a phone editor owes its user.
+   */
+  readonly frame?: FramePreference;
   readonly frameRate?: number;
 }): Promise<ExportOutcome> {
   let plan;
@@ -56,8 +60,7 @@ export async function exportTimeline(input: {
       // proposal rather than a fact. The native renderer checks each file before
       // using its audio, which is the only place the answer actually lives.
       audibleAssetIds: new Set(input.assets.filter((asset) => asset.kind !== 'image').map((asset) => asset.id)),
-      width: input.width ?? 1920,
-      height: input.height ?? 1080,
+      ...outputFrameFor({ timeline: input.timeline, assets: input.assets, ...(input.frame === undefined ? {} : { preference: input.frame }) }),
       frameRate: input.frameRate ?? 30
     });
   } catch (error) {
