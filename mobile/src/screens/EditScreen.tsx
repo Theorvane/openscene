@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { nextVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
 import { clipDurationMs, clipTimelineEndMs } from '@openvideo/shared/timelineClipGeometry';
 import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
+import { track } from '../lib/analyticsClient';
 import { theme } from '../lib/theme';
 import { useMobileEditor, type EditorAsset } from '../lib/editorState';
 import {
@@ -184,6 +185,14 @@ export function EditScreen({
     if (projectId === null) return;
     const next = FRAME_ORDER[(FRAME_ORDER.indexOf(framePreference) + 1) % FRAME_ORDER.length] as FramePreference;
     setFramePreference(next);
+    // Whether people leave the frame to the footage or ask for something else,
+    // as flags — the choice is a small closed set, not free text.
+    track('export_frame_changed', {
+      source: next === 'source',
+      portrait: next === 'portrait',
+      landscape: next === 'landscape',
+      square: next === 'square'
+    });
     const project = readProject(projectId);
     if (project !== null) writeProject({ ...project, frame: next });
   }, [framePreference, projectId]);
@@ -389,6 +398,12 @@ export function EditScreen({
       kind: 'video'
     });
     writeProject({ ...project, assets: [...project.assets, stored] });
+    // How long a clip people bring in, and the shape of it. Never its name or
+    // where it came from.
+    track('clip_imported', {
+      seconds: stored.durationMs / 1_000,
+      portrait: stored.height > stored.width
+    });
 
     const asset: EditorAsset = {
       id: stored.id,

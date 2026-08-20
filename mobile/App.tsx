@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -88,6 +88,16 @@ function Shell() {
     setConnectionsVersion((version) => version + 1);
   };
   const [exportState, setExportState] = useState<ExportState>({ kind: 'idle' });
+
+  /*
+    Once per launch, and nothing else about it.
+
+    Declared since analytics arrived and never sent, which made every other
+    number impossible to read: exports per what?
+  */
+  useEffect(() => {
+    track('app_opened');
+  }, []);
   /**
    * Where the tab body starts, measured rather than assumed.
    *

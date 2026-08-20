@@ -163,3 +163,61 @@ describe('the claims about it', () => {
     expect(screen).toMatch(/switchLabel: \{(?![^}]*textTransform)[^}]*\}/);
   });
 });
+
+/**
+ * The list was mostly aspiration.
+ *
+ * Nine events were declared and three were ever sent, all about export — so the
+ * dashboard could say how often people exported and nothing about whether what
+ * they exported had been edited, which is the only question worth asking of an
+ * editor.
+ */
+describe('the events the app actually sends', () => {
+  const read = (path: string) => readFile(new URL(`../mobile/${path}`, import.meta.url), 'utf8');
+
+  it('sends every event it declares', async () => {
+    const sources = (
+      await Promise.all([
+        read('App.tsx'),
+        read('src/lib/editorState.ts'),
+        read('src/screens/EditScreen.tsx'),
+        read('src/screens/ProjectsScreen.tsx')
+      ])
+    ).join('\n');
+
+    // Generation is the AI studio's to send, and lives behind a provider key
+    // this suite has no business exercising.
+    const wired = ANALYTICS_EVENTS.filter((event) => !event.startsWith('generation_'));
+    for (const event of wired) {
+      expect(sources, `${event} is declared but never sent`).toContain(`'${event}'`);
+    }
+  });
+
+  it('reports an edit only once it has been accepted', async () => {
+    // A refused tap is not use of a feature, and `apply` decides inside a state
+    // updater — so the report goes out with the write that follows it, not from
+    // inside the updater.
+    const state = await read('src/lib/editorState.ts');
+    expect(state).toMatch(/pendingEvent\.current = null;\s*\n\s*track\(/);
+  });
+
+  it('says which control was used without saying what it was set to', async () => {
+    // "Someone graded a clip" is a product question; what colour they chose is
+    // their footage.
+    const state = await read('src/lib/editorState.ts');
+    expect(state).toContain("name: 'clip_adjusted'");
+    expect(state).toMatch(/colour: touched\.some/);
+    expect(state).not.toMatch(/brightness: next\.brightness/);
+  });
+
+  it('never reports a name, a title or a file', async () => {
+    const sources = (
+      await Promise.all([read('src/lib/editorState.ts'), read('src/screens/EditScreen.tsx'), read('src/screens/ProjectsScreen.tsx')])
+    ).join('\n');
+    // The sanitiser would drop these anyway; a call site that tries is a
+    // misunderstanding worth catching here.
+    expect(sources).not.toMatch(/track\([^)]*displayName/);
+    expect(sources).not.toMatch(/track\([^)]*\btext\b/);
+    expect(sources).not.toMatch(/track\([^)]*\buri\b/);
+  });
+});
