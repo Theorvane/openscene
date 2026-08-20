@@ -16,7 +16,7 @@ function getBoundedNumber(record: Record<string, unknown>, key: string, min: num
 }
 
 function parseClipEffects(value: unknown): ClipEffects | null {
-  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['opacity', 'scale', 'positionX', 'positionY', 'rotation', 'volume', 'speed'])) {
+  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['opacity', 'scale', 'positionX', 'positionY', 'rotation', 'volume', 'speed', 'brightness', 'contrast', 'saturation'])) {
     return null;
   }
   const opacity = getBoundedNumber(value, 'opacity', CLIP_EFFECT_RANGES.opacity.min, CLIP_EFFECT_RANGES.opacity.max);
@@ -37,13 +37,25 @@ function parseClipEffects(value: unknown): ClipEffects | null {
   const speed = hasSpeed
     ? getBoundedNumber(value, 'speed', CLIP_EFFECT_RANGES.speed.min, CLIP_EFFECT_RANGES.speed.max)
     : null;
+
+  /*
+    Colour, on the same terms as speed: absent stays absent so the document
+    round-trips, and present-but-impossible is refused rather than clamped.
+  */
+  const colour: { -readonly [K in 'brightness' | 'contrast' | 'saturation']?: number } = {};
+  for (const key of ['brightness', 'contrast', 'saturation'] as const) {
+    if (value[key] === undefined) continue;
+    const range = CLIP_EFFECT_RANGES[key];
+    const parsed = getBoundedNumber(value, key, range.min, range.max);
+    if (parsed === null) return null;
+    colour[key] = parsed;
+  }
   if (opacity === null || scale === null || positionX === null || positionY === null || rotation === null || volume === null) {
     return null;
   }
   if (hasSpeed && speed === null) return null;
-  return speed === null
-    ? { opacity, scale, positionX, positionY, rotation, volume }
-    : { opacity, scale, positionX, positionY, rotation, volume, speed };
+  const base = { opacity, scale, positionX, positionY, rotation, volume, ...colour };
+  return speed === null ? base : { ...base, speed };
 }
 
 function parseClipTiming(value: Record<string, unknown>): ClipTiming | null {

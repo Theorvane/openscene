@@ -298,6 +298,48 @@ function SelectionInspector({ editor }: InspectorContentProps): ReactElement {
             </PropertyRow>
           </PropertyGroup>
 
+          <PropertyGroup title="Colour">
+            <PropertyRow label="Brightness">
+              <input
+                className="property-slider"
+                type="range"
+                aria-label="Clip brightness"
+                value={effects.brightness ?? 0}
+                min={CLIP_EFFECT_RANGES.brightness.min}
+                max={CLIP_EFFECT_RANGES.brightness.max}
+                step={0.05}
+                onChange={(event) => editor.updateSelectedClipEffects({ brightness: Number(event.currentTarget.value) })}
+              />
+              <span className="property-value-chip">{(effects.brightness ?? 0).toFixed(2)}</span>
+            </PropertyRow>
+            <PropertyRow label="Contrast">
+              <input
+                className="property-slider"
+                type="range"
+                aria-label="Clip contrast"
+                value={effects.contrast ?? 1}
+                min={CLIP_EFFECT_RANGES.contrast.min}
+                max={CLIP_EFFECT_RANGES.contrast.max}
+                step={0.05}
+                onChange={(event) => editor.updateSelectedClipEffects({ contrast: Number(event.currentTarget.value) })}
+              />
+              <span className="property-value-chip">{(effects.contrast ?? 1).toFixed(2)}</span>
+            </PropertyRow>
+            <PropertyRow label="Saturation">
+              <input
+                className="property-slider"
+                type="range"
+                aria-label="Clip saturation"
+                value={effects.saturation ?? 1}
+                min={CLIP_EFFECT_RANGES.saturation.min}
+                max={CLIP_EFFECT_RANGES.saturation.max}
+                step={0.05}
+                onChange={(event) => editor.updateSelectedClipEffects({ saturation: Number(event.currentTarget.value) })}
+              />
+              <span className="property-value-chip">{(effects.saturation ?? 1).toFixed(2)}</span>
+            </PropertyRow>
+          </PropertyGroup>
+
           <PropertyGroup title="Transform">
             <PropertyRow label="Position">
               <span className="property-axis-label" aria-hidden="true">X</span>

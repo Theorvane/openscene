@@ -18,6 +18,9 @@ import androidx.media3.common.audio.ChannelMixingAudioProcessor
 import androidx.media3.common.audio.ChannelMixingMatrix
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.effect.BitmapOverlay
+import androidx.media3.effect.Brightness
+import androidx.media3.effect.Contrast
+import androidx.media3.effect.HslAdjustment
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextureOverlay
@@ -108,7 +111,11 @@ class VideoExportModule : Module() {
     val rotationDegrees: Float = 0f,
     val gain: Float = 1f,
     /** Playback rate. 2 is twice as fast and half as long on the timeline. */
-    val speed: Float = 1f
+    val speed: Float = 1f,
+    /** Colour. Neutral is 0, 1, 1 — added brightness, multiplied contrast and saturation. */
+    val brightness: Float = 0f,
+    val contrast: Float = 1f,
+    val saturation: Float = 1f
   ) {
     // Length on the timeline, which at anything but 1× is not the length of the
     // source window. Everything that places or overlaps segments asks this.
@@ -132,7 +139,10 @@ class VideoExportModule : Module() {
           offsetY = num(it["offsetY"], 0f),
           rotationDegrees = num(it["rotationDegrees"], 0f),
           gain = num(it["gain"], 1f),
-          speed = num(it["speed"], 1f)
+          speed = num(it["speed"], 1f),
+          brightness = num(it["brightness"], 0f),
+          contrast = num(it["contrast"], 1f),
+          saturation = num(it["saturation"], 1f)
         )
       }
       .filter { it.uri.isNotEmpty() && it.sourceEndMs > it.sourceStartMs }
@@ -389,6 +399,31 @@ class VideoExportModule : Module() {
             .setRedScale(level)
             .setGreenScale(level)
             .setBlueScale(level)
+            .build()
+        )
+      }
+      /*
+        Colour before the fade, so the grade lands on the picture rather than on
+        a picture already multiplied towards black — a clip at 50% opacity and
+        raised brightness is a brightened clip that is then faded, which is the
+        order the desktop's `eq` sits in too.
+
+        Media3 has these three as separate effects; applying none of them when a
+        clip is neutral keeps an ungraded export byte-comparable with one made
+        before colour existed.
+      */
+      if (segment.brightness != 0f) add(Brightness(segment.brightness))
+      if (segment.contrast != 1f) {
+        // Media3's `Contrast` is centred on zero, where the plan's is centred on
+        // one: 1.4 in the plan is 0.4 here.
+        add(Contrast(segment.contrast - 1f))
+      }
+      if (segment.saturation != 1f) {
+        add(
+          HslAdjustment.Builder()
+            // The same off-by-one-hundred: the builder takes a percentage
+            // change, so 0.5 in the plan is -50 here and 1.5 is +50.
+            .adjustSaturation((segment.saturation - 1f) * 100f)
             .build()
         )
       }

@@ -1,5 +1,6 @@
 import { timelineDurationMs } from './timelineLogic';
 import { cuts, transitionForCut } from './timelineTransitionLogic';
+import { clipColour } from './clipColour';
 import { clipSpeed } from './timelineClipGeometry';
 import type { TimelineDocument, TimelineTitle } from './timelineTypes';
 
@@ -32,6 +33,13 @@ export type CompositionSegment = {
   readonly rotationDegrees: number;
   /** Playback rate. 1 is the rate it was shot at, and what every older plan meant. */
   readonly speed: number;
+  /**
+   * Colour. Neutral is `0, 1, 1` and renders identically everywhere, which is
+   * what lets a renderer without grading still be right for an ungraded clip.
+   */
+  readonly brightness: number;
+  readonly contrast: number;
+  readonly saturation: number;
 };
 
 export type AudioSegment = {
@@ -172,7 +180,8 @@ export function buildCompositionPlan(input: {
           offsetX: clip.effects.positionX,
           offsetY: clip.effects.positionY,
           rotationDegrees: clip.effects.rotation,
-          speed: clipSpeed(clip)
+          speed: clipSpeed(clip),
+          ...clipColour(clip.effects)
         });
       }
       videoLayers.push(layer);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Dimensions, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Gesture, GestureDetector, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -34,6 +34,23 @@ const TRANSITION_LABELS: Readonly<Record<TransitionType, string>> = {
   dipToBlack: 'Dip to black'
 };
 import { CLIP_EFFECT_RANGES } from '@openvideo/shared/timelineTypes';
+
+/**
+ * Whether this phone's renderer applies a grade.
+ *
+ * Android does. iOS composes with layer instructions, which carry a transform
+ * and an opacity and no colour, so grading there waits on a compositor that
+ * does not exist yet. Offering a control that an export ignores is worse than
+ * not offering it, and hiding it entirely leaves someone comparing two phones
+ * with no explanation — so it is shown, disabled, with the reason.
+ */
+const COLOUR_IS_RENDERED = Platform.OS !== 'ios';
+
+/** One step of a colour control, held inside what the renderers accept. */
+function stepColour(value: number, delta: number, key: 'brightness' | 'contrast' | 'saturation'): number {
+  const range = CLIP_EFFECT_RANGES[key];
+  return Number(Math.min(range.max, Math.max(range.min, value + delta)).toFixed(2));
+}
 import type { TimelineTitle } from '@openvideo/shared/timelineTypes';
 
 /**
@@ -811,6 +828,47 @@ export function EditScreen({
               })
             }
           />
+          {/*
+            Colour, and the one thing this app cannot do on every phone.
+
+            Android grades; iOS composes with layer instructions, which carry a
+            transform and an opacity and no colour at all, so grading there
+            needs a compositor that does not exist yet. The controls are shown
+            disabled with the reason rather than hidden — a control that is
+            absent on one platform and present on another is a bug report
+            waiting to happen, and one that silently does nothing is worse.
+          */}
+          <Stepper
+            label="Brightness"
+            value={(selected.clip.effects.brightness ?? 0).toFixed(2)}
+            disabled={!COLOUR_IS_RENDERED}
+            onDown={() => editor.setSelectedEffects({ brightness: stepColour(selected.clip.effects.brightness ?? 0, -0.1, 'brightness') })}
+            onUp={() => editor.setSelectedEffects({ brightness: stepColour(selected.clip.effects.brightness ?? 0, 0.1, 'brightness') })}
+          />
+          <Stepper
+            label="Contrast"
+            value={(selected.clip.effects.contrast ?? 1).toFixed(2)}
+            disabled={!COLOUR_IS_RENDERED}
+            onDown={() => editor.setSelectedEffects({ contrast: stepColour(selected.clip.effects.contrast ?? 1, -0.1, 'contrast') })}
+            onUp={() => editor.setSelectedEffects({ contrast: stepColour(selected.clip.effects.contrast ?? 1, 0.1, 'contrast') })}
+          />
+          <Stepper
+            label="Saturation"
+            value={(selected.clip.effects.saturation ?? 1).toFixed(2)}
+            disabled={!COLOUR_IS_RENDERED}
+            onDown={() => editor.setSelectedEffects({ saturation: stepColour(selected.clip.effects.saturation ?? 1, -0.1, 'saturation') })}
+            onUp={() => editor.setSelectedEffects({ saturation: stepColour(selected.clip.effects.saturation ?? 1, 0.1, 'saturation') })}
+          />
+          <Text style={styles.panelNote}>
+            {COLOUR_IS_RENDERED
+              ? // Said out loud rather than approximated. React Native has no
+                // colour filter, and a preview that showed roughly the right
+                // brightness and nothing of saturation would be a preview that
+                // disagrees with the file — which is the failure this editor
+                // keeps being caught by.
+                'Colour applies to the export. The preview does not show it yet.'
+              : 'Colour is not rendered on iOS yet — an export would ignore it, so it is not offered.'}
+          </Text>
           <Stepper
             label="Volume"
             value={`${Math.round(selected.clip.effects.volume * 100)}%`}
@@ -984,21 +1042,41 @@ function Stepper({
   label,
   value,
   onDown,
-  onUp
+  onUp,
+  disabled
 }: {
   label: string;
   value: string;
   onDown: () => void;
   onUp: () => void;
+  /** Shown but not usable, for a control this platform's renderer ignores. */
+  disabled?: boolean;
 }) {
+  const off = disabled === true;
   return (
-    <View style={styles.stepper}>
+    <View style={[styles.stepper, off && styles.stepperOff]}>
       <Text style={styles.stepperLabel}>{label}</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Decrease ${label}`} onPress={onDown} hitSlop={STEPPER_SLOP} style={press(styles.stepperButton)}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Decrease ${label}`}
+        accessibilityState={{ disabled: off }}
+        disabled={off}
+        onPress={onDown}
+        hitSlop={STEPPER_SLOP}
+        style={press(styles.stepperButton)}
+      >
         <Text style={styles.stepperButtonText}>−</Text>
       </Pressable>
       <Text style={styles.stepperValue}>{value}</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Increase ${label}`} onPress={onUp} hitSlop={STEPPER_SLOP} style={press(styles.stepperButton)}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Increase ${label}`}
+        accessibilityState={{ disabled: off }}
+        disabled={off}
+        onPress={onUp}
+        hitSlop={STEPPER_SLOP}
+        style={press(styles.stepperButton)}
+      >
         <Text style={styles.stepperButtonText}>+</Text>
       </Pressable>
 
@@ -1081,6 +1159,7 @@ const styles = StyleSheet.create({
   inspectorTitle: { color: theme.textWeak, fontSize: 12, fontWeight: '700', letterSpacing: 0.6 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   panelNote: { color: theme.textWeaker, fontSize: 13 },
+  stepperOff: { opacity: 0.4 },
   choiceRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   choice: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
   choiceOn: { borderColor: theme.accent, backgroundColor: theme.accent },

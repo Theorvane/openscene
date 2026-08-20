@@ -21,6 +21,12 @@ export const CLIP_EFFECT_RANGES = {
   // Slower than a quarter is a slideshow of held frames, and faster than four
   // is a source read faster than it can be decoded on a phone.
   speed: { min: 0.25, max: 4 },
+  // Added, so 0 is neutral and the ends are a stop either way.
+  brightness: { min: -1, max: 1 },
+  // Multiplied, so 1 is neutral. Zero contrast is a flat grey card and zero
+  // saturation is black and white, which is a filter rather than a mistake.
+  contrast: { min: 0, max: 2 },
+  saturation: { min: 0, max: 2 },
   volumeDb: { min: -40, max: 0 }
 } as const;
 
@@ -48,6 +54,18 @@ export type ClipEffects = {
    * questions rather than the same subtraction.
    */
   readonly speed?: number;
+  /**
+   * Colour, as three numbers that mean what every grading control means.
+   *
+   * `brightness` is added, `contrast` and `saturation` are multiplied, and all
+   * three are optional: absent is neutral, so a project written before colour
+   * existed opens and saves back byte-identical. Neutral also renders
+   * identically on all three renderers, which is what lets one of them not have
+   * the feature yet without changing anybody's export.
+   */
+  readonly brightness?: number;
+  readonly contrast?: number;
+  readonly saturation?: number;
 };
 
 export const DEFAULT_CLIP_EFFECTS: ClipEffects = Object.freeze({

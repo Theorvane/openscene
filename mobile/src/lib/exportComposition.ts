@@ -121,7 +121,14 @@ export async function exportTimeline(input: {
     rotationDegrees: segment.rotationDegrees,
     // Retiming reaches the native modules the same way the other effects do —
     // through this bridge, which is where opacity and scale were once dropped.
-    speed: segment.speed
+    speed: segment.speed,
+    // Colour, forwarded like every other effect. Android grades; iOS does not
+    // yet, and ignores keys it does not know — which is the right way for it to
+    // degrade, because an ungraded clip is neutral and renders the same either
+    // way.
+    brightness: segment.brightness,
+    contrast: segment.contrast,
+    saturation: segment.saturation
   });
 
   try {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode, type SyntheticEvent } from 'react';
 
 import type { TimelineEditorController } from './useTimelineEditor';
-import { effectCssTransform } from './clipEffectControls';
+import { effectCssFilter, effectCssTransform } from './clipEffectControls';
 import { buildTimelineView } from './editorTimelineView';
 import {
   programMonitorPreviewLoadState,
@@ -101,7 +101,10 @@ export function ProgramMonitor({ editor, exportControl }: ProgramMonitorProps): 
   const mediaVolume = readyPreviewIsActivePlaybackClip ? primaryAudioLayer?.mediaVolume ?? primaryVisualLayer?.effects.volume ?? null : null;
   const activeVideoStyle: CSSProperties | undefined = activeClipEffects === null ? undefined : {
     opacity: activeClipEffects.opacity,
-    transform: effectCssTransform(activeClipEffects)
+    transform: effectCssTransform(activeClipEffects),
+    // The grade, shown where the change is meant to be visible. Undefined when
+    // the clip is neutral, so the monitor carries no filter that does nothing.
+    filter: effectCssFilter(activeClipEffects)
   };
   const blackOverlayStyle: CSSProperties | undefined = previewState === null || previewState.blackOpacity === 0 ? undefined : {
     background: '#000',

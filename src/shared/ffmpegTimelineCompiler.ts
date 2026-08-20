@@ -5,6 +5,7 @@
  * binding without the composition logic being written twice.
  */
 import { timelineDurationMs } from './timelineLogic';
+import { clipColour, isGraded } from './clipColour';
 import { clipSourceSpanMs, clipSpeed, clipTimelineEndMs } from './timelineClipGeometry';
 import type {
   AudioTimelineTrack,
@@ -82,6 +83,21 @@ function requireAssetPath(assetPaths: ReadonlyMap<string, string>, assetId: stri
   return path;
 }
 
+/**
+ * The grade, as `eq`, or nothing at all.
+ *
+ * Omitted entirely when the clip is neutral: an `eq` that changes nothing still
+ * costs a pass over every frame, and a graph that reads the same as it did
+ * before colour existed is easier to compare against an older export.
+ */
+function colourFilter(clip: PersistedTimelineClip): readonly string[] {
+  if (!isGraded(clip.effects)) return [];
+  const colour = clipColour(clip.effects);
+  return [
+    `eq=brightness=${colour.brightness}:contrast=${colour.contrast}:saturation=${colour.saturation}`
+  ];
+}
+
 function videoFilter(
   clip: PersistedTimelineClip,
   inputIndex: number,
@@ -101,6 +117,11 @@ function videoFilter(
     `scale=w='iw*${clip.effects.scale}':h='ih*${clip.effects.scale}'`,
     'format=rgba',
     `rotate=${rotation}:fillcolor=black@0`,
+    // Colour before compositing, so the grade applies to the picture rather
+    // than to the picture already faded against black — a clip at 50% opacity
+    // and +0.2 brightness is a brightened clip that is then faded, which is the
+    // order every editor means and the order the other renderers use.
+    ...colourFilter(clip),
     // The transition ramps come after the clip's own opacity, so they scale it
     // rather than replace it: a clip held at 50% still dips to nothing.
     `colorchannelmixer=aa=${clip.effects.opacity}`,
