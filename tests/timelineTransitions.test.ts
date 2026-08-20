@@ -277,7 +277,7 @@ describe('what the phone is told', () => {
     expect(kotlin).toContain('private fun dipOverlay(');
     expect(kotlin).toContain('setAlphaScale(alpha)');
 
-    const swift = await readFile(new URL('../mobile/modules/video-export/ios/VideoExportModule.swift', import.meta.url), 'utf8');
+    const swift = await readFile(new URL('../mobile/modules/video-export/ios/VideoComposer.swift', import.meta.url), 'utf8');
     expect(swift).toContain('setOpacityRamp(');
   });
 });

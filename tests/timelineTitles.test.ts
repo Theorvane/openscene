@@ -212,7 +212,7 @@ describe('the titles the native modules draw', () => {
   });
 
   it('draws them on iOS over the finished picture', async () => {
-    const swift = await read('modules/video-export/ios/VideoExportModule.swift');
+    const swift = await read('modules/video-export/ios/VideoComposer.swift');
     expect(swift).toContain('CATextLayer');
     expect(swift).toContain('AVVideoCompositionCoreAnimationTool');
   });

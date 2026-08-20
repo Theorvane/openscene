@@ -46,26 +46,6 @@ struct TitleInput: Record {
   @Field var positionY: Double = 0
 }
 
-/**
- A `#rrggbb` string as a colour, falling back to white.
-
- A title in the wrong colour is a visible, fixable mistake; a refused export over
- one is not.
- */
-private func parseHexColor(_ value: String) -> CGColor {
-  var hex = value
-  if hex.hasPrefix("#") { hex.removeFirst() }
-  guard hex.count == 6, let rgb = UInt32(hex, radix: 16) else {
-    return UIColor.white.cgColor
-  }
-  return UIColor(
-    red: CGFloat((rgb >> 16) & 0xff) / 255,
-    green: CGFloat((rgb >> 8) & 0xff) / 255,
-    blue: CGFloat(rgb & 0xff) / 255,
-    alpha: 1
-  ).cgColor
-}
-
 struct ExportRequest: Record {
   @Field var width: Int = 1920
   @Field var height: Int = 1080
@@ -77,9 +57,6 @@ struct ExportRequest: Record {
   @Field var titles: [TitleInput] = []
 }
 
-private func time(_ milliseconds: Double) -> CMTime {
-  CMTime(value: CMTimeValue(max(0, milliseconds).rounded()), timescale: 1000)
-}
 
 public final class VideoExportModule: Module {
   public func definition() -> ModuleDefinition {
@@ -137,242 +114,68 @@ public final class VideoExportModule: Module {
     ]
   }
 
+  /**
+   The boundary, and nothing else.
+
+   Records in, plain values out, and the composer's errors turned into the ones
+   the JavaScript side knows. What gets rendered lives in `VideoComposer`, which
+   has no Expo in it — so a macOS test can run the same code a phone runs, which
+   is the only way anything here gets proven rather than merely compiled.
+   */
   private static func export(_ request: ExportRequest) async throws -> [String: Any] {
-    if request.videoSegments.isEmpty && request.audioSegments.isEmpty {
+    do {
+      let output = try await VideoComposer.export(request.asComposerRequest())
+      return ["uri": output.absoluteString, "durationMs": request.durationMs]
+    } catch ComposerError.emptyComposition {
       throw Exception(name: "EmptyComposition", description: "The timeline has no media to export.")
-    }
-
-    let composition = AVMutableComposition()
-    let renderSize = CGSize(width: request.width, height: request.height)
-    var layerInstructions: [AVMutableVideoCompositionLayerInstruction] = []
-
-    // Each video segment gets its own track. Sharing one track would serialise
-    // clips that are meant to overlap, which is exactly what a multi-track
-    // timeline is for.
-    for segment in request.videoSegments {
-      guard let url = URL(string: segment.uri) ?? URL(string: "file://\(segment.uri)") else { continue }
-      let asset = AVURLAsset(url: url)
-      guard let sourceTrack = try await asset.loadTracks(withMediaCharacteristic: .visual).first else { continue }
-      guard let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
-
-      let range = CMTimeRange(start: time(segment.sourceStartMs), end: time(segment.sourceEndMs))
-      try track.insertTimeRange(range, of: sourceTrack, at: time(segment.timelineStartMs))
-
-      /*
-       Retiming, as a scale on what was just inserted.
-
-       AVFoundation has no speed property; it has "make this range last that
-       long", which is the same statement read the other way round. The range
-       scaled is the one in *composition* time — where the clip was inserted,
-       not where it came from — so it is built from the insertion point rather
-       than from the source window.
-       */
-      let rate = max(0.01, segment.speed)
-      if rate != 1 {
-        let sourceSpan = segment.sourceEndMs - segment.sourceStartMs
-        track.scaleTimeRange(
-          CMTimeRange(start: time(segment.timelineStartMs), duration: time(sourceSpan)),
-          toDuration: time(sourceSpan / rate)
-        )
-      }
-
-      let instruction = AVMutableVideoCompositionLayerInstruction(assetTrack: track)
-
-      /*
-       What Adjust set, in the order the desktop's filter graph applies it:
-       scale, then rotate, then place. These used to be dropped — the shared plan
-       computed them and nothing on a phone read them — so opacity and scale
-       changed a stored number and nothing anyone could see.
-
-       Scale and rotation are taken about the clip's own centre rather than the
-       origin, or enlarging a clip would also walk it off the frame; the clip is
-       then centred in the render size and offset from there, which is what
-       `overlay=(main_w-overlay_w)/2+x` means on the desktop.
-       */
-      let preferred = try await sourceTrack.load(.preferredTransform)
-      let oriented = try await sourceTrack.load(.naturalSize).applying(preferred)
-      let halfWidth = abs(oriented.width) / 2
-      let halfHeight = abs(oriented.height) / 2
-      let radians = CGFloat(segment.rotationDegrees) * .pi / 180
-      let scale = CGFloat(max(0, segment.scale))
-
-      var transform = preferred
-      transform = transform.concatenating(CGAffineTransform(translationX: -halfWidth, y: -halfHeight))
-      transform = transform.concatenating(CGAffineTransform(scaleX: scale, y: scale))
-      transform = transform.concatenating(CGAffineTransform(rotationAngle: radians))
-      transform = transform.concatenating(
-        CGAffineTransform(
-          translationX: renderSize.width / 2 + CGFloat(segment.offsetX),
-          y: renderSize.height / 2 + CGFloat(segment.offsetY)
-        )
-      )
-      instruction.setTransform(transform, at: .zero)
-      let baseOpacity = Float(min(1, max(0, segment.opacity)))
-      instruction.setOpacity(baseOpacity, at: .zero)
-
-      /*
-       Transitions, as opacity ramps on the clips either side of a cut.
-
-       There is no cross-dissolve to do: the timeline refuses overlapping clips,
-       so at no instant are there two pictures to mix. The outgoing clip going to
-       nothing over black and the incoming one arriving is what the desktop draws
-       and what the FFmpeg graph renders, and `setOpacityRamp` says exactly that.
-
-       Clamped to the segment's own span, so a dip that reaches past the end of a
-       clip ramps only over the part of it that exists.
-       */
-      let segmentStartMs = segment.timelineStartMs
-      let segmentEndMs = segment.timelineStartMs + (segment.sourceEndMs - segment.sourceStartMs)
-      for dip in request.dips where dip.durationMs > 0 {
-        let midMs = dip.startMs + dip.durationMs / 2
-        let endMs = dip.startMs + dip.durationMs
-
-        let outStart = max(dip.startMs, segmentStartMs)
-        if outStart < min(midMs, segmentEndMs) {
-          instruction.setOpacityRamp(
-            fromStartOpacity: baseOpacity,
-            toEndOpacity: 0,
-            timeRange: CMTimeRange(start: time(outStart), end: time(min(midMs, segmentEndMs)))
-          )
-        }
-
-        let inEnd = min(endMs, segmentEndMs)
-        if max(midMs, segmentStartMs) < inEnd {
-          instruction.setOpacityRamp(
-            fromStartOpacity: 0,
-            toEndOpacity: baseOpacity,
-            timeRange: CMTimeRange(start: time(max(midMs, segmentStartMs)), end: time(inEnd))
-          )
-        }
-      }
-
-      // The plan hands layers bottom-first, and AVFoundation draws the first
-      // layer instruction on top — so the order is reversed when they are
-      // assembled below rather than here.
-      layerInstructions.append(instruction)
-    }
-
-    // Gain was read only as "is this audible at all"; the value itself was
-    // dropped, so every clip played at full volume however it was set.
-    var audioParameters: [AVMutableAudioMixInputParameters] = []
-    for segment in request.audioSegments where segment.gain > 0 {
-      guard let url = URL(string: segment.uri) ?? URL(string: "file://\(segment.uri)") else { continue }
-      let asset = AVURLAsset(url: url)
-      guard let sourceTrack = try await asset.loadTracks(withMediaType: .audio).first else { continue }
-      guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
-      let range = CMTimeRange(start: time(segment.sourceStartMs), end: time(segment.sourceEndMs))
-      try track.insertTimeRange(range, of: sourceTrack, at: time(segment.timelineStartMs))
-
-      // Sound follows the picture, scaled the same way it is. AVFoundation
-      // resamples the audio rather than leaving it two seconds long behind a
-      // picture that has already finished.
-      let audioRate = max(0.01, segment.speed)
-      if audioRate != 1 {
-        let sourceSpan = segment.sourceEndMs - segment.sourceStartMs
-        track.scaleTimeRange(
-          CMTimeRange(start: time(segment.timelineStartMs), duration: time(sourceSpan)),
-          toDuration: time(sourceSpan / audioRate)
-        )
-      }
-
-      if segment.gain != 1 {
-        let parameters = AVMutableAudioMixInputParameters(track: track)
-        parameters.setVolume(Float(segment.gain), at: .zero)
-        audioParameters.append(parameters)
-      }
-    }
-
-    let instruction = AVMutableVideoCompositionInstruction()
-    instruction.timeRange = CMTimeRange(start: .zero, duration: time(request.durationMs))
-    instruction.layerInstructions = layerInstructions.reversed()
-
-    let videoComposition = AVMutableVideoComposition()
-    videoComposition.renderSize = renderSize
-    videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(1, request.frameRate)))
-    videoComposition.instructions = [instruction]
-
-    /*
-     Titles, over the finished picture.
-
-     Core Animation is how AVFoundation draws anything that is not a track, and a
-     layer that is not in the tree for the whole composition needs its own
-     timing: `beginTime` and `duration` on the layer, with the animation clock
-     told not to run, so it appears exactly for its range and holds still.
-
-     `AVCoreAnimationBeginTimeAtZero` rather than zero, because a Core Animation
-     `beginTime` of zero means "now" and would place every title at the start.
-     */
-    if !request.titles.isEmpty {
-      let parent = CALayer()
-      parent.frame = CGRect(origin: .zero, size: renderSize)
-      let videoLayer = CALayer()
-      videoLayer.frame = parent.frame
-      parent.addSublayer(videoLayer)
-
-      for title in request.titles where !title.text.isEmpty && title.timelineEndMs > title.timelineStartMs {
-        let text = CATextLayer()
-        text.string = title.text
-        text.fontSize = CGFloat(title.sizePx)
-        text.foregroundColor = parseHexColor(title.color)
-        text.alignmentMode = .center
-        text.isWrapped = true
-        text.contentsScale = 1
-        // Centred, then offset, the way every other placement in the plan works.
-        // Core Animation's y grows upward and the plan's grows downward.
-        let height = CGFloat(title.sizePx) * 1.6
-        text.frame = CGRect(
-          x: 0,
-          y: renderSize.height / 2 - height / 2 - CGFloat(title.positionY),
-          width: renderSize.width,
-          height: height
-        )
-        text.position = CGPoint(x: renderSize.width / 2 + CGFloat(title.positionX), y: text.position.y)
-
-        text.beginTime = AVCoreAnimationBeginTimeAtZero + title.timelineStartMs / 1000
-        text.duration = (title.timelineEndMs - title.timelineStartMs) / 1000
-        text.isHidden = false
-        text.speed = 0
-        text.timeOffset = 0
-        text.fillMode = .both
-        parent.addSublayer(text)
-      }
-
-      videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
-        postProcessingAsVideoLayer: videoLayer,
-        in: parent
-      )
-    }
-
-    let output = FileManager.default.temporaryDirectory
-      .appendingPathComponent("openvideo-export-\(Int(Date().timeIntervalSince1970)).mp4")
-
-    guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
+    } catch ComposerError.exportUnavailable {
       throw Exception(name: "ExportUnavailable", description: "This device cannot create an export session.")
+    } catch ComposerError.exportFailed(let reason) {
+      throw Exception(name: "ExportFailed", description: reason)
     }
-    session.outputURL = output
-    session.outputFileType = .mp4
-    if !layerInstructions.isEmpty {
-      session.videoComposition = videoComposition
-    }
-    // Built above and attached here: an audio mix that is never given to the
-    // session is the same as no mix at all, which is how the gain went missing.
-    if !audioParameters.isEmpty {
-      let mix = AVMutableAudioMix()
-      mix.inputParameters = audioParameters
-      session.audioMix = mix
-    }
+  }
+}
 
-    await session.export()
+/// Records are the bridge's shape; the composer takes plain values.
+private extension SegmentInput {
+  var asComposerSegment: ComposerSegment {
+    ComposerSegment(
+      uri: uri,
+      timelineStartMs: timelineStartMs,
+      sourceStartMs: sourceStartMs,
+      sourceEndMs: sourceEndMs,
+      gain: gain,
+      opacity: opacity,
+      scale: scale,
+      offsetX: offsetX,
+      offsetY: offsetY,
+      rotationDegrees: rotationDegrees,
+      speed: speed
+    )
+  }
+}
 
-    // A cancelled or failed session leaves no usable file; reporting success
-    // would hand the user a path to nothing.
-    guard session.status == .completed else {
-      throw Exception(
-        name: "ExportFailed",
-        description: session.error?.localizedDescription ?? "The export did not complete."
-      )
-    }
-
-    return ["uri": output.absoluteString, "durationMs": request.durationMs]
+private extension ExportRequest {
+  func asComposerRequest() -> ComposerRequest {
+    ComposerRequest(
+      width: width,
+      height: height,
+      frameRate: frameRate,
+      durationMs: durationMs,
+      videoSegments: videoSegments.map(\.asComposerSegment),
+      audioSegments: audioSegments.map(\.asComposerSegment),
+      dips: dips.map { ComposerDip(startMs: $0.startMs, durationMs: $0.durationMs) },
+      titles: titles.map {
+        ComposerTitle(
+          text: $0.text,
+          timelineStartMs: $0.timelineStartMs,
+          timelineEndMs: $0.timelineEndMs,
+          sizePx: $0.sizePx,
+          color: $0.color,
+          positionX: $0.positionX,
+          positionY: $0.positionY
+        )
+      }
+    )
   }
 }

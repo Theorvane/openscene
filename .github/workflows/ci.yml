@@ -88,3 +88,23 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
+
+  # The iOS renderer is run, not only compiled.
+  #
+  # `ios-module` proves the Swift builds, which says nothing about whether an
+  # exported file has the right length or whether a dip actually darkens. Every
+  # rendering bug this project has had was found by exporting and measuring, and
+  # iOS was the one renderer nothing could export from: its composition logic sat
+  # inside an Expo module, reachable only from a running app on a device.
+  #
+  # `VideoComposer` has no Expo in it now, so a Mac runner exports real files
+  # through exactly the code a phone uses — no simulator needed, because
+  # AVFoundation, Core Graphics and Core Animation are all on macOS too.
+  ios-export:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the composer's export tests
+        working-directory: mobile/modules/video-export/composer-tests
+        run: swift test

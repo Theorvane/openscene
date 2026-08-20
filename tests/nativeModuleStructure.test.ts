@@ -34,6 +34,7 @@ function braceDepth(source: string): { readonly final: number; readonly wentNega
 describe('the native sources are structurally whole', () => {
   it.each([
     ['modules/video-export/ios/VideoExportModule.swift'],
+    ['modules/video-export/ios/VideoComposer.swift'],
     ['modules/video-export/android/src/main/java/expo/modules/videoexport/VideoExportModule.kt']
   ])('every block in %s closes', async (path) => {
     const { final, wentNegativeAt } = braceDepth(await read(path));
@@ -42,7 +43,10 @@ describe('the native sources are structurally whole', () => {
   });
 
   it('declares each Swift record type once', async () => {
-    const swift = await read('modules/video-export/ios/VideoExportModule.swift');
+    const swift = (await Promise.all([
+      read('modules/video-export/ios/VideoExportModule.swift'),
+      read('modules/video-export/ios/VideoComposer.swift')
+    ])).join('\n');
     const declared = [...swift.matchAll(/^struct (\w+): Record \{/gm)].map(([, name]) => name);
     // A merge that duplicates a type compiles nowhere; a merge that drops one is
     // a field silently going missing.

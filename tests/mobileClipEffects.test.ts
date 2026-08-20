@@ -88,7 +88,11 @@ describe('the native renderers', () => {
   });
 
   it('applies them on iOS', async () => {
-    const swift = await read('modules/video-export/ios/VideoExportModule.swift');
+    // A source assertion, and no longer the only evidence: `ios-export` in CI
+    // runs this exact file on a Mac runner, exports real files and measures
+    // them. This one catches a line being deleted; that one catches it being
+    // wrong.
+    const swift = await read('modules/video-export/ios/VideoComposer.swift');
     expect(swift).toContain('instruction.setOpacity(');
     expect(swift).toContain('CGAffineTransform(rotationAngle: radians)');
     // Scale about the clip's own centre, or enlarging it walks it off frame.

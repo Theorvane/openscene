@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, readlink } from 'node:fs/promises';
 
 import { describe, expect, it } from 'vitest';
 
@@ -130,5 +130,28 @@ describe('the iOS module', () => {
     const yaml = await read();
     expect(yaml).toContain('CODE_SIGNING_ALLOWED=NO');
     expect(yaml).not.toMatch(/ios-module:[\s\S]*?APPLE_DISTRIBUTION_CERTIFICATE/);
+  });
+});
+
+describe('the iOS renderer', () => {
+  const read = () => readFile(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+
+  it('is exported from and measured, not only compiled', async () => {
+    // Compiling proves a line exists. Every rendering bug this project has had
+    // was found by exporting a file and reading it back, and iOS was the one
+    // renderer nothing could export from until its composition was lifted out
+    // of the Expo module.
+    const yaml = await read();
+    expect(yaml).toContain('ios-export:');
+    expect(yaml).toContain('swift test');
+    expect(yaml).toContain('mobile/modules/video-export/composer-tests');
+  });
+
+  it('tests the file the app builds rather than a copy of it', async () => {
+    // The package's source is a symlink to `ios/VideoComposer.swift`. A copy
+    // would drift, and a drifting copy passing its tests is worse than no
+    // tests: it says the renderer works when what works is the copy.
+    const link = await readlink(new URL('../mobile/modules/video-export/composer-tests/Sources/VideoComposer/VideoComposer.swift', import.meta.url));
+    expect(link).toContain('ios/VideoComposer.swift');
   });
 });

@@ -341,7 +341,7 @@ describe('what the phone is told', () => {
   });
 
   it('retimes both on iOS', async () => {
-    const swift = await read('modules/video-export/ios/VideoExportModule.swift');
+    const swift = await read('modules/video-export/ios/VideoComposer.swift');
     // Once for the picture, once for the sound.
     expect(swift.match(/scaleTimeRange\(/g)?.length).toBe(2);
   });
