@@ -67,7 +67,10 @@ describe('the native renderers', () => {
     // composite against, so the picture came out at full strength. Compositing
     // over black at alpha `a` is multiplying RGB by `a`.
     expect(kotlin).toContain('RgbAdjustment.Builder()');
-    expect(kotlin).not.toContain('AlphaScale(');
+    // A word boundary, not a substring: `StaticOverlaySettings.setAlphaScale`
+    // is a different thing entirely — it is how a transition's dip and a title
+    // are faded — and matching it here would fail for the wrong reason.
+    expect(kotlin).not.toMatch(/\bAlphaScale\(/);
     // Scale is a crop, not a scale: `setScale` resizes the frame and the
     // `Presentation` fixing the output size fits it straight back, so the
     // picture came out exactly as it went in.
