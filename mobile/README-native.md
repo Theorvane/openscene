@@ -66,9 +66,44 @@ No extra dependency ships for it: on Android `TestSuiteActivity` is inside
 `launchTestSuite` is on `LevelPlay` in `IronSourceSDK`. Both were checked against
 the artifacts this project resolves.
 
-Nothing appears there until the dashboard has the networks configured — a
-network with no placement set up shows as unavailable even when its adapter did
-make it into the binary, which is the distinction worth reading carefully.
+**The Test Suite has to be enabled for the LevelPlay account before it opens.**
+Running it on an emulator gives:
+
+```
+E LevelPlaySDK: API: TestSuite cannot be launched,
+                Please contact your account manager to enable it
+```
+
+That refusal never reaches the bridge — `launchTestSuite()` resolves as if it
+worked, so the Settings row says "Opened" while nothing appears. Ask the
+LevelPlay account manager to switch it on; there is nothing to fix in the app.
+
+Once it opens, nothing appears in it until the dashboard has the networks
+configured — a network with no placement set up shows as unavailable even when
+its adapter did make it into the binary, which is the distinction worth reading
+carefully.
+
+## What running it on an emulator actually showed
+
+Worth writing down, because two of these are only visible on a device:
+
+- **The Pangle SDK version is a narrow window, and both edges fail identically.**
+  `ads-sdk` 6.5.1.2 has no `setAdxId`; `pag-sdk` 7.9 and later dropped
+  `setGDPRConsent(int)`. Adapter 4.3.51 calls both, so only 7.1.0.4 … 7.8.6.2
+  work. Either mismatch builds, installs, and throws `NoSuchMethodError` inside
+  LevelPlay's init, which the SDK catches — the symptom is a network that never
+  initialises, with nothing on screen to say so.
+- **LevelPlay's ad-quality connector supports none of them.** "ByteDance SDK
+  version 7.8.6.2 is not yet supported by the connector", and the same of 7.5.0.5
+  and 8.1.0.7. Ad Quality is revenue measurement rather than delivery, so Pangle
+  still serves.
+- **Unity Ads does not initialise on an emulator**, with
+  `reason=gateway_universal, errorCode=PUBLIC_ERROR_CODE_INIT_UNKNOWN`. It is
+  passed the LevelPlay app key as its game id, which is what the dashboard
+  configuration decides — check that on a real device before reading anything
+  into it.
+- **Meta's adapter is alive**: it logs a test-device hash at init, which is the
+  clearest per-network proof available without the Test Suite.
 
 ## Why the banner probes React Native rather than the SDK
 
@@ -154,12 +189,28 @@ npx expo-modules-autolinking react-native-config --platform android --json \
 
 Remember to delete `ios/` and `android/` afterwards. They are build output.
 
-## Not verified on a device yet
+## The plugin needs a patch to build at all on RN 0.86
 
-The banner, the interstitial and initialisation have only ever been exercised as
-code and as unit tests. `ironsource-mediation@3.2.0` is built against React
-Native 0.73 and registers its banner through `requireNativeComponent`, a legacy
-view manager; this app is on 0.86 with the New Architecture, where legacy view
-managers go through the interop layer. That is the first thing to check on a
-development build, and the failure mode is a banner that never appears rather
-than a build error.
+`ironsource-mediation@3.2.0` is built against React Native 0.73, and its
+`IronSourceMediationModule.kt` does not compile against 0.86: React Native
+converted `ReactContextBaseJavaModule` to Kotlin, where `getCurrentActivity()`
+is a function rather than a Java getter, so Kotlin's synthetic-property access —
+`currentActivity` — is no longer allowed. Ninety-nine errors, one cause.
+
+`patches/ironsource-mediation+3.2.0.patch` replaces `currentActivity?.` with
+`getCurrentActivity()?.` in that file, applied by `patch-package` from
+`postinstall`. It touches only the legacy ironSource API module, which nothing
+here calls; the LevelPlay files compile as they are. Drop the patch when Unity
+ships a plugin built for the New Architecture.
+
+## Still not seen on a device: the banner and the interstitial
+
+Initialisation runs, and the five adapters load — that much an emulator showed.
+What has not been seen is an ad, because the Test Suite is not enabled for the
+account and a development build requests no live unit.
+
+The banner is the part most likely to be wrong: `ironsource-mediation` registers
+it through `requireNativeComponent`, a legacy view manager, and this app is on
+0.86 with the New Architecture, where legacy view managers go through the interop
+layer. The failure mode is a banner that never appears rather than a build error,
+so it needs a look rather than a green build.

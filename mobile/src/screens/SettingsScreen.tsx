@@ -218,7 +218,8 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
           <Text style={styles.sectionBlurb}>
             LevelPlay’s Test Suite. Shows which of the five networks — ironSource, Unity Ads, AppLovin, Meta, Pangle —
             actually made it into this binary, and loads a test ad for each placement. Development builds request no
-            live ad, so this is the only place an ad appears before a store build.
+            live ad, so this is the only place an ad appears before a store build. It has to be switched on for the
+            LevelPlay account first; until then the SDK refuses to launch it and says so only in the log.
           </Text>
           <Pressable
             accessibilityRole="button"

@@ -1,0 +1,162 @@
+diff --git a/node_modules/ironsource-mediation/android/src/main/java/com/ironsource/react_native_mediation/IronSourceMediationModule.kt b/node_modules/ironsource-mediation/android/src/main/java/com/ironsource/react_native_mediation/IronSourceMediationModule.kt
+index e387730..cbbecfd 100644
+--- a/node_modules/ironsource-mediation/android/src/main/java/com/ironsource/react_native_mediation/IronSourceMediationModule.kt
++++ b/node_modules/ironsource-mediation/android/src/main/java/com/ironsource/react_native_mediation/IronSourceMediationModule.kt
+@@ -80,7 +80,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun getAdvertiserId(promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       val executor = Executors.newSingleThreadExecutor()
+       executor.execute {
+         // this API MUST be called on a background thread
+@@ -98,7 +98,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun validateIntegration(promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       IntegrationHelper.validateIntegration(this)
+       return promise.resolve(null)
+     } ?: return promise.reject(
+@@ -113,7 +113,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun shouldTrackNetworkState(isEnabled: Boolean, promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       IronSource.shouldTrackNetworkState(this, isEnabled)
+       return promise.resolve(null)
+     } ?: return promise.reject(
+@@ -220,7 +220,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun launchTestSuite(promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       IronSource.launchTestSuite(this)
+       return promise.resolve(null)
+     } ?: return promise.reject(
+@@ -239,7 +239,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+     adUnit: String,
+     promise: Promise
+   ) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       val adUnit = LevelPlayUtils.parseAdUnit(adUnit);
+ 
+       // If adUnit is null, reject the promise
+@@ -273,7 +273,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun clearWaterfallConfiguration(adUnit: String, promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       val adUnit = LevelPlayUtils.parseAdUnit(adUnit)
+ 
+       // If adUnit is null, reject the promise
+@@ -323,7 +323,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun init(appKey: String, promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       if (appKey.isEmpty()) {
+         return promise.reject(E_ILLEGAL_ARGUMENT, "appKey must be provided.")
+       }
+@@ -342,7 +342,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun initWithAdUnits(appKey: String, adUnits: ReadableArray, promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       if (appKey.isEmpty()) {
+         return promise.reject(E_ILLEGAL_ARGUMENT, "appKey must be provided.")
+       }
+@@ -374,7 +374,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun showRewardedVideo(promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       IronSource.showRewardedVideo()
+       return promise.resolve(null)
+     } ?: return promise.reject(
+@@ -389,7 +389,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun showRewardedVideoForPlacement(placementName: String, promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       IronSource.showRewardedVideo(placementName)
+       return promise.resolve(null)
+     } ?: return promise.reject(
+@@ -503,7 +503,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun showInterstitialForPlacement(placementName: String, promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       IronSource.showInterstitial(placementName)
+       return promise.resolve(null)
+     } ?: return promise.reject(
+@@ -564,7 +564,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+         else -> Gravity.BOTTOM
+       }
+     }
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       // Default vertical position
+       val position = options.getString(KEY_POSITION)
+         ?: return promise.reject(E_ILLEGAL_ARGUMENT, "Banner Position must be passed.")
+@@ -682,7 +682,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    * The JS event is sent by RCTBannerListener.
+    */
+   private fun onBannerAdLoadFailed() {
+-    currentActivity?.runOnUiThread {
++    getCurrentActivity()?.runOnUiThread {
+       synchronized(this@IronSourceMediationModule) {
+         mBannerContainer?.removeAllViews()
+         if (mBanner != null) {
+@@ -697,7 +697,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun destroyBanner(promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       runOnUiThread {
+         synchronized(this@IronSourceMediationModule) {
+           mBannerContainer?.removeAllViews()
+@@ -717,7 +717,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun displayBanner(promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       runOnUiThread {
+         synchronized(this@IronSourceMediationModule) {
+           mBannerVisibility = View.VISIBLE
+@@ -734,7 +734,7 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+    */
+   @ReactMethod
+   fun hideBanner(promise: Promise) {
+-    currentActivity?.apply {
++    getCurrentActivity()?.apply {
+       runOnUiThread {
+         synchronized(this@IronSourceMediationModule) {
+           mBannerVisibility = View.GONE
+@@ -772,11 +772,11 @@ class IronSourceMediationModule(reactContext: ReactApplicationContext) :
+ 
+   /** LifecycleEventListener ================================================================= **/
+   override fun onHostResume() {
+-    currentActivity?.apply { IronSource.onResume(this) }
++    getCurrentActivity()?.apply { IronSource.onResume(this) }
+   }
+ 
+   override fun onHostPause() {
+-    currentActivity?.apply { IronSource.onPause(this) }
++    getCurrentActivity()?.apply { IronSource.onPause(this) }
+   }
+ 
+   override fun onHostDestroy() {

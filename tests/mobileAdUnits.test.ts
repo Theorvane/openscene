@@ -146,12 +146,12 @@ describe('the native side', () => {
       'com.unity3d.ads:unity-ads',
       'com.applovin:applovin-sdk',
       'com.facebook.android:audience-network-sdk',
-      'com.pangle.global:ads-sdk'
+      'com.pangle.global:pag-sdk'
     ]) {
       expect(plugin, `${sdk} is missing on Android`).toContain(sdk);
     }
     // And Pangle's SDK is not on Maven Central, which fails as "could not find
-    // com.pangle.global:ads-sdk" long after the adapter itself resolved.
+    // com.pangle.global:pag-sdk" long after the adapter itself resolved.
     expect(plugin).toContain('artifact.bytedance.com/repository/pangle');
     // Editing a generated file twice is the failure mode of a config plugin, and
     // `expo prebuild` runs more than once.

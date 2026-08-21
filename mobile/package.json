@@ -27,14 +27,16 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "postinstall": "patch-package",
+    "start": "expo start",
+    "typecheck": "tsc --noEmit",
+    "web": "expo start --web"
   },
   "private": true
 }

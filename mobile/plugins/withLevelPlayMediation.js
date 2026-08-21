@@ -45,8 +45,25 @@ const ANDROID_DEPENDENCIES = [
   "implementation 'com.unity3d.ads-mediation:facebook-adapter:4.3.52'",
   "implementation 'com.facebook.android:audience-network-sdk:6.21.0'",
   // Pangle — the SDK is not on Maven Central; see PANGLE_MAVEN below.
+  //
+  // The artifact and the version are both narrower than they look, and both
+  // were found by running it rather than by reading anything. Pangle's Android
+  // SDK ships as `pag-sdk`, not the older `ads-sdk`, whose last release (6.5.1.2)
+  // has no `PAGConfig.Builder.setAdxId` — and `pag-sdk` 7.9 and later dropped
+  // `setGDPRConsent(int)`. Adapter 4.3.51 calls both, so it only works against
+  // 7.1.0.4 … 7.8.6.2, and 7.8.6.2 is the last of those. Either mismatch builds,
+  // installs, and then throws `NoSuchMethodError` inside LevelPlay's init on the
+  // device, where the SDK catches it — so the symptom is a network that never
+  // initialises rather than a crash, and nothing on screen says which.
+  //
+  // LevelPlay's ad-quality connector supports none of the versions this adapter
+  // can use — it says "ByteDance SDK version 7.8.6.2 is not yet supported by the
+  // connector" at init, and says the same of 7.5.0.5 and of 8.1.0.7. Ad Quality
+  // is revenue measurement rather than delivery, so Pangle still serves; there is
+  // simply no version that satisfies both, and picking the newest the adapter
+  // accepts is the closest thing to a fix available here.
   "implementation 'com.unity3d.ads-mediation:pangle-adapter:4.3.51'",
-  "implementation 'com.pangle.global:ads-sdk:6.5.1.2'",
+  "implementation 'com.pangle.global:pag-sdk:7.8.6.2'",
   // Required by the LevelPlay SDK itself, and not pulled in by it: without these
   // the SDK cannot read the advertising id or the app set id, and every network
   // sees an anonymous request with no device signal at all.
@@ -58,7 +75,7 @@ const ANDROID_DEPENDENCIES = [
 /**
  * Pangle publishes its global Android SDK to ByteDance's own repository rather
  * than to Maven Central. The adapter resolves from Central; the SDK it needs
- * does not, and the failure is a plain "could not find com.pangle.global:ads-sdk".
+ * does not, and the failure is a plain "could not find com.pangle.global:pag-sdk".
  */
 const PANGLE_MAVEN = 'https://artifact.bytedance.com/repository/pangle';
 

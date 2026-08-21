@@ -211,15 +211,26 @@ answers are no longer "none":
   per-network `NSExceptionDomains`, which each network publishes; expect it to go
   stale.
 
-**Ads have not been seen to run.** Expo Go cannot load the SDK, so the banner,
-the initialisation and the interstitial have only ever been exercised as code.
-There is a second reason to check before shipping: `ironsource-mediation@3.2.0`
-is built against React Native 0.73 and registers its banner as a legacy view
-manager, while this app is on 0.86 with the New Architecture. A development build
-must show a banner — through LevelPlay's Test Suite, reachable from Settings in a
-development build, since there are no test ad units — before a store build ships
-one. A release that reaches users with a
-silently broken banner earns nothing and still declares ad collection.
+**Initialisation runs; no ad has been seen.** An Android development build on an
+emulator reaches `LevelPlay.init()` with the Android app key and loads the five
+adapters. What it cannot show is an ad: LevelPlay's Test Suite is not enabled for
+this account — the SDK refuses it with "please contact your account manager to
+enable it" — and a development build requests no live unit by design. **Ask the
+LevelPlay account manager to enable the Test Suite**, then confirm a banner and an
+interstitial on a device before a store build ships either. A release that reaches
+users with a silently broken banner earns nothing and still declares ad
+collection.
+
+The banner is the part most likely to be wrong: `ironsource-mediation@3.2.0` is
+built against React Native 0.73 and registers its banner as a legacy view manager,
+while this app is on 0.86 with the New Architecture. The same version gap needs a
+patch to compile at all on Android; see `README-native.md`.
+
+**Unity Ads did not initialise on the emulator**, with `gateway_universal /
+PUBLIC_ERROR_CODE_INIT_UNKNOWN`, and LevelPlay's ad-quality connector rejects
+every Pangle SDK version the adapter can use. Neither blocks the other networks,
+and both are dashboard-side rather than code — but both belong on the list of
+things to confirm on a real device before reading revenue numbers as real.
 
 **There are two placements, and the interstitial is the one policy is strict
 about.** Reviewed against the LevelPlay programme policies and each mediated
