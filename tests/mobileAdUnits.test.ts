@@ -184,6 +184,25 @@ describe('the native side', () => {
     expect(ids).not.toContain('cstr6suwn9.skadnetwork');
   });
 
+  it('can open the test suite, and only from a development build', async () => {
+    // Development requests no live ad, so both placements stay empty and an
+    // integration that works is indistinguishable from one that does not. The
+    // Test Suite is the only way to tell them apart — and it has to be reachable
+    // from the app, or it may as well not ship.
+    const seam = await readMobile('src/lib/adsModule.ts');
+    expect(seam).toContain('launchTestSuite()');
+    // Initialised first: the Test Suite is a LevelPlay screen and needs the SDK
+    // up before it can list anything.
+    expect(seam).toMatch(/await ensureAdsReady\(ads\)[\s\S]{0,200}launchTestSuite\(\)/);
+
+    const settings = await readMobile('src/screens/SettingsScreen.tsx');
+    expect(settings).toContain('openAdTestSuite()');
+    // Behind `__DEV__` so it is compiled out of a store build rather than merely
+    // hidden in one: a user who found it would find ads they cannot dismiss on a
+    // screen that explains nothing.
+    expect(settings).toMatch(/\{__DEV__ && \([\s\S]{0,1200}openAdTestSuite\(\)/);
+  });
+
   it('carries the ATS exception the mediated networks need', async () => {
     // Several networks still serve creatives and make tracking calls over plain
     // HTTP; without this they fail silently as no-fill rather than as an error,

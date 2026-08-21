@@ -216,8 +216,9 @@ the initialisation and the interstitial have only ever been exercised as code.
 There is a second reason to check before shipping: `ironsource-mediation@3.2.0`
 is built against React Native 0.73 and registers its banner as a legacy view
 manager, while this app is on 0.86 with the New Architecture. A development build
-must show a banner — through LevelPlay's Test Suite, since there are no test ad
-units — before a store build ships one. A release that reaches users with a
+must show a banner — through LevelPlay's Test Suite, reachable from Settings in a
+development build, since there are no test ad units — before a store build ships
+one. A release that reaches users with a
 silently broken banner earns nothing and still declares ad collection.
 
 **There are two placements, and the interstitial is the one policy is strict

@@ -29,6 +29,7 @@ export type AdsModule = {
     init(request: LevelPlayInitRequest, listener: { onInitSuccess: (configuration: unknown) => void; onInitFailed: (error: unknown) => void }): Promise<void>;
     setConsent(isConsent: boolean): Promise<void>;
     setMetaData(key: string, values: string[]): Promise<void>;
+    launchTestSuite(): Promise<void>;
   };
   readonly LevelPlayInitRequest: { builder(appKey: string): { withLegacyAdFormats(formats: AdFormat[]): { build(): LevelPlayInitRequest } } };
   readonly LevelPlayInterstitialAd: new (adUnitId: string) => InterstitialAdInstance;
@@ -133,6 +134,37 @@ async function initialise(ads: AdsModule, appKey: string): Promise<boolean> {
   } catch {
     // No SDK to initialise, or a key it would not accept: no ad, and nothing said.
     return false;
+  }
+}
+
+/**
+ * Opens LevelPlay's Test Suite, which is the only way to see an ad while
+ * building.
+ *
+ * `src/lib/ads.ts` hands a development build no ad unit at all — LevelPlay
+ * publishes no test units, and an impression from a developer's own device is
+ * invalid traffic — so without this there is nothing to look at between writing
+ * the integration and shipping it to a store. The Test Suite serves from the
+ * dashboard rather than from live inventory: it lists every configured network,
+ * says whether its adapter is actually in the binary, and loads a test ad per
+ * placement. That is the check to run on a development build.
+ *
+ * It needs initialisation, which needs the app key — which a development build
+ * does have. Nothing here is reachable from a release build; see the caller.
+ *
+ * Resolves what happened, so the caller can say so rather than appear to do
+ * nothing: the Test Suite is a native screen, and a failed launch looks exactly
+ * like a tap that missed.
+ */
+export async function openAdTestSuite(): Promise<'opened' | 'no-sdk' | 'no-init'> {
+  const ads = loadAds();
+  if (ads === null) return 'no-sdk';
+  if (!(await ensureAdsReady(ads))) return 'no-init';
+  try {
+    await ads.LevelPlay.launchTestSuite();
+    return 'opened';
+  } catch {
+    return 'no-init';
   }
 }
 

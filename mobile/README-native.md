@@ -52,13 +52,23 @@ developer's own device is invalid traffic — which is what suspends a publisher
 account.
 
 So `src/lib/ads.ts` returns **null in development**, for both placements, on
-every platform. The sanctioned way to see an ad while building is LevelPlay's own
-Test Suite, which serves from the dashboard rather than from live inventory:
+every platform — which means both placements are empty in a dev build, and an
+integration that works looks exactly like one that does not.
 
-```ts
-import { LevelPlay } from 'ironsource-mediation';
-await LevelPlay.launchTestSuite(); // after init, from a dev build only
-```
+LevelPlay's Test Suite is what tells them apart. It serves from the dashboard
+rather than from live inventory, lists every configured network with whether its
+adapter is actually in this binary, and loads a test ad per placement. It is
+reachable from **Settings → Ad mediation → Test suite**, behind `__DEV__` so it
+compiles out of a store build rather than merely being hidden in one.
+
+No extra dependency ships for it: on Android `TestSuiteActivity` is inside
+`mediation-sdk` and declared in that AAR's own manifest, and on iOS
+`launchTestSuite` is on `LevelPlay` in `IronSourceSDK`. Both were checked against
+the artifacts this project resolves.
+
+Nothing appears there until the dashboard has the networks configured — a
+network with no placement set up shows as unavailable even when its adapter did
+make it into the binary, which is the distinction worth reading carefully.
 
 ## Why the banner probes React Native rather than the SDK
 

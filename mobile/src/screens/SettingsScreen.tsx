@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
+import { openAdTestSuite } from '../lib/adsModule';
 import { PROVIDER_KEYS, readSlot } from '../lib/credentials';
 import { useAnalyticsPreference } from '../lib/analyticsClient';
 import { SPEND_FEATURES, useSpendPermissions } from '../lib/permissions';
@@ -57,6 +58,12 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
   const permissions = useSpendPermissions();
   const analytics = useAnalyticsPreference();
   const { providers: customProviders, refresh: refreshCustom } = useCustomProviders();
+  /**
+   * What the Test Suite tap did. Null until asked, so the row reads "Open".
+   * Launching it is a native screen appearing over this one, and a launch that
+   * failed looks exactly like a tap that missed — so it says which.
+   */
+  const [testSuite, setTestSuite] = useState<'opening' | 'opened' | 'no-sdk' | 'no-init' | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     const slots = new Set<string>([
@@ -189,6 +196,54 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
           <Text style={[styles.permValue, analytics.enabled && styles.aboutLink]}>{analytics.enabled ? 'on' : 'off'}</Text>
         </Pressable>
       </View>
+
+      {/*
+        The only way to see an ad while building.
+
+        LevelPlay publishes no test ad units, so `src/lib/ads.ts` hands a
+        development build none and both placements stay empty — which is
+        indistinguishable from an integration that does not work. The Test Suite
+        is the answer to that: it serves from the dashboard rather than from live
+        inventory, lists every configured network with whether its adapter is
+        actually in this binary, and loads a test ad per placement.
+
+        Behind `__DEV__`, so it is compiled out of a store build rather than
+        merely hidden in one. It is a debugging surface, and a user finding it
+        would be finding ads they cannot dismiss from a screen that explains
+        nothing.
+      */}
+      {__DEV__ && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Ad mediation (development only)</Text>
+          <Text style={styles.sectionBlurb}>
+            LevelPlay’s Test Suite. Shows which of the five networks — ironSource, Unity Ads, AppLovin, Meta, Pangle —
+            actually made it into this binary, and loads a test ad for each placement. Development builds request no
+            live ad, so this is the only place an ad appears before a store build.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open the LevelPlay test suite"
+            onPress={() => {
+              setTestSuite('opening');
+              void openAdTestSuite().then(setTestSuite);
+            }}
+            style={press(styles.aboutRow)}
+          >
+            <Text style={styles.aboutLabel}>Test suite</Text>
+            <Text style={[styles.aboutValue, testSuite === null && styles.aboutLink]}>
+              {testSuite === null
+                ? 'Open'
+                : testSuite === 'opening'
+                  ? 'Opening…'
+                  : testSuite === 'opened'
+                    ? 'Opened'
+                    : testSuite === 'no-sdk'
+                      ? 'Needs a development build'
+                      : 'Could not initialise'}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       {/*
         Who made this, and where to find them.
