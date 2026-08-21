@@ -194,9 +194,9 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
         Who made this, and where to find them.
 
         An app that carries ads is a published thing rather than a personal
-        build, and both the stores and AdMob expect a publisher a user can
-        identify and reach. The site is the place a privacy policy lives, which
-        serving ads also requires.
+        build, and both the stores and the ad network expect a publisher a user
+        can identify and reach. The site is the place a privacy policy lives,
+        which serving ads also requires.
       */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>

@@ -194,8 +194,8 @@ function Shell() {
       Before the export would be an ad in front of an action the user just
       asked for, arriving under a thumb still travelling toward the button they
       pressed; during it would be an ad over a progress state. Both are what
-      AdMob's interstitial policies are written about. Finishing is the one
-      genuine break this app has.
+      the mediated networks' interstitial policies are written about. Finishing
+      is the one genuine break this app has.
 
       A failed export still calls this — with `false`, which shows nothing and
       releases the ad that was loaded for a moment that did not arrive.

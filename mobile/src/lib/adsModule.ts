@@ -1,57 +1,57 @@
-import { TurboModuleRegistry } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
+
+import { levelPlayAppKey } from './ads';
+
+import type {
+  AdFormat,
+  LevelPlayAdSize,
+  LevelPlayBannerAdViewProps,
+  LevelPlayInitRequest,
+  LevelPlayInterstitialAd as LevelPlayInterstitialAdClass
+} from 'ironsource-mediation';
 
 /**
- * The one place that touches the Google Mobile Ads SDK.
+ * The one place that touches the Unity LevelPlay SDK.
  *
  * Both placements need the same three things — is the SDK in this binary, hand
- * it to me, and may I request an ad yet — and the first of those is the part
- * that cost two red screens to get right. Doing it once means the next placement
- * cannot get it wrong.
+ * it to me, and is it initialised yet — and the first of those is the part that
+ * cost two red screens to get right under the AdMob binding. Doing it once means
+ * the next placement cannot get it wrong.
+ *
+ * `import type` above is erased at compile time, so nothing here loads the
+ * package before `loadAds` decides it is safe to.
  */
 
-type BannerComponent = React.ComponentType<{
-  readonly unitId: string;
-  readonly size: string;
-  readonly onAdFailedToLoad?: (error: unknown) => void;
-}>;
-
-export type InterstitialAdInstance = {
-  addAdEventListener(type: string, listener: (payload?: unknown) => void): () => void;
-  load(): void;
-  show(): Promise<unknown>;
-};
+export type InterstitialAdInstance = InstanceType<typeof LevelPlayInterstitialAdClass>;
 
 export type AdsModule = {
-  readonly BannerAd: BannerComponent;
-  readonly BannerAdSize: Record<string, string>;
-  readonly MobileAds: () => { initialize(): Promise<unknown> };
-  readonly AdsConsent: {
-    requestInfoUpdate(): Promise<unknown>;
-    loadAndShowConsentFormIfRequired(): Promise<unknown>;
-    getConsentInfo(): Promise<{ canRequestAds?: boolean }>;
+  readonly LevelPlay: {
+    init(request: LevelPlayInitRequest, listener: { onInitSuccess: (configuration: unknown) => void; onInitFailed: (error: unknown) => void }): Promise<void>;
+    setConsent(isConsent: boolean): Promise<void>;
+    setMetaData(key: string, values: string[]): Promise<void>;
   };
-  /** Present in every shipped version of the package; typed optional so a build without it degrades. */
-  readonly InterstitialAd?: { createForAdRequest(unitId: string): InterstitialAdInstance };
-  readonly AdEventType?: Record<string, string>;
+  readonly LevelPlayInitRequest: { builder(appKey: string): { withLegacyAdFormats(formats: AdFormat[]): { build(): LevelPlayInitRequest } } };
+  readonly LevelPlayInterstitialAd: new (adUnitId: string) => InterstitialAdInstance;
+  readonly LevelPlayBannerAdView: React.ComponentType<LevelPlayBannerAdViewProps>;
+  readonly LevelPlayAdSize: { BANNER: LevelPlayAdSize; createAdaptiveAdSize(width?: number | null): Promise<LevelPlayAdSize | null> };
+  readonly AdFormat: typeof AdFormat;
 };
 
 /**
  * Whether this binary has the ad SDK in it, asked without touching the SDK.
  *
- * The obvious approach — require it and catch — does not work here, and finding
- * that out cost two red screens. The package's entry registers its TurboModules
- * eagerly with `getEnforcing`, which throws where the native side is missing;
- * the throw escapes a `try` around the `require`, and probing the returned
- * object instead only moves the failure a line later. There is no defensive way
- * to ask the module whether it is there.
- *
- * `TurboModuleRegistry.get` returns null rather than throwing, and it is React
- * Native's own registry rather than the package's — so the question is answered
- * before anything of the SDK is loaded at all.
+ * The obvious approach — require it and catch — was not safe under the AdMob
+ * binding, and finding that out cost two red screens: that package registered
+ * its TurboModules eagerly with `getEnforcing`, so the throw escaped a `try`
+ * around the `require`. `ironsource-mediation` reads `NativeModules` instead,
+ * which yields `undefined` rather than throwing, but the question is still asked
+ * through React Native's own registry rather than through the package — so the
+ * answer arrives before any of the SDK loads, whatever the package does at
+ * import time.
  */
 export function hasAdsNativeModule(): boolean {
   try {
-    return TurboModuleRegistry.get('RNGoogleMobileAdsModule') != null;
+    return NativeModules.LevelPlayMediation != null;
   } catch {
     return false;
   }
@@ -62,14 +62,15 @@ export function loadAds(): AdsModule | null {
   if (!hasAdsNativeModule()) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const required: unknown = require('react-native-google-mobile-ads');
+    const required: unknown = require('ironsource-mediation');
     for (const candidate of [required, (required as { default?: unknown } | null)?.default]) {
       const module = candidate as Partial<AdsModule> | undefined;
       if (
-        typeof module?.BannerAd === 'function' &&
-        module.BannerAdSize !== undefined &&
-        typeof module.MobileAds === 'function' &&
-        module.AdsConsent !== undefined
+        module?.LevelPlay !== undefined &&
+        typeof module.LevelPlayInterstitialAd === 'function' &&
+        module.LevelPlayBannerAdView !== undefined &&
+        module.LevelPlayAdSize !== undefined &&
+        module.LevelPlayInitRequest !== undefined
       ) {
         return module as AdsModule;
       }
@@ -81,27 +82,61 @@ export function loadAds(): AdsModule | null {
 }
 
 /**
- * Consent, then initialisation, then permission to ask for an ad.
+ * Privacy signals, then initialisation, then permission to ask for an ad.
  *
- * Google's own guidance is "before requesting ads, use `canRequestAds` to check
- * if you've obtained consent" — so nothing requests anything until this resolves
- * true. Where no consent is required the form is skipped and this returns
- * quickly; where it is required, showing it *is* the requirement.
+ * LevelPlay ships no consent form of its own — the AdMob binding brought Google's
+ * UMP with it, and removing the binding removed the CMP too. What replaces it is
+ * the conservative default rather than a prompt: consent is declared *not* given,
+ * so every mediated network serves contextual, non-personalised ads, and CCPA's
+ * do-not-sell signal is set for the same reason. That is the same posture the app
+ * already had — App Tracking Transparency is deliberately not implemented, so
+ * there was never personalised inventory to lose.
+ *
+ * Turning personalised ads on means adding a certified CMP and the ATT prompt
+ * first, and passing what the user actually chose to `setConsent` here. Nothing
+ * else in the app has to change for that.
  */
 export async function ensureAdsReady(ads: AdsModule): Promise<boolean> {
+  const appKey = levelPlayAppKey(Platform.OS);
+  if (appKey === null) return false;
+  initialisation ??= initialise(ads, appKey);
+  return initialisation;
+}
+
+/**
+ * Initialising twice is not an error, but it is a second round trip and a second
+ * set of listeners, and both placements call this. The promise is the memo.
+ */
+let initialisation: Promise<boolean> | null = null;
+
+async function initialise(ads: AdsModule, appKey: string): Promise<boolean> {
   try {
-    await ads.AdsConsent.requestInfoUpdate();
-    await ads.AdsConsent.loadAndShowConsentFormIfRequired();
+    await ads.LevelPlay.setConsent(false);
+    await ads.LevelPlay.setMetaData('do_not_sell', ['true']);
   } catch {
-    // Fall through: `canRequestAds` still decides, and it is the part that gates.
+    // Fall through: a signal that did not get through is a reason to be more
+    // careful, not a reason to skip init — but if `setConsent` failed, the
+    // networks fall back to their own defaults, which is why it is attempted
+    // before init rather than after and why failure is not silently ignored
+    // below: init still has to succeed for anything to be requested.
   }
   try {
-    const info = await ads.AdsConsent.getConsentInfo();
-    if (info.canRequestAds !== true) return false;
-    await ads.MobileAds().initialize();
-    return true;
+    const request = ads.LevelPlayInitRequest.builder(appKey)
+      .withLegacyAdFormats([ads.AdFormat.BANNER, ads.AdFormat.INTERSTITIAL])
+      .build();
+    return await new Promise<boolean>((resolve) => {
+      void ads.LevelPlay.init(request, {
+        onInitSuccess: () => resolve(true),
+        onInitFailed: () => resolve(false)
+      }).catch(() => resolve(false));
+    });
   } catch {
-    // No consent, or no SDK to initialise: no ad, and nothing said.
+    // No SDK to initialise, or a key it would not accept: no ad, and nothing said.
     return false;
   }
+}
+
+/** Test seam: the memo is deliberate, and deliberate state has to be resettable. */
+export function resetAdsInitialisationForTests(): void {
+  initialisation = null;
 }

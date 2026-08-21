@@ -27,7 +27,6 @@ let ads: AdsModule | null | undefined;
 let loaded: InterstitialAdInstance | null = null;
 let filled = false;
 let lastShownAt: number | null = null;
-let unsubscribe: (() => void) | null = null;
 
 function module(): AdsModule | null {
   if (ads === undefined) ads = loadAds();
@@ -39,8 +38,9 @@ function unitId(): string | null {
 }
 
 function forget(): void {
-  unsubscribe?.();
-  unsubscribe = null;
+  // `remove` releases the native ad object behind this instance. Dropping the
+  // reference without it leaks one per export.
+  void loaded?.remove().catch(() => undefined);
   loaded = null;
   filled = false;
 }
@@ -48,38 +48,37 @@ function forget(): void {
 /** Requested while the encoder runs, so there is something to show when it stops. */
 export function prepareExportAd(): void {
   const sdk = module();
-  const factory = sdk?.InterstitialAd;
   const unit = unitId();
-  if (sdk === null || factory === undefined || unit === null || loaded !== null) return;
+  if (sdk === null || unit === null || loaded !== null) return;
 
   void (async () => {
-    // Consent gates the request itself, not merely the presentation — asking
-    // first and checking later is the compliance failure, and nothing on screen
-    // would reveal it.
+    // LevelPlay has to be initialised — with the app key, and carrying the
+    // privacy signals — before any unit is asked for. Requesting first and
+    // initialising later is not merely out of order: the request is dropped.
     if (!(await ensureAdsReady(sdk))) return;
     try {
-      const ad = factory.createForAdRequest(unit);
-      const events = sdk.AdEventType ?? {};
-      const off = [
-        ad.addAdEventListener(events.LOADED ?? 'loaded', () => {
+      const ad = new sdk.LevelPlayInterstitialAd(unit);
+      ad.setListener({
+        onAdLoaded: () => {
           filled = true;
-        }),
-        ad.addAdEventListener(events.ERROR ?? 'error', () => {
+        },
+        onAdLoadFailed: () => {
           // A no-fill is a moment rather than a verdict; the next export asks again.
           forget();
-        }),
-        ad.addAdEventListener(events.CLOSED ?? 'closed', () => {
-          // An interstitial instance is single-use — showing a closed one does
-          // nothing, silently, which is the failure that looks like "the ad
-          // stopped working after the first time".
+        },
+        onAdDisplayed: () => undefined,
+        onAdDisplayFailed: () => {
           forget();
-        })
-      ];
+        },
+        onAdClosed: () => {
+          // A LevelPlay interstitial instance is single-use — showing a closed
+          // one does nothing, silently, which is the failure that looks like
+          // "the ad stopped working after the first time".
+          forget();
+        }
+      });
       loaded = ad;
-      unsubscribe = () => {
-        for (const remove of off) remove();
-      };
-      ad.load();
+      await ad.loadAd();
     } catch {
       forget();
     }
@@ -122,9 +121,9 @@ function whenForeground(): Promise<boolean> {
 }
 
 /**
- * Shown only if the export succeeded, consent allows it, a unit exists, and it
- * has been long enough. Resolves whether anything was shown, so a caller can
- * order its own UI against it.
+ * Shown only if the export succeeded, a unit exists, an ad filled, and it has
+ * been long enough. Resolves whether anything was shown, so a caller can order
+ * its own UI against it.
  */
 export async function showExportAd(exportSucceeded: boolean, now = Date.now()): Promise<boolean> {
   // Waited on before deciding, not sampled: see `whenForeground`.
@@ -146,7 +145,7 @@ export async function showExportAd(exportSucceeded: boolean, now = Date.now()): 
     return false;
   }
   try {
-    await loaded.show();
+    await loaded.showAd(null);
     lastShownAt = now;
     return true;
   } catch {

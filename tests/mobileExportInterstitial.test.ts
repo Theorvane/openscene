@@ -9,14 +9,14 @@ import { INTERSTITIAL_MIN_GAP_MS, decideInterstitial } from '../mobile/src/lib/e
  * When a finished export may be followed by a full-screen ad.
  *
  * Where an interstitial goes is the whole of this feature, and every rule here
- * is one AdMob's policies name directly — an ad in front of an action the user
+ * is one the mediated networks' policies name directly — an ad in front of an action the user
  * asked for, an ad over content that is still loading, an ad in the moment a
  * user is least likely to have meant the tap that dismisses it.
  */
 
 const base = {
   exportSucceeded: true,
-  unitId: 'ca-app-pub-3940256099942544/1033173712',
+  unitId: 'levelplay-interstitial-unit',
   adFilled: true,
   appActive: true,
   lastShownAt: null,
@@ -62,28 +62,21 @@ describe('the export interstitial', () => {
 });
 
 describe('the interstitial unit', () => {
-  it('never hands a development build a live unit', () => {
+  it('asks for nothing in a development build', () => {
+    // LevelPlay publishes no test units — every unit is real mediated inventory
+    // whoever asks — so the development answer is none rather than a safe id.
     for (const platform of ['ios', 'android'] as const) {
-      expect(interstitialAdUnitId(platform, true)).toMatch(/^ca-app-pub-3940256099942544\//);
+      expect(interstitialAdUnitId(platform, true)).toBeNull();
     }
   });
 
-  it('uses the platform own unit in a production build', () => {
-    expect(interstitialAdUnitId('ios', false)).toBe('ca-app-pub-1548414855954305/3993164988');
-    expect(interstitialAdUnitId('android', false)).toBe('ca-app-pub-1548414855954305/9641715519');
-    // Four live units now, and every one of them has to be the placement it is
-    // used for. An interstitial served into a banner slot, or the reverse, is a
-    // policy violation rather than a rendering bug.
-    expect(new Set([
-      interstitialAdUnitId('ios', false),
-      interstitialAdUnitId('android', false),
-      bannerAdUnitId('ios', false),
-      bannerAdUnitId('android', false)
-    ]).size).toBe(4);
-    for (const unit of [interstitialAdUnitId('ios', false), interstitialAdUnitId('android', false)]) {
-      // A unit uses `/`; the `~` form is the app id, and swapping the two fails
-      // only at runtime on a real device, where it is expensive to find.
-      expect(unit).toMatch(/^ca-app-pub-1548414855954305\/\d+$/);
+  it('uses the platform own unit, and never the banner one', () => {
+    // An interstitial served into a banner slot, or the reverse, is a policy
+    // violation rather than a rendering bug.
+    expect(interstitialAdUnitId('ios', false)).toBe('ii71gp04gfktnj8i');
+    expect(interstitialAdUnitId('android', false)).toBe('9etyh0zw8fg8dgou');
+    for (const platform of ['ios', 'android'] as const) {
+      expect(interstitialAdUnitId(platform, false)).not.toBe(bannerAdUnitId(platform, false));
     }
   });
 
@@ -116,9 +109,12 @@ describe('the export flow', () => {
   it('releases an ad loaded for a moment that did not arrive', async () => {
     const ad = await read('src/lib/exportAd.ts');
     expect(ad).toContain('if (!exportSucceeded) forget();');
-    // An interstitial instance is single-use: showing a closed one does nothing,
-    // silently, which reads as "the ad stopped working after the first time".
-    expect(ad).toMatch(/CLOSED[\s\S]{0,260}forget\(\)/);
+    // A LevelPlay interstitial instance is single-use: showing a closed one does
+    // nothing, silently, which reads as "the ad stopped working after the first
+    // time". And the native object behind it has to be handed back, or every
+    // export leaks one.
+    expect(ad).toMatch(/onAdClosed: \(\) => \{[\s\S]{0,320}forget\(\)/);
+    expect(ad).toContain('loaded?.remove()');
   });
 
   it('waits for the user to come back rather than sampling the moment', async () => {
@@ -135,8 +131,11 @@ describe('the export flow', () => {
     expect(ad).toMatch(/setTimeout\(\(\) => settle\(false\), RETURN_WINDOW_MS\)/);
   });
 
-  it('checks consent before the request rather than before the presentation', async () => {
+  it('initialises before the request rather than before the presentation', async () => {
+    // LevelPlay drops a request made before init, and init is where the privacy
+    // signals are set — so both belong ahead of the ad object, not ahead of the
+    // moment it is shown.
     const ad = await read('src/lib/exportAd.ts');
-    expect(ad).toMatch(/await ensureAdsReady\(sdk\)[\s\S]{0,200}createForAdRequest/);
+    expect(ad).toMatch(/await ensureAdsReady\(sdk\)[\s\S]{0,300}new sdk\.LevelPlayInterstitialAd/);
   });
 });

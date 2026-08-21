@@ -8,23 +8,34 @@ import { theme } from '../lib/theme';
 /**
  * The banner, above the tab bar.
  *
- * Loaded at the point of use rather than imported at the top. The Google Mobile
- * Ads SDK is native, so a client without it — Expo Go, or any build made before
- * this — cannot provide it, and a top-level import of an unavailable native
- * module throws while the module graph is still loading and takes the whole app
- * down before a screen mounts. `expo-media-library` did exactly that here once
+ * Loaded at the point of use rather than imported at the top. The Unity LevelPlay
+ * SDK is native, so a client without it — Expo Go, or any build made before this
+ * — cannot provide it, and a top-level import of an unavailable native module
+ * throws while the module graph is still loading and takes the whole app down
+ * before a screen mounts. `expo-media-library` did exactly that here once
  * already; this is the same lesson applied before it costs anything.
  *
- * Placement is deliberate. AdMob's policies are specific about ads a user can
- * tap by accident, and the tab bar directly below is five 44pt targets. The
- * banner therefore gets its own block with a rule above it and the bar's own
- * border below, rather than sharing an edge with anything tappable — and it is
- * hidden entirely while the keyboard is up, where it would sit between the
- * composer and the user's thumb.
+ * Placement is deliberate. Every mediated network's policies are specific about
+ * ads a user can tap by accident, and the tab bar directly below is five 44pt
+ * targets. The banner therefore gets its own block with a rule above it and the
+ * bar's own border below, rather than sharing an edge with anything tappable —
+ * and it is hidden entirely while the keyboard is up, where it would sit between
+ * the composer and the user's thumb.
  */
 
 /** Long enough that a dead network is not retried at cost, short enough to recover. */
 const RETRY_AFTER_MS = 60_000;
+
+/**
+ * The fixed 320×50 banner rather than an adaptive one.
+ *
+ * `LevelPlayAdSize.createAdaptiveAdSize` is a promise that can resolve null, so
+ * an adaptive banner is a second failure mode between mount and first request.
+ * The block below is centred and sized for this, and the tab bar's position does
+ * not depend on which of the two arrives.
+ */
+const BANNER_WIDTH = 320;
+const BANNER_HEIGHT = 50;
 
 export function AdBanner() {
   // Resolved once: `require` is cached, but asking on every render made this run
@@ -32,11 +43,9 @@ export function AdBanner() {
   const [ads] = useState(() => loadAds());
   const unitId = bannerAdUnitId(Platform.OS, __DEV__);
   /**
-   * Consent first, then initialise, then request. Google's own guidance is
-   * "before requesting ads, use `canRequestAds` to check if you've obtained
-   * consent from the user" — so the banner does not render until that is true.
-   * In regions where no consent is required the form is skipped and this
-   * resolves immediately; where it is required, showing it is the requirement.
+   * LevelPlay has to be initialised with the app key before any unit is asked
+   * for, and initialisation carries the privacy signals with it — so the banner
+   * does not render until that has resolved. See `ensureAdsReady`.
    */
   const [ready, setReady] = useState(false);
   /**
@@ -79,10 +88,15 @@ export function AdBanner() {
 
   return (
     <View style={styles.root}>
-      <ads.BannerAd
-        unitId={unitId}
-        size={ads.BannerAdSize.ANCHORED_ADAPTIVE_BANNER ?? ads.BannerAdSize.BANNER ?? 'BANNER'}
-        onAdFailedToLoad={() => setFailed(true)}
+      <ads.LevelPlayBannerAdView
+        adUnitId={unitId}
+        adSize={ads.LevelPlayAdSize.BANNER}
+        placementName={null}
+        style={styles.banner}
+        listener={{
+          onAdLoaded: () => setFailed(false),
+          onAdLoadFailed: () => setFailed(true)
+        }}
       />
     </View>
   );
@@ -90,8 +104,8 @@ export function AdBanner() {
 
 const styles = StyleSheet.create({
   // Its own block, with a rule above it: the tab bar's targets start immediately
-  // below, and an ad sharing an edge with a button is the accidental tap AdMob's
-  // policies are written about.
+  // below, and an ad sharing an edge with a button is the accidental tap every
+  // one of these networks' policies is written about.
   root: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -99,5 +113,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.line,
     backgroundColor: theme.bg
+  },
+  // A native view with no intrinsic size in React Native's layout: without this
+  // it measures zero and the ad is present, paid for, and invisible.
+  banner: {
+    width: BANNER_WIDTH,
+    height: BANNER_HEIGHT
   }
 });

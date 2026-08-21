@@ -4,8 +4,8 @@ import appConfig from '../../app.json';
  * Who publishes this app.
  *
  * An app carrying ads is a published thing rather than a personal build, and
- * both the stores and AdMob expect a publisher a user can identify and reach.
- * The site is also where a privacy policy has to live, which serving ads
+ * both the stores and the ad network expect a publisher a user can identify and
+ * reach. The site is also where a privacy policy has to live, which serving ads
  * requires of its own accord.
  */
 export const DEVELOPER_NAME = 'sloki9637';
@@ -14,10 +14,10 @@ export const DEVELOPER_SITE = 'www.sloki9637.com';
 /**
  * The two pages a published app has to be able to point at.
  *
- * Serving ads requires a privacy policy — AdMob asks for the URL and the stores
- * ask again — and it has to be reachable from inside the app, not only from a
- * listing page the user never sees. Full URLs rather than paths joined onto the
- * site, so what ships is exactly what was checked.
+ * Serving ads requires a privacy policy — LevelPlay asks for the URL and the
+ * stores ask again — and it has to be reachable from inside the app, not only
+ * from a listing page the user never sees. Full URLs rather than paths joined
+ * onto the site, so what ships is exactly what was checked.
  */
 export const PRIVACY_URL = 'https://www.sloki9637.com/privacy';
 export const TERMS_URL = 'https://www.sloki9637.com/terms';

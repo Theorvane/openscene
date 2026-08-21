@@ -32,50 +32,68 @@ and the editor's export note should read "Export renders with AVFoundation" rath
 
 `ios/` and `android/` are gitignored, as Expo's continuous-native-generation flow expects — they are regenerated from config and never edited by hand.
 
-# The AdMob banner
+# The LevelPlay banner
 
-`react-native-google-mobile-ads` is the maintained AdMob binding for React
-Native and what Expo points at; `expo-ads-admob` is gone. Like the export
-module it is native, so Expo Go cannot show an ad — but unlike the export
-module, it cannot even be *asked* whether it is there.
+Ads are mediated by **Unity LevelPlay** (formerly ironSource) through
+`ironsource-mediation`. AdMob and `react-native-google-mobile-ads` are gone
+entirely. LevelPlay is the mediation SDK; the demand comes from ironSource's own
+network plus four adapters — Unity Ads, AppLovin, Meta Audience Network and
+Pangle — wired in by `plugins/withLevelPlayMediation.js`.
+
+Like the export module it is native, so Expo Go can neither show an ad nor be
+asked for one.
+
+## There is no test ad unit, and that changes the rule
+
+AdMob publishes always-fill test ids, so the old rule was "never a live unit in a
+development build". LevelPlay publishes none: every LevelPlay ad unit is real
+mediated inventory whoever asks for it, and an impression or a click from a
+developer's own device is invalid traffic — which is what suspends a publisher
+account.
+
+So `src/lib/ads.ts` returns **null in development**, for both placements, on
+every platform. The sanctioned way to see an ad while building is LevelPlay's own
+Test Suite, which serves from the dashboard rather than from live inventory:
+
+```ts
+import { LevelPlay } from 'ironsource-mediation';
+await LevelPlay.launchTestSuite(); // after init, from a dev build only
+```
 
 ## Why the banner probes React Native rather than the SDK
 
 `requireOptionalNativeModule` is the pattern everywhere else here, and requiring
-in a `try` is the pattern `exportComposition` uses. Neither works for this
-package: its entry registers TurboModules eagerly with `getEnforcing`, so the
-throw escapes a `try` around the `require`, and inspecting whatever the require
-returned only moves the failure a line later. Both were tried; both were red
-screens.
+in a `try` is the pattern `exportComposition` uses. Neither was safe under the
+AdMob binding: its entry registered TurboModules eagerly with `getEnforcing`, so
+the throw escaped a `try` around the `require`, and inspecting whatever the
+require returned only moved the failure a line later. Both were tried; both were
+red screens.
 
-`TurboModuleRegistry.get` returns null instead of throwing and belongs to React
-Native rather than the package, so `AdBanner` asks it first and never touches
-the SDK in a client that lacks it.
+`ironsource-mediation` reads `NativeModules` instead, which yields `undefined`
+rather than throwing — but `src/lib/adsModule.ts` still asks React Native's own
+registry (`NativeModules.LevelPlayMediation`) before requiring the package, so
+the answer arrives before any of the SDK loads whatever the package does at
+import time. The types are imported with `import type`, which is erased.
 
-## The ads binding is pinned, and why
+## The adapters are pinned to the SDK the plugin pins
 
-`react-native-google-mobile-ads` is held at **16.0.0**, not the newest release.
-16.4.0 pulls `play-services-ads:25.4.0`, which is compiled with Kotlin 2.3
-metadata; this project's Kotlin is 2.1, and a compiler cannot read metadata from
-a version newer than itself:
+`ironsource-mediation@3.2.0` pins LevelPlay **8.10.0** on both platforms
+(`com.unity3d.ads-mediation:mediation-sdk:8.10.0`, pod `IronSourceSDK 8.10.0.0`).
+The adapters' 5.x line requires LevelPlay 9.x — CocoaPods refuses that outright,
+and on Android it resolves to a mismatched pair that fails at runtime rather than
+at build time. So the pins in the config plugin are the last of the 4.3.x line,
+which is the one built against 8.x, and they move when the plugin moves.
 
-```
-Module was compiled with an incompatible version of Kotlin.
-The binary version of its metadata is 2.3.0, expected version is 2.1.0.
-```
+Two more things about Android that are not obvious from the LevelPlay docs:
 
-Raising Kotlin instead was tried and is worse. `expo-build-properties`'
-`android.kotlinVersion` moves the stdlib to 2.3 but leaves each module compiling
-at 2.1, so the build then fails in `react-native-safe-area-context` rather than
-in the ads SDK — "the compiler version 2.1.0 can read versions up to 2.2.0".
-Kotlin here comes from Expo's version catalog and moves when Expo moves.
+- The adapter artifacts' POMs are **empty**. Each demand network's own SDK has to
+  be declared alongside its adapter, or the adapter reports the network
+  unavailable at init — which reads as poor fill rather than as a bug.
+- Pangle's global Android SDK is **not on Maven Central**. It comes from
+  `https://artifact.bytedance.com/repository/pangle`, which the plugin adds to
+  `allprojects.repositories`.
 
-16.0.0 pulls `play-services-ads:24.6.0`, which builds. When Expo's Kotlin
-reaches 2.3, the binding can go forward again — until then, upgrading it breaks
-the Android build outright, which is the sort of thing worth knowing before
-spending twenty minutes on a red Gradle log.
-
-## Confirming the SDK is actually linked
+## Confirming the SDK and the adapters are actually linked
 
 `ios/` and `android/` are gitignored and regenerated, so this is a check to run
 rather than a state to keep:
@@ -83,38 +101,55 @@ rather than a state to keep:
 ```bash
 cd mobile
 npx expo prebuild --platform android --no-install
-grep -A1 APPLICATION_ID android/app/src/main/AndroidManifest.xml
+grep -c 'ads-mediation:' android/app/build.gradle          # four adapters
+grep -c 'artifact.bytedance.com' android/build.gradle      # one repository
 
 npx expo prebuild --platform ios --no-install
-grep -A1 GADApplicationIdentifier ios/*/Info.plist
+grep -c 'IronSource.*Adapter' ios/Podfile                  # four pods
+grep -c skadnetwork ios/*/Info.plist                       # seven identifiers
 ```
 
-Both should print the app id for that platform — `~3232346149` on Android,
-`~2877122921` on iOS. An app id uses `~`; an ad unit uses `/`, and swapping them
-fails only on a device.
+Running `expo prebuild` twice must not double any of those counts — the plugin
+writes a marker comment into each generated file and skips a file that has it.
+
+`pod install` resolves this set cleanly and pins `IronSourceSDK 8.10.0.0`, with
+one warning worth knowing about rather than fixing:
+
+```
+Can't merge user_target_xcconfig for pod targets: ["FBAudienceNetwork",
+"IronSourceAdQualitySDK"]. Singular build setting
+EXCLUDED_ARCHS[sdk=iphonesimulator*] has different values.
+```
+
+The two disagree about which dead architectures to exclude from a simulator
+build — `i386` against `arm64e armv7 armv7s` — so CocoaPods applies neither. None
+of those is built by a current Xcode, and `arm64` is excluded by neither, so the
+simulator build is unaffected. It is noise, not a broken pod.
+
+The SKAdNetwork identifiers come from Unity's LevelPlay SKAdNetwork ID manager
+(`https://docs.unity.com/en-us/grow/levelplay/sdk/ios/skadnetwork-id-manager`),
+read on 2026-08-22. They are the networks allowed to be credited with a
+conversion from this app, so the list belongs to Unity and not to us: when the
+mediated networks change, re-copy it rather than editing entries by hand. An
+invented identifier is worse than a missing one — it claims an attribution
+relationship that does not exist.
 
 That the binding itself is linked is worth checking separately, because it is
 resolved at build time rather than written into a file:
 
 ```bash
 npx expo-modules-autolinking react-native-config --platform android --json \
-  | grep -c react-native-google-mobile-ads
+  | grep -c ironsource-mediation
 ```
-
-The iOS pod resolves through `RNGoogleMobileAds.podspec`, which depends on
-`Google-Mobile-Ads-SDK` — that pod is the Google SDK itself.
-
-On iOS the same prebuild should also show fifty `SKAdNetworkIdentifier` entries:
-
-```bash
-grep -c skadnetwork ios/*/Info.plist
-```
-
-Those come from Google's AdMob iOS quick-start, copied on 2026-08-13. They are
-the networks allowed to be credited with a conversion from this app, so the list
-belongs to Google and not to us: when it changes, re-copy it from
-`https://developers.google.com/admob/ios/quick-start` rather than editing
-entries by hand. An invented identifier is worse than a missing one — it claims
-an attribution relationship that does not exist.
 
 Remember to delete `ios/` and `android/` afterwards. They are build output.
+
+## Not verified on a device yet
+
+The banner, the interstitial and initialisation have only ever been exercised as
+code and as unit tests. `ironsource-mediation@3.2.0` is built against React
+Native 0.73 and registers its banner through `requireNativeComponent`, a legacy
+view manager; this app is on 0.86 with the New Architecture, where legacy view
+managers go through the interop layer. That is the first thing to check on a
+development build, and the failure mode is a banner that never appears rather
+than a build error.

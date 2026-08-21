@@ -5,9 +5,10 @@
  * to be right can be tested. `showExportInterstitial` is the thin layer that
  * carries it out.
  *
- * Where an interstitial goes is the entire design. AdMob's policies are specific
- * about the format, and export is the only moment in this app that is a genuine
- * break rather than an interruption:
+ * Where an interstitial goes is the entire design. Every network mediated through
+ * LevelPlay — Unity Ads, AppLovin, Meta, Pangle — has policies specific about the
+ * format, and export is the only moment in this app that is a genuine break
+ * rather than an interruption:
  *
  * - **After the export finishes**, never before it starts. An ad in front of an
  *   action the user just asked for is the unexpected-interruption case, and it
@@ -38,9 +39,10 @@ export type InterstitialContext = {
   readonly exportSucceeded: boolean;
   readonly unitId: string | null;
   /**
-   * Whether an ad was actually requested and filled. Consent is not asked here:
-   * it gates the *request*, which happens long before this — checking it again
-   * at presentation would be checking the wrong end.
+   * Whether an ad was actually requested and filled. Initialisation and the
+   * privacy signals are not asked about here: they gate the *request*, which
+   * happens long before this — checking them again at presentation would be
+   * checking the wrong end.
    */
   readonly adFilled: boolean;
   /**
@@ -59,7 +61,7 @@ export type InterstitialContext = {
 };
 
 export function decideInterstitial(context: InterstitialContext): InterstitialDecision {
-  // Checked before consent and before the unit, because it is the one that is
+  // Checked before the unit and before fill, because it is the one that is
   // about the user rather than about the account: a failed export must not be
   // followed by an ad even in a build where everything else is in place.
   if (!context.exportSucceeded) return { show: false, because: 'export-failed' };
