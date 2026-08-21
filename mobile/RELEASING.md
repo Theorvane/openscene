@@ -196,11 +196,20 @@ answers are no longer "none":
   before initialising, so every network serves contextual inventory. Personalised
   ads in the EU require a certified CMP first — that is a decision, not an
   omission.
-- **App Transport Security is untouched.** LevelPlay's integration guide asks for
-  `NSAllowsArbitraryLoads`, because some mediated networks still make plain-HTTP
-  calls. It is not set here. If a network turns out to need it, adding it is an
-  app-wide ATS exception that Apple asks to have justified at review, so it is a
-  deliberate step rather than a default.
+- **App Transport Security carries an app-wide exception.**
+  `NSAllowsArbitraryLoads` is set in `app.json`, which LevelPlay's integration
+  guide requires: several mediated networks still serve creatives and make
+  tracking calls over plain HTTP, and without it those requests fail silently as
+  no-fill. Apple asks for this to be justified at review, and the justification
+  is exactly that — third-party ad SDKs the app does not control the endpoints
+  of. Nothing OpenScene itself talks to uses HTTP: the AI providers, the update
+  feed and the analytics endpoint are all HTTPS, so the exception widens what the
+  ad SDKs may do and nothing else. It is also why no narrower exception works —
+  the hosts belong to five networks and change without notice.
+
+  If review pushes back, the fallback is `NSAllowsArbitraryLoadsForMedia` plus
+  per-network `NSExceptionDomains`, which each network publishes; expect it to go
+  stale.
 
 **Ads have not been seen to run.** Expo Go cannot load the SDK, so the banner,
 the initialisation and the interstitial have only ever been exercised as code.

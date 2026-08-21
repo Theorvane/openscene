@@ -20,6 +20,9 @@
         "NSPhotoLibraryUsageDescription": "OpenScene reads the videos you pick so you can put them on a timeline. It copies the ones you choose into the project and never scans your library on its own.",
         "NSPhotoLibraryAddUsageDescription": "OpenScene saves a finished export to your photo library when you ask it to.",
         "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
         "SKAdNetworkItems": [
           {
             "SKAdNetworkIdentifier": "su67r6k2v3.skadnetwork"

@@ -184,6 +184,16 @@ describe('the native side', () => {
     expect(ids).not.toContain('cstr6suwn9.skadnetwork');
   });
 
+  it('carries the ATS exception the mediated networks need', async () => {
+    // Several networks still serve creatives and make tracking calls over plain
+    // HTTP; without this they fail silently as no-fill rather than as an error,
+    // which is the worst shape this misconfiguration could take. It is an app-wide
+    // exception Apple asks to have justified at review — see RELEASING.md — so
+    // it is asserted rather than left to whoever edits app.json next.
+    const config = JSON.parse(await readMobile('app.json'));
+    expect(config.expo.ios.infoPlist.NSAppTransportSecurity.NSAllowsArbitraryLoads).toBe(true);
+  });
+
   it('asks React Native whether the SDK is there before touching the SDK', async () => {
     // The lesson survives the change of network even though the mechanism did
     // not: the previous binding registered TurboModules eagerly with
