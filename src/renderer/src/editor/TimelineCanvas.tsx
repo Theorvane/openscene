@@ -4,6 +4,7 @@ import { formatDuration } from '../format';
 import { buildTimelineView, clientXToTimelineMs } from './editorTimelineView';
 import { buildRulerTicks } from './timelineRulerTicks';
 import { useClipThumbnails } from './clipThumbnails';
+import { useClipWaveform } from './clipWaveform';
 import type { ThumbnailClip } from '../../../shared/clipThumbnails';
 import { clipDurationMs } from '../../../shared/timelineClipGeometry';
 import type { TimelineEditorController } from './useTimelineEditor';
@@ -189,6 +190,64 @@ function ClipFilmstrip({
     <span aria-hidden="true" className="timeline-clip__filmstrip">
       {frames.map((frame: string, index: number) => (
         <img key={`${index}-${frame.length}`} src={frame} alt="" />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * The shape of a sound, on an audio clip.
+ *
+ * An audio clip was a coloured block with a filename on it, which is nothing to
+ * aim at — the phone drew this first and the desktop kept scrubbing to find a
+ * beat. What to draw comes from `shared/audioPeaks`, so one clip has one shape
+ * on both surfaces; how it is read is each surface's own business.
+ */
+function ClipWaveform({
+  assetId,
+  clip,
+  laneWidthPx,
+  overFrames,
+  projectId,
+  widthPercent
+}: {
+  readonly assetId: string;
+  readonly clip: { readonly sourceStartMs: number; readonly sourceEndMs: number };
+  readonly laneWidthPx: number;
+  /** A video clip keeps its frames; the sound sits in a band along the bottom. */
+  readonly overFrames: boolean;
+  readonly projectId: string;
+  readonly widthPercent: number;
+}): ReactElement | null {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void window.videoTool.getAssetPlaybackUrl({ projectId, assetId }).then((response) => {
+      if (live && response.ok) setUrl(response.value.url);
+    });
+    return () => {
+      live = false;
+    };
+  }, [assetId, projectId]);
+
+  const peaks = useClipWaveform({
+    assetId,
+    url,
+    clip,
+    widthPx: (laneWidthPx * widthPercent) / 100
+  });
+  if (peaks.length === 0) return null;
+
+  return (
+    <span
+      aria-hidden="true"
+      className={overFrames ? 'timeline-clip__waveform timeline-clip__waveform--strip' : 'timeline-clip__waveform'}
+    >
+      {peaks.map((height: number, index: number) => (
+        // Mirrored about the middle, the way every waveform is drawn: the eye
+        // reads the envelope rather than the individual bar.
+        <span key={index} style={{ height: `${Math.round(height * 90)}%` }} />
       ))}
     </span>
   );
@@ -884,6 +943,21 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                           assetId={block.clip.assetId}
                           clip={block.clip}
                           laneWidthPx={laneWidthPx}
+                          projectId={editor.project.id}
+                          widthPercent={block.widthPercent}
+                        />
+                      )}
+                      {/*
+                        On both kinds, because a video clip's own sound is most
+                        of the sound in a cut — the phone draws it the same way,
+                        as a band along the bottom where the frames stay visible.
+                      */}
+                      {editor.project !== null && (
+                        <ClipWaveform
+                          assetId={block.clip.assetId}
+                          clip={block.clip}
+                          laneWidthPx={laneWidthPx}
+                          overFrames={track.kind === 'video'}
                           projectId={editor.project.id}
                           widthPercent={block.widthPercent}
                         />

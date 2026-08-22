@@ -6181,9 +6181,52 @@ button {
   object-fit: cover;
 }
 
+/*
+  The waveform, on the same terms as the filmstrip: behind the label and the
+  handles, and never in the way of a drag.
+
+  Bars grow from the middle in both directions, which is how every waveform is
+  drawn — the eye reads the envelope rather than any single bar — so the row is
+  centred and each bar is given its height as a percentage.
+*/
+.timeline-clip__waveform {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 2px;
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+/*
+  Over a filmstrip, the sound takes a band along the bottom rather than the whole
+  height: the frames are what say which shot this is, and the waveform is what
+  says where in it the sound happens. Its own ground, or white bars over a bright
+  frame are invisible.
+*/
+.timeline-clip__waveform--strip {
+  top: auto;
+  height: 38%;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 0 0 var(--radius-xs) var(--radius-xs);
+}
+
+.timeline-clip__waveform > span {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
 /* Over frames, the text needs its own ground to stay legible. */
 .timeline-clip:has(.timeline-clip__filmstrip) > strong,
-.timeline-clip:has(.timeline-clip__filmstrip) > small {
+.timeline-clip:has(.timeline-clip__filmstrip) > small,
+.timeline-clip:has(.timeline-clip__waveform) > strong,
+.timeline-clip:has(.timeline-clip__waveform) > small {
   position: relative;
   z-index: 1;
   justify-self: start;
