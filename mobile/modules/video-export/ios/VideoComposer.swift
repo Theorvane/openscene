@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreGraphics
+import CoreImage
 import QuartzCore
 
 /**
@@ -35,6 +36,14 @@ public struct ComposerSegment {
   public var offsetY: Double
   public var rotationDegrees: Double
   public var speed: Double
+  /**
+   Whether this source is a photograph rather than a movie.
+
+   A still has no timeline of its own: opened the way a movie is opened it
+   contributes a single frame, or nothing at all. It is held here for the length
+   the clip asks for, which is what `-loop 1 -t` says on the desktop.
+   */
+  public var still: Bool
 
   /// Defaults are "unchanged", so a caller that knows nothing of an effect still renders.
   public init(
@@ -48,7 +57,8 @@ public struct ComposerSegment {
     offsetX: Double = 0,
     offsetY: Double = 0,
     rotationDegrees: Double = 0,
-    speed: Double = 1
+    speed: Double = 1,
+    still: Bool = false
   ) {
     self.uri = uri
     self.timelineStartMs = timelineStartMs
@@ -61,6 +71,7 @@ public struct ComposerSegment {
     self.offsetY = offsetY
     self.rotationDegrees = rotationDegrees
     self.speed = speed
+    self.still = still
   }
 }
 
@@ -165,6 +176,91 @@ func parseHexColor(_ value: String) -> CGColor {
   ) ?? white
 }
 
+/**
+ A photograph, written out as a movie of the length it has to be held for.
+
+ `loadTracks(withMediaCharacteristic: .visual)` comes back empty for a PNG — a
+ still has no visual *track* — so the export loop dropped the segment and the cut
+ came out shorter than the timeline with nothing saying why. That is why mobile
+ export refused a timeline containing one at all.
+
+ Of the three ways to fix it, this is the one that leaves everything else alone.
+ A Core Animation layer would change how the whole composition is assembled, and
+ a custom compositor would have to reimplement the transform, the opacity and the
+ ramps; encoding the still first makes it an ordinary source, so it picks up the
+ trim, the retime, the placement and the transitions exactly as a movie does,
+ with no second implementation of any of them to keep in step.
+
+ Drawn at the image's own size, because that is what the desktop does: `-loop 1`
+ feeds FFmpeg the photograph as it is and the same filter chain scales and places
+ it. A still that filled the frame here and not there would be two pictures of
+ one project.
+ */
+func stillMovie(at url: URL, holdingForMs milliseconds: Double, frameRate: Int, into directory: URL) throws -> URL {
+  guard let image = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]) else {
+    throw ComposerError.exportFailed("The still could not be read: \(url.lastPathComponent)")
+  }
+
+  // Even, because H.264 refuses odd dimensions, and bounded because a modern
+  // phone photograph is far larger than any timeline renders at.
+  let longest: CGFloat = 4096
+  let fitted = min(1, longest / max(image.extent.width, image.extent.height))
+  let width = max(2, Int((image.extent.width * fitted).rounded(.down)) & ~1)
+  let height = max(2, Int((image.extent.height * fitted).rounded(.down)) & ~1)
+
+  let output = directory.appendingPathComponent("openvideo-still-\(UUID().uuidString.prefix(8)).mp4")
+  let writer = try AVAssetWriter(outputURL: output, fileType: .mp4)
+  let input = AVAssetWriterInput(
+    mediaType: .video,
+    outputSettings: [
+      AVVideoCodecKey: AVVideoCodecType.h264,
+      AVVideoWidthKey: width,
+      AVVideoHeightKey: height
+    ]
+  )
+  input.expectsMediaDataInRealTime = false
+  let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+    assetWriterInput: input,
+    sourcePixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+  )
+  writer.add(input)
+  writer.startWriting()
+  writer.startSession(atSourceTime: .zero)
+
+  var buffer: CVPixelBuffer?
+  CVPixelBufferCreate(nil, width, height, kCVPixelFormatType_32BGRA, nil, &buffer)
+  guard let pixels = buffer else {
+    throw ComposerError.exportFailed("The still could not be prepared for encoding.")
+  }
+  let scale = CGAffineTransform(scaleX: CGFloat(width) / image.extent.width, y: CGFloat(height) / image.extent.height)
+  CIContext().render(
+    image.transformed(by: scale),
+    to: pixels,
+    bounds: CGRect(x: 0, y: 0, width: width, height: height),
+    colorSpace: CGColorSpaceCreateDeviceRGB()
+  )
+
+  // The same frame at every tick. A one-frame movie stretched with
+  // `scaleTimeRange` would be cheaper and is not the same thing: a decoder given
+  // one frame and told it lasts ten seconds is a decoder holding a frame, and
+  // players disagree about what that means.
+  let rate = max(1, frameRate)
+  let frames = max(1, Int((max(0, milliseconds) / 1000 * Double(rate)).rounded()))
+  for frame in 0..<frames {
+    while !input.isReadyForMoreMediaData { usleep(500) }
+    adaptor.append(pixels, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: CMTimeScale(rate)))
+  }
+  input.markAsFinished()
+
+  let finished = DispatchSemaphore(value: 0)
+  writer.finishWriting { finished.signal() }
+  finished.wait()
+  guard writer.status == .completed else {
+    throw ComposerError.exportFailed(writer.error?.localizedDescription ?? "The still could not be encoded.")
+  }
+  return output
+}
+
 func time(_ milliseconds: Double) -> CMTime {
   CMTime(value: CMTimeValue(max(0, milliseconds).rounded()), timescale: 1000)
 }
@@ -182,8 +278,44 @@ public enum VideoComposer {
     // Each video segment gets its own track. Sharing one track would serialise
     // clips that are meant to overlap, which is exactly what a multi-track
     // timeline is for.
+    /*
+     Stills are encoded once, before anything is assembled, and cleaned up after.
+
+     Written into a directory of their own so the export can delete the lot in
+     one call rather than tracking each file — a temporary movie per still, left
+     behind, is a photograph's worth of disk per export.
+     */
+    let stillsDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("openvideo-stills-\(UUID().uuidString.prefix(8)))")
+    if request.videoSegments.contains(where: { $0.still }) {
+      try FileManager.default.createDirectory(at: stillsDirectory, withIntermediateDirectories: true)
+    }
+    defer { try? FileManager.default.removeItem(at: stillsDirectory) }
+
     for segment in request.videoSegments {
-      guard let url = URL(string: segment.uri) ?? URL(string: "file://\(segment.uri)") else { continue }
+      guard let source = URL(string: segment.uri) ?? URL(string: "file://\(segment.uri)") else { continue }
+      /*
+       A photograph has no visual track, so `loadTracks` came back empty and the
+       `guard` below dropped the segment — silently, leaving an export shorter
+       than the cut with nothing saying why. Encoded first, it is an ordinary
+       source and everything after this line treats it as one.
+
+       Held for the source window rather than the timeline length: the frames are
+       trimmed and then retimed, so a still played at 2× needs the material the
+       trim asks for before the retime compresses it. That is the same number the
+       desktop passes to `-t`.
+       */
+      let url: URL
+      if segment.still {
+        url = try stillMovie(
+          at: source,
+          holdingForMs: segment.sourceEndMs,
+          frameRate: request.frameRate,
+          into: stillsDirectory
+        )
+      } else {
+        url = source
+      }
       let asset = AVURLAsset(url: url)
       guard let sourceTrack = try await asset.loadTracks(withMediaCharacteristic: .visual).first else { continue }
       guard let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }

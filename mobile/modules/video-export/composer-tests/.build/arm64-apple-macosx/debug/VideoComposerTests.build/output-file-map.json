@@ -1,0 +1,19 @@
+{
+  "": {
+    "swift-dependencies": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/primary.swiftdeps"
+  },
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Tests/VideoComposerTests/ExportTests.swift": {
+    "dependencies": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/ExportTests.d",
+    "object": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/ExportTests.swift.o",
+    "swiftmodule": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/ExportTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/ExportTests.swiftdeps",
+    "diagnostics": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/ExportTests.dia"
+  },
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Tests/VideoComposerTests/PeaksTests.swift": {
+    "dependencies": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/PeaksTests.d",
+    "object": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/PeaksTests.swift.o",
+    "swiftmodule": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/PeaksTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/PeaksTests.swiftdeps",
+    "diagnostics": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/PeaksTests.dia"
+  }
+}

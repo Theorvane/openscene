@@ -1,5 +1,7 @@
 import AVFoundation
 import CoreImage
+import ImageIO
+import UniformTypeIdentifiers
 import XCTest
 
 @testable import VideoComposer
@@ -107,6 +109,32 @@ final class ExportTests: XCTestCase {
     return total / Double(width * height)
   }
 
+  /// A solid-colour PNG, which is what a photograph is to this renderer.
+  private func writeStill(level: UInt8, size: CGSize = CGSize(width: 64, height: 48)) throws -> URL {
+    let url = directory.appendingPathComponent("still-\(UUID().uuidString).png")
+    let width = Int(size.width)
+    let height = Int(size.height)
+    var pixels = [UInt8](repeating: level, count: width * height * 4)
+    for index in stride(from: 3, to: pixels.count, by: 4) { pixels[index] = 255 }
+    let context = CGContext(
+      data: &pixels,
+      width: width,
+      height: height,
+      bitsPerComponent: 8,
+      bytesPerRow: width * 4,
+      space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    )
+    guard let image = context?.makeImage(),
+          let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else {
+      XCTFail("could not write the still")
+      return url
+    }
+    CGImageDestinationAddImage(destination, image, nil)
+    CGImageDestinationFinalize(destination)
+    return url
+  }
+
   func testExportsAClipOfTheLengthTheTimelineAsksFor() async throws {
     let source = try writeRamp(seconds: 2)
     let request = ComposerRequest(
@@ -160,6 +188,64 @@ final class ExportTests: XCTestCase {
     let atDip = try await luminance(of: output, atSeconds: 1.5)
     let after = try await luminance(of: output, atSeconds: 1.95)
     XCTAssertLessThan(atDip, after - 40, "the frame at the midpoint of a dip should be far darker than the one after it")
+  }
+
+  /**
+   A photograph, held for the length of its clip.
+
+   `loadTracks(withMediaCharacteristic: .visual)` comes back empty for a PNG, so
+   the segment was dropped and the export came out shorter than the cut with
+   nothing saying why — which is why mobile export refused a timeline with a
+   still in it rather than shipping a wrong video.
+   */
+  func testHoldsAStillForTheLengthOfItsClip() async throws {
+    let still = try writeStill(level: 200)
+    let output = try await VideoComposer.export(
+      ComposerRequest(
+        width: 64,
+        height: 48,
+        frameRate: 30,
+        durationMs: 3_000,
+        videoSegments: [ComposerSegment(uri: still.absoluteString, sourceEndMs: 3_000, still: true)]
+      )
+    )
+
+    let duration = try await AVURLAsset(url: output).load(.duration).seconds
+    XCTAssertEqual(duration, 3, accuracy: 0.3, "a still has to be held for its clip, not dropped")
+
+    // And it is the picture, not black: a hold that produced an empty frame
+    // would pass a duration check and fail the only one that matters.
+    let middle = try await luminance(of: output, atSeconds: 1.5)
+    XCTAssertEqual(middle, 200, accuracy: 30, "the frame at the middle of the hold should be the photograph")
+  }
+
+  /**
+   A still beside a movie, which is what a timeline actually looks like.
+
+   Encoding the still first is what lets everything after it treat the two the
+   same — the trim, the retime, the placement and the transitions all run on an
+   ordinary source — so the test that matters is that both survive one export.
+   */
+  func testHoldsAStillNextToAClip() async throws {
+    let still = try writeStill(level: 30)
+    let clip = try writeRamp(seconds: 2)
+    let output = try await VideoComposer.export(
+      ComposerRequest(
+        width: 64,
+        height: 48,
+        frameRate: 30,
+        durationMs: 4_000,
+        videoSegments: [
+          ComposerSegment(uri: clip.absoluteString, sourceEndMs: 2_000),
+          ComposerSegment(uri: still.absoluteString, timelineStartMs: 2_000, sourceEndMs: 2_000, still: true)
+        ]
+      )
+    )
+
+    let duration = try await AVURLAsset(url: output).load(.duration).seconds
+    XCTAssertEqual(duration, 4, accuracy: 0.3, "the cut is the clip and then the hold")
+    let onTheStill = try await luminance(of: output, atSeconds: 3)
+    XCTAssertEqual(onTheStill, 30, accuracy: 30, "the second half of the cut is the photograph")
   }
 
   func testRefusesACompositionWithNothingInIt() async throws {

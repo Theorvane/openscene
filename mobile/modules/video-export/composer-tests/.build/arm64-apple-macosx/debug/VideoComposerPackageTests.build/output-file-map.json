@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/primary.swiftdeps"
+  },
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.derived/runner.swift": {
+    "dependencies": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/runner.d",
+    "object": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/runner.swift.o",
+    "swiftmodule": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/runner~partial.swiftmodule",
+    "swift-dependencies": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/runner.swiftdeps",
+    "diagnostics": "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/runner.dia"
+  }
+}
