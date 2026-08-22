@@ -193,7 +193,9 @@ answers are no longer "none":
   UMP came with the AdMob binding and left with it. What replaces it is the
   conservative default rather than a prompt: `ensureAdsReady` declares consent
   *not* given (`LevelPlay.setConsent(false)`) and sets CCPA's do-not-sell signal
-  before initialising, so every network serves contextual inventory. Personalised
+  before initialising, so every network serves contextual inventory. It fails
+  closed — if either signal cannot be applied, the SDK is never initialised and
+  no ad is requested, rather than serving under the networks' own defaults. Personalised
   ads in the EU require a certified CMP first — that is a decision, not an
   omission.
 - **App Transport Security carries an app-wide exception.**

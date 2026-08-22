@@ -253,6 +253,12 @@ describe('the native side', () => {
 
     expect(seam).toContain('setConsent(false)');
     expect(seam).toContain("setMetaData('do_not_sell', ['true'])");
+    // And it fails closed. These two are the entire privacy posture; if either
+    // does not apply, the networks fall back to their own defaults — which is
+    // personalised inventory with no consent behind it, served under answers the
+    // store forms and the privacy policy both deny, with nothing on screen
+    // looking any different. No signals, no init.
+    expect(seam).toMatch(/setMetaData\('do_not_sell'[\s\S]{0,120}\} catch \{[\s\S]{0,600}return false;/);
     expect(seam.indexOf('setConsent(false)')).toBeLessThan(seam.indexOf('LevelPlay.init('));
     // The gate is on the render, not merely in the effect.
     expect(banner).toContain('await ensureAdsReady(ads)');

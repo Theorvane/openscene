@@ -114,6 +114,16 @@ async function initialise(ads: AdsModule, appKey: string): Promise<boolean> {
   try {
     await ads.LevelPlay.setConsent(false);
     await ads.LevelPlay.setMetaData('do_not_sell', ['true']);
+  } catch {
+    // Fail closed. These two are the entire privacy posture: without them the
+    // mediated networks fall back to their own defaults, which is personalised
+    // inventory with no consent behind it and no do-not-sell signal — the exact
+    // arrangement this app has never had. Carrying on to `init` would serve ads
+    // under a posture the store answers and the privacy policy both deny, and
+    // nothing on screen would look different. No signals, no init, no ads.
+    return false;
+  }
+  try {
     // The Test Suite is opted into here rather than granted by anyone: without
     // this flag `launchTestSuite` refuses with "please contact your account
     // manager to enable it", which reads as a permission problem and is not one
@@ -121,15 +131,13 @@ async function initialise(ads: AdsModule, appKey: string): Promise<boolean> {
     // because init is what reads the metadata; setting it afterwards changes
     // nothing and produces exactly the same refusal.
     //
-    // Development only. It is a debugging surface, and the build that ships has
-    // no way to reach it anyway — see the caller in Settings.
+    // Development only, and deliberately not fail-closed: it is a debugging
+    // surface rather than a privacy signal, so losing it costs the Test Suite
+    // and nothing else. The build that ships has no way to reach it anyway —
+    // see the caller in Settings.
     if (__DEV__) await ads.LevelPlay.setMetaData('is_test_suite', ['enable']);
   } catch {
-    // Fall through: a signal that did not get through is a reason to be more
-    // careful, not a reason to skip init — but if `setConsent` failed, the
-    // networks fall back to their own defaults, which is why it is attempted
-    // before init rather than after and why failure is not silently ignored
-    // below: init still has to succeed for anything to be requested.
+    // No Test Suite this run.
   }
   try {
     const request = ads.LevelPlayInitRequest.builder(appKey)
