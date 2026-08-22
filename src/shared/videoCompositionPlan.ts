@@ -21,6 +21,16 @@ import type { TimelineDocument, TimelineTitle } from './timelineTypes';
 export type CompositionSegment = {
   /** Index into the plan's `sources`, not a path — paths belong to the host. */
   readonly sourceIndex: number;
+  /**
+   * Which layer this belongs to, bottom first: 0 is drawn under 1.
+   *
+   * The order of `videoSegments` has always said this, and a renderer that
+   * stacks in order needs nothing more. Android does: it builds a Media3
+   * sequence, which plays one item after another by definition, so it needs to
+   * know where one layer ends and the next begins rather than infer it from
+   * timings that happen not to overlap.
+   */
+  readonly layer: number;
   /** Where this segment starts in the finished video. */
   readonly timelineStartMs: number;
   /** The slice taken from the source. */
@@ -172,6 +182,9 @@ export function buildCompositionPlan(input: {
         if (clip.effects.opacity <= 0 || clip.effects.scale <= 0) continue;
         layer.push({
           sourceIndex: sourceIndexFor(clip.assetId),
+          // Filled in below: which layer this is depends on how many video
+          // tracks there turn out to be, and the tracks are read top-first.
+          layer: 0,
           timelineStartMs: clip.timelineStartMs,
           sourceStartMs: clip.sourceStartMs,
           sourceEndMs: clip.sourceEndMs,
@@ -238,8 +251,11 @@ export function buildCompositionPlan(input: {
       .map((assetId, index) => (input.stillAssetIds?.has(assetId) === true ? index : -1))
       .filter((index) => index !== -1),
     // Bottom row first, so a pipeline that stacks in order puts the timeline's
-    // top track on top.
-    videoSegments: [...videoLayers].reverse().flat(),
+    // top track on top — and each segment is told which row it is in, for the
+    // renderer that cannot read it off the order.
+    videoSegments: [...videoLayers]
+      .reverse()
+      .flatMap((layer, index) => layer.map((segment) => ({ ...segment, layer: index }))),
     audioSegments,
     dips: dipsFor(input.timeline),
     titles: input.timeline.titles ?? []

@@ -68,11 +68,12 @@ import kotlin.math.roundToLong
  * sequence, and the silence between clips has to be said out loud as a gap
  * rather than implied by a start time.
  *
- * Overlapping video is therefore the one thing this refuses. The plan flattens
- * every video track into one list, so two clips covering the same moment came
- * from two tracks and want compositing — which is a second sequence and a
- * compositor, not a bigger loop. Refusing names it; guessing would silently drop
- * a layer from someone's cut.
+ * Overlapping video used to be refused here for that reason: the plan flattened
+ * every video track into one list, so two clips covering the same moment arrived
+ * as one sequence that could only play them in turn. The plan now says which
+ * layer each segment belongs to, bottom first, so a layer is a sequence and
+ * Media3 composites the sequences against each other — which is what it does
+ * with them anyway.
  */
 @UnstableApi
 class VideoExportModule : Module() {
@@ -112,6 +113,8 @@ class VideoExportModule : Module() {
     val sourceStartMs: Long,
     val sourceEndMs: Long,
     val still: Boolean,
+    /** Which layer, bottom first: 0 is drawn under 1. One layer is one sequence. */
+    val layer: Int = 0,
     /** What Adjust set. Defaults are "unchanged", so an older caller still renders. */
     val opacity: Float = 1f,
     val scale: Float = 1f,
@@ -142,6 +145,7 @@ class VideoExportModule : Module() {
           sourceStartMs = ms(it["sourceStartMs"]),
           sourceEndMs = ms(it["sourceEndMs"]),
           still = it["still"] as? Boolean ?: false,
+          layer = (it["layer"] as? Number)?.toInt() ?: 0,
           opacity = num(it["opacity"], 1f),
           scale = num(it["scale"], 1f),
           offsetX = num(it["offsetX"], 0f),
@@ -518,8 +522,18 @@ class VideoExportModule : Module() {
     if (uri.startsWith("file://") || uri.startsWith("content://")) Uri.parse(uri)
     else Uri.fromFile(File(uri))
 
-  private fun overlaps(segments: List<Segment>): Boolean =
-    segments.zipWithNext().any { (first, second) -> second.timelineStartMs < first.timelineEndMs }
+  /**
+   * Two clips of one layer covering the same moment.
+   *
+   * Within a layer this cannot be composited and cannot be played in turn — a
+   * sequence is one item after another — so it stays refused. Across layers it
+   * is the ordinary case now, and each layer gets its own sequence.
+   */
+  private fun overlapsWithinALayer(segments: List<Segment>): Boolean =
+    segments
+      .groupBy { it.layer }
+      .values
+      .any { layer -> layer.sortedBy { it.timelineStartMs }.zipWithNext().any { (first, second) -> second.timelineStartMs < first.timelineEndMs } }
 
   private fun export(request: Map<String, Any?>): Map<String, Any> {
     val width = (request["width"] as? Number)?.toInt() ?: 1920
@@ -531,19 +545,31 @@ class VideoExportModule : Module() {
     if (video.isEmpty() && audio.isEmpty()) {
       throw CodedException("ERR_EMPTY_COMPOSITION", "The timeline has no media to export.", null)
     }
-    if (overlaps(video)) {
+    if (overlapsWithinALayer(video)) {
       throw CodedException(
         "ERR_LAYERED_VIDEO",
-        "Two video clips cover the same moment. Overlapping layers are not composited on Android yet — " +
-          "put them on one track, or export on the desktop.",
+        "Two clips on the same track cover the same moment, which no renderer can draw. " +
+          "Move one of them to a track of its own.",
         null
       )
     }
 
     // Checked against the files, not against what the caller believed.
     val audible = audio.filter { hasAudio(it.uri) }
-    val sequences = listOfNotNull(
-      sequenceOf(video, frameRate, removeAudio = true, width = width, height = height),
+    /*
+      One sequence per layer, bottom first.
+
+      A Media3 sequence plays its items in turn, so a layer is exactly what fits
+      in one — and `Composition` composites the sequences it is given, drawing
+      each over the ones before it. That is the same stacking order the plan hands
+      every renderer, so a cut looks the same here, on iOS and on the desktop.
+    */
+    val videoSequences = video
+      .groupBy { it.layer }
+      .toSortedMap()
+      .values
+      .mapNotNull { layer -> sequenceOf(layer.sortedBy { it.timelineStartMs }, frameRate, removeAudio = true, width = width, height = height) }
+    val sequences = videoSequences + listOfNotNull(
       sequenceOf(audible, frameRate, removeAudio = false, width = width, height = height)
     )
     // Transitions are composition effects: a dip belongs over the finished

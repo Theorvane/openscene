@@ -117,6 +117,10 @@ export async function exportTimeline(input: {
   */
   const withEffects = (segment: CompositionSegment) => ({
     ...withUri(segment),
+    // Which layer this is in, bottom first. iOS and the desktop read it off the
+    // order; Android cannot, because a Media3 sequence plays its items in turn
+    // and needs to know where one layer ends and the next begins.
+    layer: segment.layer,
     opacity: segment.opacity,
     scale: segment.scale,
     offsetX: segment.offsetX,
