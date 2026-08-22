@@ -66,24 +66,34 @@ No extra dependency ships for it: on Android `TestSuiteActivity` is inside
 `launchTestSuite` is on `LevelPlay` in `IronSourceSDK`. Both were checked against
 the artifacts this project resolves.
 
-**The Test Suite has to be enabled for the LevelPlay account before it opens.**
-Running it on an emulator gives:
+**The Test Suite is opted into with metadata, before `init`.** Without it,
+`launchTestSuite()` is refused:
 
 ```
 E LevelPlaySDK: API: TestSuite cannot be launched,
                 Please contact your account manager to enable it
 ```
 
-That refusal never reaches the bridge — `launchTestSuite()` resolves as if it
-worked, so the Settings row says "Opened" while nothing appears. Ask the
-LevelPlay account manager to switch it on; there is nothing to fix in the app.
+That message is a leftover from the SDK's beta and sends you to the wrong place:
+nothing is granted by an account manager. The flag is
+`setMetaData('is_test_suite', ['enable'])`, and the order is the whole of it —
+init is what reads the metadata, so setting it afterwards produces exactly the
+same refusal:
+
+```
+setMetaData('is_test_suite', ['enable'])  →  init()  →  onInitSuccess  →  launchTestSuite()
+```
+
+`ensureAdsReady` does this in `__DEV__` builds only. The refusal never reaches
+the bridge either — `launchTestSuite()` resolves as if it worked — so a wrong
+order shows up as a Settings row saying "Opened" with nothing on screen.
 
 Once it opens, nothing appears in it until the dashboard has the networks
 configured — a network with no placement set up shows as unavailable even when
 its adapter did make it into the binary, which is the distinction worth reading
 carefully.
 
-## What running it on an emulator actually showed
+## What the Test Suite showed on an emulator
 
 Worth writing down, because two of these are only visible on a device:
 
@@ -102,8 +112,19 @@ Worth writing down, because two of these are only visible on a device:
   passed the LevelPlay app key as its game id, which is what the dashboard
   configuration decides — check that on a real device before reading anything
   into it.
-- **Meta's adapter is alive**: it logs a test-device hash at init, which is the
-  clearest per-network proof available without the Test Suite.
+- **Meta's adapter is alive**: it logs a test-device hash at init.
+- **Four of the five networks are bidding, not five.** The Test Suite lists
+  ironSource (SDK/adapter 8.10.0), Meta (6.21.0 / 4.3.52), Pangle (7.8.6.2 /
+  4.3.51) and UnityAds (4.17.0 / 4.3.65) against both ad units. **AppLovin is
+  absent** — its adapter is in the binary, but the network has no instance
+  configured for this app in the LevelPlay dashboard, so nothing asks it to bid.
+  That is a dashboard change, not a code one.
+- **Both placements serve.** With the Test Suite's Live/Test switch set to Test,
+  the banner unit `hmcgn9ps07dbs3x9` reports "Ad shown successfully" and renders
+  a 320×50 creative, and the interstitial unit `9etyh0zw8fg8dgou` loads and plays
+  a full-screen video. Switch it to Test before loading: the default is Live, and
+  a live impression from a developer's own device is the invalid traffic this
+  whole arrangement exists to avoid.
 
 ## Why the banner probes React Native rather than the SDK
 
@@ -203,14 +224,12 @@ is a function rather than a Java getter, so Kotlin's synthetic-property access �
 here calls; the LevelPlay files compile as they are. Drop the patch when Unity
 ships a plugin built for the New Architecture.
 
-## Still not seen on a device: the banner and the interstitial
+## Still unproven: the app's own banner view
 
-Initialisation runs, and the five adapters load — that much an emulator showed.
-What has not been seen is an ad, because the Test Suite is not enabled for the
-account and a development build requests no live unit.
-
-The banner is the part most likely to be wrong: `ironsource-mediation` registers
-it through `requireNativeComponent`, a legacy view manager, and this app is on
-0.86 with the New Architecture, where legacy view managers go through the interop
-layer. The failure mode is a banner that never appears rather than a build error,
-so it needs a look rather than a green build.
+Both placements serve — through the Test Suite, which renders them with its own
+views. What that does not exercise is `AdBanner`, which mounts
+`LevelPlayBannerAdView`: `ironsource-mediation` registers it through
+`requireNativeComponent`, a legacy view manager, and this app is on 0.86 with the
+New Architecture, where legacy view managers go through the interop layer. The
+failure mode is a banner that never appears rather than a build error, so it
+needs a look on a build that requests one.

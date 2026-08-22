@@ -114,6 +114,16 @@ async function initialise(ads: AdsModule, appKey: string): Promise<boolean> {
   try {
     await ads.LevelPlay.setConsent(false);
     await ads.LevelPlay.setMetaData('do_not_sell', ['true']);
+    // The Test Suite is opted into here rather than granted by anyone: without
+    // this flag `launchTestSuite` refuses with "please contact your account
+    // manager to enable it", which reads as a permission problem and is not one
+    // — the message is a leftover from the SDK's beta. It has to precede `init`,
+    // because init is what reads the metadata; setting it afterwards changes
+    // nothing and produces exactly the same refusal.
+    //
+    // Development only. It is a debugging surface, and the build that ships has
+    // no way to reach it anyway — see the caller in Settings.
+    if (__DEV__) await ads.LevelPlay.setMetaData('is_test_suite', ['enable']);
   } catch {
     // Fall through: a signal that did not get through is a reason to be more
     // careful, not a reason to skip init — but if `setConsent` failed, the

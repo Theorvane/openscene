@@ -211,26 +211,32 @@ answers are no longer "none":
   per-network `NSExceptionDomains`, which each network publishes; expect it to go
   stale.
 
-**Initialisation runs; no ad has been seen.** An Android development build on an
-emulator reaches `LevelPlay.init()` with the Android app key and loads the five
-adapters. What it cannot show is an ad: LevelPlay's Test Suite is not enabled for
-this account — the SDK refuses it with "please contact your account manager to
-enable it" — and a development build requests no live unit by design. **Ask the
-LevelPlay account manager to enable the Test Suite**, then confirm a banner and an
-interstitial on a device before a store build ships either. A release that reaches
-users with a silently broken banner earns nothing and still declares ad
-collection.
+**Both placements have been seen to serve — through the Test Suite.** On an
+Android emulator, with the Test Suite's Live/Test switch set to Test, the banner
+unit renders a creative and the interstitial unit loads and plays one. The app
+keys and all four unit ids match the dashboard.
 
-The banner is the part most likely to be wrong: `ironsource-mediation@3.2.0` is
-built against React Native 0.73 and registers its banner as a legacy view manager,
-while this app is on 0.86 with the New Architecture. The same version gap needs a
-patch to compile at all on Android; see `README-native.md`.
+What that does not prove is the app's own banner view. The Test Suite renders ads
+with its own views; `AdBanner` mounts `LevelPlayBannerAdView`, which
+`ironsource-mediation` registers as a legacy view manager while this app runs the
+New Architecture. The failure mode is a banner that never appears rather than a
+build error, so it still needs a look before a store build ships one — a release
+that reaches users with a silently broken banner earns nothing and still declares
+ad collection.
 
-**Unity Ads did not initialise on the emulator**, with `gateway_universal /
-PUBLIC_ERROR_CODE_INIT_UNKNOWN`, and LevelPlay's ad-quality connector rejects
-every Pangle SDK version the adapter can use. Neither blocks the other networks,
-and both are dashboard-side rather than code — but both belong on the list of
-things to confirm on a real device before reading revenue numbers as real.
+**Only four of the five networks are actually bidding.** The Test Suite lists
+ironSource, Meta, Pangle and UnityAds against both ad units; **AppLovin is
+absent** — the adapter is in the binary, but the network has no instance
+configured for this app in the LevelPlay dashboard. Set it up there, or the store
+build ships an SDK that is declared in the privacy answers and never asked to
+bid.
+
+**Two more to confirm on a real device.** Unity Ads did not initialise on the
+emulator (`gateway_universal / PUBLIC_ERROR_CODE_INIT_UNKNOWN`) even though the
+Test Suite lists it, and LevelPlay's ad-quality connector rejects every Pangle
+SDK version the adapter can use — measurement rather than delivery. Neither
+blocks the other networks; both belong on the list before reading revenue numbers
+as real.
 
 **There are two placements, and the interstitial is the one policy is strict
 about.** Reviewed against the LevelPlay programme policies and each mediated

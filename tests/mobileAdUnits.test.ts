@@ -191,6 +191,14 @@ describe('the native side', () => {
     // from the app, or it may as well not ship.
     const seam = await readMobile('src/lib/adsModule.ts');
     expect(seam).toContain('launchTestSuite()');
+    // Opted into with metadata, and *before* init — init is what reads it, so
+    // the same call afterwards is refused with "contact your account manager",
+    // a message left over from the SDK's beta that sends you somewhere else
+    // entirely. Order is the whole of this one.
+    // Stated as an order rather than a proximity: what matters is which call
+    // happens first, not how many lines of comment sit between them.
+    expect(seam).toContain("setMetaData('is_test_suite', ['enable'])");
+    expect(seam.indexOf("setMetaData('is_test_suite'")).toBeLessThan(seam.indexOf('LevelPlay.init('));
     // Initialised first: the Test Suite is a LevelPlay screen and needs the SDK
     // up before it can list anything.
     expect(seam).toMatch(/await ensureAdsReady\(ads\)[\s\S]{0,200}launchTestSuite\(\)/);
@@ -245,7 +253,7 @@ describe('the native side', () => {
 
     expect(seam).toContain('setConsent(false)');
     expect(seam).toContain("setMetaData('do_not_sell', ['true'])");
-    expect(seam).toMatch(/setConsent\(false\)[\s\S]{0,900}LevelPlay\.init\(/);
+    expect(seam.indexOf('setConsent(false)')).toBeLessThan(seam.indexOf('LevelPlay.init('));
     // The gate is on the render, not merely in the effect.
     expect(banner).toContain('await ensureAdsReady(ads)');
     expect(banner).toContain('!ready || failed || keyboardUp) return null;');
