@@ -41,7 +41,24 @@ export const ANALYTICS_EVENTS = [
   'export_failed',
   'generation_started',
   'generation_finished',
-  'library_item_added_to_timeline'
+  'library_item_added_to_timeline',
+  /*
+    The editing itself.
+
+    Export counts alone answer "how often does someone export" and nothing about
+    whether what they exported was edited — which is the only question worth
+    asking of an editor. These say which parts of it get used, and none of them
+    can carry anything about the footage: the properties are counts and flags,
+    and the sanitiser refuses the rest.
+  */
+  'clip_split',
+  'clip_trimmed',
+  'clip_deleted',
+  'clip_adjusted',
+  'title_added',
+  'transition_set',
+  'track_added',
+  'export_frame_changed'
 ] as const;
 
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];

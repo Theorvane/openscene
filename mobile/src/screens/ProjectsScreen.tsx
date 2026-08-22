@@ -11,6 +11,7 @@ import {
   View
 } from 'react-native';
 
+import { track } from '../lib/analyticsClient';
 import { createProject, deleteProject, listProjects, renameProject, type ProjectSummary } from '../lib/projectStore';
 import { CloseIcon, GearIcon, PencilIcon } from '../components/Icon';
 import { FormScreen } from '../components/FormScreen';
@@ -64,6 +65,9 @@ export function ProjectsScreen({
 
   const create = (): void => {
     const project = createProject(draftName);
+    // No name: what someone calls their project is theirs, and `name` is a
+    // forbidden key besides.
+    track('project_created');
     setDraftName('');
     refresh();
     onOpen(project.id);

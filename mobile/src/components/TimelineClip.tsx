@@ -5,6 +5,7 @@ import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture
 import type { PersistedTimelineClip } from '@openvideo/shared/timelineTypes';
 import { clipDurationMs } from '@openvideo/shared/timelineClipGeometry';
 import { handleWidthFor, MIN_CLIP_WIDTH } from '../lib/timelineHandles';
+import { useAudioPeaks } from '../lib/audioPeaks';
 import { useClipThumbnails } from '../lib/thumbnails';
 import { theme } from '../lib/theme';
 
@@ -74,6 +75,23 @@ export function TimelineClip({
     widthPx: width
   });
   const thumbnails = kind === 'video' && still === true && assetUri != null ? [assetUri] : decoded;
+
+  /*
+    The shape of the sound, for a clip that has no picture.
+
+    An audio clip was a coloured block with a filename on it — nothing to aim
+    at, so finding a beat or a gap meant scrubbing and listening one guess at a
+    time. Video clips got frames for exactly this reason.
+  */
+  const peaks = useAudioPeaks({
+    assetId: clip.assetId,
+    // Video clips too, and for the better reason: the phone cannot import an
+    // audio file at all, so almost every sound in a cut is a video clip's own.
+    // A strip along the bottom of the frames is where an editor puts it.
+    uri: still === true ? null : assetUri ?? null,
+    clip,
+    widthPx: width
+  });
 
   /*
     Plain `Animated`, driven from the gesture's callbacks.
@@ -167,7 +185,16 @@ export function TimelineClip({
             ))}
           </View>
         )}
-        <Text style={[styles.label, thumbnails.length > 0 && styles.labelOverFrames]} numberOfLines={1}>
+        {peaks.length > 0 && (
+          <View pointerEvents="none" style={[styles.waveform, kind === 'video' && styles.waveformStrip]}>
+            {peaks.map((height, index) => (
+              // Mirrored about the middle, the way every waveform is drawn: the
+              // eye reads the envelope, not the individual bar.
+              <View key={index} style={[styles.bar, { height: `${Math.round(height * 90)}%` }]} />
+            ))}
+          </View>
+        )}
+        <Text style={[styles.label, (thumbnails.length > 0 || peaks.length > 0) && styles.labelOverFrames]} numberOfLines={1}>
           {label}
         </Text>
         {/*
@@ -232,6 +259,29 @@ const styles = StyleSheet.create({
   // Each frame takes an equal share of the clip, so the strip stays even as the
   // timeline zooms and the count changes.
   frame: { flex: 1, height: '100%' },
+  /*
+    The waveform clips itself, for the reason the filmstrip does: `overflow` on
+    the clip container stopped every other clip from painting.
+  */
+  waveform: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 6,
+    overflow: 'hidden'
+  },
+  /*
+    On a video clip the sound is a strip along the bottom rather than the whole
+    height: the frames are what says which shot this is, and the waveform is
+    what says where the words are. On an audio clip there is nothing else to
+    show, so it takes the lot.
+  */
+  waveformStrip: { top: undefined, height: '38%', backgroundColor: 'rgba(0,0,0,0.35)' },
+  bar: { flex: 1, marginHorizontal: 0.5, borderRadius: 1, backgroundColor: theme.bg, opacity: 0.55 },
   // Over frames the label needs its own ground; on the bare block it does not.
   labelOverFrames: {
     color: theme.text,

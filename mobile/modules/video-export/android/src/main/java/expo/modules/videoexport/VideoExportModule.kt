@@ -2,6 +2,9 @@ package expo.modules.videoexport
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Handler
@@ -45,6 +48,8 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.nio.ByteOrder
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
@@ -94,6 +99,10 @@ class VideoExportModule : Module() {
 
     AsyncFunction("extractFrame") { uri: String, atMs: Double ->
       extractFrame(uri, atMs)
+    }
+
+    AsyncFunction("readAudioPeaks") { uri: String, startMs: Double, endMs: Double, bars: Int ->
+      readAudioPeaks(uri, startMs, endMs, bars)
     }
   }
 
@@ -611,6 +620,126 @@ class VideoExportModule : Module() {
       "uri" to Uri.fromFile(output).toString(),
       "durationMs" to (request["durationMs"] as? Number ?: 0).toDouble()
     )
+  }
+
+  /**
+   * The shape of a sound, as one number per bar.
+   *
+   * Decoded rather than estimated: there is no metadata for loudness, so the
+   * only way to know where the beat is, is to read the samples. The decoder is
+   * asked for the clip's own window and the samples are folded into buckets as
+   * they arrive, so a long file costs a pass and not a copy of itself in memory.
+   *
+   * Peak rather than average per bucket, because a waveform is drawn to be
+   * looked at: the loudest moment in a bar is what the eye is looking for, and
+   * an average of a busy passage flattens into a wall.
+   *
+   * Best-effort. Anything that will not decode comes back empty and the clip is
+   * drawn the way it was before waveforms existed.
+   */
+  private fun readAudioPeaks(uri: String, startMs: Double, endMs: Double, bars: Int): List<Double> {
+    val wanted = max(1, min(4_000, bars))
+    val spanUs = ((endMs - startMs) * 1_000).toLong()
+    if (spanUs <= 0) return emptyList()
+
+    val extractor = MediaExtractor()
+    var codec: MediaCodec? = null
+    try {
+      extractor.setDataSource(uri.removePrefix("file://"))
+      val track = (0 until extractor.trackCount).firstOrNull { index ->
+        extractor.getTrackFormat(index).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
+      } ?: return emptyList()
+
+      extractor.selectTrack(track)
+      extractor.seekTo((startMs * 1_000).toLong(), MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+      val format = extractor.getTrackFormat(track)
+      val mime = format.getString(MediaFormat.KEY_MIME) ?: return emptyList()
+      codec = MediaCodec.createDecoderByType(mime)
+      codec.configure(format, null, null, 0)
+      codec.start()
+
+      val peaks = DoubleArray(wanted)
+      val info = MediaCodec.BufferInfo()
+      var sawInput = false
+      var sawOutput = false
+
+      while (!sawOutput) {
+        if (!sawInput) {
+          val index = codec.dequeueInputBuffer(10_000)
+          if (index >= 0) {
+            val buffer = codec.getInputBuffer(index)
+            val size = if (buffer == null) -1 else extractor.readSampleData(buffer, 0)
+            if (size < 0) {
+              codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+              sawInput = true
+            } else {
+              codec.queueInputBuffer(index, 0, size, extractor.sampleTime, 0)
+              // Past the clip's window there is nothing left to draw, so the
+              // read stops rather than decoding the rest of the file.
+              if (extractor.sampleTime > (endMs * 1_000).toLong()) {
+                sawInput = true
+              } else {
+                extractor.advance()
+              }
+            }
+          }
+        }
+
+        val out = codec.dequeueOutputBuffer(info, 10_000)
+        if (out >= 0) {
+          val buffer = codec.getOutputBuffer(out)
+          if (buffer != null && info.size > 0) {
+            /*
+              Each sample goes in the bucket its own moment falls in.
+
+              One bucket per buffer puts a whole buffer's loudest sample
+              wherever that buffer started, so a chunk straddling a boundary
+              smears a loud passage back over a quiet one. The iOS reader had
+              the same fault and CI measured it: a third of full scale in a half
+              that was meant to be silent.
+            */
+            val outputFormat = codec.outputFormat
+            val rate = outputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE, 44_100).toDouble()
+            val channels = outputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT, 1).coerceAtLeast(1)
+            val bufferStartUs = info.presentationTimeUs - (startMs * 1_000).toLong()
+            val shorts = buffer.order(ByteOrder.nativeOrder()).asShortBuffer()
+            // Every fiftieth sample: a peak does not move meaningfully between
+            // neighbours, and reading them all is the difference between a
+            // waveform that appears and one that arrives late.
+            var index = 0
+            while (index < shorts.limit()) {
+              val frame = index / channels
+              val positionUs = bufferStartUs + (frame * 1_000_000.0 / rate)
+              val position = positionUs / spanUs
+              if (position >= 0 && position < 1) {
+                val bucket = (position * wanted).toInt().coerceIn(0, wanted - 1)
+                val value = abs(shorts.get(index).toInt()) / 32_768.0
+                if (value > peaks[bucket]) peaks[bucket] = value
+              }
+              index += 50
+            }
+          }
+          codec.releaseOutputBuffer(out, false)
+          if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) sawOutput = true
+        } else if (out == MediaCodec.INFO_TRY_AGAIN_LATER && sawInput) {
+          // The decoder has nothing more coming and nothing more to give.
+          sawOutput = true
+        }
+      }
+      return peaks.toList()
+    } catch (error: Exception) {
+      // A file that will not decode is not an error anyone can act on: the clip
+      // is simply drawn the way it was before waveforms existed.
+      return emptyList()
+    } finally {
+      try {
+        codec?.stop()
+        codec?.release()
+      } catch (error: Exception) {
+        // Already gone.
+      }
+      extractor.release()
+    }
   }
 
   private fun extractFrame(uri: String, atMs: Double): Map<String, Any> {

@@ -80,6 +80,13 @@ type VideoExportModuleType = {
   exportComposition(request: NativeExportRequest): Promise<NativeExportResult>;
   /** Negative `atMs` means the last frame. */
   extractFrame(uri: string, atMs: number): Promise<NativeFrame>;
+  /**
+   * One peak per bar for a clip's window, each 0–1.
+   *
+   * Empty when the file will not decode, which is a clip drawn the way it was
+   * before waveforms existed rather than an error anyone can act on.
+   */
+  readAudioPeaks(uri: string, startMs: number, endMs: number, bars: number): Promise<number[]>;
 };
 
 /**
@@ -124,5 +131,12 @@ export default {
       throw new Error('This build cannot read frames out of a clip. Rebuild the development client.');
     }
     return nativeModule.extractFrame(uri, atMs);
+  },
+  async readAudioPeaks(uri: string, startMs: number, endMs: number, bars: number): Promise<number[]> {
+    // Empty rather than an error: a build without the reader draws the clip the
+    // way every build did before waveforms, which is a missing decoration and
+    // not a broken editor.
+    if (nativeModule === null || typeof nativeModule.readAudioPeaks !== 'function') return [];
+    return nativeModule.readAudioPeaks(uri, startMs, endMs, bars);
   }
 } satisfies VideoExportModuleType;

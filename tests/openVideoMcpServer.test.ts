@@ -589,4 +589,91 @@ describe('OpenScene TypeMCP Server and Tool declarations', () => {
     expect(missingResult.success).toBe(false);
     expect(extractorCalls).toBe(0);
   });
+
+  it('splits, titles and joins clips through the shared rules, and reports them back', async () => {
+    const server = new OpenVideoMcpServer();
+    server.setServices(projectStore);
+    const project = await projectStore.create({ name: 'Agent-editable project' });
+    const asset = videoAsset();
+    await projectStore.registerAsset(project.id, asset);
+    const trackId = project.timeline.tracks[0]!.id;
+    const added = await server.addClipToTimeline({
+      projectId: project.id, trackId, assetId: asset.id, startOffsetSeconds: 0, durationSeconds: 8
+    });
+    const clipId = (added as { clipId: string }).clipId;
+
+    // A split has to land strictly inside the clip.
+    const outside = await server.splitTimelineClip({ projectId: project.id, clipId, atSeconds: 8 });
+    expect(outside).toMatchObject({ success: false, error: expect.stringContaining('strictly inside') });
+
+    const split = await server.splitTimelineClip({ projectId: project.id, clipId, atSeconds: 4 });
+    expect(split).toMatchObject({ success: true, leftClipId: clipId });
+    const rightClipId = (split as { rightClipId: string }).rightClipId;
+
+    // A transition needs a cut; away from one it is refused rather than guessed at.
+    const nowhere = await server.setTimelineTransition({ projectId: project.id, atSeconds: 1, type: 'fade' });
+    expect(nowhere).toMatchObject({ success: false, error: expect.stringContaining('No cut') });
+
+    const joined = await server.setTimelineTransition({
+      projectId: project.id, atSeconds: 4.1, type: 'dipToBlack', lengthSeconds: 0.5
+    });
+    expect(joined).toMatchObject({ success: true, cutSeconds: 4, type: 'dipToBlack' });
+
+    const titled = await server.addTimelineTitle({
+      projectId: project.id, text: 'Chapter one', atSeconds: 1, lengthSeconds: 2, color: '#ff8800'
+    });
+    expect(titled).toMatchObject({ success: true });
+    const titleId = (titled as { titleId: string }).titleId;
+
+    // Everything the agent just wrote is visible when it reads back.
+    const read = await server.getProjectTimeline({ projectId: project.id });
+    expect(read).toMatchObject({
+      success: true,
+      project: {
+        timeline: {
+          titles: [{ id: titleId, text: 'Chapter one', color: '#ff8800' }],
+          transitions: [{ type: 'dipToBlack', durationMs: 500 }]
+        }
+      }
+    });
+    const clips = (read as { project: { timeline: { tracks: { clips: { id: string; timelineEndMs: number }[] }[] } } })
+      .project.timeline.tracks[0]!.clips;
+    expect(clips.map((clip) => clip.id)).toEqual([clipId, rightClipId]);
+    expect(clips[0]!.timelineEndMs).toBe(4_000);
+
+    const removedTitle = await server.removeTimelineTitle({ projectId: project.id, titleId });
+    expect(removedTitle).toMatchObject({ success: true });
+    const removedTransition = await server.setTimelineTransition({ projectId: project.id, atSeconds: 4 });
+    expect(removedTransition).toMatchObject({ success: true, removed: true });
+
+    const reopened = await projectStore.open(project.id);
+    expect(reopened?.timeline.titles ?? []).toEqual([]);
+    expect(reopened?.timeline.transitions ?? []).toEqual([]);
+  });
+
+  it('refuses a speed change that would not fit, and says which of the two reasons it is', async () => {
+    const server = new OpenVideoMcpServer();
+    server.setServices(projectStore);
+    const project = await projectStore.create({ name: 'Retime-safe project' });
+    const asset = videoAsset();
+    await projectStore.registerAsset(project.id, asset);
+    const trackId = project.timeline.tracks[0]!.id;
+    const first = await server.addClipToTimeline({
+      projectId: project.id, trackId, assetId: asset.id, startOffsetSeconds: 0, durationSeconds: 4
+    });
+    await server.addClipToTimeline({
+      projectId: project.id, trackId, assetId: asset.id, startOffsetSeconds: 4, durationSeconds: 4
+    });
+    const clipId = (first as { clipId: string }).clipId;
+
+    // Out of range and out of room are different problems and read differently.
+    const tooSlow = await server.updateClipEffects({ projectId: project.id, clipId, effects: { speed: 0.01 } });
+    expect(tooSlow.success).toBe(false);
+    const noRoom = await server.updateClipEffects({ projectId: project.id, clipId, effects: { speed: 0.5 } });
+    expect(noRoom).toMatchObject({ success: false, error: expect.stringContaining('neighbour') });
+
+    // A refused write leaves a project that still opens.
+    const reopened = await projectStore.open(project.id);
+    expect(reopened?.timeline.tracks[0]!.clips).toHaveLength(2);
+  });
 });
