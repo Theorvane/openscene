@@ -162,6 +162,101 @@ final class ExportTests: XCTestCase {
     XCTAssertLessThan(atDip, after - 40, "the frame at the midpoint of a dip should be far darker than the one after it")
   }
 
+  /**
+   Colour, which iOS used to read and drop.
+
+   The grade reaches this renderer through the shared plan and had nowhere to go:
+   layer instructions carry a transform and an opacity and no colour, so the
+   controls were disabled on the phone with the reason on screen. This exports the
+   same clip twice and reads the two files back — the only evidence that means
+   anything here is a luminance that moved.
+   */
+  func testBrightensAGradedClip() async throws {
+    let source = try writeRamp(seconds: 2)
+    func export(_ colour: ComposerColour) async throws -> Double {
+      let output = try await VideoComposer.export(
+        ComposerRequest(
+          width: 64,
+          height: 48,
+          frameRate: 30,
+          durationMs: 2_000,
+          videoSegments: [ComposerSegment(uri: source.absoluteString, sourceEndMs: 2_000, colour: colour)]
+        )
+      )
+      return try await luminance(of: output, atSeconds: 1)
+    }
+
+    let neutral = try await export(ComposerColour())
+    let brighter = try await export(ComposerColour(brightness: 0.3))
+    let darker = try await export(ComposerColour(brightness: -0.3))
+
+    XCTAssertGreaterThan(brighter, neutral + 25, "brightness up should reach the file")
+    XCTAssertLessThan(darker, neutral - 25, "brightness down should reach the file")
+  }
+
+  /**
+   That the compositor draws the picture where the layer instructions did.
+
+   A custom compositor takes over placement as well as colour — Core Image's
+   origin is at the bottom left and AVFoundation's is at the top, and getting the
+   conversion wrong puts the picture off the frame or upside down while every
+   duration and every luminance still passes. So this grades one clip by an amount
+   that changes nothing visible and asserts the frame is unchanged.
+   */
+  func testAGradedExportIsFramedLikeAnUngradedOne() async throws {
+    let source = try writeRamp(seconds: 2)
+    func export(_ colour: ComposerColour) async throws -> Double {
+      let output = try await VideoComposer.export(
+        ComposerRequest(
+          width: 64,
+          height: 48,
+          frameRate: 30,
+          durationMs: 2_000,
+          videoSegments: [ComposerSegment(uri: source.absoluteString, sourceEndMs: 2_000, colour: colour)]
+        )
+      )
+      return try await luminance(of: output, atSeconds: 1)
+    }
+
+    // Saturation on a grey clip is a grade that changes nothing a luminance can
+    // see — so it only proves the compositor ran, and the frame has to match.
+    let throughInstructions = try await export(ComposerColour())
+    let throughCompositor = try await export(ComposerColour(saturation: 1.4))
+    XCTAssertEqual(
+      throughCompositor,
+      throughInstructions,
+      accuracy: 6,
+      "a graded export goes through the custom compositor and must frame the picture identically"
+    )
+  }
+
+  /**
+   A dip still dips when the compositor is the one drawing it.
+
+   The ramps are AVFoundation's to apply in the ungraded path and ours in the
+   graded one, which is two implementations of one behaviour — the sort of pair
+   that agrees until nobody is looking.
+   */
+  func testDimsAGradedFrameWhereATransitionDips() async throws {
+    let source = try writeRamp(seconds: 2)
+    let output = try await VideoComposer.export(
+      ComposerRequest(
+        width: 64,
+        height: 48,
+        frameRate: 30,
+        durationMs: 2_000,
+        videoSegments: [
+          ComposerSegment(uri: source.absoluteString, sourceEndMs: 2_000, colour: ComposerColour(saturation: 1.2))
+        ],
+        dips: [ComposerDip(startMs: 1_200, durationMs: 600)]
+      )
+    )
+
+    let atDip = try await luminance(of: output, atSeconds: 1.5)
+    let after = try await luminance(of: output, atSeconds: 1.95)
+    XCTAssertLessThan(atDip, after - 40, "the compositor has to apply the ramps the layer instructions used to")
+  }
+
   func testRefusesACompositionWithNothingInIt() async throws {
     do {
       _ = try await VideoComposer.export(ComposerRequest(durationMs: 1_000))

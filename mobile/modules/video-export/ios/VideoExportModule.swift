@@ -26,6 +26,10 @@ struct SegmentInput: Record {
   @Field var rotationDegrees: Double = 0
   /// Playback rate. 1 is the rate it was shot at, and what an older caller means.
   @Field var speed: Double = 1
+  /// The grade. Neutral is `0, 1, 1`, which is also what an older caller means.
+  @Field var brightness: Double = 0
+  @Field var contrast: Double = 1
+  @Field var saturation: Double = 1
 }
 
 /// A transition, as the black it puts over the picture: total at the midpoint.
@@ -154,7 +158,8 @@ private extension SegmentInput {
       offsetX: offsetX,
       offsetY: offsetY,
       rotationDegrees: rotationDegrees,
-      speed: speed
+      speed: speed,
+      colour: ComposerColour(brightness: brightness, contrast: contrast, saturation: saturation)
     )
   }
 }

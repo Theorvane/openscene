@@ -125,10 +125,9 @@ export async function exportTimeline(input: {
     // Retiming reaches the native modules the same way the other effects do —
     // through this bridge, which is where opacity and scale were once dropped.
     speed: segment.speed,
-    // Colour, forwarded like every other effect. Android grades; iOS does not
-    // yet, and ignores keys it does not know — which is the right way for it to
-    // degrade, because an ungraded clip is neutral and renders the same either
-    // way.
+    // Colour, forwarded like every other effect. Both renderers grade now:
+    // Android with Media3 effects, iOS through a custom compositor, because
+    // AVFoundation's layer instructions carry no colour at all.
     brightness: segment.brightness,
     contrast: segment.contrast,
     saturation: segment.saturation
