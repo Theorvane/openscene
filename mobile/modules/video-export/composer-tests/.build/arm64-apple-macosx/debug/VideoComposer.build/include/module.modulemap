@@ -1,3 +1,0 @@
-module VideoComposer {
-    header "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/include/VideoComposer-Swift.h"
-}

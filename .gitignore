@@ -25,3 +25,11 @@ video-qa*.png
 # is how this line came to exist: a measurement is worth keeping as an assertion
 # or a written result, never as somebody's verbose runtime output.
 ffmpeg-*.log
+
+# Swift Package Manager build output.
+#
+# `composer-tests` is a real package with a real build directory, and running its
+# tests fills it with thousands of module-cache files. They landed in a commit
+# once; ignoring them is how that stops happening.
+.build/
+*.xcuserdatad
