@@ -2,10 +2,11 @@ Editing on a phone that behaves like editing.
 
 • Drag to move, drag the ends to trim, pinch to zoom
 • Adjust opacity, scale, start, length and volume
-• Colour: brightness, contrast, saturation, temperature
+• Colour: brightness, contrast, saturation
 • Straighten a sideways clip, move it in the frame
+• Photos hold for as long as you give them
+• Clips on two tracks now layer, instead of being refused
 • Waveforms on the timeline
 • A clip's own sound goes into the export
-• Steppers for precise cuts
 
-Fixes: phone footage exports in the shape it was shot, exports carry the effects the editor shows, and a gap at the start no longer fails.
+Fixes: phone footage exports in the shape it was shot.
