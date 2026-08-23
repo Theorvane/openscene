@@ -166,8 +166,13 @@ surface genuinely cannot do something it says so rather than failing quietly —
 in the composition is not implemented on iOS yet, so the app refuses those exports there instead of
 producing a video with the picture missing.
 
-The mobile app carries a banner and an interstitial after a finished export, and reports anonymous
-usage counts to the publisher's own server. Neither exists on the desktop. Both are described under
+**The mobile app is paid for by ads.** That is the business model, not an incidental feature: a
+banner above the tab bar and a full-screen ad after a finished export, mediated by Unity LevelPlay
+with Unity Ads, AppLovin, Meta and Pangle bidding into it. There is no paid tier and nothing is
+unlocked by watching one. The app also reports anonymous usage counts to the publisher's own server.
+
+**The desktop app has neither.** No ads, no analytics, no account — the difference is deliberate, and
+it is why the two surfaces declare different things to different reviewers. Both are described under
 [your data](#where-your-data-lives); the usage counts have a switch in Settings, the ads do not.
 
 ```bash

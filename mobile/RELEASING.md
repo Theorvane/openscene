@@ -171,6 +171,17 @@ the ads no longer bring one, see below. What is sent is bounded by
 can only be numbers, booleans or null, which is why no prompt, file name, path or
 key can reach it.
 
+**Both stores have to be told the app contains ads, separately from the privacy
+answers.** Play has a "Contains ads" declaration on the app content page, which
+also puts an "Ads" badge on the listing; the App Store asks the same question
+when setting up the app's version information. This is not the privacy
+questionnaire and answering that one does not answer this. A listing that does
+not declare ads while the binary serves them is the mismatch enforcement looks
+for, and on Play it is grounds for removal rather than a warning.
+
+The app says so itself in Settings — "OpenScene is free. Ads pay for it" — which
+is what makes the declaration and the product agree.
+
 **The app shows ads, and that changes the privacy answers.** Ads are mediated by
 Unity LevelPlay (formerly ironSource), with Unity Ads, AppLovin, Meta Audience
 Network and Pangle bidding in through adapters. AdMob and the Google Mobile Ads

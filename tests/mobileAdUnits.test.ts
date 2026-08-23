@@ -81,6 +81,19 @@ describe('LevelPlay ad units', () => {
     }
   });
 
+  it('says in the app that ads are what pay for it', async () => {
+    // The app carried a banner and a full-screen ad and never said why. A user
+    // looking for "is this free, and what is the catch" found the ads and no
+    // statement — and both stores require an ads declaration, so a listing that
+    // declares them while the app never mentions them is a mismatch a reviewer
+    // can see.
+    const settings = await readFile(new URL('../mobile/src/screens/SettingsScreen.tsx', import.meta.url), 'utf8');
+    expect(settings).toContain('OpenScene is free. Ads pay for it');
+    // And the honest half of it: nothing is sold, and the desktop has none.
+    expect(settings).toContain('There is no paid tier');
+    expect(settings).toContain('the desktop app has no ads');
+  });
+
   it('names the publisher, and takes the version from the config', async () => {
     // An app carrying ads is a published thing rather than a personal build, and
     // both the stores and the mediation account expect a publisher a user can

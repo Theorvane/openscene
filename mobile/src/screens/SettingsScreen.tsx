@@ -255,6 +255,21 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
       */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
+        {/*
+          What pays for this, said before anyone has to work it out.
+
+          The app carries a banner and a full-screen ad after an export, and
+          until now nothing in it said why. A user looking for "is this free, and
+          what is the catch" found the ads and no statement — and both stores
+          require an ads declaration, so a listing that declares them while the
+          app never mentions them is a mismatch a reviewer can see. It is one
+          sentence, and it is the honest one.
+        */}
+        <Text style={styles.sectionBlurb}>
+          OpenScene is free. Ads pay for it — a banner here, and a full-screen ad after an export finishes, mediated by
+          Unity LevelPlay. There is no paid tier, nothing is unlocked by watching one, and the desktop app has no ads at
+          all.
+        </Text>
         <View style={styles.aboutRow}>
           <Text style={styles.aboutLabel}>Developer</Text>
           <Text style={styles.aboutValue}>{DEVELOPER_NAME}</Text>
