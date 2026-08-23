@@ -106,6 +106,20 @@ describe('the surfaces', () => {
     expect(desktop).toMatch(/catch \{[\s\S]{0,300}return \[\] as readonly number\[\]/);
   });
 
+  it('never reads one asset under another one id', async () => {
+    // A clip changing which asset it points at leaves the previous URL in state
+    // while the next lookup is in flight, and the reader caches what it decodes
+    // under the *new* id — one stale render is enough to remember the wrong file
+    // against the right clip, and it stays wrong until the cache is evicted.
+    // Pairing the id with the URL makes the mismatch unrepresentable.
+    const canvas = await readDesktop('renderer/src/editor/TimelineCanvas.tsx');
+    expect(canvas).toContain('function useAssetPlaybackUrl');
+    expect(canvas).toContain('setResolved({ assetId, url: response.value.url })');
+    expect(canvas).toContain('return resolved?.assetId === assetId ? resolved.url : null;');
+    // Both readers ask the same way, since the filmstrip had the same hole.
+    expect(canvas.match(/useAssetPlaybackUrl\(projectId, assetId\)/g)).toHaveLength(2);
+  });
+
   it('draws it on video clips there too, the way the phone does', async () => {
     const canvas = await readDesktop('renderer/src/editor/TimelineCanvas.tsx');
     expect(canvas).toContain('<ClipWaveform');

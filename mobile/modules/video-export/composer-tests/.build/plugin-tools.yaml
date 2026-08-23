@@ -1,0 +1,112 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "PackageStructure": ["<PackageStructure>"]
+  "VideoComposer-arm64-apple-macosx-debug.module": ["<VideoComposer-arm64-apple-macosx-debug.module>"]
+  "VideoComposerPackageTests-arm64-apple-macosx-debug.module": ["<VideoComposerPackageTests-arm64-apple-macosx-debug.module>"]
+  "VideoComposerPackageTests-arm64-apple-macosx-debug.test": ["<VideoComposerPackageTests-arm64-apple-macosx-debug.test>"]
+  "VideoComposerTests-arm64-apple-macosx-debug.module": ["<VideoComposerTests-arm64-apple-macosx-debug.module>"]
+  "main": ["<VideoComposer-arm64-apple-macosx-debug.module>"]
+  "test": ["<VideoComposer-arm64-apple-macosx-debug.module>","<VideoComposerPackageTests-arm64-apple-macosx-debug.test>","<VideoComposerTests-arm64-apple-macosx-debug.module>"]
+default: "main"
+nodes:
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Sources/VideoComposer/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Tests/VideoComposerTests/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Sources/VideoComposer/AudioPeaks.swift","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Sources/VideoComposer/VideoComposer.swift"]
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/sources"]
+    description: "Write auxiliary file /Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/sources"
+
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.derived/runner.swift"]
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/sources"]
+    description: "Write auxiliary file /Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/sources"
+
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.derived/runner.swift":
+    tool: test-entry-point-tool
+    inputs: []
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.derived/runner.swift"]
+
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/AudioPeaks.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/VideoComposer.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/runner.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/ExportTests.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/PeaksTests.swift.o"]
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.product/Objects.LinkFileList"
+
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Tests/VideoComposerTests/ExportTests.swift","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Tests/VideoComposerTests/PeaksTests.swift"]
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/sources"]
+    description: "Write auxiliary file /Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/sources"
+
+  "/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+
+  "<VideoComposer-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/AudioPeaks.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/VideoComposer.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposer.swiftmodule"]
+    outputs: ["<VideoComposer-arm64-apple-macosx-debug.module>"]
+
+  "<VideoComposerPackageTests-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/runner.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposerPackageTests.swiftmodule"]
+    outputs: ["<VideoComposerPackageTests-arm64-apple-macosx-debug.module>"]
+
+  "<VideoComposerPackageTests-arm64-apple-macosx-debug.test>":
+    tool: phony
+    inputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.xctest/Contents/MacOS/VideoComposerPackageTests"]
+    outputs: ["<VideoComposerPackageTests-arm64-apple-macosx-debug.test>"]
+
+  "<VideoComposerTests-arm64-apple-macosx-debug.module>":
+    tool: phony
+    inputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/ExportTests.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/PeaksTests.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposerTests.swiftmodule"]
+    outputs: ["<VideoComposerTests-arm64-apple-macosx-debug.module>"]
+
+  "C.VideoComposer-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Sources/VideoComposer/AudioPeaks.swift","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Sources/VideoComposer/VideoComposer.swift","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/sources"]
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/AudioPeaks.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/VideoComposer.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposer.swiftmodule"]
+    description: "Compiling Swift Module 'VideoComposer' (2 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","VideoComposer","-emit-dependencies","-emit-module","-emit-module-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposer.swiftmodule","-output-file-map","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/sources","-I","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j12","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/include/VideoComposer-Swift.h","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","composer_tests"]
+
+  "C.VideoComposerPackageTests-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.derived/runner.swift","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposerTests.swiftmodule","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/sources"]
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/runner.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposerPackageTests.swiftmodule"]
+    description: "Compiling Swift Module 'VideoComposerPackageTests' (1 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","VideoComposerPackageTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposerPackageTests.swiftmodule","-output-file-map","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/sources","-I","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j12","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/include/VideoComposerPackageTests-Swift.h","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","composer_tests"]
+
+  "C.VideoComposerPackageTests-arm64-apple-macosx-debug.test":
+    tool: shell
+    inputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/AudioPeaks.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposer.build/VideoComposer.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.build/runner.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/ExportTests.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/PeaksTests.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.product/Objects.LinkFileList"]
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.xctest/Contents/MacOS/VideoComposerPackageTests"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/VideoComposerPackageTests.xctest/Contents/MacOS/VideoComposerPackageTests"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug","-o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.xctest/Contents/MacOS/VideoComposerPackageTests","-module-name","VideoComposerPackageTests","-Xlinker","-no_warn_duplicate_libraries","-Xlinker","-bundle","-Xlinker","-rpath","-Xlinker","@loader_path/../../../","@/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerPackageTests.product/Objects.LinkFileList","-Xlinker","-rpath","-Xlinker","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-6.2/macosx","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposer.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposerPackageTests.swiftmodule","-Xlinker","-add_ast_path","-Xlinker","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposerTests.swiftmodule","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.VideoComposerTests-arm64-apple-macosx-debug.module":
+    tool: shell
+    inputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Tests/VideoComposerTests/ExportTests.swift","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Tests/VideoComposerTests/PeaksTests.swift","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposer.swiftmodule","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/sources"]
+    outputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/ExportTests.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/PeaksTests.swift.o","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposerTests.swiftmodule"]
+    description: "Compiling Swift Module 'VideoComposerTests' (2 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","VideoComposerTests","-emit-dependencies","-emit-module","-emit-module-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules/VideoComposerTests.swiftmodule","-output-file-map","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/VideoComposerTests.build/sources","-I","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-Xfrontend","-enable-cross-import-overlays","-j12","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","composer_tests"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Sources/VideoComposer/","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Tests/VideoComposerTests/","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Package.swift","/Users/jungwon/Dev/openscene/mobile/modules/video-export/composer-tests/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+
