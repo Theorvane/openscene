@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 
 import type { LocalExportJob } from '../../../shared/exportTypes';
+import { outputFrameFor, type FramePreference } from '../../../shared/outputFrame';
+import {
+  DEFAULT_EXPORT_FRAME,
+  EXPORT_FRAME_LABELS,
+  EXPORT_FRAME_PREFERENCES,
+  EXPORT_FRAME_STORAGE_KEY,
+  parseExportFramePreferences,
+  serializeExportFramePreferences
+} from './exportFramePreference';
 import { errorMessage, type StatusMessage } from '../appTypes';
 import { Button, StatusCard } from '../ui';
 import type { TimelineEditorController } from './useTimelineEditor';
@@ -16,6 +25,33 @@ function getActionStatus(responseMessage: string): StatusMessage {
   return { tone: 'danger', text: responseMessage };
 }
 
+/**
+ * The remembered shape for a project, read and written where the editor's other
+ * preferences live. A storage that refuses to answer is the default, not an
+ * error: the worst that costs is exporting the shape the footage already is.
+ */
+function readFramePreference(projectId: string): FramePreference {
+  if (typeof window === 'undefined') return DEFAULT_EXPORT_FRAME;
+  try {
+    return parseExportFramePreferences(window.localStorage.getItem(EXPORT_FRAME_STORAGE_KEY))[projectId] ?? DEFAULT_EXPORT_FRAME;
+  } catch {
+    return DEFAULT_EXPORT_FRAME;
+  }
+}
+
+function writeFramePreference(projectId: string, preference: FramePreference): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const stored = parseExportFramePreferences(window.localStorage.getItem(EXPORT_FRAME_STORAGE_KEY));
+    window.localStorage.setItem(
+      EXPORT_FRAME_STORAGE_KEY,
+      serializeExportFramePreferences({ ...stored, [projectId]: preference })
+    );
+  } catch {
+    // A preference that could not be saved still applies to this export.
+  }
+}
+
 export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
   const [job, setJob] = useState<LocalExportJob | null>(null);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -27,6 +63,28 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
   const [actionStatus, setActionStatus] = useState<StatusMessage | null>(null);
   const project = editor.project;
   const hasProject = project !== null;
+  const [framePreference, setFramePreference] = useState<FramePreference>(DEFAULT_EXPORT_FRAME);
+
+  useEffect(() => {
+    setFramePreference(project === null ? DEFAULT_EXPORT_FRAME : readFramePreference(project.id));
+  }, [project?.id]);
+
+  /*
+    The frame this cut goes into, decided by the rule both surfaces share.
+
+    The desktop used to take the first *asset* with dimensions on it, which is
+    not the same question: the shared rule reads the timeline's leading clip, so
+    a project that opens with its second import came out one shape here and
+    another on a phone. Nothing about a project should depend on which app opened
+    it.
+  */
+  const frame = useMemo(
+    () =>
+      project === null
+        ? null
+        : outputFrameFor({ timeline: project.timeline, assets: project.assets, preference: framePreference }),
+    [framePreference, project]
+  );
   const actionState = useMemo(
     () => getExportActionState({ hasProject, hasUnsavedTimeline: editor.hasUnsavedTimeline, isStarting, job }),
     [editor.hasUnsavedTimeline, hasProject, isStarting, job]
@@ -64,14 +122,19 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
     setIsStarting(true);
     setActionStatus(null);
     setUnavailableReason('');
-    const response = await window.videoTool.startExportJob({ projectId: project.id });
+    const response = await window.videoTool.startExportJob({
+      projectId: project.id,
+      // Sent explicitly: the main process falls back to the first video asset's
+      // size, which is the answer this control exists to replace.
+      ...(frame === null ? {} : { width: frame.width, height: frame.height })
+    });
     setIsStarting(false);
     if (response.ok) {
       setJob(response.value);
       return;
     }
     setUnavailableReason(errorMessage(response.error));
-  }, [actionState.canStart, project]);
+  }, [actionState.canStart, frame, project]);
 
   const cancelExport = useCallback(async (): Promise<void> => {
     if (job === null || !actionState.canCancel) return;
@@ -129,6 +192,26 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
       </Button>
       {isPopoverOpen && (
         <div id="export-popover" className="export-popover" role="dialog" aria-label="MP4 export">
+          <label className="export-panel__frame" htmlFor="export-frame">
+            Frame
+            <select
+              id="export-frame"
+              value={framePreference}
+              disabled={!hasProject}
+              onChange={(event) => {
+                const next = event.target.value as FramePreference;
+                setFramePreference(next);
+                if (project !== null) writeFramePreference(project.id, next);
+              }}
+            >
+              {EXPORT_FRAME_PREFERENCES.map((preference) => (
+                <option key={preference} value={preference}>{EXPORT_FRAME_LABELS[preference]}</option>
+              ))}
+            </select>
+            {/* Said in pixels, because "Portrait" is a choice and 1080 × 1920 is
+                what the file will be. */}
+            <span className="export-panel__frame-size">{frame === null ? '—' : `${frame.width} × ${frame.height}`}</span>
+          </label>
           <div className="export-popover__actions" role="toolbar" aria-label="MP4 export actions">
             <Button variant="primary" onClick={() => void startExport()} disabled={!actionState.canStart || isStarting}>Export MP4</Button>
             <Button variant="stop" onClick={() => void cancelExport()} disabled={!actionState.canCancel || isCancelling}>Cancel</Button>

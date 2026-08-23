@@ -3470,6 +3470,30 @@ button {
   box-shadow: var(--shadow-editorial);
 }
 
+/*
+  The frame the cut is rendered into, said as a choice and as a number.
+
+  "Portrait" is what a person picks; 1080 × 1920 is what the file will be, and
+  showing both is what stops the choice being a guess.
+*/
+.export-panel__frame {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--text-muted, #9aa0aa);
+  font-size: 13px;
+}
+
+.export-panel__frame select {
+  flex: 0 1 auto;
+}
+
+.export-panel__frame-size {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
 .export-popover__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
