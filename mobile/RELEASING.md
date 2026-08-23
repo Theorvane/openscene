@@ -10,7 +10,7 @@ survive `expo prebuild` belongs in a config plugin, as the release signing does.
 | --- | --- |
 | Display name | OpenScene |
 | iOS bundle id / Android applicationId | `com.sloki9637.openscene` |
-| Version | `0.4.1` (`expo.version`) |
+| Version | `0.5.0` (`expo.version`) |
 | iOS build number | `expo.ios.buildNumber` |
 | Android version code | `expo.android.versionCode` |
 
@@ -283,10 +283,24 @@ and confirm a playable file arrives in the photo library. If it does not, set
 `isSupported` back to `false` in `VideoExportModule.kt` so the app says so
 plainly rather than handing the user a path to nothing, and ship iOS first.
 
-Overlapping video layers are refused by name on Android — the plan flattens
-every video track into one list, and compositing two sequences is work that is
-not done. A single video track, which is what the app creates by default,
-exports as one sequence.
+Overlapping video layers are composited now rather than refused: the plan says
+which layer a segment belongs to and Android builds one Media3 sequence per
+layer. That is the part with the least evidence behind it in this release — it
+compiles and it is assembled the way `Composition` documents, and no device has
+been seen to render two stacked clips. The preflight above is where that gets
+answered: put one clip over another on a second track before deciding the feature
+works.
+
+**The published privacy policy has to say the app shows ads, before this
+ships.** The app now states it in Settings — "OpenScene is free. Ads pay for it"
+— and names Unity LevelPlay. The policy at `https://www.sloki9637.com/privacy`
+says nothing about advertising, mediated networks, advertising identifiers, or
+advertising as a purpose. An in-app disclosure the policy contradicts is worse
+than neither: it is the app telling a reviewer where to look.
+
+`store/privacy-policy-ads.md` holds the section to publish. Publishing it is not
+a repository change and nothing here can check it, so it belongs on this list
+rather than in a test.
 
 **Age rating** — user-supplied prompts reach a generative model, so both stores
 treat it as user-generated content. Expect questions about moderation; the

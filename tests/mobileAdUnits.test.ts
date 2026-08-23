@@ -91,9 +91,18 @@ describe('LevelPlay ad units', () => {
     expect(settings).toContain('OpenScene is free. Ads pay for it');
     // And the honest half of it: nothing is sold, and the desktop has none.
     expect(settings).toContain('There is no paid tier');
-    expect(settings).toContain('the desktop app has no ads');
-  });
 
+  it('has the advertising section the published policy still needs', async () => {
+    // Publishing is a website change, so the repository keeps the complete
+    // policy text and release gate aligned with the app's actual ad setup.
+    const draft = await readFile(new URL('../store/privacy-policy-ads.md', import.meta.url), 'utf8');
+    for (const network of ['Unity LevelPlay', 'Unity Ads', 'AppLovin', 'Meta Audience Network', 'Pangle']) {
+      expect(draft, ` serves ads in this app and belongs in the policy`).toContain(network);
+    }
+    expect(draft).toContain('non-personalised');
+    expect(draft).toContain('do not sell or share');
+    expect(draft).toContain('App Tracking Transparency is not implemented');
+    expect(draft).toContain('
   it('names the publisher, and takes the version from the config', async () => {
     // An app carrying ads is a published thing rather than a personal build, and
     // both the stores and the mediation account expect a publisher a user can
