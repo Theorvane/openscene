@@ -28,6 +28,10 @@ struct SegmentInput: Record {
   @Field var speed: Double = 1
   /// Whether the source is a photograph, which has to be held rather than played.
   @Field var still: Bool = false
+  /// The grade. Neutral is `0, 1, 1`, which is also what an older caller means.
+  @Field var brightness: Double = 0
+  @Field var contrast: Double = 1
+  @Field var saturation: Double = 1
 }
 
 /// A transition, as the black it puts over the picture: total at the midpoint.
@@ -168,7 +172,8 @@ private extension SegmentInput {
       offsetY: offsetY,
       rotationDegrees: rotationDegrees,
       speed: speed,
-      still: still
+      still: still,
+      colour: ComposerColour(brightness: brightness, contrast: contrast, saturation: saturation)
     )
   }
 }

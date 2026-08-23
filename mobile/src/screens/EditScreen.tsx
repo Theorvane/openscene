@@ -50,13 +50,12 @@ const FRAME_LABELS: Readonly<Record<FramePreference, string>> = {
 /**
  * Whether this phone's renderer applies a grade.
  *
- * Android does. iOS composes with layer instructions, which carry a transform
- * and an opacity and no colour, so grading there waits on a compositor that
- * does not exist yet. Offering a control that an export ignores is worse than
- * not offering it, and hiding it entirely leaves someone comparing two phones
- * with no explanation — so it is shown, disabled, with the reason.
+ * Both do now. Android grades with Media3 effects; iOS draws its own frames
+ * through Core Image, because AVFoundation's layer instructions carry a
+ * transform and an opacity and no colour at all — which is why these controls
+ * spent a release disabled on iOS with the reason on screen.
  */
-const COLOUR_IS_RENDERED = Platform.OS !== 'ios';
+const COLOUR_IS_RENDERED = true;
 
 /**
  * A quarter turn, wrapped.
@@ -961,34 +960,28 @@ export function EditScreen({
           <Stepper
             label="Brightness"
             value={(selected.clip.effects.brightness ?? 0).toFixed(2)}
-            disabled={!COLOUR_IS_RENDERED}
             onDown={() => editor.setSelectedEffects({ brightness: stepColour(selected.clip.effects.brightness ?? 0, -0.1, 'brightness') })}
             onUp={() => editor.setSelectedEffects({ brightness: stepColour(selected.clip.effects.brightness ?? 0, 0.1, 'brightness') })}
           />
           <Stepper
             label="Contrast"
             value={(selected.clip.effects.contrast ?? 1).toFixed(2)}
-            disabled={!COLOUR_IS_RENDERED}
             onDown={() => editor.setSelectedEffects({ contrast: stepColour(selected.clip.effects.contrast ?? 1, -0.1, 'contrast') })}
             onUp={() => editor.setSelectedEffects({ contrast: stepColour(selected.clip.effects.contrast ?? 1, 0.1, 'contrast') })}
           />
           <Stepper
             label="Saturation"
             value={(selected.clip.effects.saturation ?? 1).toFixed(2)}
-            disabled={!COLOUR_IS_RENDERED}
             onDown={() => editor.setSelectedEffects({ saturation: stepColour(selected.clip.effects.saturation ?? 1, -0.1, 'saturation') })}
             onUp={() => editor.setSelectedEffects({ saturation: stepColour(selected.clip.effects.saturation ?? 1, 0.1, 'saturation') })}
           />
-          <Text style={styles.panelNote}>
-            {COLOUR_IS_RENDERED
-              ? // Said out loud rather than approximated. React Native has no
-                // colour filter, and a preview that showed roughly the right
-                // brightness and nothing of saturation would be a preview that
-                // disagrees with the file — which is the failure this editor
-                // keeps being caught by.
-                'Colour applies to the export. The preview does not show it yet.'
-              : 'Colour is not rendered on iOS yet — an export would ignore it, so it is not offered.'}
-          </Text>
+          {/*
+            Said out loud rather than approximated. React Native has no colour
+            filter, and a preview that showed roughly the right brightness and
+            nothing of saturation would be a preview that disagrees with the
+            file — which is the failure this editor keeps being caught by.
+          */}
+          <Text style={styles.panelNote}>Colour applies to the export. The preview does not show it yet.</Text>
           <Stepper
             label="Volume"
             value={`${Math.round(selected.clip.effects.volume * 100)}%`}

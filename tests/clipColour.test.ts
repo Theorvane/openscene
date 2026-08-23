@@ -185,10 +185,30 @@ describe('the surfaces', () => {
     expect(bridge).toContain('saturation: segment.saturation');
   });
 
-  it('says on iOS that it does not render colour, instead of pretending', async () => {
+  it('grades on iOS through a compositor, because layer instructions cannot', async () => {
+    // This is where iOS spent a release: the controls were shown disabled with
+    // the reason, because `AVMutableVideoCompositionLayerInstruction` carries a
+    // transform and an opacity and no colour at all. Drawing the frames through
+    // Core Image is what makes the grade reachable, and it has to keep doing the
+    // placement and the transition ramps the layer instructions were doing.
+    const composer = await readMobile('modules/video-export/ios/VideoComposer.swift');
+    expect(composer).toContain('AVVideoCompositing');
+    expect(composer).toContain('CIColorControls');
+    expect(composer).toContain('customVideoCompositorClass = GradingCompositor.self');
+    // And only where it is needed: an ungraded export stays on AVFoundation's
+    // own compositing rather than paying for a Core Image render per frame.
+    expect(composer).toContain('request.videoSegments.contains(where: { !$0.colour.isNeutral })');
+
+    // The bridge has to carry the three numbers into the module, or the
+    // compositor grades by the defaults and nothing changes.
+    const module = await readMobile('modules/video-export/ios/VideoExportModule.swift');
+    expect(module).toContain('@Field var brightness: Double = 0');
+    expect(module).toContain('ComposerColour(brightness: brightness, contrast: contrast, saturation: saturation)');
+
+    // And the controls are no longer disabled on one platform.
     const screen = await readMobile('src/screens/EditScreen.tsx');
-    expect(screen).toContain("Platform.OS !== 'ios'");
-    expect(screen).toContain('not rendered on iOS yet');
+    expect(screen).not.toContain('not rendered on iOS yet');
+    expect(screen).not.toContain("Platform.OS !== 'ios'");
   });
 
   it('admits the phone preview does not show a grade', async () => {
