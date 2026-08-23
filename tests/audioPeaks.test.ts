@@ -58,6 +58,7 @@ describe('turning peaks into bars', () => {
  */
 describe('the surfaces', () => {
   const readMobile = (path: string) => readFile(new URL(`../mobile/${path}`, import.meta.url), 'utf8');
+  const readDesktop = (path: string) => readFile(new URL(`../src/${path}`, import.meta.url), 'utf8');
 
   it('reads peaks natively on Android', async () => {
     const kotlin = await readMobile(
@@ -87,5 +88,48 @@ describe('the surfaces', () => {
   it('treats a file it cannot read as a clip drawn the way it was', async () => {
     const bridge = await readMobile('modules/video-export/index.ts');
     expect(bridge).toMatch(/readAudioPeaks[\s\S]{0,400}return \[\]/);
+  });
+
+  it('draws the same shape on the desktop, read the way that surface can', async () => {
+    // The phone drew this first, which left the desktop editing audio blind —
+    // the gap "Two Surfaces, One Core" exists to catch. What to draw is shared;
+    // how to read it is each surface's own business, and Chromium already has
+    // the decoders, so this is Web Audio rather than a process per clip.
+    const desktop = await readDesktop('renderer/src/editor/clipWaveform.ts');
+    expect(desktop).toContain("from '../../../shared/audioPeaks'");
+    expect(desktop).toContain('decodeAudioData');
+    // One decode per source, not per clip: trimming must not re-read the file.
+    expect(desktop).toContain('const envelopes = new Map<string, readonly number[]>()');
+    // And every channel, or sound panned hard to one side draws as silence.
+    expect(desktop).toContain('channel < audio.numberOfChannels');
+    // Best-effort, like the filmstrip beside it.
+    expect(desktop).toMatch(/catch \{[\s\S]{0,300}return \[\] as readonly number\[\]/);
+  });
+
+  it('never reads one asset under another one id', async () => {
+    // A clip changing which asset it points at leaves the previous URL in state
+    // while the next lookup is in flight, and the reader caches what it decodes
+    // under the *new* id — one stale render is enough to remember the wrong file
+    // against the right clip, and it stays wrong until the cache is evicted.
+    // Pairing the id with the URL makes the mismatch unrepresentable.
+    const canvas = await readDesktop('renderer/src/editor/TimelineCanvas.tsx');
+    expect(canvas).toContain('function useAssetPlaybackUrl');
+    expect(canvas).toContain('setResolved({ assetId, url: response.value.url })');
+    expect(canvas).toContain('return resolved?.assetId === assetId ? resolved.url : null;');
+    // Both readers ask the same way, since the filmstrip had the same hole.
+    expect(canvas.match(/useAssetPlaybackUrl\(projectId, assetId\)/g)).toHaveLength(2);
+  });
+
+  it('draws it on video clips there too, the way the phone does', async () => {
+    const canvas = await readDesktop('renderer/src/editor/TimelineCanvas.tsx');
+    expect(canvas).toContain('<ClipWaveform');
+    // Not gated on the track kind: a video clip's own sound is most of the
+    // sound in a cut, and it gets the band along the bottom.
+    expect(canvas).toContain("overFrames={track.kind === 'video'}");
+    const css = await readDesktop('renderer/src/styles.css');
+    expect(css).toContain('.timeline-clip__waveform--strip');
+    // Behind the label and the handles, and never swallowing a drag — the whole
+    // clip is one button.
+    expect(css).toMatch(/\.timeline-clip__waveform \{[\s\S]{0,300}pointer-events: none/);
   });
 });

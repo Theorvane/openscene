@@ -26,6 +26,12 @@ struct SegmentInput: Record {
   @Field var rotationDegrees: Double = 0
   /// Playback rate. 1 is the rate it was shot at, and what an older caller means.
   @Field var speed: Double = 1
+  /// Whether the source is a photograph, which has to be held rather than played.
+  @Field var still: Bool = false
+  /// The grade. Neutral is `0, 1, 1`, which is also what an older caller means.
+  @Field var brightness: Double = 0
+  @Field var contrast: Double = 1
+  @Field var saturation: Double = 1
 }
 
 /// A transition, as the black it puts over the picture: total at the midpoint.
@@ -63,6 +69,17 @@ public final class VideoExportModule: Module {
     Name("VideoExport")
 
     Property("isSupported") { true }
+
+    /*
+      The switch that lets a timeline with a photograph on it be exported.
+
+      `areStillsRenderable` in the JS bridge reads this, and refuses the export
+      where it is false — because a renderer that cannot hold a still opens it as
+      a movie and contributes nothing, which is an export quietly shorter than
+      the cut. True now that `stillMovie` encodes one before the composition is
+      assembled.
+    */
+    Property("supportsStills") { true }
 
     AsyncFunction("exportComposition") { (request: ExportRequest) -> [String: Any] in
       try await Self.export(request)
@@ -154,7 +171,9 @@ private extension SegmentInput {
       offsetX: offsetX,
       offsetY: offsetY,
       rotationDegrees: rotationDegrees,
-      speed: speed
+      speed: speed,
+      still: still,
+      colour: ComposerColour(brightness: brightness, contrast: contrast, saturation: saturation)
     )
   }
 }

@@ -32,7 +32,7 @@ import { createImageGenerationJob, createSpeechGenerationJob, createVideoGenerat
 import { CredentialStore } from './credentialStore';
 import { LlmExecutionAdapter } from './llmAdapter';
 import { getOpenVideoMcpDefinition, OpenVideoMcpServer } from './openVideoMcpServer';
-import { AGENT_CHAT_MUTATING_TOOL_NAMES, AGENT_CHAT_SPEND_TOOL_NAMES, createAgentChatTools } from './agentChatTools';
+import { AGENT_CHAT_SPEND_TOOL_NAMES, agentChatMutatingToolNames, createAgentChatTools } from './agentChatTools';
 import { buildAgentChatGraph } from './agentChatGraph';
 import { AgentChatSessionManager } from './agentChatSession';
 import { createAgentChatModel } from './agentChatModel';
@@ -431,7 +431,9 @@ async function installIpcHandlers(): Promise<void> {
   const agentChatTools = await createAgentChatTools(mcpServerInstance);
   const agentChatGraphBundle = buildAgentChatGraph({
     tools: agentChatTools,
-    mutatingToolNames: AGENT_CHAT_MUTATING_TOOL_NAMES,
+    // Derived from the tools that exist, so a tool added tomorrow asks for
+    // approval by default rather than because someone remembered a list.
+    mutatingToolNames: agentChatMutatingToolNames(agentChatTools),
     spendToolNames: AGENT_CHAT_SPEND_TOOL_NAMES,
     createModel: createAgentChatModel(agentChatTools, credentialStore, chatGptOAuthService)
   });

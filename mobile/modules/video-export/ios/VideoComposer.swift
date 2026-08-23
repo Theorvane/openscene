@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreGraphics
+import CoreImage
 import QuartzCore
 
 /**
@@ -35,6 +36,15 @@ public struct ComposerSegment {
   public var offsetY: Double
   public var rotationDegrees: Double
   public var speed: Double
+  /**
+   Whether this source is a photograph rather than a movie.
+
+   A still has no timeline of its own: opened the way a movie is opened it
+   contributes a single frame, or nothing at all. It is held here for the length
+   the clip asks for, which is what `-loop 1 -t` says on the desktop.
+   */
+  public var still: Bool
+  public var colour: ComposerColour
 
   /// Defaults are "unchanged", so a caller that knows nothing of an effect still renders.
   public init(
@@ -48,7 +58,9 @@ public struct ComposerSegment {
     offsetX: Double = 0,
     offsetY: Double = 0,
     rotationDegrees: Double = 0,
-    speed: Double = 1
+    speed: Double = 1,
+    still: Bool = false,
+    colour: ComposerColour = ComposerColour()
   ) {
     self.uri = uri
     self.timelineStartMs = timelineStartMs
@@ -61,7 +73,36 @@ public struct ComposerSegment {
     self.offsetY = offsetY
     self.rotationDegrees = rotationDegrees
     self.speed = speed
+    self.still = still
+    self.colour = colour
   }
+}
+
+/**
+ A clip's grade, in the units the shared plan uses.
+
+ `brightness` is added and the other two multiply, which is what `eq` means on
+ the desktop, what Media3's `Brightness` and `Contrast` mean on Android, and what
+ `CIColorControls` means here — so the same three numbers describe the same
+ picture on all three renderers.
+
+ The neutral answer is the one that matters most: it has to render identically to
+ a composition with no grade at all, because that is what lets every ungraded
+ clip skip the compositor entirely.
+ */
+public struct ComposerColour: Equatable {
+  public var brightness: Double
+  public var contrast: Double
+  public var saturation: Double
+
+  public init(brightness: Double = 0, contrast: Double = 1, saturation: Double = 1) {
+    self.brightness = brightness
+    self.contrast = contrast
+    self.saturation = saturation
+  }
+
+  /// Whether anything would change if the grade were skipped.
+  public var isNeutral: Bool { brightness == 0 && contrast == 1 && saturation == 1 }
 }
 
 /// A transition, as the black it puts over the picture: total at the midpoint.
@@ -165,6 +206,246 @@ func parseHexColor(_ value: String) -> CGColor {
   ) ?? white
 }
 
+/**
+ A photograph, written out as a movie of the length it has to be held for.
+
+ `loadTracks(withMediaCharacteristic: .visual)` comes back empty for a PNG — a
+ still has no visual *track* — so the export loop dropped the segment and the cut
+ came out shorter than the timeline with nothing saying why. That is why mobile
+ export refused a timeline containing one at all.
+
+ Of the three ways to fix it, this is the one that leaves everything else alone.
+ A Core Animation layer would change how the whole composition is assembled, and
+ a custom compositor would have to reimplement the transform, the opacity and the
+ ramps; encoding the still first makes it an ordinary source, so it picks up the
+ trim, the retime, the placement and the transitions exactly as a movie does,
+ with no second implementation of any of them to keep in step.
+
+ Drawn at the image's own size, because that is what the desktop does: `-loop 1`
+ feeds FFmpeg the photograph as it is and the same filter chain scales and places
+ it. A still that filled the frame here and not there would be two pictures of
+ one project.
+ */
+func stillMovie(at url: URL, holdingForMs milliseconds: Double, frameRate: Int, into directory: URL) throws -> URL {
+  guard let image = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]) else {
+    throw ComposerError.exportFailed("The still could not be read: \(url.lastPathComponent)")
+  }
+
+  // Even, because H.264 refuses odd dimensions, and bounded because a modern
+  // phone photograph is far larger than any timeline renders at.
+  let longest: CGFloat = 4096
+  let fitted = min(1, longest / max(image.extent.width, image.extent.height))
+  let width = max(2, Int((image.extent.width * fitted).rounded(.down)) & ~1)
+  let height = max(2, Int((image.extent.height * fitted).rounded(.down)) & ~1)
+
+  let output = directory.appendingPathComponent("openvideo-still-\(UUID().uuidString.prefix(8)).mp4")
+  let writer = try AVAssetWriter(outputURL: output, fileType: .mp4)
+  let input = AVAssetWriterInput(
+    mediaType: .video,
+    outputSettings: [
+      AVVideoCodecKey: AVVideoCodecType.h264,
+      AVVideoWidthKey: width,
+      AVVideoHeightKey: height
+    ]
+  )
+  input.expectsMediaDataInRealTime = false
+  let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+    assetWriterInput: input,
+    sourcePixelBufferAttributes: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+  )
+  writer.add(input)
+  writer.startWriting()
+  writer.startSession(atSourceTime: .zero)
+
+  var buffer: CVPixelBuffer?
+  CVPixelBufferCreate(nil, width, height, kCVPixelFormatType_32BGRA, nil, &buffer)
+  guard let pixels = buffer else {
+    throw ComposerError.exportFailed("The still could not be prepared for encoding.")
+  }
+  let scale = CGAffineTransform(scaleX: CGFloat(width) / image.extent.width, y: CGFloat(height) / image.extent.height)
+  CIContext().render(
+    image.transformed(by: scale),
+    to: pixels,
+    bounds: CGRect(x: 0, y: 0, width: width, height: height),
+    colorSpace: CGColorSpaceCreateDeviceRGB()
+  )
+
+  // The same frame at every tick. A one-frame movie stretched with
+  // `scaleTimeRange` would be cheaper and is not the same thing: a decoder given
+  // one frame and told it lasts ten seconds is a decoder holding a frame, and
+  // players disagree about what that means.
+  let rate = max(1, frameRate)
+  let frames = max(1, Int((max(0, milliseconds) / 1000 * Double(rate)).rounded()))
+  for frame in 0..<frames {
+    while !input.isReadyForMoreMediaData { usleep(500) }
+    adaptor.append(pixels, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: CMTimeScale(rate)))
+  }
+  input.markAsFinished()
+
+  let finished = DispatchSemaphore(value: 0)
+  writer.finishWriting { finished.signal() }
+  finished.wait()
+  guard writer.status == .completed else {
+    throw ComposerError.exportFailed(writer.error?.localizedDescription ?? "The still could not be encoded.")
+  }
+  return output
+}
+
+/**
+ One clip, as the compositor needs it: what to draw, where, how opaque, and what
+ the grade does to it.
+
+ This is the same description the layer instructions carry, written out because a
+ custom compositor has to do their work itself — there is no way to keep them and
+ add colour, since `AVMutableVideoCompositionLayerInstruction` has a transform and
+ an opacity and nothing else in it.
+ */
+final class GradedLayer {
+  let trackID: CMPersistentTrackID
+  /// Built for AVFoundation's space, with y growing downward; converted per frame.
+  let transform: CGAffineTransform
+  let baseOpacity: Double
+  let ramps: [OpacityRamp]
+  let colour: ComposerColour
+
+  init(trackID: CMPersistentTrackID, transform: CGAffineTransform, baseOpacity: Double, ramps: [OpacityRamp], colour: ComposerColour) {
+    self.trackID = trackID
+    self.transform = transform
+    self.baseOpacity = baseOpacity
+    self.ramps = ramps
+    self.colour = colour
+  }
+
+  /**
+   Opacity at a moment, with the same shape `setOpacityRamp` gives it: the base
+   value until a ramp starts, interpolated inside one, and held at the ramp's end
+   value afterwards until the next begins.
+   */
+  func opacity(at moment: CMTime) -> Double {
+    let seconds = moment.seconds
+    var value = baseOpacity
+    for ramp in ramps.sorted(by: { $0.startSeconds < $1.startSeconds }) where ramp.startSeconds <= seconds {
+      if seconds >= ramp.endSeconds {
+        value = ramp.to
+      } else {
+        let span = max(0.000_001, ramp.endSeconds - ramp.startSeconds)
+        value = ramp.from + (ramp.to - ramp.from) * ((seconds - ramp.startSeconds) / span)
+      }
+    }
+    return min(1, max(0, value))
+  }
+
+  /**
+   The transform in Core Image's terms.
+
+   AVFoundation places a frame with the origin at the top left and y growing
+   downward; Core Image's origin is at the bottom left and y grows upward. The
+   same matrix in the other space is the source flipped, transformed, and flipped
+   back — which is why this is a conversion rather than a second transform to
+   keep in step with the first.
+   */
+  func coreImageTransform(sourceExtent: CGRect, renderSize: CGSize) -> CGAffineTransform {
+    let flipSource = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: sourceExtent.height)
+    let flipRender = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: renderSize.height)
+    return flipSource.concatenating(transform).concatenating(flipRender)
+  }
+}
+
+/// A transition ramp, in seconds, so the arithmetic per frame is not `CMTime`'s.
+struct OpacityRamp {
+  let startSeconds: Double
+  let endSeconds: Double
+  let from: Double
+  let to: Double
+}
+
+/// The layers to draw for a stretch of the timeline, back to front.
+final class GradingInstruction: NSObject, AVVideoCompositionInstructionProtocol {
+  let timeRange: CMTimeRange
+  let enablePostProcessing = false
+  /// The opacity ramps change every frame, so no frame stands in for another.
+  let containsTweening = true
+  let requiredSourceTrackIDs: [NSValue]?
+  let passthroughTrackID = kCMPersistentTrackID_Invalid
+  let layers: [GradedLayer]
+
+  init(timeRange: CMTimeRange, layers: [GradedLayer]) {
+    self.timeRange = timeRange
+    self.layers = layers
+    self.requiredSourceTrackIDs = layers.map { NSNumber(value: $0.trackID) }
+  }
+}
+
+/**
+ The picture, drawn a frame at a time, because colour has to happen somewhere.
+
+ Used only when at least one clip is graded. Everything else keeps the layer
+ instructions: they are AVFoundation's own path, they cost nothing per frame, and
+ an ungraded export should not become a Core Image render because the feature
+ exists.
+
+ Order matters and is the same order the desktop's filter graph uses — grade the
+ clip, fade it, place it — and the layers arrive back to front, so each is drawn
+ over what is already there.
+ */
+final class GradingCompositor: NSObject, AVVideoCompositing {
+  let sourcePixelBufferAttributes: [String: any Sendable]? = [
+    kCVPixelBufferPixelFormatTypeKey as String: [kCVPixelFormatType_32BGRA]
+  ]
+  let requiredPixelBufferAttributesForRenderContext: [String: any Sendable] = [
+    kCVPixelBufferPixelFormatTypeKey as String: [kCVPixelFormatType_32BGRA]
+  ]
+
+  private let context = CIContext(options: [.useSoftwareRenderer: false])
+
+  func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {}
+
+  func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
+    guard let instruction = request.videoCompositionInstruction as? GradingInstruction,
+          let destination = request.renderContext.newPixelBuffer() else {
+      request.finish(with: ComposerError.exportUnavailable)
+      return
+    }
+
+    let renderSize = request.renderContext.size
+    // Black underneath, which is what an empty stretch of timeline looks like on
+    // every other renderer and what a dip fades to.
+    var canvas = CIImage(color: CIColor(red: 0, green: 0, blue: 0)).cropped(to: CGRect(origin: .zero, size: renderSize))
+
+    for layer in instruction.layers {
+      guard let buffer = request.sourceFrame(byTrackID: layer.trackID) else { continue }
+      var image = CIImage(cvPixelBuffer: buffer)
+      let extent = image.extent
+
+      if !layer.colour.isNeutral {
+        image = image.applyingFilter(
+          "CIColorControls",
+          parameters: [
+            kCIInputBrightnessKey: layer.colour.brightness,
+            kCIInputContrastKey: layer.colour.contrast,
+            kCIInputSaturationKey: layer.colour.saturation
+          ]
+        )
+      }
+
+      let alpha = layer.opacity(at: request.compositionTime)
+      if alpha <= 0 { continue }
+      if alpha < 1 {
+        image = image.applyingFilter(
+          "CIColorMatrix",
+          parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: CGFloat(alpha))]
+        )
+      }
+
+      image = image.transformed(by: layer.coreImageTransform(sourceExtent: extent, renderSize: renderSize))
+      canvas = image.composited(over: canvas)
+    }
+
+    context.render(canvas, to: destination)
+    request.finish(withComposedVideoFrame: destination)
+  }
+}
+
 func time(_ milliseconds: Double) -> CMTime {
   CMTime(value: CMTimeValue(max(0, milliseconds).rounded()), timescale: 1000)
 }
@@ -178,12 +459,58 @@ public enum VideoComposer {
     let composition = AVMutableComposition()
     let renderSize = CGSize(width: request.width, height: request.height)
     var layerInstructions: [AVMutableVideoCompositionLayerInstruction] = []
+    /*
+     The same description, twice, because the two paths cannot share one object.
+
+     Layer instructions are AVFoundation's own compositing and cost nothing per
+     frame, but they carry a transform and an opacity and no colour at all. A
+     graded export therefore has to draw its own frames — see `GradingCompositor`
+     — and an ungraded one should not pay for that. Which path runs is decided
+     once, below, by whether any clip is actually graded.
+     */
+    var gradedLayers: [GradedLayer] = []
 
     // Each video segment gets its own track. Sharing one track would serialise
     // clips that are meant to overlap, which is exactly what a multi-track
     // timeline is for.
+    /*
+     Stills are encoded once, before anything is assembled, and cleaned up after.
+
+     Written into a directory of their own so the export can delete the lot in
+     one call rather than tracking each file — a temporary movie per still, left
+     behind, is a photograph's worth of disk per export.
+     */
+    let stillsDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("openvideo-stills-\(UUID().uuidString.prefix(8)))")
+    if request.videoSegments.contains(where: { $0.still }) {
+      try FileManager.default.createDirectory(at: stillsDirectory, withIntermediateDirectories: true)
+    }
+    defer { try? FileManager.default.removeItem(at: stillsDirectory) }
+
     for segment in request.videoSegments {
-      guard let url = URL(string: segment.uri) ?? URL(string: "file://\(segment.uri)") else { continue }
+      guard let source = URL(string: segment.uri) ?? URL(string: "file://\(segment.uri)") else { continue }
+      /*
+       A photograph has no visual track, so `loadTracks` came back empty and the
+       `guard` below dropped the segment — silently, leaving an export shorter
+       than the cut with nothing saying why. Encoded first, it is an ordinary
+       source and everything after this line treats it as one.
+
+       Held for the source window rather than the timeline length: the frames are
+       trimmed and then retimed, so a still played at 2× needs the material the
+       trim asks for before the retime compresses it. That is the same number the
+       desktop passes to `-t`.
+       */
+      let url: URL
+      if segment.still {
+        url = try stillMovie(
+          at: source,
+          holdingForMs: segment.sourceEndMs,
+          frameRate: request.frameRate,
+          into: stillsDirectory
+        )
+      } else {
+        url = source
+      }
       let asset = AVURLAsset(url: url)
       guard let sourceTrack = try await asset.loadTracks(withMediaCharacteristic: .visual).first else { continue }
       guard let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
@@ -256,28 +583,43 @@ public enum VideoComposer {
        */
       let segmentStartMs = segment.timelineStartMs
       let segmentEndMs = segment.timelineStartMs + (segment.sourceEndMs - segment.sourceStartMs)
+      var ramps: [OpacityRamp] = []
       for dip in request.dips where dip.durationMs > 0 {
         let midMs = dip.startMs + dip.durationMs / 2
         let endMs = dip.startMs + dip.durationMs
 
         let outStart = max(dip.startMs, segmentStartMs)
-        if outStart < min(midMs, segmentEndMs) {
+        let outEnd = min(midMs, segmentEndMs)
+        if outStart < outEnd {
           instruction.setOpacityRamp(
             fromStartOpacity: baseOpacity,
             toEndOpacity: 0,
-            timeRange: CMTimeRange(start: time(outStart), end: time(min(midMs, segmentEndMs)))
+            timeRange: CMTimeRange(start: time(outStart), end: time(outEnd))
           )
+          ramps.append(OpacityRamp(startSeconds: outStart / 1000, endSeconds: outEnd / 1000, from: Double(baseOpacity), to: 0))
         }
 
+        let inStart = max(midMs, segmentStartMs)
         let inEnd = min(endMs, segmentEndMs)
-        if max(midMs, segmentStartMs) < inEnd {
+        if inStart < inEnd {
           instruction.setOpacityRamp(
             fromStartOpacity: 0,
             toEndOpacity: baseOpacity,
-            timeRange: CMTimeRange(start: time(max(midMs, segmentStartMs)), end: time(inEnd))
+            timeRange: CMTimeRange(start: time(inStart), end: time(inEnd))
           )
+          ramps.append(OpacityRamp(startSeconds: inStart / 1000, endSeconds: inEnd / 1000, from: 0, to: Double(baseOpacity)))
         }
       }
+
+      gradedLayers.append(
+        GradedLayer(
+          trackID: track.trackID,
+          transform: transform,
+          baseOpacity: Double(baseOpacity),
+          ramps: ramps,
+          colour: segment.colour
+        )
+      )
 
       // The plan hands layers bottom-first, and AVFoundation draws the first
       // layer instruction on top — so the order is reversed when they are
@@ -315,14 +657,34 @@ public enum VideoComposer {
       }
     }
 
-    let instruction = AVMutableVideoCompositionInstruction()
-    instruction.timeRange = CMTimeRange(start: .zero, duration: time(request.durationMs))
-    instruction.layerInstructions = layerInstructions.reversed()
-
     let videoComposition = AVMutableVideoComposition()
     videoComposition.renderSize = renderSize
     videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(1, request.frameRate)))
-    videoComposition.instructions = [instruction]
+
+    /*
+     Two ways to draw the same picture, and the grade is what decides between
+     them.
+
+     Where nothing is graded — which is most exports — AVFoundation composites
+     from the layer instructions built above, exactly as it did before colour
+     existed. Where something is, `GradingCompositor` draws every frame through
+     Core Image instead, because a layer instruction has no colour in it and
+     there is no way to add one.
+
+     Both are handed the same layers in the same order: the plan hands them
+     bottom-first and AVFoundation draws the *first* layer instruction on top, so
+     that list is reversed while the compositor's, which draws in order, is not.
+     */
+    let wholeTimeline = CMTimeRange(start: .zero, duration: time(request.durationMs))
+    if request.videoSegments.contains(where: { !$0.colour.isNeutral }) {
+      videoComposition.customVideoCompositorClass = GradingCompositor.self
+      videoComposition.instructions = [GradingInstruction(timeRange: wholeTimeline, layers: gradedLayers)]
+    } else {
+      let instruction = AVMutableVideoCompositionInstruction()
+      instruction.timeRange = wholeTimeline
+      instruction.layerInstructions = layerInstructions.reversed()
+      videoComposition.instructions = [instruction]
+    }
 
     /*
      Titles, over the finished picture.

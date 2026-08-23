@@ -3,7 +3,14 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { GENERATION_COST_POLICY } from '../src/main/agentChatGraph';
-import { AGENT_CHAT_MUTATING_TOOL_NAMES, AGENT_CHAT_SPEND_TOOL_NAMES } from '../src/main/agentChatTools';
+import { AGENT_CHAT_SPEND_TOOL_NAMES, agentChatMutatingToolNames } from '../src/main/agentChatTools';
+import { getOpenVideoMcpDefinition } from '../src/main/openVideoMcpServer';
+
+// Derived from the server's real tools: a hand-written mutating list fails open,
+// which is how four project writes shipped without ever asking for approval.
+const AGENT_CHAT_MUTATING_TOOL_NAMES = agentChatMutatingToolNames(
+  (getOpenVideoMcpDefinition()?.tools ?? []).map((tool) => ({ name: tool.name }))
+);
 
 const graphSource = readFileSync(resolve(process.cwd(), 'src/main/agentChatGraph.ts'), 'utf8');
 const skillDoc = readFileSync(

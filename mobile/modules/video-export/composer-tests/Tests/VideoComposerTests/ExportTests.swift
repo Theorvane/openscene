@@ -1,5 +1,7 @@
 import AVFoundation
 import CoreImage
+import ImageIO
+import UniformTypeIdentifiers
 import XCTest
 
 @testable import VideoComposer
@@ -107,6 +109,32 @@ final class ExportTests: XCTestCase {
     return total / Double(width * height)
   }
 
+  /// A solid-colour PNG, which is what a photograph is to this renderer.
+  private func writeStill(level: UInt8, size: CGSize = CGSize(width: 64, height: 48)) throws -> URL {
+    let url = directory.appendingPathComponent("still-\(UUID().uuidString).png")
+    let width = Int(size.width)
+    let height = Int(size.height)
+    var pixels = [UInt8](repeating: level, count: width * height * 4)
+    for index in stride(from: 3, to: pixels.count, by: 4) { pixels[index] = 255 }
+    let context = CGContext(
+      data: &pixels,
+      width: width,
+      height: height,
+      bitsPerComponent: 8,
+      bytesPerRow: width * 4,
+      space: CGColorSpaceCreateDeviceRGB(),
+      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    )
+    guard let image = context?.makeImage(),
+          let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else {
+      XCTFail("could not write the still")
+      return url
+    }
+    CGImageDestinationAddImage(destination, image, nil)
+    CGImageDestinationFinalize(destination)
+    return url
+  }
+
   func testExportsAClipOfTheLengthTheTimelineAsksFor() async throws {
     let source = try writeRamp(seconds: 2)
     let request = ComposerRequest(
@@ -160,6 +188,159 @@ final class ExportTests: XCTestCase {
     let atDip = try await luminance(of: output, atSeconds: 1.5)
     let after = try await luminance(of: output, atSeconds: 1.95)
     XCTAssertLessThan(atDip, after - 40, "the frame at the midpoint of a dip should be far darker than the one after it")
+  }
+
+  /**
+   A photograph, held for the length of its clip.
+
+   `loadTracks(withMediaCharacteristic: .visual)` comes back empty for a PNG, so
+   the segment was dropped and the export came out shorter than the cut with
+   nothing saying why — which is why mobile export refused a timeline with a
+   still in it rather than shipping a wrong video.
+   */
+  func testHoldsAStillForTheLengthOfItsClip() async throws {
+    let still = try writeStill(level: 200)
+    let output = try await VideoComposer.export(
+      ComposerRequest(
+        width: 64,
+        height: 48,
+        frameRate: 30,
+        durationMs: 3_000,
+        videoSegments: [ComposerSegment(uri: still.absoluteString, sourceEndMs: 3_000, still: true)]
+      )
+    )
+
+    let duration = try await AVURLAsset(url: output).load(.duration).seconds
+    XCTAssertEqual(duration, 3, accuracy: 0.3, "a still has to be held for its clip, not dropped")
+
+    // And it is the picture, not black: a hold that produced an empty frame
+    // would pass a duration check and fail the only one that matters.
+    let middle = try await luminance(of: output, atSeconds: 1.5)
+    XCTAssertEqual(middle, 200, accuracy: 30, "the frame at the middle of the hold should be the photograph")
+  }
+
+  /**
+   A still beside a movie, which is what a timeline actually looks like.
+
+   Encoding the still first is what lets everything after it treat the two the
+   same — the trim, the retime, the placement and the transitions all run on an
+   ordinary source — so the test that matters is that both survive one export.
+   */
+  func testHoldsAStillNextToAClip() async throws {
+    let still = try writeStill(level: 30)
+    let clip = try writeRamp(seconds: 2)
+    let output = try await VideoComposer.export(
+      ComposerRequest(
+        width: 64,
+        height: 48,
+        frameRate: 30,
+        durationMs: 4_000,
+        videoSegments: [
+          ComposerSegment(uri: clip.absoluteString, sourceEndMs: 2_000),
+          ComposerSegment(uri: still.absoluteString, timelineStartMs: 2_000, sourceEndMs: 2_000, still: true)
+        ]
+      )
+    )
+
+    let duration = try await AVURLAsset(url: output).load(.duration).seconds
+    XCTAssertEqual(duration, 4, accuracy: 0.3, "the cut is the clip and then the hold")
+    let onTheStill = try await luminance(of: output, atSeconds: 3)
+    XCTAssertEqual(onTheStill, 30, accuracy: 30, "the second half of the cut is the photograph")
+  }
+
+  /**
+   Colour, which iOS used to read and drop.
+
+   The grade reaches this renderer through the shared plan and had nowhere to go:
+   layer instructions carry a transform and an opacity and no colour, so the
+   controls were disabled on the phone with the reason on screen. This exports the
+   same clip twice and reads the two files back — the only evidence that means
+   anything here is a luminance that moved.
+   */
+  func testBrightensAGradedClip() async throws {
+    let source = try writeRamp(seconds: 2)
+    func export(_ colour: ComposerColour) async throws -> Double {
+      let output = try await VideoComposer.export(
+        ComposerRequest(
+          width: 64,
+          height: 48,
+          frameRate: 30,
+          durationMs: 2_000,
+          videoSegments: [ComposerSegment(uri: source.absoluteString, sourceEndMs: 2_000, colour: colour)]
+        )
+      )
+      return try await luminance(of: output, atSeconds: 1)
+    }
+
+    let neutral = try await export(ComposerColour())
+    let brighter = try await export(ComposerColour(brightness: 0.3))
+    let darker = try await export(ComposerColour(brightness: -0.3))
+
+    XCTAssertGreaterThan(brighter, neutral + 25, "brightness up should reach the file")
+    XCTAssertLessThan(darker, neutral - 25, "brightness down should reach the file")
+  }
+
+  /**
+   That the compositor draws the picture where the layer instructions did.
+
+   A custom compositor takes over placement as well as colour — Core Image's
+   origin is at the bottom left and AVFoundation's is at the top, and getting the
+   conversion wrong puts the picture off the frame or upside down while every
+   duration and every luminance still passes. So this grades one clip by an amount
+   that changes nothing visible and asserts the frame is unchanged.
+   */
+  func testAGradedExportIsFramedLikeAnUngradedOne() async throws {
+    let source = try writeRamp(seconds: 2)
+    func export(_ colour: ComposerColour) async throws -> Double {
+      let output = try await VideoComposer.export(
+        ComposerRequest(
+          width: 64,
+          height: 48,
+          frameRate: 30,
+          durationMs: 2_000,
+          videoSegments: [ComposerSegment(uri: source.absoluteString, sourceEndMs: 2_000, colour: colour)]
+        )
+      )
+      return try await luminance(of: output, atSeconds: 1)
+    }
+
+    // Saturation on a grey clip is a grade that changes nothing a luminance can
+    // see — so it only proves the compositor ran, and the frame has to match.
+    let throughInstructions = try await export(ComposerColour())
+    let throughCompositor = try await export(ComposerColour(saturation: 1.4))
+    XCTAssertEqual(
+      throughCompositor,
+      throughInstructions,
+      accuracy: 6,
+      "a graded export goes through the custom compositor and must frame the picture identically"
+    )
+  }
+
+  /**
+   A dip still dips when the compositor is the one drawing it.
+
+   The ramps are AVFoundation's to apply in the ungraded path and ours in the
+   graded one, which is two implementations of one behaviour — the sort of pair
+   that agrees until nobody is looking.
+   */
+  func testDimsAGradedFrameWhereATransitionDips() async throws {
+    let source = try writeRamp(seconds: 2)
+    let output = try await VideoComposer.export(
+      ComposerRequest(
+        width: 64,
+        height: 48,
+        frameRate: 30,
+        durationMs: 2_000,
+        videoSegments: [
+          ComposerSegment(uri: source.absoluteString, sourceEndMs: 2_000, colour: ComposerColour(saturation: 1.2))
+        ],
+        dips: [ComposerDip(startMs: 1_200, durationMs: 600)]
+      )
+    )
+
+    let atDip = try await luminance(of: output, atSeconds: 1.5)
+    let after = try await luminance(of: output, atSeconds: 1.95)
+    XCTAssertLessThan(atDip, after - 40, "the compositor has to apply the ramps the layer instructions used to")
   }
 
   func testRefusesACompositionWithNothingInIt() async throws {

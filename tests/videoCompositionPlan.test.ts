@@ -71,6 +71,36 @@ describe('composition plan', () => {
     // top — the same inversion the FFmpeg overlay chain needs.
     expect(plan.sources[plan.videoSegments[0]?.sourceIndex ?? -1]).toBe('asset-bottom');
     expect(plan.sources[plan.videoSegments[1]?.sourceIndex ?? -1]).toBe('asset-top');
+    // And says so outright, for the renderer that cannot read it off the order:
+    // a Media3 sequence plays its items in turn, so Android has to know where
+    // one layer ends and the next begins rather than infer it from timings that
+    // happen not to overlap.
+    expect(plan.videoSegments[0]?.layer).toBe(0);
+    expect(plan.videoSegments[1]?.layer).toBe(1);
+  });
+
+  it('numbers the layers of clips that cover the same moment', () => {
+    // Given: two rows, each with a clip over the other.
+    const withSecond = addTrack(createInitialTimeline(), { id: 'video-2', name: 'Video 2', kind: 'video' });
+    if (withSecond === null) throw new Error('expected a second video track');
+    const timeline: TimelineDocument = {
+      ...withSecond,
+      tracks: withSecond.tracks.map((track) => {
+        if (track.id === INITIAL_VIDEO_TRACK_ID) return { ...track, clips: [clip('over', 'asset-over', 500)] };
+        if (track.id === 'video-2') return { ...track, clips: [clip('under', 'asset-under', 0)] };
+        return track;
+      })
+    };
+
+    // When
+    const plan = planFor(timeline);
+
+    // Then: overlapping in time, and separated by layer rather than refused.
+    const under = plan.videoSegments.find((segment) => plan.sources[segment.sourceIndex] === 'asset-under');
+    const over = plan.videoSegments.find((segment) => plan.sources[segment.sourceIndex] === 'asset-over');
+    expect(under?.layer).toBe(0);
+    expect(over?.layer).toBe(1);
+    expect(over?.timelineStartMs).toBeLessThan((under?.sourceEndMs ?? 0));
   });
 
   it('drops clips that would composite to nothing', () => {
