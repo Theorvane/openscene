@@ -1062,7 +1062,18 @@ export class OpenVideoMcpServer {
     return {
       server: 'openvideo-mcp-server',
       version: '0.1.0',
-      tools: ['planVideoScenario', 'checkNarrationLength', 'estimateGenerationCost', 'createVideoJob', 'createSpeechJob', 'createImageJob', 'getJobStatus', 'importGeneratedResult', 'getProjectTimeline', 'watchProjectVideo', 'trimTimelineClip', 'updateClipEffects', 'addClipToTimeline', 'removeTimelineClip', 'exportProjectVideo']
+      /*
+        Read off the decorated methods rather than typed out again.
+
+        Hand-written, it went stale the moment the agent gained the edits it
+        could not reach: fifteen names advertised against nineteen registered,
+        with splitting a clip, titles and transitions missing from the list of
+        what this server can do. A descriptor that disagrees with the server is
+        worse than none — it is what a client believes.
+      */
+      // `getMcpServerDefinition` returns undefined for a class it has no
+      // metadata for, which for this one would mean the decorators did not run.
+      tools: (getOpenVideoMcpDefinition()?.tools ?? []).map((tool) => tool.name)
     };
   }
 }
