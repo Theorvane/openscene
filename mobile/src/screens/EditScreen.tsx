@@ -709,7 +709,7 @@ export function EditScreen({
         ) : (
           editor.timeline.tracks.every((track) => track.clips.length === 0) && (
             <Text style={styles.empty}>
-              Import a clip, or generate one under Video. Drag a clip to move it; drag its ends to trim.
+              Import a clip, or generate one under Video. Drag a clip to move it; drag its ends—or long-press and drag—to change its length.
             </Text>
           )
         )}

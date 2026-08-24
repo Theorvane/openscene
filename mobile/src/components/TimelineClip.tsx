@@ -28,6 +28,9 @@ import { theme } from '../lib/theme';
  * the document at finger rate would fight the gesture.
  */
 
+/** Long enough to be deliberate, short enough not to make the editor wait. */
+const LONG_PRESS_TRIM_MS = 350;
+
 export function TimelineClip({
   clip,
   label,
@@ -149,7 +152,38 @@ export function TimelineClip({
     [selected, onSelect, scrollGesture, handle, width, pxPerMs, clip.timelineStartMs, lengthMs, onMove, onTrim, onDragStateChange, edge, offset, stretch]
   );
 
-  const gesture = useMemo(() => Gesture.Race(pan, tap), [pan, tap]);
+  /*
+    A deliberate trim anywhere on the clip.
+
+    The narrow edge handles remain the fast route, but a 350ms hold activates
+    this higher-priority pan before the finger moves. That means a short drag
+    still moves the clip, while a hold followed by a horizontal drag changes
+    its right edge — no pixel-hunting at the end of a short clip.
+  */
+  const longPressTrim = useMemo(
+    () =>
+      Gesture.Pan()
+        .blocksExternalGesture(scrollGesture)
+        .activateAfterLongPress(LONG_PRESS_TRIM_MS)
+        .runOnJS(true)
+        .onBegin(() => {
+          edge.current = 'right';
+          if (!selected) onSelect();
+          onDragStateChange(true);
+        })
+        .onUpdate((event) => stretch.setValue(event.translationX))
+        .onEnd((event) => onTrim('right', clip.timelineStartMs + lengthMs + event.translationX / pxPerMs))
+        .onFinalize(() => {
+          stretch.setValue(0);
+          onDragStateChange(false);
+        }),
+    [selected, onSelect, scrollGesture, pxPerMs, clip.timelineStartMs, lengthMs, onTrim, onDragStateChange, edge, stretch]
+  );
+
+  // Exclusive lets the delayed recogniser win only after the hold has
+  // activated. Moving sooner makes it fail, so the familiar move/edge-trim pan
+  // starts immediately rather than waiting out the hold.
+  const gesture = useMemo(() => Gesture.Exclusive(longPressTrim, Gesture.Race(pan, tap)), [longPressTrim, pan, tap]);
 
   // A left trim moves the visible edge; a right trim only changes the width, so
   // the preview transform is the same either way and the commit differs.

@@ -70,6 +70,16 @@ describe('timeline gestures', () => {
     expect(screen).toMatch(/<View style={styles\.railColumn}>[\s\S]{0,4000}<\/View>\n\n\s+<GestureDetector gesture={laneScroll}>/);
   });
 
+  it('lets a long press anywhere on a clip trim its right edge', async () => {
+    const clip = await read('src/components/TimelineClip.tsx');
+    // The delayed pan gets first refusal; a short drag makes it fail and keeps
+    // the ordinary move/edge-trim pan immediate.
+    expect(clip).toContain('const LONG_PRESS_TRIM_MS = 350;');
+    expect(clip).toContain('.activateAfterLongPress(LONG_PRESS_TRIM_MS)');
+    expect(clip).toContain("onTrim('right', clip.timelineStartMs + lengthMs + event.translationX / pxPerMs)");
+    expect(clip).toContain('Gesture.Exclusive(longPressTrim, Gesture.Race(pan, tap))');
+  });
+
   it('offers length and start as numbers', async () => {
     // Trimming was only possible by grabbing a 22pt edge, and zooming in to cut
     // precisely is what pushes that edge off screen.
