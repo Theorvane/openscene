@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -90,13 +90,30 @@ function Shell() {
   const [exportState, setExportState] = useState<ExportState>({ kind: 'idle' });
 
   /*
-    Once per launch, and nothing else about it.
+    One event for each foreground session and one when that session ends.
 
-    Declared since analytics arrived and never sent, which made every other
-    number impossible to read: exports per what?
+    Mobile platforms do not offer a reliable callback for force-quit or process
+    termination. Leaving `active` is the durable boundary instead: it records
+    the session when the app backgrounds, then opening it again starts a new
+    one. The duration is rounded by the analytics sanitiser before it leaves the
+    device.
   */
   useEffect(() => {
+    let activeSince = Date.now();
+    let previous = AppState.currentState;
     track('app_opened');
+
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (previous === 'active' && next !== 'active') {
+        track('app_closed', { sessionSeconds: (Date.now() - activeSince) / 1_000 });
+      } else if (previous !== 'active' && next === 'active') {
+        activeSince = Date.now();
+        track('app_opened');
+      }
+      previous = next;
+    });
+
+    return () => subscription.remove();
   }, []);
   /**
    * Where the tab body starts, measured rather than assumed.

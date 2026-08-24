@@ -34,6 +34,7 @@ export const OPENPANEL_API_URL = 'https://panel.sanhouse.kr/api';
  */
 export const ANALYTICS_EVENTS = [
   'app_opened',
+  'app_closed',
   'project_created',
   'clip_imported',
   'export_started',

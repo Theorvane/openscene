@@ -75,6 +75,11 @@ describe('the event list', () => {
     expect(isAnalyticsEvent('user_typed_prompt')).toBe(false);
     expect(new Set(ANALYTICS_EVENTS).size).toBe(ANALYTICS_EVENTS.length);
   });
+
+  it('includes foreground-session boundaries', () => {
+    expect(isAnalyticsEvent('app_opened')).toBe(true);
+    expect(isAnalyticsEvent('app_closed')).toBe(true);
+  });
 });
 
 describe('the OpenPanel client', () => {
