@@ -1,7 +1,7 @@
 {
   "name": "video-window-recorder",
   "productName": "OpenScene",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "OpenScene secure Electron MVP for selected-window preview and local WebM recording.",
   "main": "./out/main/index.js",
   "type": "module",

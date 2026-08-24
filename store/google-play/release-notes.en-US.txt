@@ -1,12 +1,6 @@
-Editing on a phone that behaves like editing.
+Editing is easier on a phone.
 
-• Drag to move, drag the ends to trim, pinch to zoom
-• Adjust opacity, scale, start, length and volume
-• Colour: brightness, contrast, saturation
-• Straighten a sideways clip, move it in the frame
-• Photos hold for as long as you give them
-• Clips on two tracks now layer, instead of being refused
-• Waveforms on the timeline
-• A clip's own sound goes into the export
+• Long-press any timeline clip, then drag left or right to change its length — no need to hit a narrow edge
+• Timeline activity reporting is more reliable, while still sending only anonymous, allow-listed usage counts
 
-Fixes: phone footage exports in the shape it was shot.
+Fixes: improved delivery of anonymous session activity to the publisher's self-hosted analytics service.

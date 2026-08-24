@@ -1,12 +1,6 @@
-Editing on a phone that behaves like editing.
+Editing is easier on a phone.
 
-• Drag a clip to move it, drag its ends to trim, pinch to zoom the timeline
-• Adjust panel for opacity, scale, start, length and volume — and what you set is what gets exported
-• Colour on every clip: brightness, contrast and saturation, now rendered on iPhone as well as set there
-• Straighten a clip shot sideways, and move it around inside the frame
-• Photos hold on the timeline for as long as you give them, instead of being refused
-• Waveforms on the timeline, so audio is no longer edited blind
-• A clip's own sound now goes into the export instead of being dropped
-• Steppers for start and length, so a precise cut no longer depends on grabbing a 22-point edge
+• Long-press any timeline clip, then drag left or right to change its length — no need to hit a narrow edge
+• Timeline activity reporting is more reliable, while still sending only anonymous, allow-listed usage counts
 
-Fixes: footage shot on a phone exports in the shape it was shot, exported clips carry the effects the editor shows, and a timeline that starts with a gap exports instead of failing.
+Fixes: improved delivery of anonymous session activity to the publisher's self-hosted analytics service.
