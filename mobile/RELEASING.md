@@ -85,8 +85,9 @@ the store jobs, and Play refuses a `versionCode` it already has. If that happens
 raise `version`, `buildNumber` and `versionCode` and release again; the published
 build is fine, only the record of it is missing.
 
-Create the `app-store-production` GitHub Environment, restrict it to the `main`
-branch, and require a reviewer before deploying. Store the following values as
+Create the `app-store-production` GitHub Environment and restrict it to the `main`
+branch. It has no required-reviewer gate: once a new `main` release reaches this
+environment, the App Store upload runs automatically. Store the following values as
 environment configuration (not in the repository):
 
 - Variable: `APPLE_TEAM_ID` (`5H9F8F82WT`). `APP_STORE_PROFILE_NAME` is no
@@ -105,8 +106,9 @@ commit any of these files or their decoded values.
 
 ### Google Play automation
 
-Create the `play-store-production` GitHub Environment, restrict it to the
-`main` branch, and require a reviewer before deploying. Store the following
+Create the `play-store-production` GitHub Environment and restrict it to the
+`main` branch. It has no required-reviewer gate: once the release workflow reaches
+this environment, the Play production upload runs automatically. Store the following
 values as environment configuration (not in the repository):
 
 - Variable: `ANDROID_PACKAGE_NAME` (`com.sloki9637.openscene`).
