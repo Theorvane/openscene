@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const workflow = readFileSync(resolve(process.cwd(), '.github/workflows/release.yml'), 'utf8');
+const androidStoreWorkflow = readFileSync(resolve(process.cwd(), '.github/workflows/android-google-play.yml'), 'utf8');
 const builderConfig = readFileSync(resolve(process.cwd(), 'electron-builder.yml'), 'utf8');
 const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8')) as {
   readonly version: string;
@@ -87,6 +88,13 @@ describe('release workflow', () => {
       if (use.includes('uses: ./.github/workflows/')) continue;
       expect(use).toMatch(/@[0-9a-f]{40}/);
     }
+  });
+
+  it('pins every action that runs with Google Play credentials', () => {
+    const uses = androidStoreWorkflow.match(/uses: [^\n]+/g) ?? [];
+    expect(uses.length).toBeGreaterThan(0);
+    for (const use of uses) expect(use).toMatch(/@[0-9a-f]{40}/);
+    expect(androidStoreWorkflow).toContain('actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3');
   });
 
   it('distributes mobile stores only as part of a new main release', () => {
