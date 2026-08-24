@@ -78,6 +78,8 @@ describe('timeline gestures', () => {
     expect(clip).toContain('.activateAfterLongPress(LONG_PRESS_TRIM_MS)');
     expect(clip).toContain("onTrim('right', clip.timelineStartMs + lengthMs + event.translationX / pxPerMs)");
     expect(clip).toContain('Gesture.Exclusive(longPressTrim, Gesture.Race(pan, tap))');
+    expect(clip).toContain('width: Animated.add(Animated.add(width, rightStretch), Animated.multiply(leftStretch, -1))');
+    expect(clip).toContain('translateX: Animated.add(offset, leftStretch)');
   });
 
   it('offers length and start as numbers', async () => {

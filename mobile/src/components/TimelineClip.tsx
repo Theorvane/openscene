@@ -104,7 +104,8 @@ export function TimelineClip({
     dependency for a preview transform is not a trade worth making.
   */
   const offset = useRef(new Animated.Value(0)).current;
-  const stretch = useRef(new Animated.Value(0)).current;
+  const leftStretch = useRef(new Animated.Value(0)).current;
+  const rightStretch = useRef(new Animated.Value(0)).current;
   const edge = useRef<'move' | 'left' | 'right'>('move');
 
   const tap = useMemo(() => Gesture.Tap().onEnd(() => onSelect()), [onSelect]);
@@ -136,7 +137,8 @@ export function TimelineClip({
         })
         .onUpdate((event) => {
           if (edge.current === 'move') offset.setValue(event.translationX);
-          else stretch.setValue(event.translationX);
+          else if (edge.current === 'left') leftStretch.setValue(event.translationX);
+          else rightStretch.setValue(event.translationX);
         })
         .onEnd((event) => {
           const deltaMs = event.translationX / pxPerMs;
@@ -146,10 +148,11 @@ export function TimelineClip({
         })
         .onFinalize(() => {
           offset.setValue(0);
-          stretch.setValue(0);
+          leftStretch.setValue(0);
+          rightStretch.setValue(0);
           onDragStateChange(false);
         }),
-    [selected, onSelect, scrollGesture, handle, width, pxPerMs, clip.timelineStartMs, lengthMs, onMove, onTrim, onDragStateChange, edge, offset, stretch]
+    [selected, onSelect, scrollGesture, handle, width, pxPerMs, clip.timelineStartMs, lengthMs, onMove, onTrim, onDragStateChange, edge, offset, leftStretch, rightStretch]
   );
 
   /*
@@ -171,13 +174,13 @@ export function TimelineClip({
           if (!selected) onSelect();
           onDragStateChange(true);
         })
-        .onUpdate((event) => stretch.setValue(event.translationX))
+        .onUpdate((event) => rightStretch.setValue(event.translationX))
         .onEnd((event) => onTrim('right', clip.timelineStartMs + lengthMs + event.translationX / pxPerMs))
         .onFinalize(() => {
-          stretch.setValue(0);
+          rightStretch.setValue(0);
           onDragStateChange(false);
         }),
-    [selected, onSelect, scrollGesture, pxPerMs, clip.timelineStartMs, lengthMs, onTrim, onDragStateChange, edge, stretch]
+    [selected, onSelect, scrollGesture, pxPerMs, clip.timelineStartMs, lengthMs, onTrim, onDragStateChange, edge, rightStretch]
   );
 
   // Exclusive lets the delayed recogniser win only after the hold has
@@ -185,9 +188,12 @@ export function TimelineClip({
   // starts immediately rather than waiting out the hold.
   const gesture = useMemo(() => Gesture.Exclusive(longPressTrim, Gesture.Race(pan, tap)), [longPressTrim, pan, tap]);
 
-  // A left trim moves the visible edge; a right trim only changes the width, so
-  // the preview transform is the same either way and the commit differs.
-  const animated = { transform: [{ translateX: Animated.add(offset, stretch) }] };
+  // The leading edge owns position. A right trim changes only the width, so
+  // extending a clip never makes its start—or the whole clip—follow the finger.
+  const animated = {
+    transform: [{ translateX: Animated.add(offset, leftStretch) }],
+    width: Animated.add(Animated.add(width, rightStretch), Animated.multiply(leftStretch, -1))
+  };
 
   return (
     <GestureDetector gesture={gesture}>
