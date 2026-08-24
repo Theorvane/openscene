@@ -130,8 +130,8 @@ describe('the OpenPanel client', () => {
     expect(client).toMatch(/if \(!analyticsEnabled\(\)\) return;/);
     // Same lesson as the ad SDK: a top-level import of something the runtime
     // cannot provide takes the app down before a screen mounts.
-    expect(client).not.toMatch(/^import .*from '@openpanel\/react-native';$/m);
-    expect(client).toContain("require('@openpanel/react-native')");
+    expect(client).not.toMatch(/^import .*from '@openpanel\/sdk';$/m);
+    expect(client).toContain("require('@openpanel/sdk')");
     expect(client).toContain("client.api.addHeader('Origin', OPENPANEL_ORIGIN)");
     expect(client).toContain('filter: filterOpenPanelPayload');
   });

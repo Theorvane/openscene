@@ -68,14 +68,16 @@ let client: Client | null | undefined;
 /**
  * Loaded lazily, like the ad SDK and for the same reason: a top-level import of
  * something the runtime cannot provide takes the app down while the module
- * graph is still loading, before a screen ever mounts.
+ * graph is still loading, before a screen ever mounts. The platform-neutral
+ * core client is intentional: the React Native adapter currently calls an Expo
+ * API that is absent from this app’s Expo 57 runtime.
  */
 function load(): Client | null {
   if (client !== undefined) return client;
   client = null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const required: unknown = require('@openpanel/react-native');
+    const required: unknown = require('@openpanel/sdk');
     const candidate = (required as { OpenPanel?: new (o: unknown) => Client }).OpenPanel;
     if (typeof candidate === 'function') {
       // No `clientSecret`. It exists in the options and is for server-to-server
@@ -89,8 +91,7 @@ function load(): Client | null {
       client = new candidate({
         clientId: OPENPANEL_CLIENT_ID,
         apiUrl: OPENPANEL_API_URL,
-        // The SDK adds device details after track() receives a sanitised event.
-        // Filter its final payload too, before it can be serialised.
+        // Filter the payload at the SDK send seam too, before it is serialised.
         filter: filterOpenPanelPayload
       });
       // OpenPanel's self-hosted CORS policy admits the native app through this
