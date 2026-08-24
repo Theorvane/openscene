@@ -7,6 +7,7 @@ import {
   OPENPANEL_API_URL,
   OPENPANEL_CLIENT_ID,
   OPENPANEL_ORIGIN,
+  filterOpenPanelPayload,
   isAnalyticsEvent,
   sanitiseProperties
 } from '../mobile/src/lib/analytics';
@@ -45,6 +46,27 @@ describe('analytics properties', () => {
     for (const key of ['prompt', 'fileName', 'projectTitle', 'apiKey', 'sourceUri', 'userEmail', 'file_path']) {
       expect(sanitiseProperties({ [key]: 1 }), `${key} must not be reportable`).toEqual({});
     }
+  });
+
+  it('filters SDK-added globals at the final send boundary', () => {
+    const outbound: { type: string; payload: { name: string; properties: Record<string, unknown> } } = {
+      type: 'track',
+      payload: {
+        name: 'app_opened',
+        properties: {
+          seconds: 7,
+          enabled: true,
+          __version: '0.5.0',
+          __buildNumber: '5',
+          __referrer: 'utm_campaign=free-text',
+          __path: '/editor'
+        }
+      }
+    };
+
+    expect(filterOpenPanelPayload(outbound)).toBe(true);
+    expect(outbound.payload.properties).toEqual({ seconds: 7, enabled: true });
+    expect(filterOpenPanelPayload({ type: 'identify', payload: {} })).toBe(false);
   });
 
   it('matches whole words, so an innocent name survives', () => {
@@ -111,6 +133,7 @@ describe('the OpenPanel client', () => {
     expect(client).not.toMatch(/^import .*from '@openpanel\/react-native';$/m);
     expect(client).toContain("require('@openpanel/react-native')");
     expect(client).toContain("client.api.addHeader('Origin', OPENPANEL_ORIGIN)");
+    expect(client).toContain('filter: filterOpenPanelPayload');
   });
 
   it('treats an unreadable preference as off, and an absent one as on', async () => {

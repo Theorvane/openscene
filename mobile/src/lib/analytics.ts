@@ -167,3 +167,23 @@ export function sanitiseProperties(properties: AnalyticsProperties): AnalyticsPr
 export function isAnalyticsEvent(name: string): name is AnalyticsEvent {
   return (ANALYTICS_EVENTS as readonly string[]).includes(name);
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The final privacy boundary, at the SDK's send seam.
+ *
+ * The React Native OpenPanel adapter adds version, build and Android install
+ * referrer strings after a screen calls track(). They are not part of this
+ * app's event contract, and a referrer can contain arbitrary campaign data.
+ * Mutating the payload here is intentional: this is the SDK's filter callback,
+ * invoked immediately before its core client serialises the event.
+ */
+export function filterOpenPanelPayload(payload: unknown): boolean {
+  if (!isRecord(payload) || payload.type !== 'track' || !isRecord(payload.payload)) return false;
+  const properties = isRecord(payload.payload.properties) ? payload.payload.properties : {};
+  payload.payload.properties = sanitiseProperties(properties as AnalyticsProperties);
+  return true;
+}
