@@ -87,22 +87,29 @@ describe('LevelPlay ad units', () => {
     // statement — and both stores require an ads declaration, so a listing that
     // declares them while the app never mentions them is a mismatch a reviewer
     // can see.
-    const settings = await readFile(new URL('../mobile/src/screens/SettingsScreen.tsx', import.meta.url), 'utf8');
-    expect(settings).toContain('OpenScene is free. Ads pay for it');
+    const settings = await readFile(new URL(`../mobile/src/screens/SettingsScreen.tsx`, import.meta.url), `utf8`);
+    expect(settings).toContain(`OpenScene is free. Ads pay for it`);
     // And the honest half of it: nothing is sold, and the desktop has none.
-    expect(settings).toContain('There is no paid tier');
+    expect(settings).toContain(`There is no paid tier`);
+    expect(settings).toContain(`the desktop app has no ads`);
+  });
 
   it('has the advertising section the published policy still needs', async () => {
     // Publishing is a website change, so the repository keeps the complete
     // policy text and release gate aligned with the app's actual ad setup.
-    const draft = await readFile(new URL('../store/privacy-policy-ads.md', import.meta.url), 'utf8');
-    for (const network of ['Unity LevelPlay', 'Unity Ads', 'AppLovin', 'Meta Audience Network', 'Pangle']) {
-      expect(draft, ` serves ads in this app and belongs in the policy`).toContain(network);
+    const draft = await readFile(new URL(`../store/privacy-policy-ads.md`, import.meta.url), `utf8`);
+    for (const network of [`Unity LevelPlay`, `Unity Ads`, `AppLovin`, `Meta Audience Network`, `Pangle`]) {
+      expect(draft, `${network} serves ads in this app and belongs in the policy`).toContain(network);
     }
-    expect(draft).toContain('non-personalised');
-    expect(draft).toContain('do not sell or share');
-    expect(draft).toContain('App Tracking Transparency is not implemented');
-    expect(draft).toContain('
+    expect(draft).toContain(`non-personalised`);
+    expect(draft).toContain(`do not sell or share`);
+    expect(draft).toContain(`App Tracking Transparency is not implemented`);
+    expect(draft).toContain(`## 한국어`);
+
+    const releasing = await readFile(new URL(`../mobile/RELEASING.md`, import.meta.url), `utf8`);
+    expect(releasing).toContain(`store/privacy-policy-ads.md`);
+  });
+
   it('names the publisher, and takes the version from the config', async () => {
     // An app carrying ads is a published thing rather than a personal build, and
     // both the stores and the mediation account expect a publisher a user can
