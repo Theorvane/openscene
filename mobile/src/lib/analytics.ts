@@ -25,6 +25,9 @@ export const OPENPANEL_CLIENT_ID = '329420cf-2ae4-495f-a35b-3cae1412110f';
  */
 export const OPENPANEL_API_URL = 'https://panel.sanhouse.kr/api';
 
+/** Native apps have no browser Origin; this is the allow-listed app identity. */
+export const OPENPANEL_ORIGIN = 'app://openscene';
+
 /**
  * Every event the app may send, named here rather than at the call sites.
  *
