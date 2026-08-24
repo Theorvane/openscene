@@ -1,6 +1,6 @@
-Editing is easier on a phone.
+Timeline editing feels more natural.
 
-• Long-press any timeline clip, then drag left or right to change its length — no need to hit a narrow edge
-• Timeline activity reporting is more reliable, while still sending only anonymous, allow-listed usage counts
+• Long-press a clip, then drag left or right to change its length
+• Extending a clip keeps its start fixed and grows only its trailing edge
 
-Fixes: improved delivery of anonymous session activity to the publisher's self-hosted analytics service.
+Fixes: the whole clip no longer moves while you extend its length.
