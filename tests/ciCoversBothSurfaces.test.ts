@@ -94,6 +94,13 @@ describe('the iOS signing step', () => {
     expect(yaml).not.toContain('PROVISIONING_PROFILE_SPECIFIER="$APP_STORE_PROFILE_NAME"');
   });
 
+  it('does not force a full CocoaPods CDN refresh, and retries transient failures', async () => {
+    const yaml = await read();
+    expect(yaml).not.toContain('pod install --repo-update');
+    expect(yaml).toContain('for attempt in 1 2 3');
+    expect(yaml).toContain('if pod install; then exit 0; fi');
+  });
+
   it('checks the profile covers this app before spending an archive on it', async () => {
     // A mismatch used to cost a pod install and a full archive before xcodebuild
     // mentioned it.

@@ -123,7 +123,15 @@ jobs:
 
       - name: Install CocoaPods dependencies
         working-directory: mobile/ios
-        run: pod install --repo-update
+        run: |
+          # A clean runner has no lockfile to reuse, but forcing a complete CDN
+          # refresh fetches every historical adapter spec and regularly hits 429.
+          # Resolve only this project, retrying the provider transiently instead.
+          for attempt in 1 2 3; do
+            if pod install; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep "$((attempt * 20))"
+          done
 
       - name: Archive the App Store build
         working-directory: mobile
