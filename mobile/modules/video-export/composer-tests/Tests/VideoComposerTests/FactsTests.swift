@@ -84,7 +84,8 @@ final class FactsTests: XCTestCase {
     // Stored landscape with a quarter turn. Reporting the stored size would
     // call every upright phone export the wrong shape.
     let url = try writeClip(seconds: 1, size: CGSize(width: 128, height: 64), rotated: true)
-    let facts = try XCTUnwrap(await VideoFacts.describe(uri: url.absoluteString))
+    let measured = await VideoFacts.describe(uri: url.absoluteString)
+    let facts = try XCTUnwrap(measured)
 
     XCTAssertEqual(facts.widthPx, 64)
     XCTAssertEqual(facts.heightPx, 128)
