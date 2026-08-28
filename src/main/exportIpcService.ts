@@ -9,6 +9,7 @@ import { parseExportJobActionInput, parseStartExportJobInput } from '../shared/e
 import type { LocalProjectSnapshot } from '../shared/timelineTypes';
 import type { OpenedAssetPlaybackSource } from './assetLibraryStore';
 import { ExportAssetStagingError, removeExportStaging, stageExportAssets, type StagedExportAssets } from './exportAssetStaging';
+import { preflightExport, preflightSummary } from '../shared/exportPreflight';
 import { reviewExport, type ExportPromise } from '../shared/exportReview';
 import { measureExportedFile } from './exportMeasurement';
 import { discoverFfmpeg, type FfmpegDiscoveryResult } from './ffmpegDiscovery';
@@ -99,6 +100,22 @@ export class ExportIpcService {
       const project = await this.dependencies.projects.open(input.projectId);
       if (project === null) {
         return fail('PROJECT_NOT_FOUND', 'The project to export was not found.');
+      }
+      /*
+        Whether this cut can be rendered at all, before anything is rendered.
+
+        FFmpeg composites layers and holds stills, so the only things this can
+        find on the desktop are the cut's own faults — media the project no
+        longer has, a clip running past the end of its file — and those used to
+        surface as a staging failure or as a frozen tail nobody was told about.
+      */
+      const problems = preflightExport({
+        timeline: project.timeline,
+        assets: project.assets,
+        capabilities: { stills: true, layeredVideo: true }
+      });
+      if (problems.length > 0) {
+        return fail('EXPORT_REFUSED', preflightSummary(problems));
       }
       const job = this.dependencies.jobs.create(project.id);
       createdJob = job;

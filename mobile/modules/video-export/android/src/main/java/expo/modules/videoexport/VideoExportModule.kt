@@ -94,6 +94,16 @@ class VideoExportModule : Module() {
      */
     Property("supportsStills") { true }
 
+    /**
+     * Whether two clips covering the same moment are composited.
+     *
+     * False, and said out loud rather than discovered: Media3 builds one
+     * sequence per layer here, and measured on a device the export came back as
+     * the primary sequence alone — the other layer nowhere. Reported so the cut
+     * can be refused before the render instead of losing a layer inside it.
+     */
+    Property("supportsLayeredVideo") { false }
+
     AsyncFunction("exportComposition") { request: Map<String, Any?> ->
       export(request)
     }

@@ -82,3 +82,19 @@ describe('the exported file name', () => {
     expect(kotlin).toMatch(/openvideo-export-[\s\S]{0,80}UUID\.randomUUID/);
   });
 });
+
+/**
+ * What each renderer says it can do.
+ *
+ * The shared preflight refuses a cut a renderer cannot make, and it decides
+ * from these. A module that stops reporting one silently turns a refusal into
+ * a dropped layer inside a finished export, which is where this came from.
+ */
+describe('the renderers report their own limits', () => {
+  it.each([
+    ['modules/video-export/ios/VideoExportModule.swift', 'supportsLayeredVideo") { true }'],
+    ['modules/video-export/android/src/main/java/expo/modules/videoexport/VideoExportModule.kt', 'supportsLayeredVideo") { false }']
+  ])('%s says whether it composites layers', async (path, expected) => {
+    expect(await read(path)).toContain(expected);
+  });
+});

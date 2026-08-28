@@ -228,9 +228,13 @@ describe('mobile touch and keyboard source contract', () => {
     expect(edit).toContain("const heldFrame = visible === null || visibleAsset?.kind === 'image';");
 
     // Exporting a still through a renderer that cannot hold one would drop it to
-    // a single frame, so it is refused with the reason instead.
+    // a single frame, so it is refused with the reason instead. The rule now
+    // lives in the shared preflight, asked before the render rather than after
+    // the plan is built — what this pins is that this surface still asks it,
+    // with what this build actually reports it can do.
     const composition = await readSource('src/lib/exportComposition.ts');
-    expect(composition).toContain('plan.stillSourceIndexes.length > 0 && !areStillsRenderable');
+    expect(composition).toContain('preflightExport({');
+    expect(composition).toContain('stills: areStillsRenderable');
     expect(await readSource('modules/video-export/index.ts')).toContain('export const areStillsRenderable');
   });
 

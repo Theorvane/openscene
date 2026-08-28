@@ -81,6 +81,16 @@ public final class VideoExportModule: Module {
     */
     Property("supportsStills") { true }
 
+    /*
+      Whether two clips covering the same moment are composited.
+
+      True here: the composer gives every segment its own track and stacks them
+      with layer instructions, which is what opacity and cross-dissolves are
+      already built on. Android reports false, and the shared preflight refuses
+      the cut there rather than losing a layer inside the export.
+    */
+    Property("supportsLayeredVideo") { true }
+
     AsyncFunction("exportComposition") { (request: ExportRequest) -> [String: Any] in
       try await Self.export(request)
     }

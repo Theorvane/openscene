@@ -1,10 +1,11 @@
+import { preflightExport, preflightSummary } from '@openvideo/shared/exportPreflight';
 import { reviewExport, type ExportReview } from '@openvideo/shared/exportReview';
 import { outputFrameFor, type FramePreference } from '@openvideo/shared/outputFrame';
 import { buildCompositionPlan, CompositionPlanError } from '@openvideo/shared/videoCompositionPlan';
 import type { CompositionSegment } from '@openvideo/shared/videoCompositionPlan';
 import type { TimelineDocument } from '@openvideo/shared/timelineTypes';
 import * as Sharing from 'expo-sharing';
-import VideoExport, { areStillsRenderable } from '../../modules/video-export';
+import VideoExport, { areLayersComposited, areStillsRenderable } from '../../modules/video-export';
 import type { EditorAsset } from './editorState';
 
 /**
@@ -59,6 +60,23 @@ export async function exportTimeline(input: {
   readonly frame?: FramePreference;
   readonly frameRate?: number;
 }): Promise<ExportOutcome> {
+  /*
+    Whether this renderer can make this cut, before anything is rendered.
+
+    The stills rule used to live below, after the plan was built, and the
+    layering one lived inside the Android renderer where it surfaced as a coded
+    error partway through an export. They are the same question, so they are
+    asked here, once, against what this build actually reports it can do.
+  */
+  const problems = preflightExport({
+    timeline: input.timeline,
+    assets: input.assets,
+    capabilities: { stills: areStillsRenderable, layeredVideo: areLayersComposited }
+  });
+  if (problems.length > 0) {
+    return { ok: false, message: preflightSummary(problems) };
+  }
+
   let plan;
   try {
     plan = buildCompositionPlan({
@@ -80,18 +98,6 @@ export async function exportTimeline(input: {
     return {
       ok: false,
       message: error instanceof CompositionPlanError ? error.message : 'The timeline could not be prepared for export.'
-    };
-  }
-
-  // A renderer that cannot hold a still would open it as a movie and contribute
-  // a single frame, so the export would be shorter than the timeline with
-  // nothing to say why. Refusing names the limit instead.
-  if (plan.stillSourceIndexes.length > 0 && !areStillsRenderable) {
-    return {
-      ok: false,
-      message:
-        `This build cannot render stills — ${plan.stillSourceIndexes.length} on the timeline. ` +
-        'Remove them, or rebuild the development client once still rendering lands.'
     };
   }
 

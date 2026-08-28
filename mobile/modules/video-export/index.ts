@@ -79,6 +79,14 @@ type VideoExportModuleType = {
    * before stills existed means.
    */
   readonly supportsStills?: boolean;
+  /**
+   * Whether two clips covering the same moment are composited rather than
+   * queued one after the other.
+   *
+   * Absent means no, which is what every build made before this was asked
+   * means — and no is also the honest answer for the Android renderer.
+   */
+  readonly supportsLayeredVideo?: boolean;
   exportComposition(request: NativeExportRequest): Promise<NativeExportResult>;
   /** Negative `atMs` means the last frame. */
   extractFrame(uri: string, atMs: number): Promise<NativeFrame>;
@@ -115,6 +123,14 @@ export const isExportAvailable = nativeModule !== null;
  * get wrong.
  */
 export const areStillsRenderable = nativeModule?.supportsStills === true;
+
+/**
+ * Reported by the renderer rather than assumed from the platform, for the same
+ * reason stills are: what a build can do is a fact about that build. False on
+ * Android, where a second sequence is not drawn, and the shared preflight
+ * refuses the cut before the export rather than dropping a layer inside it.
+ */
+export const areLayersComposited = nativeModule?.supportsLayeredVideo === true;
 
 /**
  * Frame extraction landed after export, so a dev client built before it has the

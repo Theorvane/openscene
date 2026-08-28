@@ -13,6 +13,8 @@ export type AppErrorCode =
   | 'INVALID_INPUT'
   | 'PERMISSION_DENIED'
   | 'RECORDER_UNAVAILABLE' | 'EXPORT_UNAVAILABLE'
+  /* The cut itself cannot be rendered, as opposed to the runtime being absent. */
+  | 'EXPORT_REFUSED'
   | 'SESSION_NOT_FOUND'
   | 'SESSION_CLOSED'
   | 'FILE_WRITE_FAILED'
