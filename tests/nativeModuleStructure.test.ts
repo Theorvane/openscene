@@ -35,6 +35,7 @@ describe('the native sources are structurally whole', () => {
   it.each([
     ['modules/video-export/ios/VideoExportModule.swift'],
     ['modules/video-export/ios/VideoComposer.swift'],
+    ['modules/video-export/ios/VideoFacts.swift'],
     ['modules/video-export/android/src/main/java/expo/modules/videoexport/VideoExportModule.kt']
   ])('every block in %s closes', async (path) => {
     const { final, wentNegativeAt } = braceDepth(await read(path));

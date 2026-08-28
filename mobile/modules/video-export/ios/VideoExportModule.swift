@@ -92,6 +92,17 @@ public final class VideoExportModule: Module {
     AsyncFunction("readAudioPeaks") { (uri: String, startMs: Double, endMs: Double, bars: Int) -> [Double] in
       await AudioPeaks.read(uri: uri, startMs: startMs, endMs: endMs, bars: bars)
     }
+
+    /*
+      What a finished file actually is, so an export can be checked against the
+      cut it came from rather than trusted because it was written.
+
+      Nothing measured comes back as nothing, and the shared rule reports that
+      as unchecked — a file this cannot open is not thereby a bad file.
+    */
+    AsyncFunction("describeVideo") { (uri: String) -> [String: Any]? in
+      await VideoFacts.describe(uri: uri)?.dictionary
+    }
   }
 
   /**

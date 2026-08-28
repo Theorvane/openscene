@@ -105,6 +105,14 @@ class VideoExportModule : Module() {
     AsyncFunction("readAudioPeaks") { uri: String, startMs: Double, endMs: Double, bars: Int ->
       readAudioPeaks(uri, startMs, endMs, bars)
     }
+
+    /**
+     * What a finished file actually is, so an export can be checked against the
+     * cut it came from rather than trusted because it was written.
+     */
+    AsyncFunction("describeVideo") { uri: String ->
+      describeVideo(uri)
+    }
   }
 
   private data class Segment(
@@ -765,6 +773,43 @@ class VideoExportModule : Module() {
         // Already gone.
       }
       extractor.release()
+    }
+  }
+
+  /**
+   * Size, length, frame rate and whether there is any sound — read from the
+   * file, not from the plan that asked for it.
+   *
+   * Rotation is applied to the reported size: a portrait recording is stored
+   * landscape with a rotation of 90, and a check that ignored that would call
+   * every phone export the wrong shape.
+   */
+  private fun describeVideo(uri: String): Map<String, Any> {
+    val retriever = MediaMetadataRetriever()
+    try {
+      retriever.setDataSource(uri.removePrefix("file://"))
+      fun metadata(key: Int): String? = retriever.extractMetadata(key)
+      val storedWidth = metadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+      val storedHeight = metadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+      val rotation = metadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+      val turned = rotation == 90 || rotation == 270
+      val durationMs = metadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+      val frameCount = metadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_FRAME_COUNT)?.toLongOrNull()
+      val described = mutableMapOf<String, Any>(
+        "widthPx" to (if (turned) storedHeight else storedWidth).toDouble(),
+        "heightPx" to (if (turned) storedWidth else storedHeight).toDouble(),
+        "durationMs" to durationMs.toDouble(),
+        "hasSoundTrack" to (metadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) == "yes")
+      )
+      // Frames over seconds, because the container reports a count and a
+      // length and no rate. Left out entirely when either is missing: the
+      // review says nothing about a rate it was not told.
+      if (frameCount != null && frameCount > 0 && durationMs > 0) {
+        described["frameRate"] = frameCount.toDouble() * 1000.0 / durationMs.toDouble()
+      }
+      return described
+    } finally {
+      retriever.release()
     }
   }
 

@@ -1,3 +1,4 @@
+import { reviewExport, type ExportReview } from '@openvideo/shared/exportReview';
 import { outputFrameFor, type FramePreference } from '@openvideo/shared/outputFrame';
 import { buildCompositionPlan, CompositionPlanError } from '@openvideo/shared/videoCompositionPlan';
 import type { CompositionSegment } from '@openvideo/shared/videoCompositionPlan';
@@ -27,7 +28,19 @@ function loadMediaLibrary(): typeof import('expo-media-library') | null {
 }
 
 export type ExportOutcome =
-  | { readonly ok: true; readonly uri: string }
+  | {
+      readonly ok: true;
+      readonly uri: string;
+      /**
+       * What the finished file turned out to be, read back off the file.
+       *
+       * A written file and a renderer that did not throw is what every
+       * truncated, silent or wrongly shaped export on this platform also
+       * produced. An older build that cannot measure reports unchecked, which
+       * is not the same as passing.
+       */
+      readonly review: ExportReview;
+    }
   | { readonly ok: false; readonly message: string };
 
 /**
@@ -163,7 +176,27 @@ export async function exportTimeline(input: {
         positionY: title.positionY
       }))
     });
-    return { ok: true, uri: result.uri };
+    /*
+      Read the file back before calling it done.
+
+      The plan already says what the file is supposed to be, so checking costs
+      one metadata read — and this is the check that would have caught the cut
+      that came out at a third of its length with a title on it.
+    */
+    const review = reviewExport(
+      {
+        widthPx: plan.width,
+        heightPx: plan.height,
+        frameRate: plan.frameRate,
+        durationMs: plan.durationMs,
+        // Placed sound only. A video clip's own audio is decided natively per
+        // file, so promising it here would raise a fault against a recording
+        // that is simply silent.
+        hasSound: plan.audioSegments.length > 0
+      },
+      await VideoExport.describeVideo(result.uri)
+    );
+    return { ok: true, uri: result.uri, review };
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Export failed.' };
   }

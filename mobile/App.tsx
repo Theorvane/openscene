@@ -17,6 +17,7 @@ import { SettingsScreen } from './src/screens/SettingsScreen';
 import { VoiceScreen } from './src/screens/VoiceScreen';
 import { assetUri, readProject } from './src/lib/projectStore';
 import { useProject } from './src/lib/useProject';
+import { exportReviewSummary } from '@openvideo/shared/exportReview';
 import { deliverExport, exportTimeline } from './src/lib/exportComposition';
 import { prepareExportAd, showExportAd } from './src/lib/exportAd';
 import { track } from './src/lib/analyticsClient';
@@ -56,7 +57,16 @@ const PROJECT_TABS = [
 
 type ProjectTab = (typeof PROJECT_TABS)[number]['id'];
 type Route = { readonly name: 'projects' } | { readonly name: 'project'; readonly projectId: string };
-type ExportState = { kind: 'idle' } | { kind: 'running' } | { kind: 'done'; where: string } | { kind: 'failed'; message: string };
+type ExportState =
+  | { kind: 'idle' }
+  | { kind: 'running' }
+  /**
+   * `wrong` is what the finished file measures when it does not match the cut.
+   * The file did save, so this is not a failure — but it is not the quiet
+   * "Saved" that a truncated or silent export used to get either.
+   */
+  | { kind: 'done'; where: string; wrong?: string }
+  | { kind: 'failed'; message: string };
 
 export default function App() {
   return (
@@ -210,9 +220,18 @@ function Shell() {
       return;
     }
     const delivery = await deliverExport(rendered.uri);
+    // What the file itself measures. Only a mismatch is said out loud: an
+    // export nobody could measure, on a build without the reader, is not a
+    // finding to put in front of someone.
+    const wrong =
+      rendered.review.checked && !rendered.review.ok ? exportReviewSummary(rendered.review) : undefined;
     setExportState(
       delivery.ok
-        ? { kind: 'done', where: delivery.how === 'photos' ? 'your photo library' : 'the app you chose' }
+        ? {
+            kind: 'done',
+            where: delivery.how === 'photos' ? 'your photo library' : 'the app you chose',
+            ...(wrong === undefined ? {} : { wrong })
+          }
         : { kind: 'failed', message: delivery.message }
     );
     /*
@@ -230,7 +249,11 @@ function Shell() {
     track(delivery.ok ? 'export_finished' : 'export_failed', {
       seconds: pictureSeconds,
       tookMs: Date.now() - startedAt,
-      toPhotos: delivery.ok ? delivery.how === 'photos' : null
+      toPhotos: delivery.ok ? delivery.how === 'photos' : null,
+      // Whether the file matched the cut, or null where nothing could measure
+      // it. A renderer that starts shipping mismatches is worth seeing in the
+      // aggregate rather than one bug report at a time.
+      matchedCut: rendered.review.checked ? rendered.review.ok : null
     });
     void showExportAd(delivery.ok);
   };
@@ -294,10 +317,22 @@ function Shell() {
           accessibilityRole="button"
           accessibilityLabel="Dismiss export result"
           onPress={() => setExportState({ kind: 'idle' })}
-          style={press([styles.banner, exportState.kind === 'failed' ? styles.bannerFail : styles.bannerOk])}
+          style={press([
+            styles.banner,
+            exportState.kind === 'failed' || exportState.wrong !== undefined ? styles.bannerFail : styles.bannerOk
+          ])}
         >
-          <Text style={[styles.bannerText, exportState.kind === 'failed' && styles.bannerTextFail]}>
-            {exportState.kind === 'failed' ? exportState.message : `Saved to ${exportState.where}.`}
+          <Text
+            style={[
+              styles.bannerText,
+              (exportState.kind === 'failed' || exportState.wrong !== undefined) && styles.bannerTextFail
+            ]}
+          >
+            {exportState.kind === 'failed'
+              ? exportState.message
+              : exportState.wrong === undefined
+                ? `Saved to ${exportState.where}.`
+                : `Saved to ${exportState.where}, but it does not match the cut. ${exportState.wrong}`}
           </Text>
           <Text style={styles.bannerDismiss}>Dismiss</Text>
         </Pressable>

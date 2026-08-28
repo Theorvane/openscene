@@ -97,4 +97,40 @@ describe('renderer export UI state', () => {
       tone: 'danger'
     });
   });
+
+  it('does not call an export complete when the file does not match the cut', () => {
+    const mismatched = jobWithState({
+      kind: 'completed',
+      completedAt: '2026-07-22T00:00:09.000Z',
+      fileName: 'cut.mp4',
+      fileSizeBytes: 2_400_000,
+      review: {
+        checked: true,
+        ok: false,
+        problems: [{ kind: 'length', detail: 'The cut is 6.60s but the file is 2.47s — shorter than it should be.' }]
+      }
+    });
+    const view = getExportStatusView({ hasProject: true, hasUnsavedTimeline: false, job: mismatched, isStarting: false });
+    expect(view).toMatchObject({ title: 'Export does not match the cut', tone: 'danger' });
+    expect(view.detail).toContain('2.47s');
+
+    // Opening it is still allowed: seeing the wrong file is how someone
+    // works out what went wrong.
+    expect(
+      getExportActionState({ hasProject: true, hasUnsavedTimeline: false, job: mismatched, isStarting: false })
+    ).toMatchObject({ canOpen: true, canReveal: true });
+  });
+
+  it('says an export went unchecked rather than quietly passing it', () => {
+    const unchecked = jobWithState({
+      kind: 'completed',
+      completedAt: '2026-07-22T00:00:09.000Z',
+      fileName: 'cut.mp4',
+      fileSizeBytes: 2_400_000,
+      review: { checked: false, why: 'The finished file could not be measured on this machine.' }
+    });
+    const view = getExportStatusView({ hasProject: true, hasUnsavedTimeline: false, job: unchecked, isStarting: false });
+    expect(view).toMatchObject({ title: 'Export complete', tone: 'success' });
+    expect(view.detail).toContain('could not be measured');
+  });
 });

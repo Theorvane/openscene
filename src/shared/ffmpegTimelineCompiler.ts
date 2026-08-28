@@ -57,6 +57,14 @@ export type CompileFfmpegTimelineInput = {
 export type CompiledFfmpegTimeline = {
   readonly args: readonly string[];
   readonly durationMs: number;
+  /**
+   * Whether this graph carries any sound at all.
+   *
+   * Reported rather than inferred later: only the compiler knows whether
+   * anything survived to `[audio-out]`, and the file is checked afterwards
+   * against what was actually asked for.
+   */
+  readonly hasSound: boolean;
 };
 
 export class FfmpegTimelineError extends Error {
@@ -434,5 +442,5 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
     '-t', seconds(durationMs),
     input.outputPath
   );
-  return { args, durationMs };
+  return { args, durationMs, hasSound: audioLabels.length > 0 };
 }

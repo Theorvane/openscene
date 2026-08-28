@@ -9,6 +9,8 @@ import { parseExportJobActionInput, parseStartExportJobInput } from '../shared/e
 import type { LocalProjectSnapshot } from '../shared/timelineTypes';
 import type { OpenedAssetPlaybackSource } from './assetLibraryStore';
 import { ExportAssetStagingError, removeExportStaging, stageExportAssets, type StagedExportAssets } from './exportAssetStaging';
+import { reviewExport, type ExportPromise } from '../shared/exportReview';
+import { measureExportedFile } from './exportMeasurement';
 import { discoverFfmpeg, type FfmpegDiscoveryResult } from './ffmpegDiscovery';
 import { startFfmpegExportProcess, type FfmpegExecution, type StartFfmpegExportProcessInput } from './ffmpegExportProcess';
 import { compileFfmpegTimeline, FfmpegTimelineError } from './ffmpegTimelineCompiler';
@@ -42,6 +44,8 @@ type PreparedExport = {
   readonly args: readonly string[];
   readonly durationMs: number;
   readonly stagingDirectory: string;
+  /** What this run promises the file will be, to be checked against it after. */
+  readonly promise: ExportPromise;
 };
 
 type PrepareExportInput = {
@@ -235,6 +239,8 @@ export class ExportIpcService {
 
   private async prepareExport(input: PrepareExportInput): Promise<PreparedExport> {
     const outputPath = await prepareExportOutputPath(this.dependencies.exportsRoot, input.jobId);
+    const dimensions = this.outputDimensions(input.request, input.project);
+    const frameRate = input.request.frameRate ?? EXPORT_DEFAULTS.frameRate;
     let staged: StagedExportAssets | null = null;
     try {
       staged = await stageExportAssets({
@@ -266,10 +272,26 @@ export class ExportIpcService {
           ? { titleFontPath: await this.titleFont(input.executablePath) }
           : {}),
         outputPath,
-        ...this.outputDimensions(input.request, input.project),
-        frameRate: input.request.frameRate ?? EXPORT_DEFAULTS.frameRate
+        ...dimensions,
+        frameRate
       });
-      return { executablePath: input.executablePath, outputPath, stagingDirectory: staged.directory, ...compiled };
+      return {
+        executablePath: input.executablePath,
+        outputPath,
+        stagingDirectory: staged.directory,
+        args: compiled.args,
+        durationMs: compiled.durationMs,
+        promise: {
+          widthPx: dimensions.width,
+          heightPx: dimensions.height,
+          frameRate,
+          durationMs: compiled.durationMs,
+          // What the graph actually carries, not what the timeline looks like
+          // it should: a video clip whose source turned out to be silent maps
+          // no audio, and a file with no sound is right in that case.
+          hasSound: compiled.hasSound
+        }
+      };
     } catch (error: unknown) {
       await Promise.all([
         removeExportOutput(outputPath),
@@ -320,7 +342,19 @@ export class ExportIpcService {
       }
       const output = await validateExportOutput(this.dependencies.exportsRoot, prepared.outputPath);
       this.completedOutputs.set(jobId, prepared.outputPath);
-      this.dependencies.jobs.markCompleted(jobId, output.fileName, output.fileSizeBytes);
+      /*
+        Read the file back before calling it done.
+
+        A zero exit and a file on disk is what every truncated, silent or
+        dropped-layer export this project has shipped also produced. The file
+        is measured and compared with what this run promised; a machine that
+        cannot measure says so rather than passing it.
+      */
+      const review = reviewExport(
+        prepared.promise,
+        await measureExportedFile({ ffmpegPath: prepared.executablePath, filePath: prepared.outputPath })
+      );
+      this.dependencies.jobs.markCompleted(jobId, output.fileName, output.fileSizeBytes, review);
     } catch (error: unknown) {
       if (this.dependencies.jobs.get(jobId)?.state.kind === 'running') {
         const reason = error instanceof Error ? exportFailureReason(error) : 'The local FFmpeg export failed.';

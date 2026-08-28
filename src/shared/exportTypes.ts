@@ -1,3 +1,5 @@
+import type { ExportReview } from './exportReview';
+
 export const EXPORT_DEFAULTS = {
   width: 1920,
   height: 1080,
@@ -34,6 +36,13 @@ export type ExportJobState =
       readonly completedAt: string;
       readonly fileName: string;
       readonly fileSizeBytes: number;
+      /**
+       * What the finished file turned out to be, read back off the file.
+       *
+       * Optional because a machine without FFprobe cannot answer, and an
+       * unchecked export is not a failed one — see `reviewExport`.
+       */
+      readonly review?: ExportReview;
     }
   | { readonly kind: 'cancelled'; readonly cancelledAt: string }
   | { readonly kind: 'failed'; readonly failedAt: string; readonly reason: string };

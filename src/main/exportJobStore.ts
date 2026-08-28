@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import type { ExportReview } from '../shared/exportReview';
 import type { ExportJobState, ExportProgress, LocalExportJob } from '../shared/exportTypes';
 
 type ExportJobStoreDependencies = {
@@ -62,13 +63,16 @@ export class ExportJobStore {
     return this.replace(job, { ...job.state, progress });
   }
 
-  markCompleted(jobId: string, fileName: string, fileSizeBytes: number): LocalExportJob {
+  markCompleted(jobId: string, fileName: string, fileSizeBytes: number, review?: ExportReview): LocalExportJob {
     const job = this.requireState(jobId, ['running']);
     return this.replace(job, {
       kind: 'completed',
       completedAt: this.now().toISOString(),
       fileName,
-      fileSizeBytes
+      fileSizeBytes,
+      // Carried only when there is one: a caller with nothing to report should
+      // not have to invent an "unchecked" review to say so.
+      ...(review === undefined ? {} : { review })
     });
   }
 

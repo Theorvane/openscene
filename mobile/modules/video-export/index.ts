@@ -1,5 +1,7 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
+import type { ExportMeasurement } from '@openvideo/shared/exportReview';
+
 /**
  * Renders a composition plan to a file.
  *
@@ -87,6 +89,13 @@ type VideoExportModuleType = {
    * before waveforms existed rather than an error anyone can act on.
    */
   readAudioPeaks(uri: string, startMs: number, endMs: number, bars: number): Promise<number[]>;
+  /**
+   * What a finished file measures, for checking an export against the cut.
+   *
+   * Null when the file will not open, which the shared review reports as
+   * unchecked rather than as a fault.
+   */
+  describeVideo(uri: string): Promise<ExportMeasurement | null>;
 };
 
 /**
@@ -131,6 +140,19 @@ export default {
       throw new Error('This build cannot read frames out of a clip. Rebuild the development client.');
     }
     return nativeModule.extractFrame(uri, atMs);
+  },
+  /**
+   * Null on a build made before the file was ever read back, which is a
+   * missing check rather than a broken export — see `reviewExport`.
+   */
+  async describeVideo(uri: string): Promise<ExportMeasurement | null> {
+    if (nativeModule === null || typeof nativeModule.describeVideo !== 'function') return null;
+    try {
+      return await nativeModule.describeVideo(uri);
+    } catch {
+      // A file the platform will not open is unchecked, not condemned.
+      return null;
+    }
   },
   async readAudioPeaks(uri: string, startMs: number, endMs: number, bars: number): Promise<number[]> {
     // Empty rather than an error: a build without the reader draws the clip the

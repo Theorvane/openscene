@@ -1,3 +1,4 @@
+import { exportReviewSummary } from '../../../shared/exportReview';
 import type { LocalExportJob } from '../../../shared/exportTypes';
 
 type StatusTone = 'neutral' | 'success' | 'warning' | 'danger';
@@ -126,13 +127,30 @@ export function getExportStatusView(input: ExportUiInput): ExportStatusView {
         tone: 'warning'
       };
     }
-    case 'completed':
+    case 'completed': {
+      /*
+        A finished file that does not match the cut is not a success with a
+        note attached. Every truncated or silent export this project has
+        shipped also ended with a written file and a zero exit, so what the
+        file measures leads here rather than trailing the size.
+      */
+      const review = input.job.state.review;
+      const ready = `${input.job.state.fileName} is ready. Size: ${formatExportBytes(input.job.state.fileSizeBytes)}.`;
+      if (review !== undefined && review.checked && !review.ok) {
+        return {
+          detail: `${exportReviewSummary(review)} ${ready}`,
+          progressValue: 100,
+          title: 'Export does not match the cut',
+          tone: 'danger'
+        };
+      }
       return {
-        detail: `${input.job.state.fileName} is ready. Size: ${formatExportBytes(input.job.state.fileSizeBytes)}.`,
+        detail: review === undefined || review.checked ? ready : `${ready} ${exportReviewSummary(review)}`,
         progressValue: 100,
         title: 'Export complete',
         tone: 'success'
       };
+    }
     case 'cancelled':
       return {
         detail: 'The local MP4 export was cancelled and the partial output was discarded.',
