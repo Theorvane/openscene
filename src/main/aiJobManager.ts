@@ -12,6 +12,9 @@ import type {
   VideoGenerationRequest
 } from '../shared/providerSeams';
 import { getDefaultDomainModelId, getDomainModel, type AiDomainModelConfig } from '../shared/aiDomainModels';
+import { checkSpend, entryFor } from '../shared/generationSpend';
+import { estimateImageCost, estimateSpeechCost, estimateVideoCost, type CostEstimate } from '../shared/mediaGenerationPricing';
+import { GenerationSpendStore } from './generationSpendStore';
 import { discoverFfmpeg } from './ffmpegDiscovery';
 import type { CredentialStore } from './credentialStore';
 import {
@@ -35,6 +38,57 @@ const videoJobs = new Map<string, VideoGenerationJob>();
 const speechJobs = new Map<string, TextToSpeechJob>();
 const imageJobs = new Map<string, ImageGenerationJob>();
 let activeCredentialStore: CredentialStore | undefined;
+let activeSpendStore: GenerationSpendStore | undefined;
+
+/**
+ * A charge refused before it was made.
+ *
+ * Its own type because the callers have to tell it apart from a provider
+ * failure: nothing was generated, nothing was spent, and the user can act on
+ * it by raising the ceiling or picking a cheaper model.
+ */
+export class GenerationSpendError extends Error {
+  override readonly name = 'GenerationSpendError';
+}
+
+export function setAiJobManagerSpendStore(store?: GenerationSpendStore | undefined): void {
+  activeSpendStore = store;
+}
+
+/**
+ * The ceiling, checked before a job is created.
+ *
+ * A machine with no ledger wired in — every test, and any host that has not
+ * set one — is unlimited, which is what the app did before there were limits
+ * at all.
+ */
+async function refuseIfOverSpendCap(estimate: CostEstimate, acceptUnknownCost: boolean | undefined): Promise<void> {
+  if (activeSpendStore === undefined) return;
+  const ledger = await activeSpendStore.read();
+  const check = checkSpend({
+    entries: ledger.entries,
+    ...(ledger.capUsd === undefined ? {} : { capUsd: ledger.capUsd }),
+    estimate,
+    nowIso: new Date().toISOString(),
+    ...(acceptUnknownCost === undefined ? {} : { acceptUnpriced: acceptUnknownCost })
+  });
+  if (!check.allowed) throw new GenerationSpendError(check.reason);
+}
+
+/**
+ * Recorded where the money is actually committed — as the request goes to the
+ * provider, not when the job is queued. A job that never got that far because
+ * a key was missing cost nothing, and charging the user's ceiling for it would
+ * lock them out over a request that never left the machine.
+ */
+async function recordSpend(estimate: CostEstimate): Promise<void> {
+  if (activeSpendStore === undefined) return;
+  try {
+    await activeSpendStore.record(entryFor(estimate, new Date().toISOString()));
+  } catch {
+    // A ledger that cannot be written must not take a generation down with it.
+  }
+}
 
 export function setAiJobManagerCredentialStore(store?: CredentialStore | undefined): void {
   activeCredentialStore = store;
@@ -223,6 +277,8 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
   const providerMapping = VIDEO_MODEL_PROVIDERS[model.providerId];
   const provider: VideoGenerationProviderId = providerMapping?.seam ?? 'gemini_veo';
   const modelId = model.id;
+  const estimate = estimateVideoCost({ modelId, durationSeconds: request.durationSeconds ?? 5 });
+  await refuseIfOverSpendCap(estimate, request.acceptUnknownCost);
   const { videoDir } = await ensureAiDirectories();
   const id = `video-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -259,6 +315,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
         throw new Error(`API key is required for ${VIDEO_PROVIDER_LABELS[provider]} cloud generation. Connect the provider in Settings first.`);
       }
 
+      await recordSpend(estimate);
       const cloudResult = await invokeCloudVideoProvider(model, apiKey, request, join(videoDir, `${id}.mp4`));
       if (!cloudResult.ok) {
         throw new Error(cloudResult.error);
@@ -293,6 +350,9 @@ export async function createImageGenerationJob(request: ImageGenerationRequest):
   const model = resolveGenerationModel('image-generation', request.modelId);
   const providerMapping = IMAGE_MODEL_PROVIDERS[model.providerId];
   const provider: ImageGenerationProviderId = providerMapping?.seam ?? 'openai_images';
+  // One image per job, which is what this seam creates.
+  const estimate = estimateImageCost({ modelId: model.id, imageCount: 1 });
+  await refuseIfOverSpendCap(estimate, request.acceptUnknownCost);
   const { imageDir } = await ensureAiDirectories();
   const id = `image-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const now = new Date().toISOString();
@@ -327,6 +387,7 @@ export async function createImageGenerationJob(request: ImageGenerationRequest):
         );
       }
 
+      await recordSpend(estimate);
       const result = await invokeCloudImageProvider(model, apiKey, request);
       if (!result.ok) {
         throw new Error(result.error);
@@ -386,6 +447,8 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
   const speechMapping = SPEECH_MODEL_PROVIDERS[model.providerId];
   const provider: TextToSpeechJob['provider'] = speechMapping?.seam ?? 'elevenlabs';
   const modelId = model.id;
+  const estimate = estimateSpeechCost({ modelId });
+  await refuseIfOverSpendCap(estimate, request.acceptUnknownCost);
   const { speechDir } = await ensureAiDirectories();
   const id = `speech-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const now = new Date().toISOString();
@@ -419,6 +482,7 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
         throw new Error(`API key is required for ${speechMapping?.label ?? 'cloud'} speech synthesis. Connect the provider in Settings first.`);
       }
 
+      await recordSpend(estimate);
       const cloudResult = await invokeCloudSpeechProvider(model, apiKey, request, join(speechDir, `${id}.mp3`));
       if (!cloudResult.ok) {
         throw new Error(cloudResult.error);

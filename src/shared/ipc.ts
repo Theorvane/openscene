@@ -59,7 +59,9 @@ export const IPC_CHANNELS = {
   updaterGetState: 'updater:get-state',
   updaterCheck: 'updater:check',
   updaterInstall: 'updater:install',
-  updaterStateChanged: 'updater:state-changed'
+  updaterStateChanged: 'updater:state-changed',
+  generationSpendGet: 'generation-spend:get',
+  generationSpendSetCap: 'generation-spend:set-cap'
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

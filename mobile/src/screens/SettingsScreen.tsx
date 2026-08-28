@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
 import { openAdTestSuite } from '../lib/adsModule';
 import { PROVIDER_KEYS, readSlot } from '../lib/credentials';
 import { useAnalyticsPreference } from '../lib/analyticsClient';
+import { describeSpend, type GenerationSpendView } from '@openvideo/shared/generationSpend';
 import { SPEND_FEATURES, useSpendPermissions } from '../lib/permissions';
+import { setSpendCap, spendView } from '../lib/spendLedger';
 import { describeProvider, providersForDomain } from '../lib/mediaProviders';
 import { ProviderConnect } from '../components/ProviderConnect';
 import { AddCustomProvider } from '../components/AddCustomProvider';
@@ -56,6 +58,32 @@ function chatRows(): readonly Row[] {
 export function SettingsScreen({ topInset }: { readonly topInset: number }) {
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
   const permissions = useSpendPermissions();
+  // What generation has cost this month, and the ceiling on it. Read once on
+  // mount and after a change, because nothing else on this screen moves it.
+  const [spend, setSpend] = useState<GenerationSpendView>(() => spendView(new Date().toISOString()));
+  const [capDraft, setCapDraft] = useState(() => {
+    const current = spendView(new Date().toISOString()).capUsd;
+    return current === undefined ? '' : String(current);
+  });
+  const [capError, setCapError] = useState('');
+
+  const saveCap = (): void => {
+    const trimmed = capDraft.trim();
+    if (trimmed.length === 0) {
+      setCapError('');
+      setSpend(setSpendCap(null));
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      // Refused rather than rounded into something: a limit nobody meant is
+      // worse than no limit, because it is trusted.
+      setCapError('Enter a number of dollars greater than zero, or leave it empty for no limit.');
+      return;
+    }
+    setCapError('');
+    setSpend(setSpendCap(parsed));
+  };
   const analytics = useAnalyticsPreference();
   const { providers: customProviders, refresh: refreshCustom } = useCustomProviders();
   /**
@@ -167,6 +195,29 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
             </View>
           );
         })}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Monthly limit</Text>
+        <Text style={styles.sectionBlurb}>
+          {describeSpend(spend.total, spend.capUsd)} A job that would take the month past the limit is refused before
+          it reaches a provider. Leave it empty for no limit.
+        </Text>
+        <View style={styles.capRow}>
+          <TextInput
+            style={styles.capInput}
+            value={capDraft}
+            onChangeText={setCapDraft}
+            placeholder="No limit"
+            placeholderTextColor={theme.textWeak}
+            keyboardType="decimal-pad"
+            accessibilityLabel="Monthly spending limit in dollars"
+          />
+          <Pressable accessibilityRole="button" onPress={saveCap} style={press(styles.permReset)}>
+            <Text style={styles.permResetText}>Save</Text>
+          </Pressable>
+        </View>
+        {capError.length > 0 && <Text style={styles.capError}>{capError}</Text>}
       </View>
 
       {/*
@@ -340,5 +391,16 @@ const styles = StyleSheet.create({
   switchLabel: { flex: 1, color: theme.text, fontSize: 14 },
   permValue: { color: theme.textWeak, fontSize: 13 },
   permReset: { justifyContent: 'center', minHeight: MIN_TAP, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, borderColor: theme.line },
-  permResetText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' }
+  permResetText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
+  capRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  capInput: {
+    flex: 1,
+    minHeight: MIN_TAP,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.line,
+    color: theme.text
+  },
+  capError: { color: theme.danger, fontSize: 13, marginTop: 8 }
 });

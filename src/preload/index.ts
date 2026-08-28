@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 import { IPC_CHANNELS } from '../shared/ipc';
+import type { GenerationSpendView } from '../shared/generationSpend';
 import type { UpdaterState } from '../shared/updater';
 import type { ExportJobActionInput, LocalExportJob, LocalFfmpegRuntimeStatus, StartExportJobInput } from '../shared/exportTypes';
 import type { ImageGenerationJob, ImageGenerationRequest, ReferenceImageSelection, TextToSpeechJob, TextToSpeechRequest, VideoGenerationJob, VideoGenerationRequest } from '../shared/providerSeams';
@@ -121,6 +122,10 @@ export interface VideoToolApi {
   aiGetImageJob(jobId: string): Promise<ApiResponse<ImageGenerationJob>>;
   aiUseImageAsVideoReference(jobId: string): Promise<ApiResponse<ReferenceImageSelection>>;
   aiSaveImageResult(jobId: string): Promise<ApiResponse<{ readonly saved: boolean }>>;
+  /** What generation has cost this month, and the ceiling if one is set. */
+  getGenerationSpend(): Promise<ApiResponse<GenerationSpendView>>;
+  /** Null removes the ceiling. A person's decision, never the agent's. */
+  setGenerationSpendCap(capUsd: number | null): Promise<ApiResponse<GenerationSpendView>>;
   onUpdaterStateChanged(listener: (snapshot: UpdaterSnapshot) => void): () => void;
   getUpdaterState(): Promise<ApiResponse<UpdaterSnapshot>>;
   checkForUpdates(): Promise<ApiResponse<UpdaterSnapshot>>;
@@ -241,6 +246,10 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.aiUseImageAsVideoReference, jobId) as Promise<ApiResponse<ReferenceImageSelection>>,
   aiSaveImageResult: (jobId) =>
     ipcRenderer.invoke(IPC_CHANNELS.aiSaveImageResult, jobId) as Promise<ApiResponse<{ readonly saved: boolean }>>,
+  getGenerationSpend: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.generationSpendGet) as Promise<ApiResponse<GenerationSpendView>>,
+  setGenerationSpendCap: (capUsd) =>
+    ipcRenderer.invoke(IPC_CHANNELS.generationSpendSetCap, capUsd) as Promise<ApiResponse<GenerationSpendView>>,
   onUpdaterStateChanged: (listener) => {
     const subscription = (_event: IpcRendererEvent, payload: unknown): void => {
       const snapshot = parseUpdaterSnapshot(payload);

@@ -21,6 +21,8 @@ import {
   type ExtractedFrame
 } from './videoFrameAnalysis';
 import { estimateVideoPlanCost, formatCostEstimate, estimateImageCost, estimateSpeechCost } from '../shared/mediaGenerationPricing';
+import { describeSpend } from '../shared/generationSpend';
+import type { GenerationSpendStore } from './generationSpendStore';
 import { MAX_SUPPORTED_SHOT_SECONDS, planVideoStoryboard, supportedShotSeconds } from '../shared/videoStoryboardPlan';
 import { checkNarrationFit, narrationBudget, detectScriptKind } from '../shared/narrationTiming';
 import { getDomainModel, getDefaultDomainModelId } from '../shared/aiDomainModels';
@@ -60,6 +62,7 @@ export class OpenVideoMcpServer {
   private exportIpcService: ExportIpcService | undefined;
   private watchFrameExtractor: WatchFrameExtractor = defaultWatchFrameExtractor;
   private resultImports: ResultAssetImportService | undefined;
+  private spendStore: GenerationSpendStore | undefined;
   private notifyProjectTimelineChanged: ((projectId: string) => void) | undefined;
 
   /**
@@ -79,6 +82,16 @@ export class OpenVideoMcpServer {
     this.projectStore = projectStore;
     this.exportIpcService = exportIpcService;
     this.watchFrameExtractor = watchFrameExtractor ?? defaultWatchFrameExtractor;
+  }
+
+  /**
+   * The spending record, so the agent can see the ceiling it is working under.
+   *
+   * Read-only on purpose: raising the limit is the user's decision, and an
+   * agent that could raise its own does not have one.
+   */
+  public setSpendStore(store: GenerationSpendStore): void {
+    this.spendStore = store;
   }
 
   /** Lets the agent finish a generation by importing its result, as the UI does. */
@@ -227,6 +240,33 @@ export class OpenVideoMcpServer {
         ? 'Show this to the user and wait for approval before generating.'
         : 'Cost is unknown. Ask the user to confirm they accept an unknown charge before generating.'
     };
+  }
+
+  @McpTool({
+    description:
+      'Read what generation has cost this month and the monthly limit, if the user set one. Read this before ' +
+      'proposing a batch of shots: a plan that would be refused halfway through is worse than a smaller plan. ' +
+      'The limit can only be changed by the user in Settings.',
+    input: z.object({})
+  })
+  async getGenerationSpend() {
+    if (!this.spendStore) return { success: false, error: 'The spending record is not available.' };
+    try {
+      const ledger = await this.spendStore.read();
+      const total = await this.spendStore.monthToDate();
+      return {
+        success: true,
+        total,
+        capUsd: ledger.capUsd,
+        summary: describeSpend(total, ledger.capUsd),
+        message:
+          ledger.capUsd === undefined
+            ? 'No monthly limit is set. Still show the user an estimate and wait for approval before generating.'
+            : `Jobs that would take this month past $${ledger.capUsd.toFixed(2)} are refused before they reach a provider.`
+      };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Failed to read the spending record' };
+    }
   }
 
   @McpTool({

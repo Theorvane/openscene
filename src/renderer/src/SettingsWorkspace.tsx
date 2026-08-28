@@ -7,6 +7,7 @@ import { isOpenAiCodexModelKey, resolveOpenAiAuthMode } from '../../shared/openA
 import { useChatGptAuth } from './ChatGptAuthContext';
 import { useModelVisibility } from './ModelVisibilityContext';
 import { ProviderConnectDialog, type ProviderOAuthMethod } from './ProviderConnectDialog';
+import { SpendSettings } from './SpendSettings';
 import { UpdatesSettings } from './UpdatesSettings';
 import { AiDomainModelSelector } from './AiDomainModelSelector';
 import { TimelineShortcutMap } from './editor/TimelineEditorLayoutControls';
@@ -26,6 +27,7 @@ const SETTINGS_SECTIONS = [
   { id: 'models', title: 'Models', description: 'Search the model catalog and choose which models appear in pickers.' },
   { id: 'edit-agent', title: 'Edit Agent', description: 'Model preference for the persistent right-side agent.' },
   { id: 'shortcuts', title: 'Shortcuts', description: 'Timeline editor keyboard shortcut remapping.' },
+  { id: 'spending', title: 'Spending', description: 'What generation has cost this month, and the ceiling on it.' },
   { id: 'updates', title: 'Updates', description: 'Installed version and how new releases reach this build.' },
   { id: 'data-privacy', title: 'Data & Privacy', description: 'Local storage, provider authorization, and deletion expectations.' }
 ] as const;
@@ -476,6 +478,8 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
             <StatusCard tone="neutral">Shortcut changes persist locally and apply immediately inside the Editing workspace.</StatusCard>
           </>
         );
+      case 'spending':
+        return <SpendSettings />;
       case 'updates':
         return <UpdatesSettings />;
       case 'data-privacy':

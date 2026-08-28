@@ -12,6 +12,7 @@ import { ExportIpcService } from './exportIpcService';
 import { registerExportIpcHandlers } from './exportIpcHandlers';
 import { ExportJobStore } from './exportJobStore';
 import { ProjectLocationRegistry } from './projectLocations';
+import { GenerationSpendStore } from './generationSpendStore';
 import { ProjectStore } from './projectStore';
 import { RecordingFileStore } from './recordingStore';
 import { registerResultAssetImportHandlers } from './resultAssetImportHandlers';
@@ -28,7 +29,7 @@ import { fail, ok } from './ipcResponses';
 import { IPC_CHANNELS } from '../shared/ipc';
 import { installApplicationMenu } from './applicationMenu';
 
-import { createImageGenerationJob, createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getGeneratedImageAsReference, getImageGenerationJob, getSpeechGenerationJob, getVideoGenerationJob, setAiJobManagerCredentialStore } from './aiJobManager';
+import { createImageGenerationJob, createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getGeneratedImageAsReference, getImageGenerationJob, getSpeechGenerationJob, getVideoGenerationJob, setAiJobManagerCredentialStore, setAiJobManagerSpendStore } from './aiJobManager';
 import { CredentialStore } from './credentialStore';
 import { LlmExecutionAdapter } from './llmAdapter';
 import { getOpenVideoMcpDefinition, OpenVideoMcpServer } from './openVideoMcpServer';
@@ -67,6 +68,15 @@ const llmPromptRouter = new LlmPromptRouter({
   chatGptAdapter: new ChatGptCodexAdapter({ oauthService: chatGptOAuthService })
 });
 setAiJobManagerCredentialStore(credentialStore);
+/*
+  The ceiling on what generation may cost, and the record of what it did.
+
+  Kept in userData rather than in memory because the point of a monthly limit
+  is that it survives the app closing: a loop restarted after a crash would
+  otherwise begin again from zero.
+*/
+const generationSpendStore = new GenerationSpendStore(join(app.getPath('userData'), 'generation-spend.json'));
+setAiJobManagerSpendStore(generationSpendStore);
 const timelineIpcService = new TimelineIpcService({
   projects: projectStore,
   assets: assetLibraryStore,
@@ -307,6 +317,33 @@ async function installIpcHandlers(): Promise<void> {
     }
   });
 
+  /*
+    What generation has cost this month, and the ceiling on it.
+
+    Reading is free; setting the ceiling is a person's decision, which is why
+    it is here and not among the agent's tools — an agent that could raise its
+    own limit does not have one.
+  */
+  ipcMain.handle(IPC_CHANNELS.generationSpendGet, async () => {
+    const ledger = await generationSpendStore.read();
+    return ok({
+      total: await generationSpendStore.monthToDate(),
+      ...(ledger.capUsd === undefined ? {} : { capUsd: ledger.capUsd })
+    });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.generationSpendSetCap, async (_event, capUsd: number | null) => {
+    try {
+      const ledger = await generationSpendStore.setCap(capUsd);
+      return ok({
+        total: await generationSpendStore.monthToDate(),
+        ...(ledger.capUsd === undefined ? {} : { capUsd: ledger.capUsd })
+      });
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to set the spending limit');
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.aiGetImageJob, async (_event, jobId: string) => {
     const job = getImageGenerationJob(jobId);
     if (job === null) {
@@ -383,6 +420,7 @@ async function installIpcHandlers(): Promise<void> {
   const mcpServerInstance = new OpenVideoMcpServer();
   mcpServerInstance.setServices(projectStore, exportIpcService);
   mcpServerInstance.setResultImportService(resultAssetImportService);
+  mcpServerInstance.setSpendStore(generationSpendStore);
   // Agent tools write the project straight to disk; tell open editors to reload
   // so the change shows up on the timeline instead of being silently shadowed.
   mcpServerInstance.setProjectTimelineChangeNotifier((projectId) => {

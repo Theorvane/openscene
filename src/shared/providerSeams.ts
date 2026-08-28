@@ -47,6 +47,14 @@ export interface VideoGenerationRequest {
   provider?: VideoGenerationProviderId;
   modelId?: string;
   apiKey?: string;
+  /**
+   * Whether the user has accepted a charge nobody can price.
+   *
+   * Under a spending limit an unpriced model is refused, because a charge that
+   * cannot be priced cannot be kept under a ceiling. This is how someone takes
+   * it deliberately anyway.
+   */
+  acceptUnknownCost?: boolean;
 }
 
 export interface VideoGenerationJob {
@@ -83,6 +91,14 @@ export interface TextToSpeechRequest {
   language?: string;
   mode?: ProviderExecutionMode;
   apiKey?: string;
+  /**
+   * Whether the user has accepted a charge nobody can price.
+   *
+   * Under a spending limit an unpriced model is refused, because a charge that
+   * cannot be priced cannot be kept under a ceiling. This is how someone takes
+   * it deliberately anyway.
+   */
+  acceptUnknownCost?: boolean;
 }
 
 export interface TextToSpeechJob {
@@ -120,6 +136,14 @@ export interface ImageGenerationRequest {
   provider?: ImageGenerationProviderId;
   modelId?: string;
   apiKey?: string;
+  /**
+   * Whether the user has accepted a charge nobody can price.
+   *
+   * Under a spending limit an unpriced model is refused, because a charge that
+   * cannot be priced cannot be kept under a ceiling. This is how someone takes
+   * it deliberately anyway.
+   */
+  acceptUnknownCost?: boolean;
 }
 
 export interface ImageGenerationJob {

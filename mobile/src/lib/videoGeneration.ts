@@ -8,7 +8,10 @@ import {
 } from '@openvideo/shared/videoGeneration';
 import { getDomainModel } from '@openvideo/shared/aiDomainModels';
 
+import { estimateVideoCost } from '@openvideo/shared/mediaGenerationPricing';
+
 import { readKey, type ProviderSlot } from './credentials';
+import { checkAgainstCap, recordCharge } from './spendLedger';
 import { projectMediaDir, type MobileAsset } from './projectStore';
 import videoExport, { isFrameExtractionAvailable } from '../../modules/video-export';
 
@@ -58,6 +61,17 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
     return { ok: false, message: `${model.providerLabel} has no adapter on this device yet.` };
   }
 
+  /*
+    The monthly ceiling, before anything is asked of a provider.
+
+    A shot sequence is the loop this is really for: each shot is approved once
+    by whoever pressed the button, and then a plan of ten runs them all. The
+    limit is what stops the tenth when the fourth already crossed it.
+  */
+  const estimate = estimateVideoCost({ modelId: model.id, durationSeconds: input.durationSeconds });
+  const allowed = checkAgainstCap(estimate, new Date().toISOString());
+  if (!allowed.allowed) return { ok: false, message: allowed.reason };
+
   const apiKey = await readKey(slot);
   if (apiKey === null) return { ok: false, message: `${model.providerLabel} is not connected. Add its key in Settings.` };
 
@@ -70,6 +84,9 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
         ? input.referenceImage
         : undefined;
 
+    // Recorded as the request goes out: that is where the money is committed,
+    // and a shot refused for a missing key cost nothing.
+    recordCharge(estimate, new Date().toISOString());
     const ready = await adapter({
       apiKey,
       modelId: model.id,
