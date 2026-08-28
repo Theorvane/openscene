@@ -18,9 +18,10 @@ describe('the desktop', () => {
     const jobs = await readRepo('src/main/aiJobManager.ts');
     const seams = [/createVideoGenerationJob/, /createImageGenerationJob/, /createSpeechGenerationJob/];
     for (const seam of seams) expect(jobs).toMatch(seam);
-    // Three creators, three checks, three records.
-    expect(jobs.match(/await refuseIfOverSpendCap\(/g)).toHaveLength(3);
-    expect(jobs.match(/await recordSpend\(estimate\)/g)).toHaveLength(3);
+    // Three creators, three reservations, three settlements each way.
+    expect(jobs.match(/await reserveSpend\(/g)).toHaveLength(3);
+    expect(jobs.match(/await settleSpend\(reservationId, 'charged'\)/g)).toHaveLength(3);
+    expect(jobs.match(/await settleSpend\(reservationId, 'released'\)/g)).toHaveLength(3);
   });
 
   it('records the charge where the request goes out, not where the job is queued', async () => {
@@ -29,7 +30,9 @@ describe('the desktop', () => {
     // charging a ceiling for it would lock someone out over nothing.
     for (const call of ['invokeCloudVideoProvider', 'invokeCloudImageProvider', 'invokeCloudSpeechProvider']) {
       const before = jobs.slice(0, jobs.indexOf(`await ${call}(`));
-      expect(before.lastIndexOf('await recordSpend(estimate)')).toBeGreaterThan(before.lastIndexOf('apiKey is required'));
+      expect(before.lastIndexOf("await settleSpend(reservationId, 'charged')")).toBeGreaterThan(
+        before.lastIndexOf('apiKey is required')
+      );
     }
   });
 
@@ -47,8 +50,10 @@ describe('the phone', () => {
     const images = await readRepo('mobile/src/screens/ImageScreen.tsx');
     const video = await readRepo('mobile/src/lib/videoGeneration.ts');
     for (const source of [images, video]) {
-      expect(source).toContain('checkAgainstCap(');
-      expect(source).toContain('recordCharge(');
+      expect(source).toContain('reserveAgainstCap(');
+      expect(source).toContain('chargeReservation(');
+      // And hands the room back when nothing was asked of a provider.
+      expect(source).toContain('releaseReservation(');
     }
     // Speech is not generated on this surface yet, so there is no third seam
     // to guard — when there is, this test is where it will be noticed.
@@ -58,13 +63,16 @@ describe('the phone', () => {
 
   it('checks before spending the key, not after the charge', async () => {
     const video = await readRepo('mobile/src/lib/videoGeneration.ts');
-    expect(video.indexOf('checkAgainstCap(')).toBeLessThan(video.indexOf('const apiKey = await readKey'));
+    expect(video.indexOf('reserveAgainstCap(')).toBeLessThan(video.indexOf('const apiKey = await readKey'));
   });
 
   it('keeps the ledger on disk, because a limit that forgets is not a limit', async () => {
     const ledger = await readRepo('mobile/src/lib/spendLedger.ts');
     expect(ledger).toContain('generation-spend.json');
     expect(ledger).toContain('@openvideo/shared/generationSpend');
+    // Checking and taking the room have to be one synchronous step, or two
+    // taps both read the same total and both pass.
+    expect(ledger).toMatch(/export function reserveAgainstCap\([^)]*\): SpendReservation \{/);
   });
 
   it('lets the limit be set and removed from Settings', async () => {

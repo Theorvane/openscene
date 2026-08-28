@@ -22,8 +22,28 @@
 
 import type { CostEstimate, GenerationKind } from './mediaGenerationPricing';
 
-/** One charge, as it was understood when it was incurred. */
+/**
+ * A charge in flight, or one that has been made.
+ *
+ * Two states because the check and the charge cannot be one moment. If the
+ * ceiling were only checked and the charge only written when the request goes
+ * out, two jobs asked for at once would both read the same total, both pass,
+ * and both spend — the ceiling would hold for one job at a time and for no
+ * other number. So a job takes its room out of the ceiling before it runs
+ * (`pending`), and the room is either kept when the request goes to the
+ * provider (`charged`) or handed back when it never does.
+ */
 export type SpendEntry = {
+  /** Unique, so a reservation can be settled or handed back by name. */
+  readonly id: string;
+  /**
+   * `pending` is room taken and not yet spent; both states count against the
+   * ceiling, because an in-flight job is money on its way out.
+   *
+   * Absent reads as charged, which is what an entry written by an earlier
+   * build means.
+   */
+  readonly state?: 'pending' | 'charged';
   /** ISO 8601, in UTC. */
   readonly at: string;
   readonly kind: GenerationKind;
@@ -134,15 +154,45 @@ export function checkSpend(input: SpendCheckInput): SpendCheck {
   return { allowed: true, spentUsd: spent.amountUsd, remainingUsd: Math.round((cap - wouldBe) * 100) / 100 };
 }
 
-/** The entry to append once the charge has actually been incurred. */
-export function entryFor(estimate: CostEstimate, atIso: string): SpendEntry {
+/** The entry to append when a job takes its room out of the ceiling. */
+export function entryFor(estimate: CostEstimate, atIso: string, id: string, state: 'pending' | 'charged' = 'pending'): SpendEntry {
   return {
+    id,
+    state,
     at: atIso,
     kind: estimate.kind,
     modelId: estimate.modelId,
     ...(estimate.priced && estimate.amountUsd !== undefined ? { amountUsd: estimate.amountUsd } : {}),
     basis: estimate.basis
   };
+}
+
+/**
+ * A reservation nobody settled, promoted to a charge.
+ *
+ * Left alone it would either hold room in the ceiling forever — locking
+ * someone out of their own limit for the rest of the month — or have to be
+ * dropped, which would forget a charge that was very likely made. Promoting is
+ * the better bet by a wide margin: the gap between taking the room and
+ * dispatching is a key lookup, while the gap between dispatching and settling
+ * is the whole generation, so a reservation that outlived the app was almost
+ * certainly already on its way to a provider.
+ */
+export function settleStale(entries: readonly SpendEntry[], nowIso: string, staleAfterMs: number): readonly SpendEntry[] {
+  const cutoff = new Date(nowIso).getTime() - staleAfterMs;
+  return entries.map((entry) =>
+    entry.state === 'pending' && new Date(entry.at).getTime() < cutoff ? { ...entry, state: 'charged' as const } : entry
+  );
+}
+
+/** Room handed back: a job that never reached a provider cost nothing. */
+export function releaseEntry(entries: readonly SpendEntry[], id: string): readonly SpendEntry[] {
+  return entries.filter((entry) => entry.id !== id || entry.state !== 'pending');
+}
+
+/** Room kept: the request went out, so the charge stands. */
+export function chargeEntry(entries: readonly SpendEntry[], id: string): readonly SpendEntry[] {
+  return entries.map((entry) => (entry.id === id ? { ...entry, state: 'charged' as const } : entry));
 }
 
 /** One line for a person: what this month has cost, and how sure that is. */

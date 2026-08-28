@@ -1,12 +1,14 @@
 import { Directory, File, Paths } from 'expo-file-system';
 
 import {
+  chargeEntry,
   checkSpend,
   entriesInMonth,
   entryFor,
+  releaseEntry,
+  settleStale,
   totalOf,
   type GenerationSpendView,
-  type SpendCheck,
   type SpendEntry
 } from '@openvideo/shared/generationSpend';
 import type { CostEstimate } from '@openvideo/shared/mediaGenerationPricing';
@@ -22,11 +24,23 @@ import type { CostEstimate } from '@openvideo/shared/mediaGenerationPricing';
  *
  * A file beside the permissions, for the same reason they are on disk: a limit
  * that forgets when the app is killed is not a limit.
+ *
+ * Reserving is one synchronous read-check-write, so two taps or two shots in a
+ * sequence cannot both read the same total and both pass. A check that is not
+ * joined to what it permits is not a limit either; it holds for one job at a
+ * time and for no other number.
  */
+
+/**
+ * How long a reservation may sit unsettled before it counts as a charge.
+ * Long enough for the slowest shot anyone waits for, short enough that an app
+ * killed mid-generation does not hold room for the rest of the month.
+ */
+const RESERVATION_STALE_AFTER_MS = 6 * 60 * 60 * 1_000;
 
 const FILE = new File(new Directory(Paths.document), 'generation-spend.json');
 
-type Stored = { capUsd?: number; entries: SpendEntry[] };
+type Stored = { capUsd?: number; entries: readonly SpendEntry[] };
 
 function read(): Stored {
   try {
@@ -70,23 +84,49 @@ export function setSpendCap(capUsd: number | null): GenerationSpendView {
   return spendView(new Date().toISOString());
 }
 
-/** Whether this job may run, given the ceiling and what the month has cost. */
-export function checkAgainstCap(estimate: CostEstimate, nowIso: string, acceptUnpriced?: boolean): SpendCheck {
+export type SpendReservation =
+  | { readonly ok: true; readonly id: string }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * Check the ceiling and take the room out of it, in one step.
+ *
+ * The room is held rather than spent: `chargeReservation` keeps it once the
+ * request has gone to the provider, `releaseReservation` hands it back when it
+ * never did.
+ */
+export function reserveAgainstCap(estimate: CostEstimate, nowIso: string, acceptUnpriced?: boolean): SpendReservation {
   const stored = read();
-  return checkSpend({
-    entries: stored.entries,
+  const entries = settleStale(stored.entries, nowIso, RESERVATION_STALE_AFTER_MS);
+  const check = checkSpend({
+    entries,
     ...(stored.capUsd === undefined ? {} : { capUsd: stored.capUsd }),
     estimate,
     nowIso,
     ...(acceptUnpriced === undefined ? {} : { acceptUnpriced })
   });
+  if (!check.allowed) {
+    write({ ...stored, entries });
+    return { ok: false, reason: check.reason };
+  }
+  // Unique without a crypto dependency: the clock plus randomness, and the id
+  // never leaves this device.
+  const id = `charge-${nowIso}-${Math.random().toString(36).slice(2, 10)}`;
+  write({ ...stored, entries: [...entries, entryFor(estimate, nowIso, id)] });
+  return { ok: true, id };
+}
+
+/** The request went out, so the charge stands. */
+export function chargeReservation(id: string): void {
+  const stored = read();
+  write({ ...stored, entries: chargeEntry(stored.entries, id) });
 }
 
 /**
- * Written once the request has actually gone to the provider, which is where
- * the money is committed. A job refused for a missing key cost nothing.
+ * The request never went out, so the room goes back. Safe to call either way:
+ * a reservation already charged is left alone.
  */
-export function recordCharge(estimate: CostEstimate, nowIso: string): void {
+export function releaseReservation(id: string): void {
   const stored = read();
-  write({ ...stored, entries: [...stored.entries, entryFor(estimate, nowIso)] });
+  write({ ...stored, entries: releaseEntry(stored.entries, id) });
 }
