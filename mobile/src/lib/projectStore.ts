@@ -3,7 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { parseTimelineDocument } from '@openvideo/shared/timelineDocumentValidators';
 import type { FramePreference } from '@openvideo/shared/outputFrame';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '@openvideo/shared/timelineClipPlacement';
-import { placeClip } from '@openvideo/shared/timelineClipLogic';
+import { placeClip, replaceClipSource } from '@openvideo/shared/timelineClipLogic';
 import { isStill, stillClipSource } from '@openvideo/shared/timelineStills';
 
 import { createInitialTimeline } from '@openvideo/shared/timelineLogic';
@@ -373,6 +373,43 @@ export function appendAssetToTimeline(project: MobileProject, asset: MobileAsset
   };
   writeProject(updated);
   return updated;
+}
+
+/**
+ * Puts a regenerated take where the previous one was.
+ *
+ * The clip keeps its place and its length, so the cut around a shot survives a
+ * second take that came back a little longer — see `replaceClipSource`. The
+ * asset record is added; the old one is left alone, because a take somebody
+ * paid for is not something to delete behind their back.
+ */
+export function replaceTakeInTimeline(
+  project: MobileProject,
+  clipId: string,
+  asset: MobileAsset
+): MobileProject | null {
+  const next = replaceClipSource(project.timeline, {
+    clipId,
+    assetId: asset.id,
+    sourceDurationMs: asset.durationMs
+  });
+  if (next === null) return null;
+  const known = project.assets.some((entry) => entry.id === asset.id);
+  const updated: MobileProject = {
+    ...project,
+    assets: known ? project.assets : [...project.assets, asset],
+    timeline: next
+  };
+  writeProject(updated);
+  return updated;
+}
+
+/** The clip a generated asset was placed as, so a redo knows what to replace. */
+export function clipIdForAsset(project: MobileProject, assetId: string): string | null {
+  const clips = project.timeline.tracks.flatMap((track) => track.clips).filter((clip) => clip.assetId === assetId);
+  // Only when there is exactly one: the same asset placed twice is two clips,
+  // and replacing an arbitrary one of them would be a guess.
+  return clips.length === 1 ? clips[0]!.id : null;
 }
 
 /** Bytes on disk for a stored asset, or null when the file has gone missing. */

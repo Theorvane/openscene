@@ -1019,6 +1019,34 @@ button {
   line-height: 1.5;
 }
 
+/* The changes asked for on a take, under the prompt they were asked about. */
+.studio-job__revisions {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--color-muted);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.studio-refine {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.studio-refine__input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-caption);
+  resize: vertical;
+}
+
 .studio-composer {
   display: flex;
   flex-direction: column;

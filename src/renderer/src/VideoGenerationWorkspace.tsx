@@ -1,4 +1,6 @@
 import { useState, type ReactElement } from 'react';
+
+import { originalOf, refineShotPrompt, revisionsOf } from '../../shared/shotPrompt';
 import type { ReferenceImageSelection, VideoGenerationJob } from '../../shared/providerSeams';
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
@@ -48,11 +50,27 @@ export function VideoGenerationWorkspace({
   const [jobs, setJobs] = useState<readonly VideoGenerationJob[]>([]);
 
   const [isGenerating, setIsGenerating] = useState(false);
+  // Which take is being refined, and what to change about it. A note belongs to
+  // one job: applying the last one to a different take would be a change nobody
+  // asked for on a shot they were happy with.
+  const [refiningJobId, setRefiningJobId] = useState<string | null>(null);
+  const [note, setNote] = useState('');
   // Nothing to report until something happens; an idle card is just noise.
   const [statusMsg, setStatusMsg] = useState<{ text: string; tone: 'neutral' | 'success' | 'warning' | 'danger' } | null>(null);
 
-  const handleGenerate = async (): Promise<void> => {
-    if (prompt.trim().length === 0) {
+  /**
+   * `overrides` is how a refined take is run: it carries the previous take's
+   * own prompt, length, shape and style, so asking for one change does not
+   * silently apply whatever the composer happens to be set to now.
+   */
+  const handleGenerate = async (overrides?: {
+    readonly prompt: string;
+    readonly aspectRatio: '16:9' | '9:16' | '1:1';
+    readonly durationSeconds: number;
+    readonly stylePreset?: string;
+  }): Promise<void> => {
+    const promptText = overrides?.prompt ?? prompt;
+    if (promptText.trim().length === 0) {
       setStatusMsg({ text: 'Please enter a video generation prompt.', tone: 'warning' });
       return;
     }
@@ -62,10 +80,10 @@ export function VideoGenerationWorkspace({
 
     try {
       const response = await window.videoTool.aiGenerateVideo({
-        prompt,
-        aspectRatio,
-        durationSeconds: effectiveDuration,
-        stylePreset: selectedStyle,
+        prompt: promptText,
+        aspectRatio: overrides?.aspectRatio ?? aspectRatio,
+        durationSeconds: overrides?.durationSeconds ?? effectiveDuration,
+        stylePreset: overrides?.stylePreset ?? selectedStyle,
         modelId: videoModel.id,
         ...(referenceImage === null ? {} : { referenceImage })
       });
@@ -101,6 +119,32 @@ export function VideoGenerationWorkspace({
       setIsGenerating(false);
       setStatusMsg({ text: err instanceof Error ? err.message : 'Unexpected error during generation.', tone: 'danger' });
     }
+  };
+
+  /**
+   * The next take of a job, with a note about what to change.
+   *
+   * The previous prompt is kept whole and the change added to it by the shared
+   * rule — the same one the phone uses — because a rewrite loses the parts
+   * nobody mentioned, which are the parts a shot is made of.
+   */
+  const refineJob = (job: VideoGenerationJob): void => {
+    const refined = refineShotPrompt(job.prompt, note);
+    if (!refined.ok) {
+      setStatusMsg({ text: refined.reason, tone: 'warning' });
+      return;
+    }
+    setRefiningJobId(null);
+    setNote('');
+    // Shown in the composer as well, so what was asked for is visible rather
+    // than only implied by a new job appearing.
+    setPrompt(refined.prompt);
+    void handleGenerate({
+      prompt: refined.prompt,
+      aspectRatio: job.aspectRatio,
+      durationSeconds: job.durationSeconds,
+      ...(job.stylePreset === undefined ? {} : { stylePreset: job.stylePreset })
+    });
   };
 
   const pickReferenceImage = async (): Promise<void> => {
@@ -221,11 +265,45 @@ export function VideoGenerationWorkspace({
                     <span className={`studio-job__status studio-job__status--${job.status}`}>{job.status}</span>
                     <span className="studio-job__provider">{job.provider}</span>
                   </div>
-                  <p className="studio-job__prompt">{job.prompt}</p>
+                  <p className="studio-job__prompt">{originalOf(job.prompt)}</p>
+                  {revisionsOf(job.prompt).length > 0 && (
+                    <ol className="studio-job__revisions">
+                      {revisionsOf(job.prompt).map((revision) => (
+                        <li key={revision}>{revision}</li>
+                      ))}
+                    </ol>
+                  )}
                   {job.status === 'completed' && job.outputFilePath !== undefined && (
                     <Button variant="primary" onClick={() => void handleImportToProject(job)}>
                       Import to project
                     </Button>
+                  )}
+                  {(job.status === 'completed' || job.status === 'failed') && (
+                    <Button
+                      variant="ghost"
+                      disabled={isGenerating}
+                      onClick={() => {
+                        setNote('');
+                        setRefiningJobId(refiningJobId === job.id ? null : job.id);
+                      }}
+                    >
+                      {refiningJobId === job.id ? 'Cancel' : 'Refine'}
+                    </Button>
+                  )}
+                  {refiningJobId === job.id && (
+                    <div className="studio-refine">
+                      <textarea
+                        className="studio-refine__input"
+                        rows={2}
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                        placeholder="What to change — slower, no text on screen…"
+                        aria-label={`What to change about this take`}
+                      />
+                      <Button variant="primary" disabled={note.trim().length === 0} onClick={() => refineJob(job)}>
+                        Generate next take
+                      </Button>
+                    </div>
                   )}
                 </li>
               ))}

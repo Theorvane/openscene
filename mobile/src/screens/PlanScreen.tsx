@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { planVideoStoryboard, supportedShotSeconds, CONTINUITY_KEYS } from '@openvideo/shared/videoStoryboardPlan';
+import { composeShotPrompt, refineShotPrompt, revisionsOf, takeLabel } from '@openvideo/shared/shotPrompt';
 import { getDomainModels } from '@openvideo/shared/aiDomainModels';
 import { ModelSelect } from '../components/ModelSelect';
 import { supportsReferenceImage, type VideoAspectRatio, type VideoProgressStage } from '@openvideo/shared/videoGeneration';
@@ -9,7 +10,7 @@ import { isFrameExtractionAvailable } from '../../modules/video-export';
 import { readProviderConnections } from '../lib/mediaProviders';
 import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { generateShot } from '../lib/videoGeneration';
-import { appendAssetToTimeline, readProject } from '../lib/projectStore';
+import { appendAssetToTimeline, clipIdForAsset, readProject, replaceTakeInTimeline } from '../lib/projectStore';
 import { SpendPrompt } from '../components/SpendPrompt';
 import { FormScreen } from '../components/FormScreen';
 import { useRevealOnFocus } from '../components/KeyboardAwareScroll';
@@ -24,6 +25,21 @@ type ShotState =
   | { readonly kind: 'running'; readonly stage: VideoProgressStage }
   | { readonly kind: 'done' }
   | { readonly kind: 'failed'; readonly message: string };
+
+/**
+ * What was actually asked of the model for one shot, kept so it can be asked
+ * again with a change rather than retyped from memory.
+ *
+ * The clip is remembered too: a second take stands where the first one did, so
+ * the cut around it survives.
+ */
+type ShotTake = {
+  readonly prompt: string;
+  readonly takeNumber: number;
+  readonly clipId?: string;
+  /** The frame this shot started from, so a redo continues from the same place. */
+  readonly startFrame?: { readonly base64: string; readonly mimeType: string };
+};
 
 const LENGTHS = [8, 16, 30, 45, 60] as const;
 
@@ -47,6 +63,13 @@ export function PlanScreen({
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>('16:9');
   const [shotStates, setShotStates] = useState<readonly ShotState[]>([]);
+  // Keyed by shot index, because the plan can change under them and an array
+  // would quietly re-index somebody's notes onto the wrong shot.
+  const [descriptions, setDescriptions] = useState<Readonly<Record<number, string>>>({});
+  const [takes, setTakes] = useState<Readonly<Record<number, ShotTake>>>({});
+  const [noteFor, setNoteFor] = useState<number | null>(null);
+  const [note, setNote] = useState('');
+  const [redoing, setRedoing] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
   const [continuity, setContinuity] = useState(true);
   const [asking, setAsking] = useState(false);
@@ -72,6 +95,10 @@ export function PlanScreen({
   // what was actually generated.
   const setPlan = (next: () => void): void => {
     setShotStates([]);
+    // The takes belong to the plan that produced them. Keeping them next to a
+    // different plan would offer to refine a shot that no longer exists.
+    setTakes({});
+    setNoteFor(null);
     next();
   };
 
@@ -95,19 +122,22 @@ export function PlanScreen({
         setShotStates((current) => current.map((entry, position) => (position === index ? state : entry)));
       mark({ kind: 'running', stage: 'submitting' });
 
+      // Composed by the shared rule rather than here, so the phone, the desktop
+      // studio and the agent all send the same words for the same shot.
+      const shotPrompt = composeShotPrompt({
+        scenario: prompt.trim(),
+        index: shot.index,
+        count: plan.shots.length,
+        durationSeconds: shot.durationSeconds,
+        ...(descriptions[shot.index]?.trim() ? { description: descriptions[shot.index]!.trim() } : {}),
+        continuity: plan.shots.length === 1 ? 'none' : carriedFrame === undefined ? 'restate' : 'from-frame'
+      });
+      const startFrame = carriedFrame;
+
       const result = await generateShot({
         projectId,
         modelId: model.id,
-        // Each shot is rendered blind, so the continuity keys are restated in
-        // every prompt rather than referenced across shots.
-        prompt: `${prompt.trim()} — shot ${shot.index} of ${plan.shots.length}, ${shot.durationSeconds}s. ${
-          carriedFrame === undefined
-            ? `Keep consistent: ${CONTINUITY_KEYS.join(', ')}.`
-            : // With a start frame the model can see the continuity keys rather
-              // than being told them, so the prompt asks it to carry on instead
-              // of re-describing a scene it is already looking at.
-              'Continue directly from the supplied first frame, keeping the same subject, wardrobe, location and lighting.'
-        }`,
+        prompt: shotPrompt,
         aspectRatio,
         durationSeconds: shot.durationSeconds,
         ...(carriedFrame === undefined ? {} : { referenceImage: carriedFrame }),
@@ -128,12 +158,109 @@ export function PlanScreen({
         mark({ kind: 'failed', message: 'The project could not be read to save this shot.' });
         break;
       }
-      mark(appendAssetToTimeline(project, result.asset) === null
-        ? { kind: 'failed', message: 'The clip was generated but no video track would take it.' }
-        : { kind: 'done' });
+      const placed = appendAssetToTimeline(project, result.asset);
+      if (placed === null) {
+        mark({ kind: 'failed', message: 'The clip was generated but no video track would take it.' });
+        continue;
+      }
+      // Kept so this shot can be asked for again with a change: the prompt to
+      // build on, the clip the next take stands in for, and the frame this one
+      // started from.
+      setTakes((current) => ({
+        ...current,
+        [shot.index]: {
+          prompt: shotPrompt,
+          takeNumber: 1,
+          ...(clipIdForAsset(placed, result.asset.id) === null
+            ? {}
+            : { clipId: clipIdForAsset(placed, result.asset.id) as string }),
+          ...(startFrame === undefined ? {} : { startFrame })
+        }
+      }));
+      mark({ kind: 'done' });
     }
 
     setRunning(false);
+  };
+
+  /**
+   * Ask for one shot again, with a note about what to change.
+   *
+   * Only that shot runs. Redoing a five-shot plan to fix the third one charged
+   * for the other four, which is why this exists at all — and the new take
+   * stands in the same place as the old one, so the cut around it survives.
+   */
+  const redoShot = async (index: number, changeNote: string): Promise<void> => {
+    const take = takes[index];
+    const shot = plan.shots.find((candidate) => candidate.index === index);
+    if (projectId === null || model === undefined || take === undefined || shot === undefined) return;
+
+    const refined = refineShotPrompt(take.prompt, changeNote);
+    if (!refined.ok) {
+      setShotStates((current) => current.map((entry, position) => (position === index - 1 ? { kind: 'failed', message: refined.reason } : entry)));
+      return;
+    }
+
+    setRedoing(index);
+    setNoteFor(null);
+    setNote('');
+    const mark = (state: ShotState): void =>
+      setShotStates((current) => current.map((entry, position) => (position === index - 1 ? state : entry)));
+    mark({ kind: 'running', stage: 'submitting' });
+
+    const result = await generateShot({
+      projectId,
+      modelId: model.id,
+      prompt: refined.prompt,
+      aspectRatio,
+      durationSeconds: shot.durationSeconds,
+      // The same frame this shot started from, so a redo continues from where
+      // the one before it left off rather than from nothing.
+      ...(take.startFrame === undefined ? {} : { referenceImage: take.startFrame }),
+      onProgress: (stage) => mark({ kind: 'running', stage })
+    });
+    setRedoing(null);
+
+    if (!result.ok) {
+      mark({ kind: 'failed', message: result.message });
+      return;
+    }
+
+    const project = readProject(projectId);
+    if (project === null) {
+      mark({ kind: 'failed', message: 'The project could not be read to save this take.' });
+      return;
+    }
+
+    /*
+      Standing in for the previous take where there is one to stand in for.
+
+      Without a clip to replace — the first take failed, or its clip has since
+      been deleted — the new take is appended instead. Appending is the honest
+      fallback: the take exists and was paid for, so it belongs in the project
+      even when the editor cannot say exactly where.
+    */
+    const placed =
+      take.clipId === undefined
+        ? appendAssetToTimeline(project, result.asset)
+        : replaceTakeInTimeline(project, take.clipId, result.asset) ?? appendAssetToTimeline(project, result.asset);
+    if (placed === null) {
+      mark({ kind: 'failed', message: 'The take was generated but no video track would take it.' });
+      return;
+    }
+
+    setTakes((current) => ({
+      ...current,
+      [index]: {
+        ...take,
+        prompt: refined.prompt,
+        takeNumber: take.takeNumber + 1,
+        ...(take.clipId === undefined && clipIdForAsset(placed, result.asset.id) !== null
+          ? { clipId: clipIdForAsset(placed, result.asset.id) as string }
+          : {})
+      }
+    }));
+    mark({ kind: 'done' });
   };
 
   const start = (): void => {
@@ -225,7 +352,7 @@ export function PlanScreen({
         </>
       )}
 
-      <Text style={styles.label}>Prompt · used for every shot</Text>
+      <Text style={styles.label}>Scenario · carried by every shot</Text>
       <TextInput
         ref={promptInput}
         onFocus={() => reveal(promptInput.current)}
@@ -242,16 +369,80 @@ export function PlanScreen({
         {plan.shots.length} shot{plan.shots.length === 1 ? '' : 's'} · accepts{' '}
         {supportedShotSeconds(model.providerId).join('/')}s
       </Text>
-      {plan.shots.map((shot) => (
-        <View key={shot.index} style={styles.shot}>
-          <Text style={styles.shotIndex}>{String(shot.index).padStart(2, '0')}</Text>
-          <Text style={styles.shotBody}>
-            {shot.startSeconds}s → {shot.startSeconds + shot.durationSeconds}s
-          </Text>
-          <Text style={styles.shotLen}>{shot.durationSeconds}s</Text>
-          <ShotStatus state={shotStates[shot.index - 1] ?? { kind: 'idle' }} />
-        </View>
-      ))}
+      {plan.shots.map((shot) => {
+        const take = takes[shot.index];
+        const revisions = take === undefined ? [] : revisionsOf(take.prompt);
+        return (
+          <View key={shot.index}>
+            <View style={styles.shot}>
+              <Text style={styles.shotIndex}>{String(shot.index).padStart(2, '0')}</Text>
+              <Text style={styles.shotBody}>
+                {shot.startSeconds}s → {shot.startSeconds + shot.durationSeconds}s
+              </Text>
+              <Text style={styles.shotLen}>{shot.durationSeconds}s</Text>
+              <ShotStatus state={shotStates[shot.index - 1] ?? { kind: 'idle' }} />
+            </View>
+
+            {/* What happens in this shot, on top of the scenario. Empty means
+                the scenario alone, which is what every shot used to get. */}
+            <TextInput
+              style={styles.shotInput}
+              value={descriptions[shot.index] ?? ''}
+              onChangeText={(value) => setDescriptions((current) => ({ ...current, [shot.index]: value }))}
+              placeholder={`Shot ${shot.index} — what happens here (optional)`}
+              placeholderTextColor={theme.textWeaker}
+              multiline
+              accessibilityLabel={`Description for shot ${shot.index}`}
+            />
+
+            {take !== undefined && (
+              <View style={styles.takeRow}>
+                <Text style={styles.takeLabel}>
+                  {takeLabel(take.takeNumber)}
+                  {revisions.length > 0 ? ` · ${revisions.length} change${revisions.length === 1 ? '' : 's'}` : ''}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={running || redoing !== null}
+                  onPress={() => {
+                    setNote('');
+                    setNoteFor(noteFor === shot.index ? null : shot.index);
+                  }}
+                  style={press([styles.redo, (running || redoing !== null) && styles.approveOff])}
+                >
+                  <Text style={styles.redoText}>{redoing === shot.index ? 'Redoing…' : 'Redo with a note'}</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {revisions.length > 0 && (
+              <Text style={styles.body}>{revisions.map((revision, order) => `${order + 1}. ${revision}`).join('  ')}</Text>
+            )}
+
+            {noteFor === shot.index && (
+              <View>
+                <TextInput
+                  style={styles.input}
+                  value={note}
+                  onChangeText={setNote}
+                  placeholder="What to change — slower, no text on screen…"
+                  placeholderTextColor={theme.textWeaker}
+                  multiline
+                  accessibilityLabel={`What to change about shot ${shot.index}`}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={note.trim().length === 0}
+                  onPress={() => void redoShot(shot.index, note)}
+                  style={press([styles.approve, note.trim().length === 0 && styles.approveOff])}
+                >
+                  <Text style={styles.approveText}>Generate this shot again</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        );
+      })}
       {shotStates.map((state, index) =>
         state.kind === 'failed' ? (
           <Text key={`failed-${index}`} style={styles.warn}>
@@ -366,6 +557,30 @@ const styles = StyleSheet.create({
   statusDone: { color: theme.mint },
   statusFailed: { color: theme.danger },
   approveOff: { opacity: 0.35 },
+  shotInput: {
+    minHeight: MIN_TAP,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.line,
+    backgroundColor: theme.surface,
+    color: theme.text,
+    fontSize: 14,
+    textAlignVertical: 'top'
+  },
+  takeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
+  takeLabel: { flex: 1, color: theme.textWeak, fontSize: 13 },
+  redo: {
+    justifyContent: 'center',
+    minHeight: MIN_TAP,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.line
+  },
+  redoText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
   approve: { marginTop: 14, minHeight: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
   approveText: { color: theme.bg, fontSize: 15, fontWeight: '700' }
 });

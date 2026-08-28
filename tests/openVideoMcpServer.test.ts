@@ -676,4 +676,31 @@ describe('OpenScene TypeMCP Server and Tool declarations', () => {
     const reopened = await projectStore.open(project.id);
     expect(reopened?.timeline.tracks[0]!.clips).toHaveLength(2);
   });
+
+  it('composes a shot prompt, and refines one without losing what it already said', () => {
+    const server = new OpenVideoMcpServer();
+
+    const first = server.composeShotPrompt({
+      scenario: 'A courier cycles through a wet city at night',
+      description: 'Close on the front wheel throwing spray',
+      shotIndex: 2,
+      shotCount: 4,
+      durationSeconds: 8,
+      continuesFromFrame: true
+    });
+    expect(first).toMatchObject({ success: true });
+    const prompt = (first as { prompt: string }).prompt;
+    expect(prompt).toContain('Close on the front wheel throwing spray');
+    expect(prompt).toContain('Shot 2 of 4, 8s.');
+
+    const refined = server.composeShotPrompt({ previousPrompt: prompt, change: 'Slower camera move' });
+    expect(refined).toMatchObject({ success: true, revisions: ['Slower camera move'] });
+    // The take being refined is still described in full: a rewrite would lose
+    // the wardrobe, lens and location nobody mentioned in the note.
+    expect((refined as { prompt: string }).prompt).toContain('Close on the front wheel throwing spray');
+
+    // Half a refinement is refused rather than guessed at.
+    expect(server.composeShotPrompt({ previousPrompt: prompt })).toMatchObject({ success: false });
+    expect(server.composeShotPrompt({})).toMatchObject({ success: false });
+  });
 });

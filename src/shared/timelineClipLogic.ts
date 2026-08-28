@@ -150,6 +150,41 @@ export function trimClipRight(timeline: TimelineDocument, input: TrimClipRightIn
   });
 }
 
+/**
+ * Point a clip at a different file without moving anything.
+ *
+ * A regenerated take of a shot is a new file that stands in the same place: the
+ * cut around it has not changed, and everything after it must not slide because
+ * the second take came back a few frames longer. So the clip keeps its start
+ * and its length, and only its source changes.
+ *
+ * Refused rather than shortened when the new file is too short to fill the
+ * clip. A take that cannot cover the shot is a take to run again, not a hole to
+ * paper over by quietly retiming the cut.
+ */
+export function replaceClipSource(
+  timeline: TimelineDocument,
+  input: { readonly clipId: string; readonly assetId: string; readonly sourceDurationMs: number }
+): TimelineDocument | null {
+  const located = findClip(timeline, input.clipId);
+  if (located === null || !isOpaqueId(input.assetId) || !isFiniteNonNegative(input.sourceDurationMs)) return null;
+
+  // The span of source the clip consumes, which is its timeline length times
+  // its speed — a retimed clip needs more or less of the file than it shows.
+  const spanMs = located.clip.sourceEndMs - located.clip.sourceStartMs;
+  if (spanMs <= 0 || input.sourceDurationMs < spanMs) return null;
+
+  return replaceClip(timeline, located, {
+    ...located.clip,
+    assetId: input.assetId,
+    // From the top of the new file: a second take has no reason to share the
+    // first one's in-point, and there is nothing before it to trim away.
+    sourceStartMs: 0,
+    sourceEndMs: spanMs,
+    sourceDurationMs: input.sourceDurationMs
+  });
+}
+
 export function updateClipEffects(timeline: TimelineDocument, input: UpdateClipEffectsInput): TimelineDocument | null {
   const located = findClip(timeline, input.clipId);
   if (located === null || !hasOnlyClipEffectKeys(input.effects)) return null;

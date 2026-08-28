@@ -24,6 +24,9 @@ import { estimateVideoPlanCost, formatCostEstimate, estimateImageCost, estimateS
 import { describeSpend } from '../shared/generationSpend';
 import type { GenerationSpendStore } from './generationSpendStore';
 import { MAX_SUPPORTED_SHOT_SECONDS, planVideoStoryboard, supportedShotSeconds } from '../shared/videoStoryboardPlan';
+// Aliased because the tool below carries the same name: the tool is the seam,
+// the rule is what it calls.
+import { composeShotPrompt as composeShotPromptRule, refineShotPrompt, revisionsOf } from '../shared/shotPrompt';
 import { checkNarrationFit, narrationBudget, detectScriptKind } from '../shared/narrationTiming';
 import { getDomainModel, getDefaultDomainModelId } from '../shared/aiDomainModels';
 import {
@@ -170,6 +173,73 @@ export class OpenVideoMcpServer {
           ? `${plan.shots.length} shot(s) totalling ${plan.totalSeconds}s.`
           : `${plan.shots.length} shot(s) totalling ${plan.totalSeconds}s; ${plan.roundedFrom}s was not reachable from this model's shot lengths. Tell the user the length changed.`) +
         ' Write one description per shot, repeating every continuity field in each. Then price the whole list with estimateGenerationCost.'
+    };
+  }
+
+  @McpTool({
+    description:
+      'Build the prompt for one shot, or the prompt for its next take after a change. Use this rather than ' +
+      'writing the prompt yourself: the phone and the desktop studio compose the same way, and a shot asked ' +
+      'for differently is a different shot. To refine, pass the previous take\'s exact prompt and a note about ' +
+      'what to change — the previous prompt is kept whole and the change added to it, because rewriting loses ' +
+      'the wardrobe, lens and location nobody mentioned. Read-only, spends nothing.',
+    input: z.object({
+      scenario: z.string().min(1).optional().describe('The whole piece, in the user\'s words. Required unless refining.'),
+      description: z.string().optional().describe('What happens in this shot in particular.'),
+      shotIndex: z.number().int().min(1).optional(),
+      shotCount: z.number().int().min(1).optional(),
+      durationSeconds: z.number().min(1).optional(),
+      continuesFromFrame: z
+        .boolean()
+        .optional()
+        .describe('True when the previous shot\'s last frame is supplied as this one\'s first.'),
+      previousPrompt: z.string().optional().describe('The exact prompt of the take being refined.'),
+      change: z.string().optional().describe('What to change about that take.')
+    })
+  })
+  composeShotPrompt(params: {
+    scenario?: string;
+    description?: string;
+    shotIndex?: number;
+    shotCount?: number;
+    durationSeconds?: number;
+    continuesFromFrame?: boolean;
+    previousPrompt?: string;
+    change?: string;
+  }) {
+    if (params.previousPrompt !== undefined || params.change !== undefined) {
+      if (params.previousPrompt === undefined || params.change === undefined) {
+        return { success: false, error: 'Refining needs both the previous take\'s prompt and what to change about it.' };
+      }
+      const refined = refineShotPrompt(params.previousPrompt, params.change);
+      if (!refined.ok) return { success: false, error: refined.reason };
+      return {
+        success: true,
+        prompt: refined.prompt,
+        revisions: revisionsOf(refined.prompt),
+        message:
+          'Pass this to createVideoJob as the prompt. Show the user the change list before spending, and reuse the ' +
+          'same length, aspect ratio and reference frame the previous take used, or it is a different shot.'
+      };
+    }
+
+    if (params.scenario === undefined || params.scenario.trim().length === 0) {
+      return { success: false, error: 'A shot prompt needs a scenario, or a previous prompt and a change.' };
+    }
+    const count = params.shotCount ?? 1;
+    const prompt = composeShotPromptRule({
+      scenario: params.scenario,
+      index: params.shotIndex ?? 1,
+      count,
+      durationSeconds: params.durationSeconds ?? 5,
+      ...(params.description === undefined ? {} : { description: params.description }),
+      continuity: count === 1 ? 'none' : params.continuesFromFrame === true ? 'from-frame' : 'restate'
+    });
+    return {
+      success: true,
+      prompt,
+      revisions: [],
+      message: 'Pass this to createVideoJob as the prompt. Price it with estimateGenerationCost first.'
     };
   }
 
