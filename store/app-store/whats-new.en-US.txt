@@ -1,6 +1,9 @@
-Timeline editing feels more natural.
+Change one shot without redoing the rest, and let the app check its own work.
 
-• Long-press a clip, then drag left or right to change its length
-• Extending a clip keeps its start fixed and grows only its trailing edge
+• Every shot in a plan can carry its own description
+• Redo one shot with a note — "slower, no text on screen"
+• Set a monthly limit on what generation may spend, and see the total
+• A cut that cannot come out right is refused before the export starts
+• The finished file is read back and compared with your cut
 
-Fixes: the whole clip no longer moves while you extend its length.
+Fixes: a short, silent or wrongly shaped export no longer reports success.

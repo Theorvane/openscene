@@ -2,7 +2,7 @@
   "expo": {
     "name": "OpenScene",
     "slug": "openscene",
-    "version": "0.5.2",
+    "version": "0.6.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "openscene",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sloki9637.openscene",
-      "buildNumber": "8",
+      "buildNumber": "9",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "OpenScene reads the videos you pick so you can put them on a timeline. It copies the ones you choose into the project and never scans your library on its own.",
         "NSPhotoLibraryAddUsageDescription": "OpenScene saves a finished export to your photo library when you ask it to.",
@@ -57,7 +57,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.sloki9637.openscene",
-      "versionCode": 7,
+      "versionCode": 8,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",

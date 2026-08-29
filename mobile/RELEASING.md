@@ -10,7 +10,7 @@ survive `expo prebuild` belongs in a config plugin, as the release signing does.
 | --- | --- |
 | Display name | OpenScene |
 | iOS bundle id / Android applicationId | `com.sloki9637.openscene` |
-| Version | `0.5.2` (`expo.version`) |
+| Version | `0.6.0` (`expo.version`) |
 | iOS build number | `expo.ios.buildNumber` |
 | Android version code | `expo.android.versionCode` |
 
