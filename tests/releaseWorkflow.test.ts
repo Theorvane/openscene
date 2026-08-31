@@ -72,6 +72,32 @@ describe('release workflow', () => {
     expect(workflow).toContain('codesign --verify --deep --strict');
   });
 
+  it('gives the signing certificate to macOS alone', () => {
+    /*
+      `CSC_LINK` is not a macOS variable. Handed to every leg of the matrix, it
+      signed the Windows installer with the Apple Developer ID — a certificate
+      Windows cannot chain to a trusted root — and every Windows update was then
+      refused as "not signed by the application owner".
+
+      `CSC_IDENTITY_AUTO_DISCOVERY: false` does not prevent this: it only stops
+      the search for a certificate, and an explicit one is still used.
+    */
+    expect(workflow).toContain("CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || '' }}");
+    expect(workflow).toContain(
+      "CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || '' }}"
+    );
+    // An unconditional certificate is exactly the bug; refuse it by shape.
+    expect(workflow).not.toMatch(/CSC_LINK: \$\{\{ secrets\./);
+    expect(workflow).not.toMatch(/CSC_KEY_PASSWORD: \$\{\{ secrets\./);
+  });
+
+  it('asks Windows for no signature it does not ship', () => {
+    // A signed build writes the certificate's subject into app-update.yml as the
+    // publisher name, and the updater then refuses anything that does not match.
+    // Unsigned, the check has nothing to compare against and refuses everything.
+    expect(builderConfig).toContain('verifyUpdateCodeSignature: false');
+  });
+
   it('describes each platform truthfully instead of calling every build unsigned', () => {
     expect(workflow).toMatch(/macOS builds are signed[^"]*notarized/);
     expect(workflow).toMatch(/Windows builds are unsigned/);

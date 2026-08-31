@@ -135,8 +135,17 @@ jobs:
           # Windows certificate exists, and auto-discovery there would only find
           # nothing slowly.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.platform == 'mac' }}
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          # The certificate goes to the macOS leg and nowhere else. `CSC_LINK` is
+          # not a macOS variable: on Windows electron-builder reads the same one
+          # and signs the installer with whatever PFX it points at, so handing it
+          # to every leg put an Apple Developer ID signature on the `.exe`.
+          # Windows cannot chain that to a trusted root, and signing also writes
+          # the certificate's subject into `app-update.yml` as the publisher name
+          # — which turns on a signature check that can then never pass. Every
+          # Windows update was refused with "not signed by the application
+          # owner", silently, from the user's side of it.
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
