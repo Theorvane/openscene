@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { AiDomain } from '../../shared/aiDomainModels';
+import { isDomainModelAvailableOnRuntime, type AiDomain } from '../../shared/aiDomainModels';
 import { agentModelGroupStatus, buildAgentModelGroups } from './agentModelPickerModel';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useLlmModel } from './LlmProviderContext';
@@ -93,7 +93,8 @@ export function DomainModelPicker({ domain, ariaLabel }: DomainModelPickerProps)
               </span>
             </div>
             {group.models.map((model) => {
-              const selectable = model.available && connected;
+              const runtimeAvailable = isDomainModelAvailableOnRuntime(model, 'desktop');
+              const selectable = runtimeAvailable && connected;
               const isActive = model.id === activeModel.id;
               return (
                 <button
@@ -103,7 +104,9 @@ export function DomainModelPicker({ domain, ariaLabel }: DomainModelPickerProps)
                   aria-selected={isActive}
                   className={`agent-model-picker__option${isActive ? ' agent-model-picker__option--active' : ''}`}
                   disabled={!selectable}
-                  title={selectable ? model.description : model.unavailableReason ?? `Connect ${model.providerLabel} in Settings → Providers first.`}
+                  title={selectable ? model.description : !runtimeAvailable
+                    ? model.unavailableReason
+                    : `Connect ${model.providerLabel} in Settings → Providers first.`}
                   onClick={() => {
                     setSelectedModelId(domain, model.id);
                     setIsOpen(false);

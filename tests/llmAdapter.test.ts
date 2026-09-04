@@ -256,6 +256,24 @@ describe('LlmExecutionAdapter (main process)', () => {
     }
   });
 
+  it('blocks AgentRouter chat until its OpenAI-compatible route preserves Edit Agent approvals', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'cred-test-agentrouter-'));
+    try {
+      const credentialStore = new CredentialStore(tempDir);
+      await credentialStore.setCredential('agentRouterApiKey', 'router-test-key');
+      const fetchMock = vi.fn<typeof fetch>();
+      const adapter = new LlmExecutionAdapter(credentialStore, { fetchImpl: fetchMock as unknown as typeof fetch });
+
+      const result = await adapter.executeCompletion({ modelId: 'agentrouter/claude-opus-4-8', prompt: 'Hi' });
+
+      expect(result).toMatchObject({ ok: false, providerId: 'agentrouter' });
+      expect(result.error).toContain('tool approvals');
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('returns an error for unknown model IDs without making a network call', async () => {
     const fetchMock = vi.fn();
     const adapter = new LlmExecutionAdapter(undefined, { fetchImpl: fetchMock as unknown as typeof fetch });

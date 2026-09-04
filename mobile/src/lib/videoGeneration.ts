@@ -7,10 +7,11 @@ import {
   type VideoProgressStage
 } from '@openvideo/shared/videoGeneration';
 import { getDomainModel } from '@openvideo/shared/aiDomainModels';
+import { getVideoProviderBinding, validateVideoRequest } from '@openvideo/shared/mediaCapabilityRegistry';
 
 import { estimateVideoCost } from '@openvideo/shared/mediaGenerationPricing';
 
-import { readKey, type ProviderSlot } from './credentials';
+import { readKey } from './credentials';
 import { chargeReservation, releaseReservation, reserveAgainstCap } from './spendLedger';
 import { projectMediaDir, type MobileAsset } from './projectStore';
 import videoExport, { isFrameExtractionAvailable } from '../../modules/video-export';
@@ -23,13 +24,6 @@ import videoExport, { isFrameExtractionAvailable } from '../../modules/video-exp
  * clip is several megabytes, and reading that into a JS string to write it back
  * out would cost the memory twice for no benefit.
  */
-
-const SLOTS: Readonly<Record<string, ProviderSlot>> = {
-  openai: 'openaiApiKey',
-  google_gemini: 'geminiApiKey',
-  runway: 'runwayApiKey',
-  luma: 'lumaApiKey'
-};
 
 export type GenerateShotInput = {
   readonly projectId: string;
@@ -56,10 +50,20 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
   if (model === undefined) return { ok: false, message: `${input.modelId} is not in the model catalog.` };
 
   const adapter = videoAdapterFor(model.providerId);
-  const slot = SLOTS[model.providerId];
-  if (adapter === undefined || slot === undefined) {
+  const binding = getVideoProviderBinding(model.id);
+  if (adapter === undefined || binding === undefined) {
     return { ok: false, message: `${model.providerLabel} has no adapter on this device yet.` };
   }
+
+  const operation = input.referenceImage === undefined ? 'text_to_video' : 'image_to_video';
+  const validation = validateVideoRequest({
+    modelId: model.id,
+    operation,
+    durationSeconds: input.durationSeconds,
+    aspectRatio: input.aspectRatio,
+    referenceImageCount: input.referenceImage === undefined ? 0 : 1
+  });
+  if (!validation.ok) return { ok: false, message: validation.message };
 
   /*
     The monthly ceiling, before anything is asked of a provider.
@@ -72,7 +76,7 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
   const reservation = reserveAgainstCap(estimate, new Date().toISOString());
   if (!reservation.ok) return { ok: false, message: reservation.reason };
 
-  const apiKey = await readKey(slot);
+  const apiKey = await readKey(binding.credentialKey);
   if (apiKey === null) {
     // Nothing was asked of a provider, so the room goes back.
     releaseReservation(reservation.id);
@@ -84,7 +88,7 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
     // use it: the alternative is an error mid-sequence, after the earlier shots
     // have already been paid for.
     const seed =
-      input.referenceImage !== undefined && supportsReferenceImage(model.providerId)
+      input.referenceImage !== undefined && supportsReferenceImage(model.id)
         ? input.referenceImage
         : undefined;
 

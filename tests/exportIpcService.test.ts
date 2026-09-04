@@ -9,6 +9,7 @@ import { ExportJobStore } from '../src/main/exportJobStore';
 import type { FfmpegExecution, StartFfmpegExportProcessInput } from '../src/main/ffmpegExportProcess';
 import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, TIMELINE_SCHEMA_VERSION } from '../src/shared/timelineTypes';
 import type { LocalProjectSnapshot } from '../src/shared/timelineTypes';
+import { createEmptyAiProjectDocument } from '../src/shared/aiProjectDomain';
 
 const SNAPSHOT: LocalProjectSnapshot = {
   schemaVersion: PROJECT_SCHEMA_VERSION,
@@ -27,6 +28,7 @@ const SNAPSHOT: LocalProjectSnapshot = {
     createdAt: '2026-07-22T00:00:00.000Z',
     updatedAt: '2026-07-22T00:00:00.000Z'
   }],
+  ai: createEmptyAiProjectDocument(),
   timeline: {
     schemaVersion: TIMELINE_SCHEMA_VERSION,
     tracks: [{

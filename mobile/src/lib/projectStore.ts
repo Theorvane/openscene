@@ -8,6 +8,12 @@ import { isStill, stillClipSource } from '@openvideo/shared/timelineStills';
 
 import { createInitialTimeline } from '@openvideo/shared/timelineLogic';
 import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, type TimelineDocument } from '@openvideo/shared/timelineTypes';
+import {
+  createEmptyAiProjectDocument,
+  parseAiProjectDocument,
+  removeAssetFromAiProjectDocument,
+  type AiProjectDocument
+} from '@openvideo/shared/aiProjectDomain';
 
 /**
  * Projects live inside the app's own storage.
@@ -72,6 +78,7 @@ export type MobileProject = {
   readonly updatedAt: string;
   readonly assets: readonly MobileAsset[];
   readonly timeline: TimelineDocument;
+  readonly ai: AiProjectDocument;
   /**
    * The frame this project exports into.
    *
@@ -140,11 +147,19 @@ export function readProject(id: string): MobileProject | null {
   try {
     const parsed: unknown = JSON.parse(file.textSync());
     const candidate = parsed as Partial<MobileProject>;
+    const storedSchemaVersion = (parsed as { readonly schemaVersion?: unknown }).schemaVersion;
+    const isLegacyV3 = storedSchemaVersion === 3;
+    if (!isLegacyV3 && storedSchemaVersion !== PROJECT_SCHEMA_VERSION) return null;
     // The timeline goes through the shared validator rather than being trusted:
     // a file edited or truncated between sessions must not become a document the
     // editing rules then operate on.
     const timeline = parseTimelineDocument(candidate.timeline);
     if (timeline === null || typeof candidate.id !== 'string' || typeof candidate.name !== 'string') return null;
+    const assets = dedupeAssets(Array.isArray(candidate.assets) ? (candidate.assets as MobileAsset[]) : []);
+    const ai = isLegacyV3 && candidate.ai === undefined
+      ? createEmptyAiProjectDocument()
+      : parseAiProjectDocument(candidate.ai, new Set(assets.map((asset) => asset.id)));
+    if (ai === null) return null;
     return {
       schemaVersion: PROJECT_SCHEMA_VERSION,
       id: candidate.id,
@@ -154,8 +169,9 @@ export function readProject(id: string): MobileProject | null {
       // Deduplicated on the way in: projects written before the placement bug
       // was fixed hold the same asset twice, which renders as duplicate keys and
       // counts double against the library. The first record wins.
-      assets: dedupeAssets(Array.isArray(candidate.assets) ? (candidate.assets as MobileAsset[]) : []),
+      assets,
       timeline,
+      ai,
       // A stored preference nobody recognises reads as absent, which is the
       // footage deciding — the same answer a project written before this had.
       ...(isFramePreference(candidate.frame) ? { frame: candidate.frame } : {})
@@ -181,7 +197,8 @@ export function createProject(name: string): MobileProject {
     createdAt: now,
     updatedAt: now,
     assets: [],
-    timeline: createInitialTimeline()
+    timeline: createInitialTimeline(),
+    ai: createEmptyAiProjectDocument()
   };
   writeProject(project);
   return project;
@@ -191,7 +208,9 @@ export function writeProject(project: MobileProject): void {
   ensureRoot();
   const dir = projectDir(project.id);
   if (!dir.exists) dir.create({ intermediates: true });
-  projectFile(project.id).write(JSON.stringify({ ...project, updatedAt: new Date().toISOString() }));
+  const ai = parseAiProjectDocument(project.ai, new Set(project.assets.map((asset) => asset.id)));
+  if (ai === null) throw new Error('Invalid AI project document.');
+  projectFile(project.id).write(JSON.stringify({ ...project, schemaVersion: PROJECT_SCHEMA_VERSION, ai, updatedAt: new Date().toISOString() }));
   announce();
 }
 
@@ -443,7 +462,8 @@ export function deleteAsset(projectId: string, assetId: string): MobileProject |
         ...track,
         clips: track.clips.filter((clip) => clip.assetId !== assetId)
       }))
-    }
+    },
+    ai: removeAssetFromAiProjectDocument(project.ai, assetId)
   };
   writeProject(updated);
   return updated;

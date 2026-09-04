@@ -128,7 +128,12 @@ export const AGENT_TOOLS: readonly AgentTool[] = [
     run: async (args) => {
       const providerId = text(args, 'providerId', 'openai');
       const modelId = text(args, 'modelId', 'sora-2');
-      const plan = planVideoStoryboard({ totalSeconds: number(args, 'totalSeconds', 30), providerId });
+      const model = getDomainModels('video-generation').find((entry) => entry.id === modelId);
+      const plan = planVideoStoryboard({
+        totalSeconds: number(args, 'totalSeconds', 30),
+        providerId: model?.providerId ?? providerId,
+        ...(model === undefined ? {} : { modelId: model.id })
+      });
       const cost = estimateVideoPlanCost(
         plan.shots.map((shot) => ({ modelId, durationSeconds: shot.durationSeconds }))
       );

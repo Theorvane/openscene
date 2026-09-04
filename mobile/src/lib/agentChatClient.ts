@@ -2,6 +2,10 @@ import { getLlmProvider, type LlmProviderInfo } from '@openvideo/shared/llmProvi
 import { readSlot } from './credentials';
 import { customCredentialKey, findCustomProvider, isCustomProviderId } from './customProviders';
 import { chatGptCredentials } from './openAiSignIn';
+import {
+  AGENT_ROUTER_EDIT_AGENT_UNAVAILABLE_REASON,
+  AGENT_ROUTER_PROVIDER_ID
+} from '@openvideo/shared/agentRouter';
 
 /**
  * A tool-calling chat turn, spoken directly from the device.
@@ -91,6 +95,9 @@ export async function sendChatTurn(input: {
   }
 
   const label = custom?.label ?? provider?.label ?? input.providerId;
+  if (input.providerId === AGENT_ROUTER_PROVIDER_ID) {
+    return { ok: false, message: AGENT_ROUTER_EDIT_AGENT_UNAVAILABLE_REASON };
+  }
   const endpoint =
     custom !== undefined ? `${custom.baseUrl.replace(/\/$/, '')}/chat/completions` : endpointFor(provider as LlmProviderInfo);
   if (endpoint === null) {

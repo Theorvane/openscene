@@ -10,13 +10,14 @@ import {
 } from '../src/renderer/src/workspaceTabs';
 
 describe('workspace tabs', () => {
-  it('switches between the editor and the three generation studios, starting on the editor', () => {
+  it('switches between the editor, Writer, and the three generation studios, starting on the editor', () => {
     // Image sits last because it feeds the others: a generated still is usually
     // the seed for image-to-video rather than the finished artefact.
-    expect(WORKSPACE_TAB_IDS).toEqual(['edit', 'voice', 'video', 'image']);
+    expect(WORKSPACE_TAB_IDS).toEqual(['edit', 'writer', 'voice', 'video', 'image']);
     expect(WORKSPACE_DEFAULT_TAB_ID).toBe('edit');
     expect(WORKSPACE_TAB_IDS.map((id) => WORKSPACE_TAB_LABELS[id])).toEqual([
       'Editing',
+      'Writer',
       'Voice Generation',
       'Video Generation',
       'Image Generation'
@@ -26,6 +27,7 @@ describe('workspace tabs', () => {
 
   it('falls back to the editor for anything unrecognised rather than a blank area', () => {
     expect(parseWorkspaceTabId('voice')).toBe('voice');
+    expect(parseWorkspaceTabId('writer')).toBe('writer');
     expect(parseWorkspaceTabId('video')).toBe('video');
     expect(parseWorkspaceTabId('image')).toBe('image');
     expect(parseWorkspaceTabId(null)).toBe('edit');

@@ -13,6 +13,7 @@ export type CredentialStatusMap = Record<string, boolean>;
 
 /** Slots that must always appear in the status map, even before anything is stored. */
 const ALWAYS_REPORTED_CREDENTIAL_KEYS = [
+  'agentRouterApiKey',
   'openaiApiKey',
   'anthropicApiKey',
   'geminiApiKey',

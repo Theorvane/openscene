@@ -7,6 +7,7 @@ import * as SecureStore from 'expo-secure-store';
  * is readable by anything that can read the bundle.
  */
 export const PROVIDER_KEYS = [
+  { slot: 'agentRouterApiKey', label: 'AgentRouter', hint: 'AgentRouter API key', providerId: 'agentrouter' },
   { slot: 'openaiApiKey', label: 'OpenAI', hint: 'sk-…', providerId: 'openai' },
   { slot: 'geminiApiKey', label: 'Google Gemini', hint: 'AIza…', providerId: 'google_gemini' },
   { slot: 'bytePlusApiKey', label: 'BytePlus ModelArk', hint: 'Bearer token', providerId: 'byteplus' },

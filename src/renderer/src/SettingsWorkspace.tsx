@@ -17,6 +17,7 @@ import { useTheme } from './ThemeProvider';
 import { THEME_PRESETS } from './theme';
 import { Button, MetadataList, Panel, PanelHeading, StatusCard } from './ui';
 import { classNames } from './ui/classNames';
+import { BrowserSessionSettings } from './BrowserSessionSettings';
 
 const SETTINGS_SECTIONS = [
   { id: 'appearance', title: 'Appearance', description: 'Theme mode and command desk presets.' },
@@ -373,6 +374,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
             )}
 
             <StatusCard tone="neutral">API keys live in main-process safe storage, are write-only from this screen, and are never rendered back.</StatusCard>
+            <BrowserSessionSettings />
             {connectTarget !== null && connectTarget.credentialKey !== undefined && (
               <ProviderConnectDialog
                 provider={connectTarget}

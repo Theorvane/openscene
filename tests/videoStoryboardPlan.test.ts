@@ -17,6 +17,9 @@ describe('shot length rules', () => {
     expect(supportedShotSeconds('google_gemini')).toEqual([4, 6, 8]);
     // An unknown engine gets the conservative pair rather than a guess.
     expect(supportedShotSeconds('kling')).toEqual([4, 8]);
+    expect(supportedShotSeconds('veo-3.0-generate-001')).toEqual([8]);
+    expect(supportedShotSeconds('gen4.5')).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(supportedShotSeconds('seedance2')).toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
   });
 });
 
@@ -120,7 +123,7 @@ describe('one shot-length table', () => {
     // The schema used to carry .max(10) while the planner emitted 12s shots for
     // Sora, so a priced and approved shot was rejected at the tool boundary —
     // the exact failure the planner exists to prevent.
-    expect(MAX_SUPPORTED_SHOT_SECONDS).toBe(12);
+    expect(MAX_SUPPORTED_SHOT_SECONDS).toBe(15);
     expect(mcp).toContain('.max(MAX_SUPPORTED_SHOT_SECONDS)');
     expect(mcp).not.toMatch(/durationSeconds: z\.number\(\)\.min\(1\)\.max\(\d/);
 
@@ -136,7 +139,8 @@ describe('one shot-length table', () => {
     const ui = readFileSync(resolve(process.cwd(), 'src/renderer/src/VideoGenerationWorkspace.tsx'), 'utf8');
 
     // Then
-    expect(ui).toContain("import { supportedShotSeconds } from '../../shared/videoStoryboardPlan'");
+    expect(ui).toContain("from '../../shared/mediaCapabilityRegistry'");
+    expect(ui).toContain('getVideoOperationConstraints(videoModel.id, selectedOperation)');
     expect(ui).not.toMatch(/return \[4, 8, 12\]/);
   });
 });
@@ -151,13 +155,13 @@ describe('the adapter reads the same table', () => {
     // Then
     // A length the table knows and the adapter does not would be snapped to a
     // different duration than the one the user was quoted and approved.
-    expect(adapters).toContain("supportedShotSeconds('openai')");
+    expect(adapters).toContain("supportedShotSeconds('sora-2')");
     expect(adapters).not.toMatch(/SORA_ALLOWED_SECONDS = \[4, 8, 12\]/);
   });
 
   it('keeps snapping to a legal length', async () => {
     const { snapSoraSeconds, SORA_ALLOWED_SECONDS } = await import('../src/main/mediaGenerationAdapters');
-    expect([...SORA_ALLOWED_SECONDS]).toEqual([...supportedShotSeconds('openai')]);
+    expect([...SORA_ALLOWED_SECONDS]).toEqual([...supportedShotSeconds('sora-2')]);
     for (const requested of [1, 5, 7, 11, 30]) {
       expect(SORA_ALLOWED_SECONDS).toContain(snapSoraSeconds(requested));
     }

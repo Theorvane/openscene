@@ -15,6 +15,7 @@ import { PlanScreen } from './src/screens/PlanScreen';
 import { ProjectsScreen } from './src/screens/ProjectsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { VoiceScreen } from './src/screens/VoiceScreen';
+import { WriterScreen } from './src/screens/WriterScreen';
 import { assetUri, readProject } from './src/lib/projectStore';
 import { useProject } from './src/lib/useProject';
 import { exportReviewSummary } from '@openvideo/shared/exportReview';
@@ -27,6 +28,7 @@ import {
   ClapperIcon,
   GearIcon,
   PictureIcon,
+  PencilIcon,
   SparkIcon,
   StackIcon,
   TimelineIcon,
@@ -47,6 +49,7 @@ import { MIN_TAP, press } from './src/lib/touch';
  */
 const PROJECT_TABS = [
   { id: 'edit', label: 'Edit', Icon: TimelineIcon },
+  { id: 'writer', label: 'Writer', Icon: PencilIcon },
   { id: 'video', label: 'Video', Icon: ClapperIcon },
   { id: 'voice', label: 'Voice', Icon: WaveIcon },
   { id: 'image', label: 'Image', Icon: PictureIcon },
@@ -340,6 +343,9 @@ function Shell() {
 
       <View style={styles.body} onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}>
         {tab === 'edit' && <EditScreen topInset={0} projectId={route.projectId} />}
+        {tab === 'writer' && (
+          <WriterScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
+        )}
         {tab === 'video' && (
           <PlanScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
         )}

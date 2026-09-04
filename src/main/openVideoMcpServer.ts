@@ -157,12 +157,12 @@ export class OpenVideoMcpServer {
       return { success: false, error: `Model ${modelId} is not a video-generation model.` };
     }
 
-    const plan = planVideoStoryboard({ totalSeconds: params.totalSeconds, providerId: model.providerId });
+    const plan = planVideoStoryboard({ totalSeconds: params.totalSeconds, providerId: model.providerId, modelId: model.id });
     return {
       success: true,
       modelId,
       providerLabel: model.providerLabel,
-      supportedShotSeconds: supportedShotSeconds(model.providerId),
+      supportedShotSeconds: supportedShotSeconds(model.id),
       totalSeconds: plan.totalSeconds,
       requestedSeconds: plan.requestedSeconds,
       roundedFrom: plan.roundedFrom,
@@ -347,7 +347,7 @@ export class OpenVideoMcpServer {
       prompt: z.string().min(1, 'Prompt is required'),
       aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
       // Derived, not a literal: see MAX_SUPPORTED_SHOT_SECONDS.
-      durationSeconds: z.number().min(1).max(MAX_SUPPORTED_SHOT_SECONDS).default(5),
+      durationSeconds: z.number().min(1).max(MAX_SUPPORTED_SHOT_SECONDS).optional(),
       stylePreset: z.string().optional().default('Cinematic'),
       modelId: z.string().optional(),
       referenceImageJobId: z
@@ -383,7 +383,7 @@ export class OpenVideoMcpServer {
     const job = await createVideoGenerationJob({
       prompt: params.prompt,
       aspectRatio: params.aspectRatio ?? '16:9',
-      durationSeconds: params.durationSeconds ?? 5,
+      ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
       stylePreset: params.stylePreset ?? 'Cinematic',
       ...(params.modelId === undefined ? {} : { modelId: params.modelId }),
       ...(referenceImage === undefined ? {} : { referenceImage })

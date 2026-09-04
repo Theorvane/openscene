@@ -7,7 +7,7 @@ import {
   resolveVisibleClip,
   sourceTimeForClip
 } from '../src/shared/timelinePlayback';
-import { DEFAULT_AUDIO_TRACK_MIX, DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION } from '../src/shared/timelineTypes';
+import { DEFAULT_AUDIO_TRACK_MIX, DEFAULT_CLIP_EFFECTS, TIMELINE_SCHEMA_VERSION } from '../src/shared/timelineTypes';
 import type { PersistedTimelineClip, TimelineDocument } from '../src/shared/timelineTypes';
 
 function clip(input: {
@@ -32,7 +32,7 @@ function clip(input: {
 }
 
 function timelineOf(tracks: TimelineDocument['tracks']): TimelineDocument {
-  return { schemaVersion: PROJECT_SCHEMA_VERSION, tracks, transitions: [] };
+  return { schemaVersion: TIMELINE_SCHEMA_VERSION, tracks, transitions: [] };
 }
 
 describe('what plays at a moment', () => {

@@ -56,37 +56,23 @@ describe('shared video generation', () => {
     expect(ready.headers).toEqual({ 'x-goog-api-key': 'gemini-key' });
   });
 
-  it('squares a 1:1 request to 16:9 for Veo, which does not render square', async () => {
-    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      if (url.endsWith(':predictLongRunning')) {
-        expect(JSON.parse(init.body as string).parameters.aspectRatio).toBe('16:9');
-        return new Response(JSON.stringify({ name: 'operations/x' }), { status: 200 });
-      }
-      return new Response(
-        JSON.stringify({
-          done: true,
-          response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://files/x.mp4' } }] } }
-        }),
-        { status: 200 }
-      );
-    });
-
-    await requestVeoVideo({
+  it('rejects a square Veo request before contacting the provider', async () => {
+    const fetchMock = vi.fn();
+    await expect(requestVeoVideo({
       apiKey: 'k',
       modelId: 'veo-3.0-generate-001',
       prompt: 'p',
       aspectRatio: '1:1',
       durationSeconds: 8,
-      pollIntervalMs: 0,
       fetchImpl: fetchMock as unknown as typeof fetch
-    });
+    })).rejects.toThrow(/accepts 16:9/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('snaps a Sora request to an accepted length and points at the content URL', async () => {
+  it('sends an accepted Sora length unchanged and points at the content URL', async () => {
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
       if (url === 'https://api.openai.com/v1/videos') {
         const body = JSON.parse(init.body as string);
-        // 9s is not an accepted Sora length; the nearest one is 8.
         expect(body.seconds).toBe('8');
         expect(body.size).toBe('1280x720');
         return new Response(JSON.stringify({ id: 'video_1' }), { status: 200 });
@@ -99,13 +85,22 @@ describe('shared video generation', () => {
       modelId: 'sora-2',
       prompt: 'p',
       aspectRatio: '16:9',
-      durationSeconds: 9,
+      durationSeconds: 8,
       pollIntervalMs: 0,
       fetchImpl: fetchMock as unknown as typeof fetch
     });
 
     expect(ready.url).toBe('https://api.openai.com/v1/videos/video_1/content');
     expect(ready.headers).toEqual({ Authorization: 'Bearer sk-test' });
+  });
+
+  it('rejects an illegal Sora duration before contacting the provider', async () => {
+    const fetchMock = vi.fn();
+    await expect(requestSoraVideo({
+      apiKey: 'sk-test', modelId: 'sora-2', prompt: 'p', aspectRatio: '16:9', durationSeconds: 9,
+      fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/accepts 4, 8, 12 second/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('surfaces a provider-side failure instead of returning an unusable job', async () => {
@@ -165,7 +160,7 @@ describe('shared video generation', () => {
         durationSeconds: 8,
         referenceImage: { mimeType: 'image/png', base64: 'AAA' }
       })
-    ).rejects.toThrow(/reference images are not supported/);
+    ).rejects.toThrow(/does not implement that request path/);
   });
 
   it('snaps only to lengths the shared table publishes', () => {
@@ -221,24 +216,17 @@ describe('shared video generation', () => {
     expect(ready.providerJobId).toBe('task_1');
   });
 
-  it('renders a square Runway request as landscape rather than being rejected', async () => {
-    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      if (url.endsWith('/text_to_video')) {
-        // Every Runway text-to-video model takes landscape or portrait only.
-        expect(JSON.parse(init.body as string).ratio).toBe('1280:720');
-        return new Response(JSON.stringify({ id: 't' }), { status: 200 });
-      }
-      return new Response(JSON.stringify({ status: 'SUCCEEDED', output: ['https://cdn/a.mp4'] }), { status: 200 });
-    });
-    await requestRunwayVideo({
+  it('rejects a square Runway request before contacting the provider', async () => {
+    const fetchMock = vi.fn();
+    await expect(requestRunwayVideo({
       apiKey: 'k',
       modelId: 'gen4.5',
       prompt: 'p',
       aspectRatio: '1:1',
       durationSeconds: 5,
-      pollIntervalMs: 0,
       fetchImpl: fetchMock as unknown as typeof fetch
-    });
+    })).rejects.toThrow(/accepts 16:9 or 9:16/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('reports a cancelled Runway task as a failure, not a silent success', async () => {
@@ -371,7 +359,7 @@ describe('shared video generation', () => {
         durationSeconds: 5,
         referenceImage: { mimeType: 'image/jpeg', base64: 'QUJD' }
       })
-    ).rejects.toThrow(/hosted image URL/);
+    ).rejects.toThrow(/does not implement that request path/);
   });
 
   it('claims continuity only where a frame can actually be sent', () => {

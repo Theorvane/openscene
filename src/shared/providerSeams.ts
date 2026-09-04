@@ -40,8 +40,9 @@ export interface VideoGenerationRequest {
   prompt: string;
   /** Optional image-to-video seed. */
   referenceImage?: ReferenceImageSelection;
-  aspectRatio: '16:9' | '9:16' | '1:1';
-  durationSeconds: number;
+  aspectRatio: VideoAspectRatio;
+  /** Omit to use the selected model's first supported duration. */
+  durationSeconds?: number;
   stylePreset?: string;
   mode?: ProviderExecutionMode;
   provider?: VideoGenerationProviderId;
@@ -63,7 +64,7 @@ export interface VideoGenerationJob {
   mode: ProviderExecutionMode;
   status: ProviderJobStatus;
   prompt: string;
-  aspectRatio: '16:9' | '9:16' | '1:1';
+  aspectRatio: VideoAspectRatio;
   durationSeconds: number;
   stylePreset?: string;
   providerJobId?: string;
@@ -173,3 +174,4 @@ export interface ImageGenerationProvider {
   createJob(request: ImageGenerationRequest): Promise<ImageGenerationJob>;
   getJob(jobId: string): Promise<ImageGenerationJob>;
 }
+import type { VideoAspectRatio } from './mediaCapabilityRegistry';

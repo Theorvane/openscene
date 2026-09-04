@@ -8,6 +8,7 @@ import {
 } from '../src/renderer/src/editor/dockTabs';
 import { createInitialTimeline } from '../src/shared/timelineLogic';
 import type { LocalProjectSnapshot, MediaAsset } from '../src/shared/timelineTypes';
+import { createEmptyAiProjectDocument } from '../src/shared/aiProjectDomain';
 
 function makeAsset(overrides: Partial<MediaAsset> = {}): MediaAsset {
   return {
@@ -33,7 +34,8 @@ function makeProject(overrides: Partial<LocalProjectSnapshot> = {}): LocalProjec
     createdAt: '2026-07-20T10:00:00.000Z',
     id: 'project-1',
     name: 'Launch reel',
-    schemaVersion: 3,
+    schemaVersion: 4,
+    ai: createEmptyAiProjectDocument(),
     timeline: createInitialTimeline(),
     updatedAt: '2026-07-20T10:00:00.000Z',
     ...overrides

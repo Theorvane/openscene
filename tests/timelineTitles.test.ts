@@ -6,7 +6,7 @@ import { compileFfmpegTimeline, escapeDrawtext } from '../src/shared/ffmpegTimel
 import { DEFAULT_TITLE_LENGTH_MS, addTitle, removeTitle, titleAt, updateTitle } from '../src/shared/timelineTitleLogic';
 import { parseTimelineDocument } from '../src/shared/timelineDocumentValidators';
 import { escapeFontPath, fontCandidates, supportsDrawtext } from '../src/shared/titleFont';
-import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, TIMELINE_SCHEMA_VERSION } from '../src/shared/timelineTypes';
+import { DEFAULT_CLIP_EFFECTS, TIMELINE_SCHEMA_VERSION } from '../src/shared/timelineTypes';
 
 /**
  * Words on the picture.

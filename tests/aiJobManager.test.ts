@@ -24,7 +24,7 @@ describe('AI Job Manager and cloud provider seams', () => {
     // Aleph edits a source video this build does not send, so job creation
     // refuses all three up front. Runway and Luma moved out of this list when
     // their adapters landed.
-    for (const modelId of ['kling-v2.5-turbo', 'minimax-hailuo-02', 'aleph2']) {
+    for (const modelId of ['kling-v2.5-turbo', 'minimax-hailuo-02', 'aleph2', 'grok-imagine-video-1.5']) {
       await expect(createVideoGenerationJob({
         prompt: `Test prompt for ${modelId}`,
         aspectRatio: '16:9',
@@ -38,7 +38,7 @@ describe('AI Job Manager and cloud provider seams', () => {
     const soraJob = await createVideoGenerationJob({
       prompt: 'Test prompt for Sora',
       aspectRatio: '16:9',
-      durationSeconds: 5,
+      durationSeconds: 4,
       modelId: 'sora-2'
     });
     const elevenJob = await createSpeechGenerationJob({
@@ -69,14 +69,25 @@ describe('AI Job Manager and cloud provider seams', () => {
   it('defaults each media domain to an available cloud model when no model id is supplied', async () => {
     const videoJob = await createVideoGenerationJob({
       prompt: 'Default model scene',
-      aspectRatio: '16:9',
-      durationSeconds: 5
+      aspectRatio: '16:9'
     });
     const speechJob = await createSpeechGenerationJob({ script: 'Default model narration', voiceId: '' });
 
     expect(videoJob.mode).toBe('api');
+    expect(videoJob.durationSeconds).toBe(4);
     expect(speechJob.mode).toBe('api');
     expect(videoJob.modelId).toBeDefined();
     expect(speechJob.modelId).toBeDefined();
+  });
+
+  it('rejects invalid model controls before a job or provider call is queued', async () => {
+    await expect(createVideoGenerationJob({
+      prompt: 'Invalid square Veo request', aspectRatio: '1:1', durationSeconds: 4,
+      modelId: 'veo-3.1-generate-preview'
+    })).rejects.toThrow(/accepts 16:9 or 9:16/);
+    await expect(createVideoGenerationJob({
+      prompt: 'Invalid Sora duration', aspectRatio: '16:9', durationSeconds: 5,
+      modelId: 'sora-2'
+    })).rejects.toThrow(/accepts 4, 8, 12 second/);
   });
 });

@@ -1,3 +1,5 @@
+import type { AiProjectDocument } from './aiProjectDomain';
+
 /**
  * `image` is a still. It has no timeline of its own and is held rather than
  * played; see `timelineStills` for what that means to a renderer. Tracks are
@@ -6,7 +8,7 @@
  */
 export const MEDIA_KINDS = ['video', 'audio', 'image'] as const;
 export const TIMELINE_SCHEMA_VERSION = 3 as const;
-export const PROJECT_SCHEMA_VERSION = 3 as const;
+export const PROJECT_SCHEMA_VERSION = 4 as const;
 export const CLIP_EFFECT_PROPERTIES = ['opacity', 'scale', 'positionX', 'positionY', 'rotation', 'volume'] as const;
 export const KEYFRAME_INTERPOLATIONS = ['linear'] as const;
 export const TRANSITION_TYPES = ['fade', 'crossfade', 'dipToBlack'] as const;
@@ -214,6 +216,8 @@ export type LocalProjectSnapshot = {
   readonly updatedAt: string;
   readonly assets: readonly MediaAsset[];
   readonly timeline: TimelineDocument;
+  /** Script, storyboard and generation lineage stored beside the authoritative timeline. */
+  readonly ai: AiProjectDocument;
 };
 
 /** Folder-picker backed results: the user can cancel the native dialog. */

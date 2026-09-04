@@ -8,25 +8,11 @@
  * rejects after the user has already approved the spend.
  */
 
-/** Clip lengths each engine will actually accept, by domain-model provider id. */
-const SUPPORTED_SHOT_SECONDS: Readonly<Record<string, readonly number[]>> = {
-  openai: [4, 8, 12],
-  google_gemini: [4, 6, 8],
-  byteplus: [5, 10],
-  // Runway takes any whole number inside a per-model range, so this is not the
-  // provider's limit but the intersection of every video model it fronts:
-  // Gen-4.5 and Gen-4 Turbo stop at 10, Seedance starts at 4, Gemini Omni Flash
-  // starts at 3. A length outside that would be legal for the model the user
-  // picked and rejected for the next one they try.
-  runway: [5, 10],
-  // Dream Machine accepts exactly these two.
-  luma: [5, 9]
-};
+import { VIDEO_MODEL_CAPABILITIES, videoControlConstraints } from './mediaCapabilityRegistry';
 
-const FALLBACK_SHOT_SECONDS: readonly number[] = [4, 8];
-
-export function supportedShotSeconds(providerId: string): readonly number[] {
-  return SUPPORTED_SHOT_SECONDS[providerId] ?? FALLBACK_SHOT_SECONDS;
+/** Model-specific lengths; provider ids remain accepted for older callers. */
+export function supportedShotSeconds(modelOrProviderId: string): readonly number[] {
+  return videoControlConstraints(modelOrProviderId).durationSeconds;
 }
 
 /**
@@ -36,8 +22,9 @@ export function supportedShotSeconds(providerId: string): readonly number[] {
  * priced and approved, which is the exact failure the planner exists to stop.
  */
 export const MAX_SUPPORTED_SHOT_SECONDS: number = Math.max(
-  ...Object.values(SUPPORTED_SHOT_SECONDS).flatMap((options) => [...options]),
-  ...FALLBACK_SHOT_SECONDS
+  ...VIDEO_MODEL_CAPABILITIES
+    .filter((model) => model.implemented.includes('text_to_video'))
+    .flatMap((model) => [...(model.operations.text_to_video?.durationSeconds ?? [])])
 );
 
 /**
@@ -62,6 +49,7 @@ export type StoryboardPlan = {
   /** Set when the shot lengths cannot sum to exactly what was asked for. */
   readonly roundedFrom?: number;
   readonly providerId: string;
+  readonly modelId?: string;
   readonly supportedShotSeconds: readonly number[];
   readonly continuityKeys: readonly ContinuityKey[];
 };
@@ -77,8 +65,10 @@ export const MAX_PLANNED_SHOTS = 24;
 export function planVideoStoryboard(input: {
   readonly totalSeconds: number;
   readonly providerId: string;
+  readonly modelId?: string;
 }): StoryboardPlan {
-  const options = [...supportedShotSeconds(input.providerId)].sort((a, b) => b - a);
+  const capabilityKey = input.modelId ?? input.providerId;
+  const options = [...supportedShotSeconds(capabilityKey)].sort((a, b) => b - a);
   const longest = options[0] ?? 8;
   const shortest = options[options.length - 1] ?? 4;
 
@@ -130,7 +120,7 @@ export function planVideoStoryboard(input: {
   // layer always contributes a candidate. Keep this guard to make the contract
   // explicit if a provider table is ever accidentally emptied.
   if (durations === undefined) {
-    throw new Error(`No legal shot durations are configured for provider ${input.providerId}.`);
+    throw new Error(`No legal shot durations are configured for ${capabilityKey}.`);
   }
 
   let startSeconds = 0;
@@ -149,7 +139,8 @@ export function planVideoStoryboard(input: {
     // Only reported when it actually differs, so a clean plan says nothing.
     ...(totalSeconds === Math.round(input.totalSeconds) ? {} : { roundedFrom: Math.round(input.totalSeconds) }),
     providerId: input.providerId,
-    supportedShotSeconds: supportedShotSeconds(input.providerId),
+    ...(input.modelId === undefined ? {} : { modelId: input.modelId }),
+    supportedShotSeconds: supportedShotSeconds(capabilityKey),
     continuityKeys: CONTINUITY_KEYS
   };
 }

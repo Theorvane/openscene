@@ -14,6 +14,7 @@ import { ProviderConnect } from '../components/ProviderConnect';
 import { AddCustomProvider } from '../components/AddCustomProvider';
 import { customCredentialKey, removeCustomProvider, useCustomProviders } from '../lib/customProviders';
 import { LLM_PROVIDERS, POPULAR_LLM_PROVIDER_IDS, getLlmCatalogProvider } from '@openvideo/shared/llmProviders';
+import { DEFAULT_LLM_MODELS } from '@openvideo/shared/llmModels';
 import { FormScreen } from '../components/FormScreen';
 import { APP_VERSION, CONTACT_EMAIL, DEVELOPER_NAME, DEVELOPER_SITE, PRIVACY_URL, TERMS_URL } from '../lib/about';
 import { theme } from '../lib/theme';
@@ -49,7 +50,7 @@ function chatRows(): readonly Row[] {
       slot: provider.credentialKey,
       label: provider.label,
       hint: provider.keyPlaceholder ?? 'API key',
-      meta: `${getLlmCatalogProvider(provider.id)?.models.length ?? 0} chat models`
+      meta: `${getLlmCatalogProvider(provider.id)?.models.length ?? DEFAULT_LLM_MODELS.filter((model) => model.providerId === provider.id).length} chat models`
     });
   }
   return rows;
@@ -172,6 +173,14 @@ export function SettingsScreen({ topInset }: { readonly topInset: number }) {
           />
         ))}
         <AddCustomProvider onAdded={refreshCustom} />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Browser sessions</Text>
+        <Text style={styles.sectionBlurb}>
+          Gemini and Grok browser-session sign-in is desktop-only because it needs an isolated Electron profile and OS
+          safeStorage. Mobile keeps this path disabled; use provider API keys stored in Keychain or Keystore here.
+        </Text>
       </View>
 
       <View style={styles.section}>

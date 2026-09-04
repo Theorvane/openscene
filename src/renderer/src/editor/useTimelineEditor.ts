@@ -40,6 +40,7 @@ import { clampPlayheadMs, findClipSelection, findFirstCompatibleTrack, insertion
 import { metadataProbeFailureMessage } from './mediaLoadFailures';
 import { useProjectAssetImports } from './useProjectAssetImports';
 import { useTimelinePlayback } from './useTimelinePlayback';
+import type { AiProjectDocument } from '../../../shared/aiProjectDomain';
 
 type TimelineUpdate = (timeline: TimelineDocument) => TimelineDocument | null;
 
@@ -560,12 +561,31 @@ export function useTimelineEditor() {
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
   }, [project, setLoadedProject]);
 
+  const saveAiProjectDocument = useCallback(async (ai: AiProjectDocument): Promise<boolean> => {
+    if (project === null) return false;
+    const response = await window.videoTool.saveAiProjectDocument({ projectId: project.id, ai });
+    if (!response.ok) {
+      setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
+      return false;
+    }
+    // Saving a script must not replace unsaved in-memory timeline edits with
+    // the older timeline snapshot that happened to be on disk.
+    setProject((current) => current === null || current.id !== response.value.id ? current : {
+      ...current,
+      ai: response.value.ai,
+      updatedAt: response.value.updatedAt
+    });
+    await refreshProjects();
+    setStatusMessage({ tone: 'success', text: 'Writer draft saved to the project.' });
+    return true;
+  }, [project, refreshProjects]);
+
   return {
     addTimelineTrack, removeTimelineTrack, renameTimelineTrack, insertTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
     cutAtPlayhead, transitionAtPlayhead, setTransitionAtPlayhead, removeTransitionAtPlayhead,
     addTitleAtPlayhead, editTitle, deleteTitle, titleAtPlayhead,
-    openProject, openProjectFolder, renameProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
+    openProject, openProjectFolder, renameProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline, saveAiProjectDocument,
     clearSelection, goToTimelineEnd, goToTimelineStart, selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,
     setNewProjectName, setSelectedAssetId, setSelectedClipId: selectClip,
     splitSelectedClip, statusMessage, trimSelectedClip, updateAssetMetadata, updateSelectedClipEffects,

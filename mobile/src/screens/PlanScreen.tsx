@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { planVideoStoryboard, supportedShotSeconds, CONTINUITY_KEYS } from '@openvideo/shared/videoStoryboardPlan';
 import { composeShotPrompt, refineShotPrompt, revisionsOf, takeLabel } from '@openvideo/shared/shotPrompt';
 import { getDomainModels } from '@openvideo/shared/aiDomainModels';
+import { getVideoOperationConstraints } from '@openvideo/shared/mediaCapabilityRegistry';
 import { ModelSelect } from '../components/ModelSelect';
 import { supportsReferenceImage, type VideoAspectRatio, type VideoProgressStage } from '@openvideo/shared/videoGeneration';
 import { isFrameExtractionAvailable } from '../../modules/video-export';
@@ -16,8 +17,6 @@ import { FormScreen } from '../components/FormScreen';
 import { useRevealOnFocus } from '../components/KeyboardAwareScroll';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
-
-const RATIOS: readonly VideoAspectRatio[] = ['16:9', '9:16', '1:1'];
 
 /** Per-shot state, so a failure names the shot that failed. */
 type ShotState =
@@ -85,9 +84,13 @@ export function PlanScreen({
   useEffect(refreshConnections, [refreshConnections, connectionsVersion]);
 
   const model = catalog.find((entry) => entry.id === modelId) ?? catalog[0];
+  const aspectRatioOptions = getVideoOperationConstraints(model.id, 'text_to_video')?.aspectRatios ?? ['16:9'];
+  const effectiveAspectRatio: VideoAspectRatio = aspectRatioOptions.includes(aspectRatio)
+    ? aspectRatio
+    : aspectRatioOptions[0] ?? '16:9';
   const plan = useMemo(
-    () => planVideoStoryboard({ totalSeconds, providerId: model.providerId }),
-    [totalSeconds, model.providerId]
+    () => planVideoStoryboard({ totalSeconds, providerId: model.providerId, modelId: model.id }),
+    [totalSeconds, model.id, model.providerId]
   );
 
   // Changing anything about the plan clears the last run's results. Leaving them
@@ -138,7 +141,7 @@ export function PlanScreen({
         projectId,
         modelId: model.id,
         prompt: shotPrompt,
-        aspectRatio,
+        aspectRatio: effectiveAspectRatio,
         durationSeconds: shot.durationSeconds,
         ...(carriedFrame === undefined ? {} : { referenceImage: carriedFrame }),
         onProgress: (stage) => mark({ kind: 'running', stage })
@@ -212,7 +215,7 @@ export function PlanScreen({
       projectId,
       modelId: model.id,
       prompt: refined.prompt,
-      aspectRatio,
+      aspectRatio: effectiveAspectRatio,
       durationSeconds: shot.durationSeconds,
       // The same frame this shot started from, so a redo continues from where
       // the one before it left off rather than from nothing.
@@ -290,7 +293,7 @@ export function PlanScreen({
    * user already made when they chose the model and the length.
    */
   /** Chaining needs both a provider that accepts a frame and a build that can read one. */
-  const continuityPossible = isFrameExtractionAvailable && supportsReferenceImage(model?.providerId ?? '');
+  const continuityPossible = isFrameExtractionAvailable && supportsReferenceImage(model?.id ?? '');
 
   const runLine = `${plan.shots.length} shot${plan.shots.length === 1 ? '' : 's'} · ${plan.totalSeconds}s`;
   const canGenerate =
@@ -324,8 +327,13 @@ export function PlanScreen({
 
       <Text style={styles.label}>Aspect ratio</Text>
       <View style={styles.row}>
-        {RATIOS.map((ratio) => (
-          <Chip key={ratio} label={ratio} selected={ratio === aspectRatio} onPress={() => setPlan(() => setAspectRatio(ratio))} />
+        {aspectRatioOptions.map((ratio) => (
+          <Chip
+            key={ratio}
+            label={ratio}
+            selected={ratio === effectiveAspectRatio}
+            onPress={() => setPlan(() => setAspectRatio(ratio))}
+          />
         ))}
       </View>
 
@@ -344,7 +352,7 @@ export function PlanScreen({
           </Pressable>
           {!continuityPossible && (
             <Text style={styles.body}>
-              {supportsReferenceImage(model?.providerId ?? '')
+              {supportsReferenceImage(model?.id ?? '')
                 ? 'This build cannot read a frame out of a clip — rebuild the development client to chain shots.'
                 : `${model?.providerLabel} cannot start from a supplied frame, so shots are generated independently.`}
             </Text>
@@ -367,7 +375,7 @@ export function PlanScreen({
 
       <Text style={styles.label}>
         {plan.shots.length} shot{plan.shots.length === 1 ? '' : 's'} · accepts{' '}
-        {supportedShotSeconds(model.providerId).join('/')}s
+        {supportedShotSeconds(model.id).join('/')}s
       </Text>
       {plan.shots.map((shot) => {
         const take = takes[shot.index];

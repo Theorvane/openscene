@@ -31,6 +31,7 @@ import { supportedAssetDialogExtensions, supportedAssetFormatForExtension } from
 import { fail, ok } from './ipcResponses';
 import { ProjectStore } from './projectStore';
 import { ProjectStoreError } from './projectStoreSupport';
+import { parseSaveAiProjectDocumentInput } from '../shared/aiProjectDomain';
 
 type NativeFileDialogResult = {
   readonly canceled: boolean;
@@ -213,6 +214,21 @@ export class TimelineIpcService {
         return fail('INVALID_INPUT', error.message);
       }
       return safeProjectError(error, 'UNKNOWN_ERROR', 'The timeline could not be saved.');
+    }
+  }
+
+  async saveAiProjectDocument(payload: unknown): Promise<ApiResponse<LocalProjectSnapshot>> {
+    const input = parseSaveAiProjectDocumentInput(payload);
+    if (input === null) {
+      return fail('INVALID_INPUT', 'The AI project document payload was not valid.');
+    }
+    try {
+      return ok(await this.dependencies.projects.saveAiProjectDocument(input.projectId, input.ai));
+    } catch (error: unknown) {
+      if (error instanceof ProjectStoreError) {
+        return fail('INVALID_INPUT', error.message);
+      }
+      return safeProjectError(error, 'UNKNOWN_ERROR', 'The AI project document could not be saved.');
     }
   }
 

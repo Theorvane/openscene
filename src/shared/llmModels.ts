@@ -1,4 +1,5 @@
 import { LLM_CATALOG } from './llmCatalog.generated';
+import { AGENT_ROUTER_MODELS, AGENT_ROUTER_PROVIDER_ID } from './agentRouter';
 
 export type LlmProviderId = string;
 
@@ -74,6 +75,18 @@ function describeCloudModel(providerLabel: string, flags: { toolCall?: boolean; 
 /** Full models.dev catalog flattened into canonical `providerId/modelId` entries. */
 export const DEFAULT_LLM_MODELS: readonly LlmModelConfig[] = [
   ...LOCAL_LLM_MODELS,
+  ...AGENT_ROUTER_MODELS.map((model): LlmModelConfig => ({
+    id: `${AGENT_ROUTER_PROVIDER_ID}/${model.id}`,
+    providerId: AGENT_ROUTER_PROVIDER_ID,
+    label: model.label,
+    providerLabel: 'AgentRouter',
+    description: 'AgentRouter account model alias; runnable in desktop Writer through the OpenAI-compatible API.',
+    category: 'editor-assistant',
+    badge: model.reasoning ? 'REASONING' : 'SMART',
+    defaultMode: 'api',
+    available: true,
+    toolCall: true
+  })),
   ...LLM_CATALOG.flatMap((provider) =>
     provider.models.map((model): LlmModelConfig => ({
       id: `${provider.id}/${model.id}`,

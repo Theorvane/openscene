@@ -5,19 +5,10 @@ import type { ReferenceImageSelection, VideoGenerationJob } from '../../shared/p
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useProjectResultImport } from './ProjectResultImportContext';
-import { supportedShotSeconds } from '../../shared/videoStoryboardPlan';
+import { getVideoOperationConstraints, isVideoOperationImplemented } from '../../shared/mediaCapabilityRegistry';
 import { Button, StatusCard } from './ui';
 
 const STYLE_PRESETS = ['Cinematic', 'Anime', '3D Render', 'Photorealistic', 'Cyberpunk', 'Film Noir'] as const;
-const ASPECT_RATIOS = ['16:9', '9:16', '1:1'] as const;
-
-/**
- * Read from the same table the agent's planner and the createVideoJob schema
- * use. Three copies of these numbers is how a 12s Sora shot became something
- * the UI offered and the tool rejected.
- */
-const durationOptionsFor = supportedShotSeconds;
-
 type VideoGenerationWorkspaceProps = {
   /**
    * Controlled from App so the image studio's "Use for video" can hand a
@@ -38,13 +29,21 @@ export function VideoGenerationWorkspace({
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [durationSeconds, setDurationSeconds] = useState<number>(5);
-  const durationOptions = durationOptionsFor(videoModel.providerId);
+  const imageInputAvailable = isVideoOperationImplemented(videoModel.id, 'image_to_video');
+  const selectedOperation = referenceImage === null ? 'text_to_video' : 'image_to_video';
+  const operationConstraints = getVideoOperationConstraints(videoModel.id, selectedOperation)
+    ?? getVideoOperationConstraints(videoModel.id, 'text_to_video');
+  const durationOptions = operationConstraints?.durationSeconds ?? [4, 8];
+  const aspectRatioOptions = operationConstraints?.aspectRatios ?? ['16:9', '9:16'];
   // Switching engines keeps the chosen length when valid, else the closest option.
   const effectiveDuration = durationOptions.includes(durationSeconds)
     ? durationSeconds
     : durationOptions.reduce((best, candidate) =>
         Math.abs(candidate - durationSeconds) < Math.abs(best - durationSeconds) ? candidate : best
       );
+  const effectiveAspectRatio = aspectRatioOptions.includes(aspectRatio)
+    ? aspectRatio
+    : aspectRatioOptions[0] ?? '16:9';
   const [selectedStyle, setSelectedStyle] = useState<string>('Cinematic');
   // Image-to-video seed: the bytes travel inline, so no path reaches here.
   const [jobs, setJobs] = useState<readonly VideoGenerationJob[]>([]);
@@ -81,7 +80,7 @@ export function VideoGenerationWorkspace({
     try {
       const response = await window.videoTool.aiGenerateVideo({
         prompt: promptText,
-        aspectRatio: overrides?.aspectRatio ?? aspectRatio,
+        aspectRatio: overrides?.aspectRatio ?? effectiveAspectRatio,
         durationSeconds: overrides?.durationSeconds ?? effectiveDuration,
         stylePreset: overrides?.stylePreset ?? selectedStyle,
         modelId: videoModel.id,
@@ -198,12 +197,12 @@ export function VideoGenerationWorkspace({
         <div className="studio-field">
           <span className="studio-field__label">Aspect ratio</span>
           <div className="studio-chips" role="group" aria-label="Aspect ratio">
-            {ASPECT_RATIOS.map((ratio) => (
+            {aspectRatioOptions.map((ratio) => (
               <button
                 key={ratio}
                 type="button"
-                aria-pressed={aspectRatio === ratio}
-                className={`studio-chip${aspectRatio === ratio ? ' studio-chip--selected' : ''}`}
+                aria-pressed={effectiveAspectRatio === ratio}
+                className={`studio-chip${effectiveAspectRatio === ratio ? ' studio-chip--selected' : ''}`}
                 onClick={() => setAspectRatio(ratio)}
               >
                 {ratio}
@@ -235,8 +234,10 @@ export function VideoGenerationWorkspace({
           <span className="studio-field__label">Reference image</span>
           {referenceImage === null ? (
             <div className="studio-reference">
-              <span className="studio-reference__empty">Optional — seeds image-to-video generation.</span>
-              <Button variant="ghost" onClick={() => void pickReferenceImage()}>Add image</Button>
+              <span className="studio-reference__empty">
+                {imageInputAvailable ? 'Optional — seeds image-to-video generation.' : `${videoModel.label} image-to-video is not implemented in this build.`}
+              </span>
+              <Button variant="ghost" disabled={!imageInputAvailable} onClick={() => void pickReferenceImage()}>Add image</Button>
             </div>
           ) : (
             <div className="studio-reference">
@@ -246,6 +247,7 @@ export function VideoGenerationWorkspace({
                 alt={`Reference image ${referenceImage.displayName}`}
               />
               <span className="studio-reference__name">{referenceImage.displayName}</span>
+              {!imageInputAvailable && <span className="studio-reference__empty">Remove this image or choose a model with implemented image-to-video.</span>}
               <Button variant="ghost" onClick={() => onReferenceImageChange(null)} aria-label="Remove reference image">
                 Remove
               </Button>
@@ -324,9 +326,9 @@ export function VideoGenerationWorkspace({
         />
         <div className="studio-composer__toolbar">
           <span className="studio-composer__hint">
-            {effectiveDuration}s · {aspectRatio} · {selectedStyle}{referenceImage === null ? '' : ' · image'}
+            {effectiveDuration}s · {effectiveAspectRatio} · {selectedStyle}{referenceImage === null ? '' : ' · image'}
           </span>
-          <Button variant="primary" onClick={() => void handleGenerate()} disabled={isGenerating || prompt.trim().length === 0}>
+          <Button variant="primary" onClick={() => void handleGenerate()} disabled={isGenerating || prompt.trim().length === 0 || (referenceImage !== null && !imageInputAvailable)}>
             {isGenerating ? 'Generating…' : 'Generate'}
           </Button>
         </div>

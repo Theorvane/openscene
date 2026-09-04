@@ -75,7 +75,7 @@ describe('media generation adapters', () => {
       modelId: 'veo-3.0-generate-001',
       prompt: 'A sunrise over Seoul',
       aspectRatio: '16:9',
-      durationSeconds: 5,
+      durationSeconds: 8,
       pollIntervalMs: 1,
       fetchImpl: fetchMock as unknown as typeof fetch
     });
@@ -93,7 +93,7 @@ describe('media generation adapters', () => {
         const body = JSON.parse(init.body as string);
         expect(body.model).toBe('sora-2');
         expect(body.size).toBe('1280x720');
-        // 10s snaps to Sora's nearest allowed clip length.
+        // The validated duration is sent unchanged.
         expect(body.seconds).toBe('8');
         return new Response(JSON.stringify({ id: 'video_abc' }), { status: 200 });
       }
@@ -110,7 +110,7 @@ describe('media generation adapters', () => {
       modelId: 'sora-2',
       prompt: 'A neon city timelapse',
       aspectRatio: '16:9',
-      durationSeconds: 10,
+      durationSeconds: 8,
       pollIntervalMs: 1,
       fetchImpl: fetchMock as unknown as typeof fetch
     });

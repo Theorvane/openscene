@@ -1,4 +1,9 @@
 import { LLM_CATALOG, type LlmCatalogProvider } from './llmCatalog.generated';
+import {
+  AGENT_ROUTER_BASE_URL,
+  AGENT_ROUTER_CREDENTIAL_KEY,
+  AGENT_ROUTER_PROVIDER_ID
+} from './agentRouter';
 
 /**
  * Provider registry: a provider is a source of models with its
@@ -44,6 +49,18 @@ export const OLLAMA_PROVIDER: LlmProviderInfo = {
   adapter: 'ollama',
   baseUrlConfigurable: true,
   description: 'Local engine over HTTP. No account or key; models run on this machine.'
+};
+
+export const AGENT_ROUTER_PROVIDER: LlmProviderInfo = {
+  id: AGENT_ROUTER_PROVIDER_ID,
+  label: 'AgentRouter',
+  kind: 'cloud',
+  auth: 'api-key',
+  adapter: 'openai-compatible',
+  credentialKey: AGENT_ROUTER_CREDENTIAL_KEY,
+  keyPlaceholder: 'AgentRouter API key',
+  baseUrl: AGENT_ROUTER_BASE_URL,
+  description: 'AgentRouter account connected through its OpenAI-compatible API for desktop Writer generation.'
 };
 
 function toProviderInfo(provider: LlmCatalogProvider): LlmProviderInfo {
@@ -157,12 +174,14 @@ export const MEDIA_PROVIDERS: readonly LlmProviderInfo[] = [
 
 export const LLM_PROVIDERS: readonly LlmProviderInfo[] = [
   OLLAMA_PROVIDER,
+  AGENT_ROUTER_PROVIDER,
   ...LLM_CATALOG.map(toProviderInfo),
   ...MEDIA_PROVIDERS
 ];
 
 /** Popular shortlist shown before "Show all providers". */
 export const POPULAR_LLM_PROVIDER_IDS: readonly string[] = [
+  AGENT_ROUTER_PROVIDER_ID,
   'anthropic',
   'openai',
   'google_gemini',

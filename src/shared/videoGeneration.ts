@@ -1,4 +1,10 @@
 import { supportedShotSeconds } from './videoStoryboardPlan';
+import {
+  VIDEO_MODEL_CAPABILITIES,
+  getVideoModelCapabilities,
+  validateVideoRequest,
+  type VideoAspectRatio
+} from './mediaCapabilityRegistry';
 
 /**
  * Video generation over each provider's HTTP surface.
@@ -23,7 +29,7 @@ const VIDEO_POLL_TIMEOUT_MS = 10 * 60_000;
 /** Runway pins API behaviour to a dated version rather than a semver. */
 const RUNWAY_API_VERSION = '2024-11-06';
 
-export type VideoAspectRatio = '16:9' | '9:16' | '1:1';
+export type { VideoAspectRatio } from './mediaCapabilityRegistry';
 
 /** Where a finished video can be fetched, and what to send when fetching it. */
 export type VideoDownload = {
@@ -50,6 +56,18 @@ export type VideoRequestInput = {
   readonly pollTimeoutMs?: number;
   readonly onProgress?: (stage: VideoProgressStage, elapsedMs: number) => void;
 };
+
+export function assertImplementedVideoRequest(input: Pick<VideoRequestInput, 'modelId' | 'durationSeconds' | 'aspectRatio' | 'referenceImage'>): void {
+  const operation = input.referenceImage === undefined ? 'text_to_video' : 'image_to_video';
+  const validation = validateVideoRequest({
+    modelId: input.modelId,
+    operation,
+    durationSeconds: input.durationSeconds,
+    aspectRatio: input.aspectRatio,
+    referenceImageCount: input.referenceImage === undefined ? 0 : 1
+  });
+  if (!validation.ok) throw new Error(validation.message);
+}
 
 async function safeErrorDetail(response: Response): Promise<string> {
   const bodyText = await response.text().catch(() => '');
@@ -98,7 +116,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolvePromise) => set
  * the table knows and the adapter does not would be silently snapped to a
  * different duration than the one the user was quoted and approved.
  */
-export const SORA_ALLOWED_SECONDS: readonly number[] = supportedShotSeconds('openai');
+export const SORA_ALLOWED_SECONDS: readonly number[] = supportedShotSeconds('sora-2');
 
 export function snapSoraSeconds(requested: number): number {
   return SORA_ALLOWED_SECONDS.reduce((best, candidate) =>
@@ -111,6 +129,7 @@ export function snapSoraSeconds(requested: number): number {
  * hand back the sample's download URI. The key travels in headers only.
  */
 export async function requestVeoVideo(input: VideoRequestInput): Promise<VideoDownload> {
+  assertImplementedVideoRequest(input);
   const fetchImpl = input.fetchImpl ?? fetch;
   const pollIntervalMs = input.pollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
   const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
@@ -129,7 +148,7 @@ export async function requestVeoVideo(input: VideoRequestInput): Promise<VideoDo
           ? {}
           : { image: { bytesBase64Encoded: input.referenceImage.base64, mimeType: input.referenceImage.mimeType } })
       }],
-      parameters: { aspectRatio: input.aspectRatio === '1:1' ? '16:9' : input.aspectRatio }
+      parameters: { aspectRatio: input.aspectRatio, durationSeconds: input.durationSeconds }
     })
   });
   await expectOk(startResponse, 'Google Veo');
@@ -172,16 +191,12 @@ export async function requestVeoVideo(input: VideoRequestInput): Promise<VideoDo
 
 /** OpenAI Sora over /v1/videos: create → poll → hand back the content URL. */
 export async function requestSoraVideo(input: VideoRequestInput): Promise<VideoDownload> {
-  if (input.referenceImage !== undefined) {
-    // Sora takes an input_reference only as multipart, which this adapter does
-    // not send. Refuse rather than silently generating without the image.
-    throw new Error('OpenAI Sora reference images are not supported in this build; use Google Veo, or remove the reference image.');
-  }
+  assertImplementedVideoRequest(input);
   const fetchImpl = input.fetchImpl ?? fetch;
   const pollIntervalMs = input.pollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
   const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${input.apiKey}` };
-  const size = input.aspectRatio === '9:16' ? '720x1280' : input.aspectRatio === '1:1' ? '720x720' : '1280x720';
+  const size = input.aspectRatio === '9:16' ? '720x1280' : '1280x720';
   const startedAt = Date.now();
   input.onProgress?.('submitting', 0);
 
@@ -191,7 +206,7 @@ export async function requestSoraVideo(input: VideoRequestInput): Promise<VideoD
     body: JSON.stringify({
       model: input.modelId,
       prompt: input.prompt,
-      seconds: String(snapSoraSeconds(input.durationSeconds)),
+      seconds: String(input.durationSeconds),
       size
     })
   });
@@ -236,6 +251,7 @@ export async function requestSoraVideo(input: VideoRequestInput): Promise<VideoD
  * one key make nine models reachable instead of one.
  */
 export async function requestRunwayVideo(input: VideoRequestInput): Promise<VideoDownload> {
+  assertImplementedVideoRequest(input);
   const fetchImpl = input.fetchImpl ?? fetch;
   const pollIntervalMs = input.pollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
   const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
@@ -246,9 +262,6 @@ export async function requestRunwayVideo(input: VideoRequestInput): Promise<Vide
     // default version that can change under us.
     'X-Runway-Version': RUNWAY_API_VERSION
   };
-  // Text-to-video takes landscape or portrait only on every model that offers
-  // it, so a square request renders landscape rather than being rejected after
-  // the user approved the spend.
   const ratio = input.aspectRatio === '9:16' ? '720:1280' : '1280:720';
   const startedAt = Date.now();
   input.onProgress?.('submitting', 0);
@@ -319,12 +332,7 @@ export async function requestRunwayVideo(input: VideoRequestInput): Promise<Vide
 
 /** Luma Dream Machine: create → poll the generation → hand back assets.video. */
 export async function requestLumaVideo(input: VideoRequestInput): Promise<VideoDownload> {
-  if (input.referenceImage !== undefined) {
-    // Dream Machine keyframes take a URL, not bytes, so continuing from a local
-    // frame would need somewhere to host it first. Refusing is better than
-    // generating an unrelated shot the user believes is a continuation.
-    throw new Error('Luma needs a hosted image URL for a start frame, which this build cannot provide. Use Runway or Veo to continue from the previous shot.');
-  }
+  assertImplementedVideoRequest(input);
   const fetchImpl = input.fetchImpl ?? fetch;
   const pollIntervalMs = input.pollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
   const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
@@ -341,7 +349,7 @@ export async function requestLumaVideo(input: VideoRequestInput): Promise<VideoD
       model: input.modelId,
       resolution: '720p',
       // Dream Machine takes only these two lengths, as a string with a unit.
-      duration: input.durationSeconds >= 7 ? '9s' : '5s',
+      duration: `${input.durationSeconds}s`,
       aspect_ratio: input.aspectRatio
     })
   });
@@ -397,8 +405,12 @@ const VIDEO_ADAPTERS: Readonly<Record<string, (input: VideoRequestInput) => Prom
  * and silently dropping it would produce a cut that does not match and no
  * indication why.
  */
-export function supportsReferenceImage(providerId: string): boolean {
-  return providerId === 'google_gemini' || providerId === 'runway';
+export function supportsReferenceImage(modelOrProviderId: string): boolean {
+  const exact = getVideoModelCapabilities(modelOrProviderId);
+  if (exact !== undefined) return exact.implemented.includes('image_to_video');
+  return VIDEO_MODEL_CAPABILITIES.some(
+    (model) => model.providerId === modelOrProviderId && model.implemented.includes('image_to_video')
+  );
 }
 
 /** The adapter a provider id resolves to, or undefined when none is ported. */

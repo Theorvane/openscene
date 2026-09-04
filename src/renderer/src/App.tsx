@@ -13,6 +13,7 @@ import { NarrationPanel } from './NarrationPanel';
 import type { ReferenceImageSelection } from '../../shared/providerSeams';
 import { ImageGenerationWorkspace } from './ImageGenerationWorkspace';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
+import { WriterWorkspace } from './WriterWorkspace';
 import {
   WORKSPACE_TAB_IDS,
   WORKSPACE_TAB_LABELS,
@@ -319,7 +320,7 @@ export function App(): ReactElement {
             />
           </section>
           <div className="app-stack local-edit-bay" hidden={!workspaceIsVisible}>
-            {/* Workspace switcher: the editor and the two generation studios
+            {/* Workspace switcher: the editor, Writer, and generation studios
                 share the area, so a generated clip lands on the timeline
                 without leaving the workspace or the agent chat beside it. */}
             <div className="workspace-tab-line">
@@ -354,6 +355,18 @@ export function App(): ReactElement {
               >
                 <h2 className="visually-hidden" id={EDIT_WORKSPACE.navId}>{EDIT_WORKSPACE.label}</h2>
                 <TimelineEditor editor={editor} />
+              </section>
+              <section
+                aria-label={WORKSPACE_TAB_LABELS.writer}
+                className="workspace-studio-panel"
+                hidden={workspaceTabId !== 'writer' || !workspaceIsVisible}
+                role="region"
+                style={APP_WORKSPACE_PANEL_STYLE}
+                tabIndex={-1}
+              >
+                {editor.project !== null && (
+                  <WriterWorkspace document={editor.project.ai} onSave={editor.saveAiProjectDocument} />
+                )}
               </section>
               <section
                 aria-label={WORKSPACE_TAB_LABELS.voice}

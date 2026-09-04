@@ -13,6 +13,7 @@ import type {
 } from '../shared/providerSeams';
 import { getDefaultDomainModelId, getDomainModel, type AiDomainModelConfig } from '../shared/aiDomainModels';
 import { estimateImageCost, estimateSpeechCost, estimateVideoCost, type CostEstimate } from '../shared/mediaGenerationPricing';
+import { getVideoOperationConstraints, getVideoProviderBinding, validateVideoRequest } from '../shared/mediaCapabilityRegistry';
 import { GenerationSpendStore } from './generationSpendStore';
 import { discoverFfmpeg } from './ffmpegDiscovery';
 import type { CredentialStore } from './credentialStore';
@@ -122,16 +123,6 @@ const VIDEO_PROVIDER_LABELS: Record<VideoGenerationProviderId, string> = {
   minimax_hailuo: 'MiniMax Hailuo'
 };
 
-/** Map a domain-model provider id onto the job seam ids and its credential slot. */
-const VIDEO_MODEL_PROVIDERS: Record<string, { seam: VideoGenerationProviderId; credentialKey: string }> = {
-  google_gemini: { seam: 'gemini_veo', credentialKey: 'geminiApiKey' },
-  openai: { seam: 'openai_sora', credentialKey: 'openaiApiKey' },
-  runway: { seam: 'runway_gen4', credentialKey: 'runwayApiKey' },
-  kling: { seam: 'kling_v3', credentialKey: 'klingApiKey' },
-  luma: { seam: 'luma_dream', credentialKey: 'lumaApiKey' },
-  minimax_hailuo: { seam: 'minimax_hailuo', credentialKey: 'minimax' }
-};
-
 const IMAGE_PROVIDER_LABELS: Record<ImageGenerationProviderId, string> = {
   openai_images: 'OpenAI Images',
   google_imagen: 'Google Imagen',
@@ -160,7 +151,7 @@ const SPEECH_MODEL_PROVIDERS: Record<string, { seam: TextToSpeechJob['provider']
 async function invokeCloudVideoProvider(
   model: AiDomainModelConfig,
   apiKey: string,
-  request: VideoGenerationRequest,
+  request: VideoGenerationRequest & { readonly durationSeconds: number },
   outputFilePath: string
 ): Promise<CloudProviderResult> {
   const synthesisInput = {
@@ -168,19 +159,23 @@ async function invokeCloudVideoProvider(
     modelId: model.id,
     prompt: request.prompt,
     aspectRatio: request.aspectRatio ?? ('16:9' as const),
-    durationSeconds: request.durationSeconds ?? 5,
+    durationSeconds: request.durationSeconds,
     ...(request.referenceImage === undefined ? {} : { referenceImage: request.referenceImage })
   };
   try {
+    const binding = getVideoProviderBinding(model.id);
+    if (binding === undefined) {
+      return { ok: false, error: `${model.providerLabel} video generation adapter is not implemented in this build.` };
+    }
     // One entry per ported provider, so adding an adapter is one line rather
     // than another branch in a chain that is easy to leave a provider out of.
     const adapters: Readonly<Record<string, (input: typeof synthesisInput) => Promise<{ bytes: Buffer; providerJobId: string }>>> = {
-      google_gemini: generateVeoVideo,
-      openai: generateSoraVideo,
+      google_veo: generateVeoVideo,
+      openai_sora: generateSoraVideo,
       runway: generateRunwayVideo,
       luma: generateLumaVideo
     };
-    const adapter = adapters[model.providerId];
+    const adapter = adapters[binding.adapterId];
     if (adapter === undefined) {
       return {
         ok: false,
@@ -273,10 +268,23 @@ function resolveGenerationModel(
 
 export async function createVideoGenerationJob(request: VideoGenerationRequest): Promise<VideoGenerationJob> {
   const model = resolveGenerationModel('video-generation', request.modelId);
-  const providerMapping = VIDEO_MODEL_PROVIDERS[model.providerId];
-  const provider: VideoGenerationProviderId = providerMapping?.seam ?? 'gemini_veo';
+  const providerMapping = getVideoProviderBinding(model.id);
+  if (providerMapping === undefined) throw new Error(`Model ${model.id} has no runnable video provider binding.`);
+  const provider: VideoGenerationProviderId = providerMapping.seamProviderId;
   const modelId = model.id;
-  const estimate = estimateVideoCost({ modelId, durationSeconds: request.durationSeconds ?? 5 });
+  const operation = request.referenceImage === undefined ? 'text_to_video' : 'image_to_video';
+  const constraints = getVideoOperationConstraints(modelId, operation);
+  const durationSeconds = request.durationSeconds ?? constraints?.durationSeconds[0] ?? 4;
+  const aspectRatio = request.aspectRatio ?? constraints?.aspectRatios[0] ?? '16:9';
+  const validation = validateVideoRequest({
+    modelId,
+    operation,
+    durationSeconds,
+    aspectRatio,
+    referenceImageCount: request.referenceImage === undefined ? 0 : 1
+  });
+  if (!validation.ok) throw new Error(validation.message);
+  const estimate = estimateVideoCost({ modelId, durationSeconds });
   const reservationId = await reserveSpend(estimate, request.acceptUnknownCost);
   const { videoDir } = await ensureAiDirectories();
   const id = `video-job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -289,12 +297,17 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
     mode: 'api',
     status: 'queued',
     prompt: request.prompt,
-    aspectRatio: request.aspectRatio ?? '16:9',
-    durationSeconds: request.durationSeconds ?? 5,
+    aspectRatio,
+    durationSeconds,
     stylePreset: request.stylePreset ?? 'Cinematic',
     modelId,
     createdAt: now,
     updatedAt: now
+  };
+  const normalizedRequest: VideoGenerationRequest & { readonly durationSeconds: number } = {
+    ...request,
+    aspectRatio,
+    durationSeconds
   };
 
   videoJobs.set(id, job);
@@ -307,7 +320,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
 
       let apiKey = request.apiKey?.trim();
       if ((!apiKey || apiKey.length === 0) && activeCredentialStore) {
-        apiKey = await activeCredentialStore.getCredentialValue(providerMapping?.credentialKey ?? 'geminiApiKey');
+        apiKey = await activeCredentialStore.getCredentialValue(providerMapping.credentialKey);
       }
 
       if (!apiKey || apiKey.length === 0) {
@@ -315,7 +328,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       }
 
       await settleSpend(reservationId, 'charged');
-      const cloudResult = await invokeCloudVideoProvider(model, apiKey, request, join(videoDir, `${id}.mp4`));
+      const cloudResult = await invokeCloudVideoProvider(model, apiKey, normalizedRequest, join(videoDir, `${id}.mp4`));
       if (!cloudResult.ok) {
         throw new Error(cloudResult.error);
       }

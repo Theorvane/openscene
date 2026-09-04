@@ -103,7 +103,6 @@ describe('OpenScene TypeMCP Server and Tool declarations', () => {
     const result = await server.createVideoJob({
       prompt: 'Cinematic intro shot of Seoul skyline',
       aspectRatio: '16:9',
-      durationSeconds: 5,
       modelId: 'sora-2'
     });
 
@@ -461,7 +460,7 @@ describe('OpenScene TypeMCP Server and Tool declarations', () => {
     const jobResult = await server.createVideoJob({
       prompt: 'Cinematic intro shot',
       aspectRatio: '16:9',
-      durationSeconds: 5,
+      durationSeconds: 4,
       modelId: 'sora-2'
     });
     expect(jobResult.success).toBe(true);

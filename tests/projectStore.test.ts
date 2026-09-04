@@ -8,6 +8,7 @@ import { ProjectLocationRegistry } from '../src/main/projectLocations';
 import { ProjectStore } from '../src/main/projectStore';
 import { createInitialTimeline, updateClipEffects } from '../src/shared/timelineLogic';
 import { DEFAULT_AUDIO_TRACK_MIX, DEFAULT_CLIP_EFFECTS } from '../src/shared/timelineTypes';
+import { createEmptyAiProjectDocument } from '../src/shared/aiProjectDomain';
 
 async function withTempDirectory<T>(run: (directory: string) => Promise<T>): Promise<T> {
   const directory = await mkdtemp(join(tmpdir(), 'video-project-store-'));
@@ -19,7 +20,7 @@ async function withTempDirectory<T>(run: (directory: string) => Promise<T>): Pro
 }
 
 describe('project store', () => {
-  it('given a strict v1 project, when opened and saved, then timeline metadata is defaulted and persisted as v3', async () => {
+  it('given a strict v1 project, when opened and saved, then timeline metadata and AI defaults are persisted as v4', async () => {
     await withTempDirectory(async (root) => {
       // Given
       const projectId = 'legacy-project';
@@ -82,7 +83,8 @@ describe('project store', () => {
 
       // Then
       expect(migrated).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
+        ai: createEmptyAiProjectDocument(),
         timeline: {
           schemaVersion: 3,
           transitions: [],
@@ -94,7 +96,7 @@ describe('project store', () => {
     });
   });
 
-  it('given a strict v2 project, when opened, then v3 keyframe, transition, and audio mix defaults are applied', async () => {
+  it('given a strict v2 project, when opened, then v4 project and v3 timeline defaults are applied', async () => {
     await withTempDirectory(async (root) => {
       // Given
       const projectId = 'v2-project';
@@ -122,7 +124,8 @@ describe('project store', () => {
 
       // Then
       expect(migrated).toMatchObject({
-        schemaVersion: 3,
+        schemaVersion: 4,
+        ai: createEmptyAiProjectDocument(),
         timeline: {
           schemaVersion: 3,
           transitions: [],
@@ -150,13 +153,14 @@ describe('project store', () => {
       // Then
       expect(created.id).toMatch(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
       expect(created).toEqual({
-        schemaVersion: 3,
+        schemaVersion: 4,
         id: created.id,
         name: 'Product demo',
         createdAt: createdAt.toISOString(),
         updatedAt: createdAt.toISOString(),
         assets: [],
-        timeline: createInitialTimeline()
+        timeline: createInitialTimeline(),
+        ai: createEmptyAiProjectDocument()
       });
       expect(reopened).toEqual(created);
       expect(summaries).toEqual([
@@ -194,6 +198,27 @@ describe('project store', () => {
       expect(saved.updatedAt).toBe('2026-07-20T10:01:00.000Z');
       expect(projectEntries).toEqual(['project.json']);
       await expect(new ProjectStore(root).open(created.id)).resolves.toEqual(saved);
+    });
+  });
+
+  it('given a project, when its AI document is saved, then it persists atomically without changing the timeline', async () => {
+    await withTempDirectory(async (root) => {
+      const store = new ProjectStore(root);
+      const created = await store.create({ name: 'Story plan' }, new Date('2026-09-02T06:00:00.000Z'));
+      const ai = {
+        ...createEmptyAiProjectDocument(),
+        styleBible: { ...createEmptyAiProjectDocument().styleBible, lighting: 'Soft daylight.' }
+      };
+
+      const saved = await store.saveAiProjectDocument(created.id, ai, new Date('2026-09-02T06:01:00.000Z'));
+      const reopened = await new ProjectStore(root).open(created.id);
+      const entries = await readdir(join(root, created.id));
+
+      expect(saved.ai).toEqual(ai);
+      expect(saved.timeline).toEqual(created.timeline);
+      expect(saved.updatedAt).toBe('2026-09-02T06:01:00.000Z');
+      expect(reopened).toEqual(saved);
+      expect(entries).toEqual(['project.json']);
     });
   });
 

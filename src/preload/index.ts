@@ -49,6 +49,9 @@ import type {
   AgentChatTurnState
 } from '../shared/agentChat';
 import type { ChatGptOAuthStatus, OpenAiAuthMode } from '../shared/openAiAuth';
+import type { BrowserSessionProviderId, BrowserSessionStatus } from '../shared/browserSession';
+import type { SaveAiProjectDocumentInput } from '../shared/aiProjectDomain';
+import type { WriterDraft, WriterGenerationInput } from '../shared/writerWorkflow';
 
 type ImportProjectAssetsResult = {
   readonly assets: readonly MediaAsset[];
@@ -85,6 +88,7 @@ export interface VideoToolApi {
   updateAssetMetadata(input: UpdateAssetMetadataInput): Promise<ApiResponse<MediaAsset>>;
   getAssetPlaybackUrl(input: GetAssetPlaybackUrlInput): Promise<ApiResponse<AssetPlaybackUrl>>;
   saveTimeline(input: SaveTimelineInput): Promise<ApiResponse<LocalProjectSnapshot>>;
+  saveAiProjectDocument(input: SaveAiProjectDocumentInput): Promise<ApiResponse<LocalProjectSnapshot>>;
   getFfmpegRuntimeStatus(): Promise<ApiResponse<LocalFfmpegRuntimeStatus>>;
   startExportJob(input: StartExportJobInput): Promise<ApiResponse<LocalExportJob>>;
   getExportJob(input: ExportJobActionInput): Promise<ApiResponse<LocalExportJob>>;
@@ -102,6 +106,9 @@ export interface VideoToolApi {
   startChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
   cancelChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
   logoutChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
+  getBrowserSessionStatuses(): Promise<ApiResponse<readonly BrowserSessionStatus[]>>;
+  startBrowserSession(providerId: BrowserSessionProviderId): Promise<ApiResponse<BrowserSessionStatus>>;
+  clearBrowserSession(providerId: BrowserSessionProviderId): Promise<ApiResponse<BrowserSessionStatus>>;
   executeLlmPrompt(request: {
     modelId: string;
     prompt: string;
@@ -109,6 +116,7 @@ export interface VideoToolApi {
     ollamaBaseUrl?: string;
     openAiAuthMode?: OpenAiAuthMode;
   }): Promise<ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>>;
+  generateWriterDraft(input: WriterGenerationInput): Promise<ApiResponse<WriterDraft>>;
   mcpGetTools(): Promise<ApiResponse<unknown>>;
   mcpExecuteTool(toolName: string, params: unknown): Promise<ApiResponse<unknown>>;
   agentChatSend(input: AgentChatSendInput): Promise<ApiResponse<AgentChatTurnState>>;
@@ -195,6 +203,8 @@ const videoTool: VideoToolApi = {
   getAssetPlaybackUrl: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.projectAssetPlaybackUrl, input) as Promise<ApiResponse<AssetPlaybackUrl>>,
   saveTimeline: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectTimelineSave, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
+  saveAiProjectDocument: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectAiDocumentSave, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
   getFfmpegRuntimeStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getFfmpegRuntimeStatus) as Promise<ApiResponse<LocalFfmpegRuntimeStatus>>,
   startExportJob: (input) => ipcRenderer.invoke(IPC_CHANNELS.startExportJob, input) as Promise<ApiResponse<LocalExportJob>>,
   getExportJob: (input) => ipcRenderer.invoke(IPC_CHANNELS.getExportJob, input) as Promise<ApiResponse<LocalExportJob>>,
@@ -221,10 +231,18 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.cancelChatGptOAuth) as Promise<ApiResponse<ChatGptOAuthStatus>>,
   logoutChatGptOAuth: () =>
     ipcRenderer.invoke(IPC_CHANNELS.logoutChatGptOAuth) as Promise<ApiResponse<ChatGptOAuthStatus>>,
+  getBrowserSessionStatuses: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.getBrowserSessionStatuses) as Promise<ApiResponse<readonly BrowserSessionStatus[]>>,
+  startBrowserSession: (providerId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.startBrowserSession, providerId) as Promise<ApiResponse<BrowserSessionStatus>>,
+  clearBrowserSession: (providerId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.clearBrowserSession, providerId) as Promise<ApiResponse<BrowserSessionStatus>>,
   executeLlmPrompt: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.executeLlmPrompt, request) as Promise<
       ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>
     >,
+  generateWriterDraft: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.writerGenerate, input) as Promise<ApiResponse<WriterDraft>>,
   mcpGetTools: () => ipcRenderer.invoke(IPC_CHANNELS.mcpGetTools) as Promise<ApiResponse<unknown>>,
   mcpExecuteTool: (toolName: string, params: unknown) =>
     ipcRenderer.invoke(IPC_CHANNELS.mcpExecuteTool, toolName, params) as Promise<ApiResponse<unknown>>,

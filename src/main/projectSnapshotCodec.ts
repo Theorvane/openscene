@@ -1,5 +1,6 @@
 import { PROJECT_SCHEMA_VERSION } from '../shared/timelineTypes';
 import type { BrowserAssetMetadata, LocalProjectSnapshot, MediaAsset, MediaKind, TimelineDocument } from '../shared/timelineTypes';
+import { createEmptyAiProjectDocument, parseAiProjectDocument } from '../shared/aiProjectDomain';
 import { migrateTimelineDocumentV1, migrateTimelineDocumentV2, parseTimelineDocument } from '../shared/timelineValidators';
 import {
   TIMELINE_VALIDATION_LIMITS,
@@ -115,6 +116,7 @@ export function findInvalidAssetRelation(
 function parseProjectRecord(
   value: Record<string, unknown>,
   timeline: TimelineDocument,
+  aiValue: unknown,
   expectedProjectId?: string
 ): LocalProjectSnapshot | null {
   const id = getOpaqueId(value, 'id');
@@ -137,21 +139,28 @@ function parseProjectRecord(
     assetIds.add(asset.id);
     assets.push(asset);
   }
+  const ai = aiValue === undefined
+    ? createEmptyAiProjectDocument()
+    : parseAiProjectDocument(aiValue, assetIds);
+  if (ai === null) {
+    return null;
+  }
   return findInvalidAssetRelation(timeline, assets) === null
-    ? { schemaVersion: PROJECT_SCHEMA_VERSION, id, name, createdAt, updatedAt, assets, timeline }
+    ? { schemaVersion: PROJECT_SCHEMA_VERSION, id, name, createdAt, updatedAt, assets, timeline, ai }
     : null;
 }
 
 export function parsePersistedProject(value: unknown, expectedProjectId?: string): LocalProjectSnapshot | null {
   if (
     !isPlainRecord(value) ||
-    !hasAllowedKeys(value, ['schemaVersion', 'id', 'name', 'createdAt', 'updatedAt', 'assets', 'timeline']) ||
-    value.schemaVersion !== PROJECT_SCHEMA_VERSION
+    !hasAllowedKeys(value, ['schemaVersion', 'id', 'name', 'createdAt', 'updatedAt', 'assets', 'timeline', 'ai']) ||
+    value.schemaVersion !== PROJECT_SCHEMA_VERSION ||
+    value.ai === undefined
   ) {
     return null;
   }
   const timeline = parseTimelineDocument(value.timeline);
-  return timeline === null ? null : parseProjectRecord(value, timeline, expectedProjectId);
+  return timeline === null ? null : parseProjectRecord(value, timeline, value.ai, expectedProjectId);
 }
 
 export function parsePersistedProjectForRead(value: unknown, expectedProjectId?: string): LocalProjectSnapshot | null {
@@ -162,12 +171,14 @@ export function parsePersistedProjectForRead(value: unknown, expectedProjectId?:
   if (
     !isPlainRecord(value) ||
     !hasAllowedKeys(value, ['schemaVersion', 'id', 'name', 'createdAt', 'updatedAt', 'assets', 'timeline']) ||
-    (value.schemaVersion !== 1 && value.schemaVersion !== 2)
+    (value.schemaVersion !== 1 && value.schemaVersion !== 2 && value.schemaVersion !== 3)
   ) {
     return null;
   }
   const timeline = value.schemaVersion === 1
     ? migrateTimelineDocumentV1(value.timeline)
-    : migrateTimelineDocumentV2(value.timeline);
-  return timeline === null ? null : parseProjectRecord(value, timeline, expectedProjectId);
+    : value.schemaVersion === 2
+      ? migrateTimelineDocumentV2(value.timeline)
+      : parseTimelineDocument(value.timeline);
+  return timeline === null ? null : parseProjectRecord(value, timeline, undefined, expectedProjectId);
 }

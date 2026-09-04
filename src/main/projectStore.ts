@@ -13,6 +13,7 @@ import type {
   UpdateAssetMetadataInput
 } from '../shared/timelineTypes';
 import { parseCreateProjectInput, parseTimelineDocument, parseUpdateAssetMetadataInput } from '../shared/timelineValidators';
+import { createEmptyAiProjectDocument, parseAiProjectDocument, type AiProjectDocument } from '../shared/aiProjectDomain';
 import { assertAssetImportQuota, DEFAULT_ASSET_IMPORT_LIMITS, type AssetImportLimits } from './assetImportPolicy';
 import {
   PROJECT_FILE_NAME,
@@ -103,7 +104,8 @@ export class ProjectStore {
       createdAt: timestamp,
       updatedAt: timestamp,
       assets: [],
-      timeline: createInitialTimeline()
+      timeline: createInitialTimeline(),
+      ai: createEmptyAiProjectDocument()
     };
 
     let directory: string | null = null;
@@ -178,7 +180,8 @@ export class ProjectStore {
       createdAt: timestamp,
       updatedAt: timestamp,
       assets: [],
-      timeline: createInitialTimeline()
+      timeline: createInitialTimeline(),
+      ai: createEmptyAiProjectDocument()
     };
     try {
       await writeProjectSnapshotAtDirectory(resolved, snapshot);
@@ -208,7 +211,8 @@ export class ProjectStore {
       createdAt: timestamp,
       updatedAt: timestamp,
       assets: [],
-      timeline: createInitialTimeline()
+      timeline: createInitialTimeline(),
+      ai: createEmptyAiProjectDocument()
     };
     await mkdir(directory, { mode: 0o700 });
     try {
@@ -284,6 +288,17 @@ export class ProjectStore {
         throw new ProjectStoreError(invalidAssetRelationMessage(invalidRelation));
       }
       return this.persist({ ...current, updatedAt: now.toISOString(), timeline: parsedTimeline });
+    });
+  }
+
+  async saveAiProjectDocument(projectId: string, ai: AiProjectDocument, now = new Date()): Promise<LocalProjectSnapshot> {
+    return this.mutateProject(projectId, async () => {
+      const current = await this.requireProject(projectId);
+      const parsedAi = parseAiProjectDocument(ai, new Set(current.assets.map((asset) => asset.id)));
+      if (parsedAi === null) {
+        throw new ProjectStoreError('Invalid AI project document.');
+      }
+      return this.persist({ ...current, updatedAt: now.toISOString(), ai: parsedAi });
     });
   }
 
