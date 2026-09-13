@@ -14,11 +14,12 @@
  */
 
 /** The day the rates below were recorded. Surfaced in every estimate. */
-export const PRICING_AS_OF = '2026-07-31';
+export const PRICING_AS_OF = '2026-09-09';
 
 export type GenerationRate =
   | { readonly kind: 'per-second'; readonly usd: number }
   | { readonly kind: 'per-image'; readonly usd: number }
+  | { readonly kind: 'free'; readonly reason: string }
   | { readonly kind: 'unknown'; readonly reason: string };
 
 const UNKNOWN_THIRD_PARTY: GenerationRate = {
@@ -33,9 +34,12 @@ const UNKNOWN_THIRD_PARTY: GenerationRate = {
  */
 const VIDEO_RATES: Readonly<Record<string, GenerationRate>> = {
   'veo-3.1-generate-preview': { kind: 'per-second', usd: 0.4 },
+  'veo-3.1-fast-generate-preview': { kind: 'per-second', usd: 0.1 },
+  'veo-3.1-lite-generate-preview': { kind: 'per-second', usd: 0.05 },
   'veo-3.0-generate-001': { kind: 'per-second', usd: 0.4 },
   'veo-3.0-fast-generate-001': { kind: 'per-second', usd: 0.15 },
   'veo-2.0-generate-001': { kind: 'per-second', usd: 0.35 },
+  'gemini-omni-1.1-flash': { kind: 'per-second', usd: 0.1 },
   'sora-2': { kind: 'per-second', usd: 0.1 },
   'sora-2-pro': { kind: 'per-second', usd: 0.3 },
   // Runway bills in credits at $0.01 each, so these are the published
@@ -58,17 +62,24 @@ const VIDEO_RATES: Readonly<Record<string, GenerationRate>> = {
 const IMAGE_RATES: Readonly<Record<string, GenerationRate>> = {
   'gpt-image-1': { kind: 'per-image', usd: 0.04 },
   'dall-e-3': { kind: 'per-image', usd: 0.04 },
-  'imagen-4.0-generate-001': { kind: 'per-image', usd: 0.04 },
-  'imagen-4.0-ultra-generate-001': { kind: 'per-image', usd: 0.06 },
-  'imagen-3.0-generate-002': { kind: 'per-image', usd: 0.03 }
+  // The adapter requests 1K output, so these are the published Standard 1K
+  // output rates. Prompt/input-token charges are small but account-dependent
+  // and remain covered by the estimate caveat.
+  'gemini-3.1-flash-image': { kind: 'per-image', usd: 0.067 },
+  'gemini-3.1-flash-lite-image': { kind: 'per-image', usd: 0.0336 },
+  'gemini-3-pro-image': { kind: 'per-image', usd: 0.134 },
+  'gemini-2.5-flash-image': { kind: 'per-image', usd: 0.039 }
 };
 
 /**
- * Speech pricing is deliberately empty rather than approximated. ElevenLabs
- * bills against a monthly credit allowance, not per character, so a
- * dollars-per-word figure would be fiction dressed as arithmetic.
+ * Cloud speech pricing is deliberately unknown rather than approximated.
+ * ElevenLabs bills against a monthly credit allowance, not per character, so
+ * a dollars-per-word figure would be fiction dressed as arithmetic. A
+ * local runtime is explicitly zero provider cost.
  */
-const SPEECH_RATES: Readonly<Record<string, GenerationRate>> = {};
+const SPEECH_RATES: Readonly<Record<string, GenerationRate>> = {
+  'vieneu-v3-turbo': { kind: 'free', reason: 'Runs on the OpenScene-managed local VieNeu-TTS runtime.' }
+};
 
 export type GenerationKind = 'video' | 'image' | 'speech';
 
@@ -133,7 +144,19 @@ export function estimateImageCost(input: { readonly modelId: string; readonly im
 }
 
 export function estimateSpeechCost(input: { readonly modelId: string }): CostEstimate {
-  return unpriced('speech', input.modelId, rateFor('speech', input.modelId));
+  const rate = rateFor('speech', input.modelId);
+  if (rate.kind === 'free') {
+    return {
+      kind: 'speech',
+      modelId: input.modelId,
+      priced: true,
+      amountUsd: 0,
+      basis: 'local runtime',
+      asOf: PRICING_AS_OF,
+      caveat: `${rate.reason} OpenScene sends no paid provider request.`
+    };
+  }
+  return unpriced('speech', input.modelId, rate);
 }
 
 function unpriced(kind: GenerationKind, modelId: string, rate: GenerationRate): CostEstimate {

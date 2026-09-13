@@ -19,7 +19,7 @@ describe('titlePreviewLayout', () => {
   it('is a no-op when the preview is the size of the export', () => {
     const layout = titlePreviewLayout(title({ sizePx: 72, positionX: 12 }), { width: 1920, height: 1080 });
 
-    expect(layout).toEqual({ fontSizePx: 72, offsetXPx: 12, offsetYPx: 0 });
+    expect(layout).toEqual({ fontSizePx: 72, offsetXPx: 12, offsetYPx: 0, outlineWidthPx: 0, paddingPx: 0 });
   });
 
   it('takes the smaller fit when the preview does not share the export aspect', () => {
@@ -34,7 +34,22 @@ describe('titlePreviewLayout', () => {
     expect(titlePreviewLayout(title({ sizePx: 72 }), { width: 0, height: 0 })).toEqual({
       fontSizePx: 0,
       offsetXPx: 0,
-      offsetYPx: 0
+      offsetYPx: 0,
+      outlineWidthPx: 0,
+      paddingPx: 0
+    });
+  });
+
+  it('scales title-safe placement, outline and box padding from the selected output frame', () => {
+    const styled = title({
+      style: { fontWeight: 'bold', outlineColor: '#000000', outlineWidthPx: 4, backgroundColor: '#000000', backgroundOpacity: 0.7, paddingPx: 16, placement: 'bottom' }
+    });
+    expect(titlePreviewLayout(styled, { width: 270, height: 480 }, { width: 1080, height: 1920 })).toEqual({
+      fontSizePx: 18,
+      offsetXPx: 0,
+      offsetYPx: 153.6,
+      outlineWidthPx: 1,
+      paddingPx: 4
     });
   });
 });

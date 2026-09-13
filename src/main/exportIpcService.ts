@@ -5,6 +5,17 @@ import { audioProbeArgs, probeSaysAudible } from '../shared/audibleAssets';
 import { FILTER_LIST_ARGS, escapeFontPath, fontCandidates, supportsDrawtext } from '../shared/titleFont';
 import type { ApiResponse } from '../shared/models';
 import { EXPORT_DEFAULTS, type LocalExportJob, type LocalFfmpegRuntimeStatus, type StartExportJobInput } from '../shared/exportTypes';
+import { createDeliveryProvenance } from '../shared/exportProvenance';
+import {
+  DEFAULT_METADATA_PRIVACY_MODE,
+  mergeMetadataTagInventories,
+  verifyMetadataPrivacy,
+  type MetadataPrivacyMode,
+  type MetadataPrivacyVerification,
+  type MetadataTagInventory
+} from '../shared/metadataPrivacy';
+import { createSubtitleSidecar, DEFAULT_SUBTITLE_DELIVERY, timelineForSubtitleDelivery, type SubtitleDelivery, type SubtitleSidecar } from '../shared/subtitleDelivery';
+import { resolvedTitleStyle } from '../shared/captionStyle';
 import { parseExportJobActionInput, parseStartExportJobInput } from '../shared/exportValidators';
 import type { LocalProjectSnapshot } from '../shared/timelineTypes';
 import type { OpenedAssetPlaybackSource } from './assetLibraryStore';
@@ -16,7 +27,8 @@ import { discoverFfmpeg, type FfmpegDiscoveryResult } from './ffmpegDiscovery';
 import { startFfmpegExportProcess, type FfmpegExecution, type StartFfmpegExportProcessInput } from './ffmpegExportProcess';
 import { compileFfmpegTimeline, FfmpegTimelineError } from './ffmpegTimelineCompiler';
 import { ExportJobStore } from './exportJobStore';
-import { ExportOutputError, prepareExportOutputPath, removeExportOutput, validateExportOutput } from './exportOutputFiles';
+import { ExportOutputError, hashExportOutput, prepareExportOutputPath, removeExportOutput, validateExportOutput, writeExportProvenanceSidecar, writeExportSubtitleSidecar } from './exportOutputFiles';
+import { inspectContainerMetadata, type InspectContainerMetadataInput } from './containerMetadataInspection';
 import { fail, ok } from './ipcResponses';
 
 type ProjectReader = {
@@ -37,6 +49,8 @@ type ExportIpcServiceDependencies = {
   readonly runInBackground?: (task: () => Promise<void>) => void;
   readonly openPath?: (path: string) => Promise<string>;
   readonly revealPath?: (path: string) => void;
+  readonly now?: () => Date;
+  readonly inspectContainerMetadata?: (input: InspectContainerMetadataInput) => Promise<MetadataTagInventory>;
 };
 
 type PreparedExport = {
@@ -45,9 +59,18 @@ type PreparedExport = {
   readonly args: readonly string[];
   readonly durationMs: number;
   readonly stagingDirectory: string;
+  readonly stagedAssetPaths: ReadonlyMap<string, string>;
   /** What this run promises the file will be, to be checked against it after. */
   readonly promise: ExportPromise;
+  readonly sidecar?: SubtitleSidecar;
+  readonly project: LocalProjectSnapshot;
+  readonly subtitleDelivery: SubtitleDelivery;
+  readonly metadataPrivacyMode: MetadataPrivacyMode;
 };
+
+class MetadataPrivacyVerificationError extends Error {
+  override readonly name = 'MetadataPrivacyVerificationError';
+}
 
 type PrepareExportInput = {
   readonly jobId: string;
@@ -66,6 +89,9 @@ function exportFailureReason(error: unknown): string {
   if (error instanceof ExportAssetStagingError) {
     return error.message;
   }
+  if (error instanceof MetadataPrivacyVerificationError) {
+    return error.message;
+  }
   return 'The local FFmpeg export failed.';
 }
 
@@ -77,6 +103,8 @@ export class ExportIpcService {
   private readonly runInBackground: (task: () => Promise<void>) => void;
   private readonly openPath: (path: string) => Promise<string>;
   private readonly revealPath: (path: string) => void;
+  private readonly now: () => Date;
+  private readonly inspectMetadata: (input: InspectContainerMetadataInput) => Promise<MetadataTagInventory>;
 
   constructor(private readonly dependencies: ExportIpcServiceDependencies) {
     this.discover = dependencies.discoverFfmpeg ?? discoverFfmpeg;
@@ -84,6 +112,8 @@ export class ExportIpcService {
     this.runInBackground = dependencies.runInBackground ?? ((task) => void task());
     this.openPath = dependencies.openPath ?? (async () => '');
     this.revealPath = dependencies.revealPath ?? (() => undefined);
+    this.now = dependencies.now ?? (() => new Date());
+    this.inspectMetadata = dependencies.inspectContainerMetadata ?? inspectContainerMetadata;
   }
 
   async startExportJob(payload: unknown): Promise<ApiResponse<LocalExportJob>> {
@@ -100,6 +130,14 @@ export class ExportIpcService {
       const project = await this.dependencies.projects.open(input.projectId);
       if (project === null) {
         return fail('PROJECT_NOT_FOUND', 'The project to export was not found.');
+      }
+      const delivery = input.subtitleDelivery ?? DEFAULT_SUBTITLE_DELIVERY;
+      if (delivery.sidecarFormat !== 'none') {
+        try {
+          createSubtitleSidecar(project.timeline, delivery.sidecarFormat);
+        } catch (error) {
+          return fail('EXPORT_REFUSED', error instanceof Error ? error.message : 'The subtitle sidecar could not be prepared.');
+        }
       }
       /*
         Whether this cut can be rendered at all, before anything is rendered.
@@ -228,7 +266,7 @@ export class ExportIpcService {
    * font where one is expected. Saying which of the two failed is the difference
    * between a fixable message and a mysterious export.
    */
-  private async titleFont(executablePath: string): Promise<string> {
+  private async titleFont(executablePath: string, weight: 'regular' | 'bold' = 'regular'): Promise<string> {
     const filters = await new Promise<string>((resolve) => {
       let listing = '';
       const probe = spawn(executablePath, [...FILTER_LIST_ARGS]);
@@ -243,7 +281,7 @@ export class ExportIpcService {
         'This FFmpeg build cannot draw text — it was compiled without libfreetype, so titles cannot be rendered.'
       );
     }
-    for (const candidate of fontCandidates(process.platform)) {
+    for (const candidate of fontCandidates(process.platform, weight)) {
       try {
         await access(candidate);
         return escapeFontPath(candidate);
@@ -251,7 +289,7 @@ export class ExportIpcService {
         // Try the next one; a machine without this face is ordinary.
       }
     }
-    throw new ExportAssetStagingError('No font could be found on this machine to draw titles with.');
+    throw new ExportAssetStagingError(`No ${weight} system font could be found on this machine to draw titles with.`);
   }
 
   private async prepareExport(input: PrepareExportInput): Promise<PreparedExport> {
@@ -260,6 +298,12 @@ export class ExportIpcService {
     const frameRate = input.request.frameRate ?? EXPORT_DEFAULTS.frameRate;
     let staged: StagedExportAssets | null = null;
     try {
+      const delivery = input.request.subtitleDelivery ?? DEFAULT_SUBTITLE_DELIVERY;
+      const metadataPrivacyMode = input.request.metadataPrivacyMode ?? DEFAULT_METADATA_PRIVACY_MODE;
+      const exportTimeline = timelineForSubtitleDelivery(input.project.timeline, delivery);
+      const sidecar = delivery.sidecarFormat === 'none'
+        ? undefined
+        : createSubtitleSidecar(input.project.timeline, delivery.sidecarFormat, dimensions);
       staged = await stageExportAssets({
         assets: this.dependencies.assets,
         project: input.project,
@@ -267,7 +311,7 @@ export class ExportIpcService {
         jobId: input.jobId
       });
       const compiled = compileFfmpegTimeline({
-        timeline: input.project.timeline,
+        timeline: exportTimeline,
         assetPaths: staged.assetPaths,
         // The compiler works from the timeline, which does not record what an
         // asset is; the project does. Without this a still is opened as a movie
@@ -285,19 +329,29 @@ export class ExportIpcService {
         audibleAssetIds: await this.audibleAssets(input.executablePath, staged.assetPaths),
         // Only looked for when there is something to draw: an export with no
         // titles must not fail because the machine has an unusual font layout.
-        ...((input.project.timeline.titles ?? []).length > 0
-          ? { titleFontPath: await this.titleFont(input.executablePath) }
+        ...((exportTimeline.titles ?? []).length > 0
+          ? {
+              titleFontPath: await this.titleFont(input.executablePath),
+              ...((exportTimeline.titles ?? []).some((title) => resolvedTitleStyle(title).fontWeight === 'bold')
+                ? { titleBoldFontPath: await this.titleFont(input.executablePath, 'bold') }
+                : {})
+            }
           : {}),
         outputPath,
         ...dimensions,
-        frameRate
+        frameRate,
+        metadataPrivacyMode
       });
       return {
         executablePath: input.executablePath,
         outputPath,
         stagingDirectory: staged.directory,
+        stagedAssetPaths: staged.assetPaths,
         args: compiled.args,
         durationMs: compiled.durationMs,
+        project: input.project,
+        subtitleDelivery: delivery,
+        metadataPrivacyMode,
         promise: {
           widthPx: dimensions.width,
           heightPx: dimensions.height,
@@ -307,7 +361,8 @@ export class ExportIpcService {
           // it should: a video clip whose source turned out to be silent maps
           // no audio, and a file with no sound is right in that case.
           hasSound: compiled.hasSound
-        }
+        },
+        ...(sidecar === undefined ? {} : { sidecar })
       };
     } catch (error: unknown) {
       await Promise.all([
@@ -335,12 +390,49 @@ export class ExportIpcService {
     return bounded - bounded % 2;
   }
 
+  private async verifyDeliveryMetadata(prepared: PreparedExport): Promise<MetadataPrivacyVerification> {
+    try {
+      const [sourceInventories, outputInventory] = await Promise.all([
+        Promise.all([...prepared.stagedAssetPaths.values()].map((filePath) => this.inspectMetadata({
+          ffmpegPath: prepared.executablePath,
+          filePath
+        }))),
+        this.inspectMetadata({ ffmpegPath: prepared.executablePath, filePath: prepared.outputPath })
+      ]);
+      return verifyMetadataPrivacy(
+        prepared.metadataPrivacyMode,
+        mergeMetadataTagInventories(sourceInventories),
+        outputInventory
+      );
+    } catch {
+      const unchecked = { checked: false, fields: [] } as const;
+      return verifyMetadataPrivacy(prepared.metadataPrivacyMode, unchecked, unchecked);
+    }
+  }
+
+  private assertPrivacyCleanVerified(verification: MetadataPrivacyVerification): void {
+    if (verification.mode !== 'privacy_clean') return;
+    if (!verification.checked) {
+      throw new MetadataPrivacyVerificationError(
+        'Privacy Clean could not verify container metadata with FFprobe, so no delivery was kept.'
+      );
+    }
+    if (!verification.ok) {
+      const remaining = verification.afterFields.map((field) => field.label).join(', ');
+      throw new MetadataPrivacyVerificationError(
+        `Privacy Clean found personal container metadata remaining in the output: ${remaining}. No delivery was kept.`
+      );
+    }
+  }
+
   private async runExport(jobId: string, prepared: PreparedExport): Promise<void> {
     if (this.dependencies.jobs.get(jobId)?.state.kind !== 'queued') {
       await Promise.all([removeExportOutput(prepared.outputPath), removeExportStaging(prepared.stagingDirectory)]);
       return;
     }
     this.dependencies.jobs.markRunning(jobId, prepared.durationMs);
+    let subtitleOutputPath: string | undefined;
+    let provenanceOutputPath: string | undefined;
     try {
       const execution = this.startProcess({
         executablePath: prepared.executablePath,
@@ -358,7 +450,15 @@ export class ExportIpcService {
         return;
       }
       const output = await validateExportOutput(this.dependencies.exportsRoot, prepared.outputPath);
-      this.completedOutputs.set(jobId, prepared.outputPath);
+      const [measurement, metadataPrivacyVerification] = await Promise.all([
+        measureExportedFile({ ffmpegPath: prepared.executablePath, filePath: prepared.outputPath }),
+        this.verifyDeliveryMetadata(prepared)
+      ]);
+      this.assertPrivacyCleanVerified(metadataPrivacyVerification);
+      const subtitleOutput = prepared.sidecar === undefined
+        ? undefined
+        : await writeExportSubtitleSidecar(this.dependencies.exportsRoot, jobId, prepared.sidecar);
+      subtitleOutputPath = subtitleOutput?.outputPath;
       /*
         Read the file back before calling it done.
 
@@ -369,9 +469,39 @@ export class ExportIpcService {
       */
       const review = reviewExport(
         prepared.promise,
-        await measureExportedFile({ ffmpegPath: prepared.executablePath, filePath: prepared.outputPath })
+        measurement
       );
-      this.dependencies.jobs.markCompleted(jobId, output.fileName, output.fileSizeBytes, review);
+      const checksum = await hashExportOutput(prepared.outputPath);
+      if (checksum.fileSizeBytes !== output.fileSizeBytes) {
+        throw new ExportOutputError('The MP4 changed before its provenance sidecar was created.');
+      }
+      const provenanceOutput = await writeExportProvenanceSidecar(
+        this.dependencies.exportsRoot,
+        jobId,
+        createDeliveryProvenance({
+          project: prepared.project,
+          exportedAt: this.now().toISOString(),
+          width: prepared.promise.widthPx,
+          height: prepared.promise.heightPx,
+          frameRate: prepared.promise.frameRate,
+          durationMs: prepared.promise.durationMs,
+          subtitleDelivery: prepared.subtitleDelivery,
+          metadataPrivacyMode: prepared.metadataPrivacyMode,
+          metadataPrivacyVerification,
+          output: { fileName: output.fileName, fileSizeBytes: output.fileSizeBytes, sha256: checksum.sha256 }
+        })
+      );
+      provenanceOutputPath = provenanceOutput.outputPath;
+      this.dependencies.jobs.markCompleted(
+        jobId,
+        output.fileName,
+        output.fileSizeBytes,
+        review,
+        subtitleOutput?.fileName,
+        provenanceOutput.fileName,
+        metadataPrivacyVerification
+      );
+      this.completedOutputs.set(jobId, prepared.outputPath);
     } catch (error: unknown) {
       if (this.dependencies.jobs.get(jobId)?.state.kind === 'running') {
         const reason = error instanceof Error ? exportFailureReason(error) : 'The local FFmpeg export failed.';
@@ -382,7 +512,13 @@ export class ExportIpcService {
       const removePartialOutput = this.dependencies.jobs.get(jobId)?.state.kind === 'completed'
         ? Promise.resolve()
         : removeExportOutput(prepared.outputPath);
-      await Promise.all([removeExportStaging(prepared.stagingDirectory), removePartialOutput]);
+      const removePartialSubtitle = this.dependencies.jobs.get(jobId)?.state.kind === 'completed' || subtitleOutputPath === undefined
+        ? Promise.resolve()
+        : removeExportOutput(subtitleOutputPath);
+      const removePartialProvenance = this.dependencies.jobs.get(jobId)?.state.kind === 'completed' || provenanceOutputPath === undefined
+        ? Promise.resolve()
+        : removeExportOutput(provenanceOutputPath);
+      await Promise.all([removeExportStaging(prepared.stagingDirectory), removePartialOutput, removePartialSubtitle, removePartialProvenance]);
     }
   }
 

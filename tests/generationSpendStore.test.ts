@@ -107,13 +107,13 @@ describe('the spending record on disk', () => {
     const store = new GenerationSpendStore(filePath, () => new Date('2026-08-28T09:00:00.000Z'));
     await store.setCap(1);
 
-    const oneImage = estimateImageCost({ modelId: 'imagen-4.0-ultra-generate-001', imageCount: 10 }); // $0.60
+    const oneImage = estimateImageCost({ modelId: 'gemini-3.1-flash-image', imageCount: 10 }); // $0.67
     const [first, second] = await Promise.all([store.reserve(oneImage), store.reserve(oneImage)]);
 
     expect([first.ok, second.ok].filter(Boolean)).toHaveLength(1);
     const refused = first.ok ? second : first;
     expect(refused.ok === false && refused.reason).toContain('over your $1.00 monthly limit');
-    expect(await store.monthToDate()).toMatchObject({ amountUsd: 0.6, entryCount: 1 });
+    expect(await store.monthToDate()).toMatchObject({ amountUsd: 0.67, entryCount: 1 });
   });
 
   it('does not lose a charge when several are written at once', async () => {

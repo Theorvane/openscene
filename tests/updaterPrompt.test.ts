@@ -87,7 +87,7 @@ describe('updater logging', () => {
     // Given
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
-    const source = readFileSync(resolve(process.cwd(), 'src/main/updater.ts'), 'utf8');
+    const source = readFileSync(resolve(process.cwd(), 'src/main/updater.ts'), 'utf8').replace(/\r\n/g, '\n');
 
     // Then
     // Without this, diagnosing "the update is not working" means guessing:

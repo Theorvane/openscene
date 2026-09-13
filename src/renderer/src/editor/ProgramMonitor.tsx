@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement, type ReactNode, type SyntheticEvent } from 'react';
 
 import type { TimelineEditorController } from './useTimelineEditor';
 import { effectCssFilter, effectCssTransform } from './clipEffectControls';
@@ -15,6 +15,9 @@ import {
 } from './programMonitorMediaSync';
 import { buildProgramMonitorPreview, type ProgramMonitorAudioLayer, type ProgramMonitorVisualLayer } from './programMonitorPreview';
 import { titlePreviewLayout, titlesAt } from '../../../shared/titlePreviewLayout';
+import { resolvedTitleStyle } from '../../../shared/captionStyle';
+import { outputFrameFor } from '../../../shared/outputFrame';
+import { DEFAULT_EXPORT_FRAME, EXPORT_FRAME_CHANGE_EVENT, readExportFramePreference } from './exportFramePreference';
 
 type ProgramMonitorProps = {
   readonly editor: TimelineEditorController;
@@ -236,6 +239,25 @@ export function ProgramMonitor({ editor, exportControl }: ProgramMonitorProps): 
   }, []);
 
   const visibleTitles = titlesAt(editor.project?.timeline.titles, editor.playheadMs);
+  const [framePreference, setFramePreference] = useState(DEFAULT_EXPORT_FRAME);
+  useEffect(() => {
+    const projectId = editor.project?.id;
+    setFramePreference(projectId === undefined ? DEFAULT_EXPORT_FRAME : readExportFramePreference(projectId));
+    const onFrameChange = (event: Event): void => {
+      const detail = (event as CustomEvent<{ readonly projectId: string }>).detail;
+      if (projectId !== undefined && detail?.projectId === projectId) {
+        setFramePreference(readExportFramePreference(projectId));
+      }
+    };
+    window.addEventListener(EXPORT_FRAME_CHANGE_EVENT, onFrameChange);
+    return () => window.removeEventListener(EXPORT_FRAME_CHANGE_EVENT, onFrameChange);
+  }, [editor.project?.id]);
+  const titleReferenceFrame = useMemo(
+    () => editor.project === null
+      ? null
+      : outputFrameFor({ timeline: editor.project.timeline, assets: editor.project.assets, preference: framePreference }),
+    [editor.project, framePreference]
+  );
 
   let preview: ReactElement;
   if (asset === null || project === null) {
@@ -263,15 +285,19 @@ export function ProgramMonitor({ editor, exportControl }: ProgramMonitorProps): 
           if (mediaRef.current !== event.currentTarget) return;
           reportMediaFailure(readyAttemptId);
         };
-        const mediaLabel = `${asset.kind === 'video' ? 'Video' : 'Audio'} preview: ${asset.displayName}`;
-        preview = asset.kind === 'video'
-	          ? <video ref={setMediaElement} key={readyAttemptId} src={previewLoadState.url} aria-label={mediaLabel} controls={false} playsInline style={activeVideoStyle} onAbort={onMediaFailure} onEnded={handleMediaEnded} onError={onMediaFailure} />
-          : (
+        const mediaLabel = `${asset.kind === 'video' ? 'Video' : asset.kind === 'image' ? 'Image' : 'Audio'} preview: ${asset.displayName}`;
+        if (asset.kind === 'video') {
+          preview = <video ref={setMediaElement} key={readyAttemptId} src={previewLoadState.url} aria-label={mediaLabel} controls={false} playsInline style={activeVideoStyle} onAbort={onMediaFailure} onEnded={handleMediaEnded} onError={onMediaFailure} />;
+        } else if (asset.kind === 'image') {
+          preview = <img key={readyAttemptId} src={previewLoadState.url} alt={mediaLabel} style={activeVideoStyle} onError={() => reportMediaFailure(readyAttemptId)} />;
+        } else {
+          preview = (
             <div className="preview-frame__empty">
               <span>{mediaLabel}</span>
               <audio ref={setMediaElement} key={readyAttemptId} src={previewLoadState.url} aria-label={mediaLabel} controls={false} onAbort={onMediaFailure} onEnded={handleMediaEnded} onError={onMediaFailure} />
             </div>
           );
+        }
         break;
       }
     }
@@ -299,7 +325,11 @@ export function ProgramMonitor({ editor, exportControl }: ProgramMonitorProps): 
           {visibleTitles.length > 0 && (
             <div className="preview-titles" aria-label="Titles at the playhead">
               {visibleTitles.map((title) => {
-                const layout = titlePreviewLayout(title, frameSize);
+                const layout = titlePreviewLayout(title, frameSize, titleReferenceFrame ?? undefined);
+                const titleStyle = resolvedTitleStyle(title);
+                const background = titleStyle.backgroundOpacity <= 0
+                  ? 'transparent'
+                  : `${titleStyle.backgroundColor}${Math.round(titleStyle.backgroundOpacity * 255).toString(16).padStart(2, '0')}`;
                 return (
                   <span
                     key={title.id}
@@ -307,6 +337,11 @@ export function ProgramMonitor({ editor, exportControl }: ProgramMonitorProps): 
                     style={{
                       color: title.color,
                       fontSize: `${layout.fontSizePx}px`,
+                      fontWeight: titleStyle.fontWeight === 'bold' ? 700 : 400,
+                      backgroundColor: background,
+                      padding: `${layout.paddingPx}px`,
+                      WebkitTextStroke: layout.outlineWidthPx > 0 ? `${layout.outlineWidthPx}px ${titleStyle.outlineColor}` : undefined,
+                      paintOrder: 'stroke fill',
                       transform: `translate(${layout.offsetXPx}px, ${layout.offsetYPx}px)`
                     }}
                   >

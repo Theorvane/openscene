@@ -50,6 +50,12 @@ struct TitleInput: Record {
   @Field var color: String = "#ffffff"
   @Field var positionX: Double = 0
   @Field var positionY: Double = 0
+  @Field var fontWeight: String = "regular"
+  @Field var outlineColor: String = "#000000"
+  @Field var outlineWidthPx: Double = 0
+  @Field var backgroundColor: String = "#000000"
+  @Field var backgroundOpacity: Double = 0
+  @Field var paddingPx: Double = 0
 }
 
 struct ExportRequest: Record {
@@ -217,7 +223,13 @@ private extension ExportRequest {
           sizePx: $0.sizePx,
           color: $0.color,
           positionX: $0.positionX,
-          positionY: $0.positionY
+          positionY: $0.positionY,
+          bold: $0.fontWeight == "bold",
+          outlineColor: $0.outlineColor,
+          outlineWidthPx: $0.outlineWidthPx,
+          backgroundColor: $0.backgroundColor,
+          backgroundOpacity: $0.backgroundOpacity,
+          paddingPx: $0.paddingPx
         )
       }
     )

@@ -1,6 +1,14 @@
 import { LLM_CATALOG } from './llmCatalog.generated';
+import { getVideoModelCapabilities } from './mediaCapabilityRegistry';
+import {
+  AGENT_ROUTER_EDIT_AGENT_UNAVAILABLE_REASON,
+  AGENT_ROUTER_MODELS,
+  AGENT_ROUTER_PROVIDER_ID,
+  AGENT_ROUTER_WRITER_DESKTOP_ONLY_REASON
+} from './agentRouter';
 
-export type AiDomain = 'voice-generation' | 'video-generation' | 'image-generation' | 'edit-agent';
+export type AiDomain = 'writer' | 'voice-generation' | 'video-generation' | 'image-generation' | 'edit-agent';
+export type AiRuntime = 'desktop' | 'mobile';
 
 export type AiDomainProvider = {
   readonly id: string;
@@ -10,9 +18,13 @@ export type AiDomainProvider = {
 
 export const AI_DOMAIN_PROVIDERS: readonly AiDomainProvider[] = [
   { id: 'local_ollama', label: 'Ollama', executionPath: 'local' },
+  { id: 'vieneu_local', label: 'VieNeu-TTS', executionPath: 'local' },
+  { id: 'comfyui_local', label: 'ComfyUI', executionPath: 'local' },
+  { id: AGENT_ROUTER_PROVIDER_ID, label: 'AgentRouter', executionPath: 'api' },
   { id: 'openai', label: 'OpenAI', executionPath: 'api' },
   { id: 'anthropic', label: 'Anthropic', executionPath: 'api' },
   { id: 'google_gemini', label: 'Google Gemini', executionPath: 'api' },
+  { id: 'xai', label: 'xAI', executionPath: 'api' },
   { id: 'deepseek', label: 'DeepSeek', executionPath: 'api' },
   { id: 'gemini', label: 'Google Gemini', executionPath: 'api' },
   { id: 'elevenlabs', label: 'ElevenLabs', executionPath: 'api' },
@@ -32,6 +44,8 @@ export type AiDomainModelConfig = {
   readonly domains: readonly AiDomain[];
   readonly available: boolean;
   readonly unavailableReason?: string;
+  /** Omitted when a runnable model works on both front ends. */
+  readonly availableOn?: readonly AiRuntime[];
   readonly contextWindow?: string;
   readonly availableContexts?: readonly string[];
   readonly precisionBit?: string;
@@ -120,6 +134,18 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     available: true
   },
   {
+    id: 'vieneu-v3-turbo',
+    providerId: 'vieneu_local',
+    label: 'VieNeu-TTS v3 Turbo',
+    providerLabel: 'VieNeu-TTS',
+    description: 'Local Vietnamese speech at 48 kHz; OpenScene starts VieNeu and discovers its voices automatically.',
+    executionPath: 'local',
+    domains: ['voice-generation'],
+    available: true,
+    availableOn: ['desktop'],
+    unavailableReason: 'VieNeu speech generation requires the desktop app and its managed local runtime.'
+  },
+  {
     id: 'gemini-2.5-flash-preview-tts',
     providerId: 'google_gemini',
     label: 'Gemini 2.5 Flash TTS',
@@ -167,22 +193,24 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
   {
     id: 'veo-3.0-generate-001',
     providerId: 'google_gemini',
-    label: 'Veo 3',
+    label: 'Veo 3 (retired)',
     providerLabel: 'Google Veo',
-    description: 'Stable Veo 3 text-to-video with native audio.',
+    description: 'Legacy Veo 3 model retained only for saved-project history.',
     executionPath: 'api',
     domains: ['video-generation'],
-    available: true
+    available: false,
+    unavailableReason: 'Google shut down the Veo 3 API model on June 30, 2026. Choose a Veo 3.1 model.'
   },
   {
     id: 'veo-3.0-fast-generate-001',
     providerId: 'google_gemini',
-    label: 'Veo 3 Fast',
+    label: 'Veo 3 Fast (retired)',
     providerLabel: 'Google Veo',
-    description: 'Faster, cheaper Veo 3 text-to-video.',
+    description: 'Legacy Veo 3 Fast model retained only for saved-project history.',
     executionPath: 'api',
     domains: ['video-generation'],
-    available: true
+    available: false,
+    unavailableReason: 'Google shut down the Veo 3 Fast API model on June 30, 2026. Choose Veo 3.1 Fast.'
   },
   {
     id: 'veo-2.0-generate-001',
@@ -190,6 +218,36 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     label: 'Veo 2',
     providerLabel: 'Google Veo',
     description: 'Previous-generation Veo text-to-video.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: true
+  },
+  {
+    id: 'veo-3.1-fast-generate-preview',
+    providerId: 'google_gemini',
+    label: 'Veo 3.1 Fast (Preview)',
+    providerLabel: 'Google Veo',
+    description: 'Lower-latency Veo 3.1 generation with native audio and advanced frame controls.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: true
+  },
+  {
+    id: 'veo-3.1-lite-generate-preview',
+    providerId: 'google_gemini',
+    label: 'Veo 3.1 Lite (Preview)',
+    providerLabel: 'Google Veo',
+    description: 'Lowest-cost Veo 3.1 text/image generation with native audio; no reference-image or extension mode.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: true
+  },
+  {
+    id: 'gemini-omni-1.1-flash',
+    providerId: 'google_gemini',
+    label: 'Gemini Omni 1.1 Flash',
+    providerLabel: 'Google Gemini',
+    description: 'Paid Gemini API: fast text/image-to-video with native audio, 3-10s at 720p.',
     executionPath: 'api',
     domains: ['video-generation'],
     available: true
@@ -369,6 +427,82 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     unavailableReason: 'MiniMax adapter is not implemented in this build.'
   },
   {
+    id: 'grok-imagine-video-1.5',
+    providerId: 'xai',
+    label: 'Grok Imagine Video 1.5',
+    providerLabel: 'xAI Grok Imagine',
+    description: 'Desktop browser-session text/image-to-video using the signed-in Grok Imagine UI.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: true,
+    availableOn: ['desktop']
+  },
+  {
+    id: 'grok-imagine-video',
+    providerId: 'xai',
+    label: 'Grok Imagine Video Edit/Extend',
+    providerLabel: 'xAI Grok Imagine',
+    description: 'xAI video editing and extension.',
+    executionPath: 'api',
+    domains: ['video-generation'],
+    available: false,
+    unavailableReason: 'The xAI edit/extend adapter is not implemented in this build.'
+  },
+  {
+    id: 'wan2.2-animate-14b-comfyui',
+    providerId: 'comfyui_local',
+    label: 'Wan 2.2 Animate 14B',
+    providerLabel: 'ComfyUI',
+    description: 'Motion transfer through a user-managed local or remote ComfyUI worker.',
+    executionPath: 'local',
+    domains: ['video-generation'],
+    available: true,
+    availableOn: ['desktop'],
+    unavailableReason: 'Motion Control requires the desktop app and a user-managed ComfyUI worker.'
+  },
+  // ── Writer: Gemini structured output plus the user's AgentRouter aliases.
+  // AgentRouter IDs are canonical provider/model keys so the same selection
+  // also resolves through Settings and Edit Agent.
+  {
+    id: 'gemini-3.1-pro-preview',
+    providerId: 'google_gemini',
+    label: 'Gemini 3.1 Pro Preview',
+    providerLabel: 'Google Gemini',
+    description: 'Quality Writer for scripts, rewrites, scenes, and detailed shot plans.',
+    executionPath: 'api',
+    domains: ['writer'],
+    available: true,
+    reasoning: true,
+    efforts: ['low', 'medium', 'high'],
+    contextWindow: '1049k'
+  },
+  {
+    id: 'gemini-3.1-flash-lite',
+    providerId: 'google_gemini',
+    label: 'Gemini 3.1 Flash Lite',
+    providerLabel: 'Google Gemini',
+    description: 'Economy Writer for faster drafts and batch content adaptation.',
+    executionPath: 'api',
+    domains: ['writer'],
+    available: true,
+    reasoning: true,
+    efforts: ['minimal', 'low', 'medium', 'high'],
+    contextWindow: '1049k'
+  },
+  ...AGENT_ROUTER_MODELS.map((model): AiDomainModelConfig => ({
+    id: `${AGENT_ROUTER_PROVIDER_ID}/${model.id}`,
+    providerId: AGENT_ROUTER_PROVIDER_ID,
+    label: model.label,
+    providerLabel: 'AgentRouter',
+    description: 'AgentRouter account model alias for scripts, rewrites, scenes, and detailed shot plans.',
+    executionPath: 'api',
+    domains: ['writer'],
+    available: true,
+    availableOn: ['desktop'],
+    unavailableReason: AGENT_ROUTER_WRITER_DESKTOP_ONLY_REASON,
+    reasoning: model.reasoning
+  })),
+  {
     id: 'qwen2.5-coder',
     providerId: 'local_ollama',
     label: 'Qwen 2.5 Coder 14B',
@@ -380,6 +514,18 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     domains: ['edit-agent'],
     available: true
   },
+  ...AGENT_ROUTER_MODELS.map((model): AiDomainModelConfig => ({
+    id: `${AGENT_ROUTER_PROVIDER_ID}/${model.id}`,
+    providerId: AGENT_ROUTER_PROVIDER_ID,
+    label: model.label,
+    providerLabel: 'AgentRouter',
+    description: 'AgentRouter account model alias for agentic timeline editing.',
+    executionPath: 'api',
+    domains: ['edit-agent'],
+    available: false,
+    unavailableReason: AGENT_ROUTER_EDIT_AGENT_UNAVAILABLE_REASON,
+    reasoning: model.reasoning
+  })),
   // Every tool-calling model from the generated models.dev catalog is
   // an edit-agent candidate; the picker gates them on provider connection.
   ...LLM_CATALOG.flatMap((provider) =>
@@ -399,7 +545,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
         available: true
       }))
   ),
-  // ── Image generation: cloud models. OpenAI Images, Google Imagen, and BytePlus
+  // ── Image generation: cloud models. OpenAI Images, Google Nano Banana, and BytePlus
   // Seedream adapters are implemented; the rest stay honestly unavailable so the
   // picker never offers a model that would fail after the user hits Generate.
   {
@@ -423,34 +569,55 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     available: true
   },
   {
-    id: 'imagen-4.0-generate-001',
+    id: 'gemini-3.1-flash-image',
     providerId: 'google_gemini',
-    label: 'Imagen 4',
-    providerLabel: 'Google Imagen',
-    description: 'Google photorealistic image generation with native aspect ratios.',
+    label: 'Nano Banana 2',
+    providerLabel: 'Google Nano Banana',
+    description: 'Paid Gemini API: recommended all-round image generation and reference editing model.',
     executionPath: 'api',
     domains: ['image-generation'],
     available: true
   },
   {
-    id: 'imagen-4.0-ultra-generate-001',
+    id: 'gemini-3.1-flash-lite-image',
     providerId: 'google_gemini',
-    label: 'Imagen 4 Ultra',
-    providerLabel: 'Google Imagen',
-    description: 'Highest-fidelity Imagen tier, one image per request.',
+    label: 'Nano Banana 2 Lite',
+    providerLabel: 'Google Nano Banana',
+    description: 'Paid Gemini API: fastest and lowest-cost Nano Banana model at 1K output.',
     executionPath: 'api',
     domains: ['image-generation'],
     available: true
   },
   {
-    id: 'imagen-3.0-generate-002',
+    id: 'gemini-3-pro-image',
     providerId: 'google_gemini',
-    label: 'Imagen 3',
-    providerLabel: 'Google Imagen',
-    description: 'Previous-generation Imagen model.',
+    label: 'Nano Banana Pro',
+    providerLabel: 'Google Nano Banana',
+    description: 'Paid Gemini API: premium image model for complex, production-quality assets.',
     executionPath: 'api',
     domains: ['image-generation'],
     available: true
+  },
+  {
+    id: 'gemini-2.5-flash-image',
+    providerId: 'google_gemini',
+    label: 'Nano Banana',
+    providerLabel: 'Google Nano Banana',
+    description: 'Paid Gemini API: legacy Nano Banana model for fast 1K generation and editing.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true
+  },
+  {
+    id: 'grok-imagine-image',
+    providerId: 'xai',
+    label: 'Grok Imagine Image (signed-in web)',
+    providerLabel: 'xAI Grok Imagine',
+    description: 'Desktop browser-session image generation through the signed-in Grok Imagine UI.',
+    executionPath: 'api',
+    domains: ['image-generation'],
+    available: true,
+    availableOn: ['desktop']
   },
   {
     id: 'seedream-4-0-250828',
@@ -528,7 +695,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
   }
 ];
 
-const AI_DOMAINS: readonly AiDomain[] = ['voice-generation', 'video-generation', 'image-generation', 'edit-agent'];
+const AI_DOMAINS: readonly AiDomain[] = ['writer', 'voice-generation', 'video-generation', 'image-generation', 'edit-agent'];
 
 export function formatAiModelOptionLabel(model: AiDomainModelConfig): string {
   const isZen = model.id === 'qwen2.5-coder';
@@ -538,11 +705,28 @@ export function formatAiModelOptionLabel(model: AiDomainModelConfig): string {
 }
 
 export function getDomainModels(domain: AiDomain): readonly AiDomainModelConfig[] {
-  return AI_DOMAIN_MODEL_CATALOG.filter((model) => model.domains.includes(domain));
+  const models = AI_DOMAIN_MODEL_CATALOG.filter((model) => model.domains.includes(domain));
+  if (domain !== 'video-generation') return models;
+  return models.map((model) => {
+    const capabilities = getVideoModelCapabilities(model.id);
+    const available = model.available && (capabilities?.implemented.length ?? 0) > 0;
+    return {
+      ...model,
+      ...(capabilities === undefined ? {} : { description: capabilities.description }),
+      available,
+      ...(available
+        ? {}
+        : { unavailableReason: model.unavailableReason ?? capabilities?.unavailableReason ?? 'No runnable video adapter is registered.' })
+    };
+  });
 }
 
 export function getAvailableDomainModels(domain: AiDomain): readonly AiDomainModelConfig[] {
   return getDomainModels(domain).filter((model) => model.available);
+}
+
+export function isDomainModelAvailableOnRuntime(model: AiDomainModelConfig, runtime: AiRuntime): boolean {
+  return model.available && (model.availableOn === undefined || model.availableOn.includes(runtime));
 }
 
 export function getDomainModel(domain: AiDomain, modelId: string): AiDomainModelConfig | undefined {

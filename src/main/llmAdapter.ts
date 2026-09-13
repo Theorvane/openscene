@@ -2,6 +2,7 @@ import type { CredentialStore } from './credentialStore';
 import { getLlmModel, parseLlmModelKey } from '../shared/llmModels';
 import { getLlmProvider, type LlmProviderInfo } from '../shared/llmProviders';
 import type { OpenAiAuthMode } from '../shared/openAiAuth';
+import { AGENT_ROUTER_EDIT_AGENT_UNAVAILABLE_REASON, AGENT_ROUTER_PROVIDER_ID } from '../shared/agentRouter';
 
 export interface LlmCompletionRequest {
   modelId: string;
@@ -66,6 +67,14 @@ export class LlmExecutionAdapter {
     const provider = getLlmProvider(model.providerId);
     if (provider === undefined || provider.kind !== 'cloud') {
       return { ok: false, modelId: model.id, providerId: model.providerId, error: `Provider ${model.providerLabel} is not available in the current build.` };
+    }
+    if (provider.id === AGENT_ROUTER_PROVIDER_ID) {
+      return {
+        ok: false,
+        modelId: model.id,
+        providerId: provider.id,
+        error: AGENT_ROUTER_EDIT_AGENT_UNAVAILABLE_REASON
+      };
     }
     return this.executeCloudCompletion(model.id, provider, request);
   }
@@ -187,7 +196,7 @@ export class LlmExecutionAdapter {
       });
 
       if (!response.ok) {
-        const detail = await safeErrorDetail(response);
+        const detail = await safeErrorDetail(response, apiKey.trim());
         const unauthorized = response.status === 401 || response.status === 403;
         return {
           ok: false,
@@ -232,16 +241,17 @@ type CloudCompletionRequest = {
 };
 
 /** Error bodies can be attacker- or provider-controlled: keep a short text detail, never echo credentials. */
-async function safeErrorDetail(response: Response): Promise<string> {
+async function safeErrorDetail(response: Response, secret = ''): Promise<string> {
   const bodyText = await response.text().catch(() => '');
+  const redact = (value: string): string => (secret.length > 0 ? value.replaceAll(secret, '[REDACTED]') : value).slice(0, 300);
   try {
     const parsed = JSON.parse(bodyText) as { error?: { message?: string } | string };
-    if (typeof parsed.error === 'string') return parsed.error.slice(0, 300);
-    if (parsed.error && typeof parsed.error.message === 'string') return parsed.error.message.slice(0, 300);
+    if (typeof parsed.error === 'string') return redact(parsed.error);
+    if (parsed.error && typeof parsed.error.message === 'string') return redact(parsed.error.message);
   } catch {
     // keep raw text
   }
-  return bodyText.slice(0, 300);
+  return redact(bodyText);
 }
 
 /** OpenAI codex-family models only speak the Responses API. */
@@ -270,7 +280,12 @@ function openAiResponsesRequest(baseUrl: string, modelId: string, apiKey: string
   };
 }
 
-function openAiStyleRequest(baseUrl: string, modelId: string, apiKey: string, request: LlmCompletionRequest): CloudCompletionRequest {
+function openAiStyleRequest(
+  baseUrl: string,
+  modelId: string,
+  apiKey: string,
+  request: LlmCompletionRequest
+): CloudCompletionRequest {
   return {
     url: `${baseUrl}/chat/completions`,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -281,8 +296,10 @@ function openAiStyleRequest(baseUrl: string, modelId: string, apiKey: string, re
         { role: 'user', content: request.prompt }
       ]
     },
-    extractCompletion: (payload) =>
-      (payload as { choices?: readonly { message?: { content?: string } }[] }).choices?.[0]?.message?.content
+    extractCompletion: (payload) => {
+      const content = (payload as { choices?: readonly { message?: { content?: unknown } }[] }).choices?.[0]?.message?.content;
+      return typeof content === 'string' ? content : undefined;
+    }
   };
 }
 

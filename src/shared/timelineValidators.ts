@@ -13,6 +13,7 @@ import {
 } from './timelineValidationPrimitives';
 import type {
   CreateProjectInput,
+  DetachVideoAudioInput,
   DeleteProjectInput,
   GetAssetPlaybackUrlInput,
   ImportRecordingResultAssetInput,
@@ -71,7 +72,7 @@ export function parseImportProjectAssetsInput(value: unknown): ImportProjectAsse
   }
   const acceptedKinds: MediaKind[] = [];
   for (const kind of value.acceptedKinds) {
-    const parsedKind = getMediaKind({ kind }, 'kind');
+    const parsedKind = getMediaKind({ kind }, 'kind') ?? (kind === 'image' ? 'image' : null);
     if (parsedKind === null) {
       return null;
     }
@@ -105,8 +106,12 @@ export function parseImportMediaInput(value: unknown): ImportMediaInput | null {
   const projectId = getOpaqueId(value, 'projectId');
   const displayName = getTrimmedString(value, 'displayName', TIMELINE_VALIDATION_LIMITS.nameLength);
   const projectRelativePath = getRelativePath(value, 'projectRelativePath');
-  const kind = getMediaKind(value, 'kind');
   const mimeType = getMimeType(value, 'mimeType');
+  const kind = getMediaKind(value, 'kind') ?? (
+    value.kind === 'image' && (mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/webp')
+      ? 'image'
+      : null
+  );
   const byteLength = getFiniteNonNegative(value, 'byteLength');
   return projectId === null || displayName === null || projectRelativePath === null || kind === null || mimeType === null || byteLength === null
     ? null
@@ -138,6 +143,15 @@ export function parseSaveTimelineInput(value: unknown): SaveTimelineInput | null
 }
 
 export function parseGetAssetPlaybackUrlInput(value: unknown): GetAssetPlaybackUrlInput | null {
+  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['projectId', 'assetId'])) {
+    return null;
+  }
+  const projectId = getOpaqueId(value, 'projectId');
+  const assetId = getOpaqueId(value, 'assetId');
+  return projectId === null || assetId === null ? null : { projectId, assetId };
+}
+
+export function parseDetachVideoAudioInput(value: unknown): DetachVideoAudioInput | null {
   if (!isPlainRecord(value) || !hasAllowedKeys(value, ['projectId', 'assetId'])) {
     return null;
   }

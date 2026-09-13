@@ -15,9 +15,9 @@ describe('export job store', () => {
     const queued = store.create('project_01');
     store.markRunning(queued.id, 2_000);
     store.updateProgress(queued.id, { processedMs: 500, durationMs: 2_000, ratio: 0.25 });
-    const completed = store.markCompleted(queued.id, 'export_01.mp4', 1234);
+    const completed = store.markCompleted(queued.id, 'export_01.mp4', 1234, undefined, 'export_01.srt', 'export_01.provenance.json');
 
-    expect(completed.state).toMatchObject({ kind: 'completed', fileName: 'export_01.mp4', fileSizeBytes: 1234 });
+    expect(completed.state).toMatchObject({ kind: 'completed', fileName: 'export_01.mp4', fileSizeBytes: 1234, subtitleFileName: 'export_01.srt', provenanceFileName: 'export_01.provenance.json' });
     expect(JSON.stringify(completed)).not.toContain('/');
   });
 

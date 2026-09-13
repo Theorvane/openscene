@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  requestGeminiOmniVideo,
   requestLumaVideo,
   requestRunwayVideo,
   requestSoraVideo,
@@ -9,6 +10,7 @@ import {
   supportsReferenceImage,
   videoAdapterFor
 } from '../src/shared/videoGeneration';
+import { validateVideoInputSet } from '../src/shared/videoGeneration';
 
 /**
  * These cover the half of video generation that both hosts share: the request,
@@ -18,6 +20,19 @@ import {
  */
 
 describe('shared video generation', () => {
+  it('requires one character image, a project driving video and an explicit Move/Mix mode', () => {
+    const base = {
+      operation: 'motion_control' as const,
+      referenceImage: { mimeType: 'image/png', base64: 'QUJD' },
+      projectId: 'project-1',
+      drivingVideoAssetId: 'asset-1',
+      motionMode: 'move' as const
+    };
+    expect(validateVideoInputSet(base)).toEqual({ operation: 'motion_control', referenceImageCount: 1 });
+    expect(() => validateVideoInputSet({ operation: 'motion_control', referenceImage: base.referenceImage, projectId: 'project-1', motionMode: 'move' })).toThrow(/imported driving-video/);
+    expect(() => validateVideoInputSet({ operation: 'motion_control', referenceImage: base.referenceImage, projectId: 'project-1', drivingVideoAssetId: 'asset-1' })).toThrow(/Move or Mix/);
+    expect(() => validateVideoInputSet({ ...base, lastFrame: base.referenceImage })).toThrow(/exactly one character image/);
+  });
   it('polls Veo until done and reports the sample URI with the key in a header', async () => {
     const calls: string[] = [];
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
@@ -43,7 +58,7 @@ describe('shared video generation', () => {
 
     const ready = await requestVeoVideo({
       apiKey: 'gemini-key',
-      modelId: 'veo-3.0-generate-001',
+      modelId: 'veo-3.1-generate-preview',
       prompt: 'a lighthouse',
       aspectRatio: '16:9',
       durationSeconds: 8,
@@ -56,37 +71,191 @@ describe('shared video generation', () => {
     expect(ready.headers).toEqual({ 'x-goog-api-key': 'gemini-key' });
   });
 
-  it('squares a 1:1 request to 16:9 for Veo, which does not render square', async () => {
-    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      if (url.endsWith(':predictLongRunning')) {
-        expect(JSON.parse(init.body as string).parameters.aspectRatio).toBe('16:9');
-        return new Response(JSON.stringify({ name: 'operations/x' }), { status: 200 });
-      }
-      return new Response(
-        JSON.stringify({
-          done: true,
-          response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://files/x.mp4' } }] } }
-        }),
-        { status: 200 }
-      );
-    });
-
-    await requestVeoVideo({
+  it('rejects a square Veo request before contacting the provider', async () => {
+    const fetchMock = vi.fn();
+    await expect(requestVeoVideo({
       apiKey: 'k',
-      modelId: 'veo-3.0-generate-001',
+      modelId: 'veo-3.1-generate-preview',
       prompt: 'p',
       aspectRatio: '1:1',
       durationSeconds: 8,
-      pollIntervalMs: 0,
       fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/accepts 16:9/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('creates Gemini Omni through Interactions, polls its File and returns an authenticated download', async () => {
+    const seenUrls: string[] = [];
+    let requestBody: any;
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      seenUrls.push(url);
+      expect(url).not.toContain('gemini-key');
+      expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('gemini-key');
+      if (url.endsWith('/interactions')) {
+        requestBody = JSON.parse(init.body as string);
+        return new Response(JSON.stringify({
+          id: 'interaction-video-1',
+          steps: [{
+            type: 'model_output',
+            content: [{
+              type: 'video', mime_type: 'video/mp4',
+              uri: 'https://generativelanguage.googleapis.com/v1beta/files/file-abc:download?alt=media'
+            }]
+          }]
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ state: 'ACTIVE' }), { status: 200 });
+    });
+
+    const ready = await requestGeminiOmniVideo({
+      apiKey: 'gemini-key', modelId: 'gemini-omni-1.1-flash', prompt: 'a paper boat',
+      aspectRatio: '9:16', durationSeconds: 7, pollIntervalMs: 0,
+      fetchImpl: fetchMock as unknown as typeof fetch
+    });
+
+    expect(requestBody).toEqual({
+      model: 'gemini-omni-1.1-flash',
+      input: [{ type: 'text', text: 'a paper boat' }],
+      response_format: {
+        type: 'video', delivery: 'uri', aspect_ratio: '9:16', duration: '7s', resolution: '720p'
+      },
+      generation_config: { video_config: { task: 'text_to_video' } },
+      background: false, store: false, stream: false
+    });
+    expect(seenUrls[1]).toBe('https://generativelanguage.googleapis.com/v1beta/files/file-abc');
+    expect(ready).toEqual({
+      url: 'https://generativelanguage.googleapis.com/v1beta/files/file-abc:download?alt=media',
+      headers: { 'x-goog-api-key': 'gemini-key' },
+      providerJobId: 'interaction-video-1',
+      mimeType: 'video/mp4'
     });
   });
 
-  it('snaps a Sora request to an accepted length and points at the content URL', async () => {
+  it('binds first/last frames and reference images to their Gemini Omni roles', async () => {
+    const bodies: any[] = [];
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/interactions')) {
+        bodies.push(JSON.parse(init.body as string));
+        return new Response(JSON.stringify({
+          output_video: { uri: 'files/omni-file', mime_type: 'video/mp4' }
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ state: 'ACTIVE' }), { status: 200 });
+    });
+    const run = (extra: Record<string, unknown>) => requestGeminiOmniVideo({
+      apiKey: 'k', modelId: 'gemini-omni-1.1-flash', prompt: 'keep identity',
+      aspectRatio: '16:9', durationSeconds: 5, pollIntervalMs: 0,
+      fetchImpl: fetchMock as unknown as typeof fetch, ...extra
+    });
+
+    await run({
+      operation: 'start_end',
+      referenceImage: { mimeType: 'image/png', base64: 'FIRST' },
+      lastFrame: { mimeType: 'image/jpeg', base64: 'LAST' }
+    });
+    await run({
+      operation: 'reference_to_video',
+      referenceImages: [
+        { mimeType: 'image/png', base64: 'ONE' },
+        { mimeType: 'image/png', base64: 'TWO' }
+      ]
+    });
+
+    expect(bodies[0].input).toEqual([
+      { type: 'image', data: 'FIRST', mime_type: 'image/png' },
+      { type: 'image', data: 'LAST', mime_type: 'image/jpeg' },
+      { type: 'text', text: '<FIRST_FRAME> <LAST_FRAME> keep identity' }
+    ]);
+    expect(bodies[0].generation_config.video_config.task).toBe('image_to_video');
+    expect(bodies[1].input[2]).toEqual({ type: 'text', text: '<IMAGE_REF_0> <IMAGE_REF_1> keep identity' });
+    expect(bodies[1].generation_config.video_config.task).toBe('reference_to_video');
+  });
+
+  it('sends Veo Start-End frames with the documented inlineData payload', async () => {
+    let startBody: unknown;
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith(':predictLongRunning')) {
+        startBody = JSON.parse(init.body as string);
+        return new Response(JSON.stringify({ name: 'operations/start-end' }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        done: true,
+        response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://files/start-end.mp4' } }] } }
+      }), { status: 200 });
+    });
+
+    await requestVeoVideo({
+      apiKey: 'k', modelId: 'veo-3.1-generate-preview', prompt: 'walk from dawn to dusk',
+      operation: 'start_end', aspectRatio: '16:9', durationSeconds: 6,
+      referenceImage: { mimeType: 'image/png', base64: 'FIRST' },
+      lastFrame: { mimeType: 'image/jpeg', base64: 'LAST' },
+      pollIntervalMs: 0, fetchImpl: fetchMock as unknown as typeof fetch
+    });
+
+    expect(startBody).toEqual({
+      instances: [{
+        prompt: 'walk from dawn to dusk',
+        image: { inlineData: { mimeType: 'image/png', data: 'FIRST' } },
+        lastFrame: { inlineData: { mimeType: 'image/jpeg', data: 'LAST' } }
+      }],
+      parameters: { aspectRatio: '16:9', durationSeconds: 6 }
+    });
+  });
+
+  it('sends up to three Veo asset references without turning one into a first frame', async () => {
+    let startBody: any;
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith(':predictLongRunning')) {
+        startBody = JSON.parse(init.body as string);
+        return new Response(JSON.stringify({ name: 'operations/references' }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        done: true,
+        response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://files/references.mp4' } }] } }
+      }), { status: 200 });
+    });
+    const referenceImages = ['ONE', 'TWO', 'THREE'].map((base64) => ({ mimeType: 'image/png', base64 }));
+
+    await requestVeoVideo({
+      apiKey: 'k', modelId: 'veo-3.1-generate-preview', prompt: 'same explorer across the scene',
+      operation: 'reference_to_video', aspectRatio: '9:16', durationSeconds: 8,
+      referenceImages, pollIntervalMs: 0, fetchImpl: fetchMock as unknown as typeof fetch
+    });
+
+    expect(startBody.instances[0].image).toBeUndefined();
+    expect(startBody.instances[0].referenceImages).toEqual(referenceImages.map((image) => ({
+      image: { inlineData: { mimeType: image.mimeType, data: image.base64 } }, referenceType: 'asset'
+    })));
+  });
+
+  it('rejects incomplete or mixed advanced inputs before contacting Veo', async () => {
+    const fetchMock = vi.fn();
+    await expect(requestVeoVideo({
+      apiKey: 'k', modelId: 'veo-3.1-generate-preview', prompt: 'p', operation: 'start_end',
+      aspectRatio: '16:9', durationSeconds: 8,
+      lastFrame: { mimeType: 'image/png', base64: 'LAST' },
+      fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/both a first frame and a last frame/);
+    await expect(requestVeoVideo({
+      apiKey: 'k', modelId: 'veo-3.1-generate-preview', prompt: 'p', operation: 'reference_to_video',
+      aspectRatio: '16:9', durationSeconds: 8,
+      referenceImage: { mimeType: 'image/png', base64: 'FIRST' },
+      referenceImages: [{ mimeType: 'image/png', base64: 'ASSET' }],
+      fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/cannot include first or last frames/);
+    await expect(requestVeoVideo({
+      apiKey: 'k', modelId: 'veo-3.1-generate-preview', prompt: 'p', operation: 'reference_to_video',
+      aspectRatio: '16:9', durationSeconds: 8,
+      referenceImages: ['1', '2', '3', '4'].map((base64) => ({ mimeType: 'image/png', base64 })),
+      fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/expects 1-3 reference image/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends an accepted Sora length unchanged and points at the content URL', async () => {
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
       if (url === 'https://api.openai.com/v1/videos') {
         const body = JSON.parse(init.body as string);
-        // 9s is not an accepted Sora length; the nearest one is 8.
         expect(body.seconds).toBe('8');
         expect(body.size).toBe('1280x720');
         return new Response(JSON.stringify({ id: 'video_1' }), { status: 200 });
@@ -99,13 +268,22 @@ describe('shared video generation', () => {
       modelId: 'sora-2',
       prompt: 'p',
       aspectRatio: '16:9',
-      durationSeconds: 9,
+      durationSeconds: 8,
       pollIntervalMs: 0,
       fetchImpl: fetchMock as unknown as typeof fetch
     });
 
     expect(ready.url).toBe('https://api.openai.com/v1/videos/video_1/content');
     expect(ready.headers).toEqual({ Authorization: 'Bearer sk-test' });
+  });
+
+  it('rejects an illegal Sora duration before contacting the provider', async () => {
+    const fetchMock = vi.fn();
+    await expect(requestSoraVideo({
+      apiKey: 'sk-test', modelId: 'sora-2', prompt: 'p', aspectRatio: '16:9', durationSeconds: 9,
+      fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/accepts 4, 8, 12 second/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('surfaces a provider-side failure instead of returning an unusable job', async () => {
@@ -133,7 +311,7 @@ describe('shared video generation', () => {
     await expect(
       requestVeoVideo({
         apiKey: 'secret-key-value',
-        modelId: 'veo-3.0-generate-001',
+        modelId: 'veo-3.1-generate-preview',
         prompt: 'p',
         aspectRatio: '16:9',
         durationSeconds: 8,
@@ -145,7 +323,7 @@ describe('shared video generation', () => {
     await expect(
       requestVeoVideo({
         apiKey: 'secret-key-value',
-        modelId: 'veo-3.0-generate-001',
+        modelId: 'veo-3.1-generate-preview',
         prompt: 'p',
         aspectRatio: '16:9',
         durationSeconds: 8,
@@ -165,7 +343,7 @@ describe('shared video generation', () => {
         durationSeconds: 8,
         referenceImage: { mimeType: 'image/png', base64: 'AAA' }
       })
-    ).rejects.toThrow(/reference images are not supported/);
+    ).rejects.toThrow(/does not implement that request path/);
   });
 
   it('snaps only to lengths the shared table publishes', () => {
@@ -177,6 +355,7 @@ describe('shared video generation', () => {
   it('resolves an adapter only for providers that actually have one', () => {
     expect(videoAdapterFor('openai')).toBe(requestSoraVideo);
     expect(videoAdapterFor('google_gemini')).toBe(requestVeoVideo);
+    expect(videoAdapterFor('google_gemini', 'gemini-omni-1.1-flash')).toBe(requestGeminiOmniVideo);
     expect(videoAdapterFor('runway')).toBe(requestRunwayVideo);
     expect(videoAdapterFor('luma')).toBe(requestLumaVideo);
     // Listed in the catalog but unported: callers must get undefined and say so
@@ -221,24 +400,17 @@ describe('shared video generation', () => {
     expect(ready.providerJobId).toBe('task_1');
   });
 
-  it('renders a square Runway request as landscape rather than being rejected', async () => {
-    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      if (url.endsWith('/text_to_video')) {
-        // Every Runway text-to-video model takes landscape or portrait only.
-        expect(JSON.parse(init.body as string).ratio).toBe('1280:720');
-        return new Response(JSON.stringify({ id: 't' }), { status: 200 });
-      }
-      return new Response(JSON.stringify({ status: 'SUCCEEDED', output: ['https://cdn/a.mp4'] }), { status: 200 });
-    });
-    await requestRunwayVideo({
+  it('rejects a square Runway request before contacting the provider', async () => {
+    const fetchMock = vi.fn();
+    await expect(requestRunwayVideo({
       apiKey: 'k',
       modelId: 'gen4.5',
       prompt: 'p',
       aspectRatio: '1:1',
       durationSeconds: 5,
-      pollIntervalMs: 0,
       fetchImpl: fetchMock as unknown as typeof fetch
-    });
+    })).rejects.toThrow(/accepts 16:9 or 9:16/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('reports a cancelled Runway task as a failure, not a silent success', async () => {
@@ -371,7 +543,7 @@ describe('shared video generation', () => {
         durationSeconds: 5,
         referenceImage: { mimeType: 'image/jpeg', base64: 'QUJD' }
       })
-    ).rejects.toThrow(/hosted image URL/);
+    ).rejects.toThrow(/does not implement that request path/);
   });
 
   it('claims continuity only where a frame can actually be sent', () => {

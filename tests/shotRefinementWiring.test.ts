@@ -34,9 +34,11 @@ describe('the phone', () => {
     expect(plan).not.toContain('void runGeneration()\n    // redo');
   });
 
-  it('stands the new take where the old one was, and continues from the same frame', async () => {
+  it('keeps the old cut until the new take is reviewed, then replaces it in place', async () => {
     const plan = await readRepo('mobile/src/screens/PlanScreen.tsx');
-    expect(plan).toContain('replaceTakeInTimeline(project, take.clipId, result.asset)');
+    expect(plan).toContain('saveGeneratedVideoCandidate(project, result.asset)');
+    expect(plan).toContain('replaceTakeInTimeline(project, take.clipId, asset)');
+    expect(plan).toContain("candidateApprovalBlockReason({");
     expect(plan).toContain('referenceImage: take.startFrame');
 
     const store = await readRepo('mobile/src/lib/projectStore.ts');
@@ -58,8 +60,8 @@ describe('the desktop', () => {
 
   it('shows what was asked for and what was changed, separately', async () => {
     const studio = await readRepo('src/renderer/src/VideoGenerationWorkspace.tsx');
-    expect(studio).toContain('originalOf(job.prompt)');
-    expect(studio).toContain('revisionsOf(job.prompt)');
+    expect(studio).toContain('originalOf(stripVideoContinuityLocks(job.prompt))');
+    expect(studio).toContain('revisionsOf(stripVideoContinuityLocks(job.prompt))');
   });
 });
 

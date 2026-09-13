@@ -1,3 +1,5 @@
+import type { AiProjectDocument } from './aiProjectDomain';
+
 /**
  * `image` is a still. It has no timeline of its own and is held rather than
  * played; see `timelineStills` for what that means to a renderer. Tracks are
@@ -6,7 +8,7 @@
  */
 export const MEDIA_KINDS = ['video', 'audio', 'image'] as const;
 export const TIMELINE_SCHEMA_VERSION = 3 as const;
-export const PROJECT_SCHEMA_VERSION = 3 as const;
+export const PROJECT_SCHEMA_VERSION = 4 as const;
 export const CLIP_EFFECT_PROPERTIES = ['opacity', 'scale', 'positionX', 'positionY', 'rotation', 'volume'] as const;
 export const KEYFRAME_INTERPOLATIONS = ['linear'] as const;
 export const TRANSITION_TYPES = ['fade', 'crossfade', 'dipToBlack'] as const;
@@ -117,6 +119,18 @@ export type BrowserAssetMetadata = {
   readonly height?: number;
 };
 
+export const RESULT_ASSET_ORIGIN_KINDS = ['recording', 'ai-generation'] as const;
+
+/** Path-free identity of a completed app result imported into the project. */
+export type ResultAssetOrigin = {
+  readonly kind: (typeof RESULT_ASSET_ORIGIN_KINDS)[number];
+  readonly resultId: string;
+};
+
+export function resultAssetOriginKey(origin: ResultAssetOrigin): string {
+  return `${origin.kind}:${origin.resultId}`;
+}
+
 export type MediaAsset = {
   readonly id: string;
   readonly displayName: string;
@@ -125,6 +139,8 @@ export type MediaAsset = {
   readonly mimeType: string;
   readonly byteLength: number;
   readonly metadata: BrowserAssetMetadata | null;
+  /** Absent for user imports and projects written before idempotent result import. */
+  readonly resultOrigin?: ResultAssetOrigin;
   readonly createdAt: string;
   readonly updatedAt: string;
 };
@@ -185,6 +201,19 @@ export type TimelineTitle = {
   readonly color: string;
   readonly positionX: number;
   readonly positionY: number;
+  /** Absent means the legacy unboxed regular style, keeping older projects readable. */
+  readonly style?: TimelineTitleStyle;
+};
+
+export type TimelineTitleStyle = {
+  readonly fontWeight: 'regular' | 'bold';
+  readonly outlineColor: string;
+  readonly outlineWidthPx: number;
+  readonly backgroundColor: string;
+  readonly backgroundOpacity: number;
+  readonly paddingPx: number;
+  /** `free` uses only positionX/Y; the other values add an aspect-aware title-safe anchor. */
+  readonly placement: 'free' | 'top' | 'center' | 'bottom';
 };
 
 export const DEFAULT_TITLE: Omit<TimelineTitle, 'id' | 'timelineStartMs' | 'timelineEndMs'> = {
@@ -214,6 +243,8 @@ export type LocalProjectSnapshot = {
   readonly updatedAt: string;
   readonly assets: readonly MediaAsset[];
   readonly timeline: TimelineDocument;
+  /** Script, storyboard and generation lineage stored beside the authoritative timeline. */
+  readonly ai: AiProjectDocument;
 };
 
 /** Folder-picker backed results: the user can cancel the native dialog. */
@@ -345,6 +376,15 @@ export type SaveTimelineInput = ProjectRequestInput & {
 
 export type GetAssetPlaybackUrlInput = ProjectRequestInput & {
   readonly assetId: string;
+};
+
+/** Extracts the first native audio stream from a project video asset. */
+export type DetachVideoAudioInput = ProjectRequestInput & {
+  readonly assetId: string;
+};
+
+export type DetachVideoAudioResult = {
+  readonly asset: MediaAsset;
 };
 
 export type ImportProjectAssetsResult = {

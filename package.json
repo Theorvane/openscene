@@ -1,12 +1,13 @@
 {
   "name": "video-window-recorder",
   "productName": "OpenScene",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "OpenScene secure Electron MVP for selected-window preview and local WebM recording.",
   "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
     "dev": "electron-vite dev",
+    "setup:local-ai": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-local-ai-runtimes.ps1",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "build": "npm run typecheck && electron-vite build",

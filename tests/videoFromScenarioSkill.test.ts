@@ -85,10 +85,12 @@ describe('image-to-video link', () => {
     expect(mcpSource).toContain('referenceImageJobId');
     // Resolving the id to inline bytes in main keeps filesystem paths out of
     // both the agent's context and the renderer.
-    expect(mcpSource).toContain('getGeneratedImageAsReference(params.referenceImageJobId)');
+    expect(mcpSource).toContain('getGeneratedImageAsReference(firstFrameJobId)');
+    expect(mcpSource).toContain('lastFrameImageJobId');
+    expect(mcpSource).toContain('referenceImageJobIds');
   });
 
   it('fails loudly when the referenced image job has no completed image', () => {
-    expect(mcpSource).toMatch(/has no completed image to use as a reference/);
+    expect(mcpSource).toMatch(/has no completed image to use as a first frame/);
   });
 });

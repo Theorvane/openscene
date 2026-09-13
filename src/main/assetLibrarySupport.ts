@@ -1,3 +1,5 @@
+import { extname } from 'node:path';
+
 import type { MediaAsset, MediaKind } from '../shared/timelineTypes';
 
 export const PROJECT_ASSETS_DIRECTORY = 'assets';
@@ -9,7 +11,11 @@ const SUPPORTED_ASSET_FORMATS = [
   { extension: '.webm', kind: 'audio', mimeType: 'audio/webm' },
   { extension: '.wav', kind: 'audio', mimeType: 'audio/wav' },
   { extension: '.mp3', kind: 'audio', mimeType: 'audio/mpeg' },
-  { extension: '.m4a', kind: 'audio', mimeType: 'audio/mp4' }
+  { extension: '.m4a', kind: 'audio', mimeType: 'audio/mp4' },
+  { extension: '.png', kind: 'image', mimeType: 'image/png' },
+  { extension: '.jpg', kind: 'image', mimeType: 'image/jpeg' },
+  { extension: '.jpeg', kind: 'image', mimeType: 'image/jpeg' },
+  { extension: '.webp', kind: 'image', mimeType: 'image/webp' }
 ] as const;
 
 export type SupportedAssetFormat = (typeof SUPPORTED_ASSET_FORMATS)[number];
@@ -36,11 +42,12 @@ export function supportedAssetExtension(extension: string, kind: MediaKind, mime
 }
 
 export function hasDeterministicAssetPath(asset: MediaAsset): boolean {
-  const format = SUPPORTED_ASSET_FORMATS.find(
-    (candidate) => candidate.kind === asset.kind && candidate.mimeType === asset.mimeType
+  const extension = extname(asset.projectRelativePath).toLowerCase();
+  const format = SUPPORTED_ASSET_FORMATS.find((candidate) =>
+    candidate.extension === extension && candidate.kind === asset.kind && candidate.mimeType === asset.mimeType
   );
   return (
     format !== undefined &&
-    asset.projectRelativePath === `${PROJECT_ASSETS_DIRECTORY}/${asset.id}/original${format.extension}`
+    asset.projectRelativePath === `${PROJECT_ASSETS_DIRECTORY}/${asset.id}/original${extension}`
   );
 }

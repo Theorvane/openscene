@@ -11,29 +11,34 @@ import { describe, expect, it } from 'vitest';
  * feature until the month someone generated through the wrong screen.
  */
 
-const readRepo = (path: string) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+const readRepo = async (path: string): Promise<string> => (
+  await readFile(new URL(`../${path}`, import.meta.url), 'utf8')
+).replace(/\r\n/g, '\n');
 
 describe('the desktop', () => {
   it('checks the ceiling at every one of its generation seams', async () => {
     const jobs = await readRepo('src/main/aiJobManager.ts');
     const seams = [/createVideoGenerationJob/, /createImageGenerationJob/, /createSpeechGenerationJob/];
     for (const seam of seams) expect(jobs).toMatch(seam);
-    // Three creators, three reservations, three settlements each way.
+    // Three creators and provider settlements. Video has one additional release
+    // before submission: if its durable queued record cannot be written, the
+    // reserved amount must be returned and the provider must never be called.
     expect(jobs.match(/await reserveSpend\(/g)).toHaveLength(3);
     expect(jobs.match(/await settleSpend\(reservationId, 'charged'\)/g)).toHaveLength(3);
-    expect(jobs.match(/await settleSpend\(reservationId, 'released'\)/g)).toHaveLength(3);
+    expect(jobs.match(/await settleSpend\(reservationId, 'released'\)/g)).toHaveLength(4);
   });
 
   it('records the charge where the request goes out, not where the job is queued', async () => {
     const jobs = await readRepo('src/main/aiJobManager.ts');
     // A job that never reached a provider — a missing key — cost nothing, and
     // charging a ceiling for it would lock someone out over nothing.
-    for (const call of ['invokeCloudVideoProvider', 'invokeCloudImageProvider', 'invokeCloudSpeechProvider']) {
+    for (const call of ['invokeCloudVideoProvider', 'invokeCloudImageProvider', 'invokeSpeechProvider']) {
       const before = jobs.slice(0, jobs.indexOf(`await ${call}(`));
       expect(before.lastIndexOf("await settleSpend(reservationId, 'charged')")).toBeGreaterThan(
         before.lastIndexOf('apiKey is required')
       );
     }
+    expect(jobs).toContain("model.executionPath === 'api'\n    ? await reserveSpend(estimateSpeechCost({ modelId }), request.acceptUnknownCost)");
   });
 
   it('lets the agent read the limit but never set it', async () => {

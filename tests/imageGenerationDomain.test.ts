@@ -24,7 +24,7 @@ describe('image generation domain', () => {
   it('marks a model available only where an adapter actually exists', () => {
     // The picker offering a model the job manager cannot run turns a click into
     // a failure the user cannot act on, so availability has to track the code.
-    const IMPLEMENTED_PROVIDERS = ['openai', 'google_gemini', 'byteplus'];
+    const IMPLEMENTED_PROVIDERS = ['openai', 'google_gemini', 'byteplus', 'xai'];
 
     for (const model of getDomainModels('image-generation')) {
       const dispatchable = IMPLEMENTED_PROVIDERS.includes(model.providerId);
@@ -64,7 +64,7 @@ describe('image generation domain', () => {
     // model in the video picker, where nothing could run it.
     expect(getDomainModel('video-generation', 'gpt-image-1')).toBeUndefined();
     expect(getDomainModel('voice-generation', 'seedream-4-0-250828')).toBeUndefined();
-    expect(getDomainModel('edit-agent', 'imagen-4.0-generate-001')).toBeUndefined();
+    expect(getDomainModel('edit-agent', 'gemini-3.1-flash-image')).toBeUndefined();
   });
 });
 
@@ -79,7 +79,7 @@ describe('still-to-video handoff', () => {
     // the image and pick it again.
     expect(app).toContain('const [videoReferenceImage, setVideoReferenceImage]');
     expect(videoStudio).toContain('readonly referenceImage: ReferenceImageSelection | null;');
-    expect(videoStudio).not.toContain('useState<ReferenceImageSelection | null>(null)');
+    expect(videoStudio).not.toContain('const [referenceImage, setReferenceImage]');
   });
 
   it('switches to the video tab as part of the handoff', () => {
@@ -89,5 +89,34 @@ describe('still-to-video handoff', () => {
   it('no longer tells the user to go and add the image themselves', () => {
     expect(imageStudio).not.toMatch(/open Video Generation and add it/);
     expect(imageStudio).toContain('onUseForVideo(response.value);');
+  });
+});
+
+describe('Writer production-image handoff', () => {
+  const app = readFileSync(resolve(process.cwd(), 'src/renderer/src/App.tsx'), 'utf8');
+  const imageStudio = readFileSync(resolve(process.cwd(), 'src/renderer/src/ImageGenerationWorkspace.tsx'), 'utf8');
+  const productionWorkflow = readFileSync(resolve(process.cwd(), 'src/shared/productionWorkflow.ts'), 'utf8');
+
+  it('imports a reviewed generated still before attaching it to the exact Writer target', () => {
+    expect(app).toContain('const [productionImageHandoff, setProductionImageHandoff]');
+    expect(app).toContain('editor.importAiResult(jobId)');
+    expect(app).toContain('attachGeneratedProductionImage(project.ai');
+    expect(app).toContain("project.id !== handoff.projectId");
+  });
+
+  it('snapshots each paid image job target and requires an explicit attach action', () => {
+    expect(imageStudio).toContain('[started.id]: handoff');
+    expect(imageStudio).toContain('generateProductionBriefs');
+    expect(imageStudio).toContain('Sync Writer ·');
+    expect(imageStudio).toContain('Custom image style');
+    expect(imageStudio).toContain('aiGetProjectImageReference');
+    expect(imageStudio).toContain('referenceImages');
+    expect(productionWorkflow).toContain('reference.assetId');
+    expect(imageStudio).toContain('nothing is attached until you approve a completed image');
+    expect(imageStudio).toContain('handleAttachToProduction(job)');
+    expect(imageStudio).toContain('Attach to ${productionTargetByJob[job.id]!.targetLabel}');
+    expect(app).toContain('window.confirm(');
+    expect(app).toContain('controller.generateProductionBriefs(handoffs)');
+    expect(app).toContain('Every result remains unapproved and must be reviewed and attached manually.');
   });
 });

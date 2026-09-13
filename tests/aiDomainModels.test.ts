@@ -4,21 +4,34 @@ import {
   AI_DOMAIN_MODEL_STORAGE_KEY,
   getAvailableDomainModels,
   getDomainModel,
+  getDomainModels,
+  isDomainModelAvailableOnRuntime,
   parseAiDomainModelPreferences
 } from '../src/shared/aiDomainModels';
 
 describe('AI domain model catalog', () => {
-  it('exposes an independent available local model for each AI domain', () => {
-    // Media generation is cloud-only; Ollama is the app's only local engine and
-    // serves the Edit Agent.
+  it('exposes available cloud voice models and the desktop-local VieNeu model', () => {
     const voiceModels = getAvailableDomainModels('voice-generation');
-    expect(voiceModels.every((model) => model.executionPath === 'api')).toBe(true);
     expect(voiceModels.map((model) => model.id)).toContain('eleven_multilingual_v2');
     expect(voiceModels.map((model) => model.id)).toContain('gpt-4o-mini-tts');
+    const vieneu = voiceModels.find((model) => model.id === 'vieneu-v3-turbo');
+    expect(vieneu).toMatchObject({ providerId: 'vieneu_local', executionPath: 'local' });
+    expect(isDomainModelAvailableOnRuntime(vieneu!, 'desktop')).toBe(true);
+    expect(isDomainModelAvailableOnRuntime(vieneu!, 'mobile')).toBe(false);
     const videoModels = getAvailableDomainModels('video-generation');
-    expect(videoModels.every((model) => model.executionPath === 'api')).toBe(true);
-    expect(videoModels.map((model) => model.id)).toContain('veo-3.0-generate-001');
+    const wan = videoModels.find((model) => model.id === 'wan2.2-animate-14b-comfyui');
+    expect(wan).toMatchObject({ executionPath: 'local', availableOn: ['desktop'] });
+    expect(isDomainModelAvailableOnRuntime(wan!, 'desktop')).toBe(true);
+    expect(isDomainModelAvailableOnRuntime(wan!, 'mobile')).toBe(false);
+    expect(videoModels.map((model) => model.id)).toContain('veo-3.1-fast-generate-preview');
+    expect(videoModels.map((model) => model.id)).toContain('veo-3.1-lite-generate-preview');
+    expect(videoModels.map((model) => model.id)).not.toContain('veo-3.0-generate-001');
+    expect(videoModels.map((model) => model.id)).toContain('gemini-omni-1.1-flash');
     expect(videoModels.map((model) => model.id)).toContain('sora-2');
+    const imageModelIds = getAvailableDomainModels('image-generation').map((model) => model.id);
+    expect(imageModelIds).toContain('gemini-3.1-flash-image');
+    expect(imageModelIds).toContain('gemini-3-pro-image');
+    expect(imageModelIds).not.toContain('imagen-3.0-generate-002');
     // The Edit Agent keeps the local engine.
     const editAgentModels = getAvailableDomainModels('edit-agent');
     expect(editAgentModels[0]?.id).toBe('qwen2.5-coder');
@@ -28,6 +41,28 @@ describe('AI domain model catalog', () => {
     expect(ids).toContain('openai/gpt-5');
     expect(ids).toContain('anthropic/claude-sonnet-5');
     expect(ids).toContain('deepseek/deepseek-chat');
+    expect(getAvailableDomainModels('writer').map((model) => model.id)).toEqual([
+      'gemini-3.1-pro-preview',
+      'gemini-3.1-flash-lite',
+      'agentrouter/claude-opus-4-8',
+      'agentrouter/claude-opus-5',
+      'agentrouter/deepseek-v4-flash',
+      'agentrouter/glm-5.3',
+      'agentrouter/gpt-5.6-sol'
+    ]);
+    expect(ids).not.toContain('agentrouter/gpt-5.6-sol');
+  });
+
+  it('runs AgentRouter Writer aliases only on desktop and keeps Edit Agent aliases visibly unavailable', () => {
+    const writer = getDomainModel('writer', 'agentrouter/gpt-5.6-sol');
+    expect(writer).toBeDefined();
+    expect(isDomainModelAvailableOnRuntime(writer!, 'desktop')).toBe(true);
+    expect(isDomainModelAvailableOnRuntime(writer!, 'mobile')).toBe(false);
+    expect(writer?.unavailableReason).toContain('OpenScene desktop');
+
+    const edit = getDomainModels('edit-agent').find((model) => model.id === 'agentrouter/gpt-5.6-sol');
+    expect(edit).toMatchObject({ available: false });
+    expect(edit?.unavailableReason).toContain('tool approvals');
   });
 
   it('keeps the local model as the edit-agent default ahead of cloud providers', () => {
@@ -50,6 +85,7 @@ describe('AI domain model catalog', () => {
       'voice-generation': 'eleven_v3',
       'video-generation': 'veo-3.1-generate-preview',
       'image-generation': 'gpt-image-1',
+      writer: 'gemini-3.1-pro-preview',
       'edit-agent': 'qwen2.5-coder'
     });
   });
@@ -68,6 +104,7 @@ describe('AI domain model catalog', () => {
     // Media domains default to their first available cloud model; the Edit
     // Agent keeps the local Ollama engine.
     expect(parseAiDomainModelPreferences(null)).toEqual({
+      writer: 'gemini-3.1-pro-preview',
       'voice-generation': 'eleven_v3',
       'video-generation': 'veo-3.1-generate-preview',
       'image-generation': 'gpt-image-1',

@@ -1,9 +1,9 @@
 import { protocol } from 'electron';
 
-import { TimelineIpcService } from './timelineIpcService';
-import { createTimelineAssetRequestHandler } from './timelineAssetResponse';
+import { MEDIA_PLAYBACK_SCHEME } from '../shared/mediaPlaybackUrls';
+import { createTimelineAssetRequestHandler, type MediaPlaybackResolver } from './timelineAssetResponse';
 
-export const PLAYBACK_SCHEME = 'video-tool-asset';
+export const PLAYBACK_SCHEME = MEDIA_PLAYBACK_SCHEME;
 
 export function registerTimelineAssetScheme(): void {
   protocol.registerSchemesAsPrivileged([
@@ -14,6 +14,6 @@ export function registerTimelineAssetScheme(): void {
   ]);
 }
 
-export function registerTimelineAssetProtocol(service: TimelineIpcService): void {
-  protocol.handle(PLAYBACK_SCHEME, createTimelineAssetRequestHandler(service));
+export function registerTimelineAssetProtocol(resolver: MediaPlaybackResolver): void {
+  protocol.handle(PLAYBACK_SCHEME, createTimelineAssetRequestHandler(resolver));
 }

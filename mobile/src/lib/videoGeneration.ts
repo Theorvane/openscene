@@ -1,16 +1,18 @@
 import { File } from 'expo-file-system';
 
 import {
-  supportsReferenceImage,
+  resolveVideoOperation,
+  validateVideoInputSet,
   videoAdapterFor,
   type VideoAspectRatio,
   type VideoProgressStage
 } from '@openvideo/shared/videoGeneration';
 import { getDomainModel } from '@openvideo/shared/aiDomainModels';
+import { getVideoProviderBinding, validateVideoRequest, type VideoOperation } from '@openvideo/shared/mediaCapabilityRegistry';
 
 import { estimateVideoCost } from '@openvideo/shared/mediaGenerationPricing';
 
-import { readKey, type ProviderSlot } from './credentials';
+import { readKey } from './credentials';
 import { chargeReservation, releaseReservation, reserveAgainstCap } from './spendLedger';
 import { projectMediaDir, type MobileAsset } from './projectStore';
 import videoExport, { isFrameExtractionAvailable } from '../../modules/video-export';
@@ -24,21 +26,17 @@ import videoExport, { isFrameExtractionAvailable } from '../../modules/video-exp
  * out would cost the memory twice for no benefit.
  */
 
-const SLOTS: Readonly<Record<string, ProviderSlot>> = {
-  openai: 'openaiApiKey',
-  google_gemini: 'geminiApiKey',
-  runway: 'runwayApiKey',
-  luma: 'lumaApiKey'
-};
-
 export type GenerateShotInput = {
   readonly projectId: string;
   readonly modelId: string;
   readonly prompt: string;
   readonly aspectRatio: VideoAspectRatio;
   readonly durationSeconds: number;
+  readonly operation?: VideoOperation;
   /** First frame to continue from, usually the tail of the previous shot. */
   readonly referenceImage?: { readonly base64: string; readonly mimeType: string };
+  readonly lastFrame?: { readonly base64: string; readonly mimeType: string };
+  readonly referenceImages?: readonly { readonly base64: string; readonly mimeType: string }[];
   readonly onProgress?: (stage: VideoProgressStage, elapsedMs: number) => void;
 };
 
@@ -55,11 +53,27 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
   const model = getDomainModel('video-generation', input.modelId);
   if (model === undefined) return { ok: false, message: `${input.modelId} is not in the model catalog.` };
 
-  const adapter = videoAdapterFor(model.providerId);
-  const slot = SLOTS[model.providerId];
-  if (adapter === undefined || slot === undefined) {
+  const adapter = videoAdapterFor(model.providerId, model.id);
+  const binding = getVideoProviderBinding(model.id);
+  if (adapter === undefined || binding === undefined || binding.credentialKey === undefined) {
     return { ok: false, message: `${model.providerLabel} has no adapter on this device yet.` };
   }
+
+  let resolvedInputs: ReturnType<typeof validateVideoInputSet>;
+  try {
+    resolvedInputs = validateVideoInputSet(input);
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Invalid video references.' };
+  }
+  const operation = resolveVideoOperation(input);
+  const validation = validateVideoRequest({
+    modelId: model.id,
+    operation,
+    durationSeconds: input.durationSeconds,
+    aspectRatio: input.aspectRatio,
+    referenceImageCount: resolvedInputs.referenceImageCount
+  });
+  if (!validation.ok) return { ok: false, message: validation.message };
 
   /*
     The monthly ceiling, before anything is asked of a provider.
@@ -72,7 +86,7 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
   const reservation = reserveAgainstCap(estimate, new Date().toISOString());
   if (!reservation.ok) return { ok: false, message: reservation.reason };
 
-  const apiKey = await readKey(slot);
+  const apiKey = await readKey(binding.credentialKey);
   if (apiKey === null) {
     // Nothing was asked of a provider, so the room goes back.
     releaseReservation(reservation.id);
@@ -80,14 +94,6 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
   }
 
   try {
-    // A reference frame is dropped rather than sent to a provider that cannot
-    // use it: the alternative is an error mid-sequence, after the earlier shots
-    // have already been paid for.
-    const seed =
-      input.referenceImage !== undefined && supportsReferenceImage(model.providerId)
-        ? input.referenceImage
-        : undefined;
-
     // Kept as the request goes out: that is where the money is committed, and
     // a shot refused for a missing key cost nothing.
     chargeReservation(reservation.id);
@@ -97,7 +103,10 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
       prompt: input.prompt,
       aspectRatio: input.aspectRatio,
       durationSeconds: input.durationSeconds,
-      ...(seed === undefined ? {} : { referenceImage: seed }),
+      operation,
+      ...(input.referenceImage === undefined ? {} : { referenceImage: input.referenceImage }),
+      ...(input.lastFrame === undefined ? {} : { lastFrame: input.lastFrame }),
+      ...(input.referenceImages === undefined ? {} : { referenceImages: input.referenceImages }),
       ...(input.onProgress === undefined ? {} : { onProgress: input.onProgress })
     });
 

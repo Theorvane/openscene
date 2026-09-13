@@ -43,6 +43,12 @@ describe('agent chat model provider resolution', () => {
     });
   });
 
+  it('rejects AgentRouter before constructing an Edit Agent client without approval support', () => {
+    expect(() => resolveAgentChatModelSpec('agentrouter/gpt-5.6-sol')).toThrow(
+      'preserve tool approvals'
+    );
+  });
+
   it('keeps local catalog models and unknown custom models on the Ollama client', () => {
     expect(resolveAgentChatModelSpec('qwen2.5-coder')).toEqual({ kind: 'ollama' });
     expect(resolveAgentChatModelSpec('my-custom-local-model')).toEqual({ kind: 'ollama' });

@@ -17,6 +17,7 @@ import { useTheme } from './ThemeProvider';
 import { THEME_PRESETS } from './theme';
 import { Button, MetadataList, Panel, PanelHeading, StatusCard } from './ui';
 import { classNames } from './ui/classNames';
+import { BrowserSessionSettings } from './BrowserSessionSettings';
 
 const SETTINGS_SECTIONS = [
   { id: 'appearance', title: 'Appearance', description: 'Theme mode and command desk presets.' },
@@ -210,14 +211,14 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
         return (
           <>
             <StatusCard tone={ffmpegView.tone}>{ffmpegView.text}</StatusCard>
-            <MetadataList items={[{ term: 'Screen permission', description: 'Checked by the recorder when capture starts.' }, { term: 'Ollama', description: 'The only local engine; it serves the Edit Agent and needs no bundled download.' }]} />
+            <MetadataList items={[{ term: 'Screen permission', description: 'Checked by the recorder when capture starts.' }, { term: 'Ollama', description: 'User-managed local engine for the Edit Agent; OpenScene downloads no model.' }, { term: 'VieNeu-TTS', description: 'User-managed local Vietnamese speech server at http://127.0.0.1:8001 by default; OpenScene downloads no model.' }]} />
           </>
         );
       case 'voice':
         return (
           <>
-            <StatusCard tone="neutral">Voice generation models are managed inside the Voice Generation workspace; connect ElevenLabs or another media provider under Providers to unlock cloud synthesis.</StatusCard>
-            <StatusCard tone="neutral">Scripts are sent to the connected voice provider only when you generate; generated audio is written to local app storage.</StatusCard>
+            <StatusCard tone="neutral">Voice generation models are managed inside the Voice Generation workspace. Connect a cloud provider there, or run <code>npm run setup:local-ai</code> once; OpenScene then starts VieNeu-TTS v3 Turbo automatically.</StatusCard>
+            <StatusCard tone="neutral">Scripts leave the app only when you generate with a cloud model. VieNeu requests stay on loopback; all generated audio is written to local app storage.</StatusCard>
           </>
         );
       case 'video':
@@ -373,6 +374,7 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
             )}
 
             <StatusCard tone="neutral">API keys live in main-process safe storage, are write-only from this screen, and are never rendered back.</StatusCard>
+            <BrowserSessionSettings />
             {connectTarget !== null && connectTarget.credentialKey !== undefined && (
               <ProviderConnectDialog
                 provider={connectTarget}

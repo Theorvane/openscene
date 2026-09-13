@@ -1,4 +1,5 @@
 import { clipDurationMs, clipTimelineEndMs } from './timelineClipGeometry';
+import { parseTimelineTitleStyle } from './captionStyle';
 import {
   AUDIO_TRACK_MIX_RANGES,
   CLIP_EFFECT_PROPERTIES,
@@ -165,6 +166,8 @@ export function parseTitles(value: unknown): readonly TimelineTitle[] | null {
     if (!Number.isFinite(title.sizePx) || Number(title.sizePx) <= 0) return null;
     if (!Number.isFinite(title.positionX) || !Number.isFinite(title.positionY)) return null;
     if (!isHexColor(title.color)) return null;
+    const style = title.style === undefined ? undefined : parseTimelineTitleStyle(title.style);
+    if (style === null) return null;
     titles.push({
       id: title.id,
       text: title.text,
@@ -173,7 +176,8 @@ export function parseTitles(value: unknown): readonly TimelineTitle[] | null {
       sizePx: Number(title.sizePx),
       color: title.color,
       positionX: Number(title.positionX),
-      positionY: Number(title.positionY)
+      positionY: Number(title.positionY),
+      ...(style === undefined ? {} : { style })
     });
   }
   return titles;

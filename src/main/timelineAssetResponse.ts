@@ -1,9 +1,12 @@
 import { parseGetAssetPlaybackUrlInput } from '../shared/timelineValidators';
 import type { OpenedAssetPlaybackSource } from './assetLibraryStore';
 import { parseAssetByteRange, type AssetByteRange } from './assetByteRange';
+import { isOpaqueId } from './projectStoreSupport';
 
-type AssetPlaybackResolver = {
+export type MediaPlaybackResolver = {
   openAssetPlaybackSource(projectId: string, assetId: string): Promise<OpenedAssetPlaybackSource | null>;
+  openGeneratedSpeechSource?(jobId: string): Promise<OpenedAssetPlaybackSource | null>;
+  openGeneratedVideoSource?(jobId: string): Promise<OpenedAssetPlaybackSource | null>;
 };
 
 function notFound(): Response {
@@ -85,11 +88,33 @@ async function streamAssetResponse(request: Request, source: OpenedAssetPlayback
 }
 
 export function createTimelineAssetRequestHandler(
-  resolver: AssetPlaybackResolver
+  resolver: MediaPlaybackResolver
 ): (request: Request) => Promise<Response> {
   return async (request) => {
     const url = new URL(request.url);
     const segments = url.pathname.split('/').filter((segment) => segment.length > 0);
+    if (
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      url.hostname === 'speech-preview' &&
+      segments.length === 1 &&
+      segments[0] !== undefined &&
+      isOpaqueId(segments[0]) &&
+      resolver.openGeneratedSpeechSource !== undefined
+    ) {
+      const source = await resolver.openGeneratedSpeechSource(segments[0]);
+      return source === null ? notFound() : streamAssetResponse(request, source);
+    }
+    if (
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      url.hostname === 'video-preview' &&
+      segments.length === 1 &&
+      segments[0] !== undefined &&
+      isOpaqueId(segments[0]) &&
+      resolver.openGeneratedVideoSource !== undefined
+    ) {
+      const source = await resolver.openGeneratedVideoSource(segments[0]);
+      return source === null ? notFound() : streamAssetResponse(request, source);
+    }
     const projectId = segments[0];
     const assetId = segments[1];
     if (

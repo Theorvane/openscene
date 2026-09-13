@@ -10,6 +10,7 @@ import type { OpenAiAuthMode } from '../shared/openAiAuth';
 import type { AgentChatModelFactory } from './agentChatGraph';
 import type { CredentialStore } from './credentialStore';
 import { CHATGPT_CODEX_ENDPOINT_METADATA, chatGptCodexClientHeaders } from './chatGptOAuthService';
+import { AGENT_ROUTER_EDIT_AGENT_UNAVAILABLE_REASON, AGENT_ROUTER_PROVIDER_ID } from '../shared/agentRouter';
 
 const DEFAULT_OLLAMA_BASE_URL = 'http://localhost:11434';
 
@@ -81,6 +82,9 @@ export function resolveAgentChatModelSpec(
       accountIdHeader: CHATGPT_CODEX_ENDPOINT_METADATA.accountIdHeader,
       useResponsesApi: true
     };
+  }
+  if (model?.providerId === AGENT_ROUTER_PROVIDER_ID) {
+    throw new AgentChatModelConfigurationError(AGENT_ROUTER_EDIT_AGENT_UNAVAILABLE_REASON);
   }
   if (model === undefined || model.providerId === 'local_ollama') {
     return { kind: 'ollama' };

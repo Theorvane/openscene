@@ -1,4 +1,5 @@
 import { exportReviewSummary } from '../../../shared/exportReview';
+import { metadataPrivacyVerificationSummary } from '../../../shared/metadataPrivacy';
 import type { LocalExportJob } from '../../../shared/exportTypes';
 
 type StatusTone = 'neutral' | 'success' | 'warning' | 'danger';
@@ -135,7 +136,10 @@ export function getExportStatusView(input: ExportUiInput): ExportStatusView {
         file measures leads here rather than trailing the size.
       */
       const review = input.job.state.review;
-      const ready = `${input.job.state.fileName} is ready. Size: ${formatExportBytes(input.job.state.fileSizeBytes)}.`;
+      const metadataSummary = input.job.state.metadataPrivacyVerification === undefined
+        ? ''
+        : ` ${metadataPrivacyVerificationSummary(input.job.state.metadataPrivacyVerification)}`;
+      const ready = `${input.job.state.fileName} is ready. Size: ${formatExportBytes(input.job.state.fileSizeBytes)}.${input.job.state.subtitleFileName === undefined ? '' : ` Subtitle: ${input.job.state.subtitleFileName}.`}${input.job.state.provenanceFileName === undefined ? '' : ` Provenance: ${input.job.state.provenanceFileName}.`}${metadataSummary}`;
       if (review !== undefined && review.checked && !review.ok) {
         return {
           detail: `${exportReviewSummary(review)} ${ready}`,

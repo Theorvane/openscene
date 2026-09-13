@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
  * load. The wiring is asserted from source, the way the other mobile rules are.
  */
 
-const read = (path: string) => readFile(new URL(`../mobile/${path}`, import.meta.url), 'utf8');
+const read = async (path: string) => (await readFile(new URL(`../mobile/${path}`, import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
 
 describe('project change notification', () => {
   it('announces from the one place that writes', async () => {

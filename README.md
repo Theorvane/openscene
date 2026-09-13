@@ -103,16 +103,22 @@ Projects and past conversations live on the start page. Picking a chat reopens i
 - Review with a playhead and a best-effort Program Monitor
 - Export H.264/AAC MP4 through your local FFmpeg
 - Keyboard shortcuts throughout, remappable in Settings
+- Deliver reviewed automatic captions by burning them into the MP4, exporting a UTF-8 SRT/WebVTT/ASS sidecar, doing both, or doing neither. Manual titles always remain independent.
+- Style titles and approved captions with shared Clean, Boxed, Cinema or Social presets, bounded outline/background controls, and aspect-aware title-safe anchors used by preview and final renderers.
 
 ### Voice generation
 
-Write a script, pick a voice model, generate, and import the result straight into the project.
+Write a script, pick a voice model, generate, and import the result straight into the project. OpenAI and ElevenLabs use your connected API key; VieNeu-TTS v3 Turbo can run locally without a key.
+
+For local voice and automatic subtitles, place the [official VieNeu-TTS project](https://github.com/pnnbao97/VieNeu-TTS) beside OpenScene and run `npm run setup:local-ai` once. The command synchronizes VieNeu's CPU/ONNX environment and installs a checksum-verified official whisper.cpp Windows runtime plus multilingual model under ignored `.local-runtimes/`. OpenScene then starts and stops its owned VieNeu process automatically, discovers voices at `http://127.0.0.1:8001`, and launches Whisper per transcription job. Set `OPENSCENE_VIENEU_PROJECT_DIR` only for a different checkout; remote VieNeu URLs are rejected.
 
 ![The Voice Generation studio with a voice picker and a script composer](docs/assets/screenshot-voice.png)
 
 ### Video generation
 
 Prompt with a style, aspect ratio, and duration — and optionally a reference image to seed image-to-video.
+
+After the Writer prompt stage is approved, the storyboard production board turns those saved shots into a manual production checklist. Assign imported storyboard frames and character references, open one shot at a time, generate and review candidates, then explicitly assemble the complete approved set on the timeline. The board never starts a provider job, replaces a take, exports, or spends credits on its own.
 
 ![The Video Generation studio with style, aspect ratio, duration, and reference image controls](docs/assets/screenshot-video.png)
 
@@ -188,7 +194,7 @@ The provider and model registry is generated from a snapshot of the [models.dev]
 - **Local**: [Ollama](https://ollama.com) runs models on your machine with no key and no account.
 - **Cloud chat**: connect a provider in *Settings → Providers* with an API key. Only connected providers' models appear in the pickers.
 - **OpenAI**: two login methods on one provider — an API key, or a ChatGPT sign-in (PKCE OAuth) for the model set that backend serves. Tokens stay in main-process safe storage; the renderer only learns whether you are connected.
-- **Generation**: 17 runnable video models across Google Veo, OpenAI Sora, Runway and Luma — Runway alone fronts Seedance, Veo 3.1, HappyHorse and Gemini Omni Flash on one key. Eight image models and seven voices. Providers without a real adapter stay listed but honestly unavailable rather than pretending to work, and every model says which it is.
+- **Generation**: runnable video models across Google Gemini Omni/Veo, OpenAI Sora, Runway, Luma and a user-managed ComfyUI Wan Animate worker — Runway also fronts Seedance, Veo 3.1, HappyHorse and a separate Gemini Omni route on one key. Google image generation uses the current Nano Banana family through Gemini Interactions, or an experimental desktop-only background browser worker that drives the normal Gemini UI with the user's encrypted signed-in session. Providers without a real adapter stay listed but honestly unavailable rather than pretending to work, and every model says which it is.
 
 A provider API key is entered in Settings and sent once through the typed bridge to Electron `safeStorage`; stored provider credentials are never returned to the renderer.
 
@@ -257,7 +263,7 @@ The renderer talks to the main process through a narrow typed `window.videoTool`
 | Local H.264/AAC MP4 export | Other export formats; frame-perfect multitrack mastering guarantees |
 | Signed installers and auto-update on all three desktop platforms, and the mobile app on the App Store and Google Play | Cloud sync, hosted rendering, accounts |
 | Agent-driven editing, generation, and export | Unattended operation — changes ask for approval |
-| Veo image-to-video via a reference image | Sora reference images (needs a multipart upload path this build does not send) |
+| Veo image-to-video, Start-End interpolation, and 1-3 character/product references; desktop ComfyUI Wan Move/Mix Motion Control with user-supplied API workflows | Sora reference images (needs a multipart upload path this build does not send); bundled ComfyUI/models |
 
 Program Monitor is a best-effort review surface. FFmpeg export is the authoritative output.
 

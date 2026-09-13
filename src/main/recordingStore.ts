@@ -1,10 +1,11 @@
 import { createWriteStream } from 'node:fs';
 import { mkdir, rm, stat } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { WriteStream } from 'node:fs';
 
 import type { ChunkAck, RecordingResult, RecordingSession } from '../shared/models';
+import { isInsideDirectory } from './projectStoreSupport';
 
 interface ActiveRecording {
   session: RecordingSession;
@@ -35,12 +36,6 @@ export function createRecordingFileName(sourceName: string, now: Date): string {
   return `${timestamp}-${sanitizeFileSegment(sourceName)}.webm`;
 }
 
-function isInsideDirectory(parentDirectory: string, childPath: string): boolean {
-  const normalizedParent = resolve(parentDirectory);
-  const normalizedChild = resolve(childPath);
-  return normalizedChild === normalizedParent || normalizedChild.startsWith(`${normalizedParent}/`);
-}
-
 function streamFinished(stream: WriteStream): Promise<void> {
   return new Promise((resolveFinished, rejectFinished) => {
     stream.once('finish', resolveFinished);
@@ -53,6 +48,17 @@ function waitForDrain(stream: WriteStream): Promise<void> {
   return new Promise((resolveDrain, rejectDrain) => {
     stream.once('drain', resolveDrain);
     stream.once('error', rejectDrain);
+  });
+}
+
+function destroyStream(stream: WriteStream): Promise<void> {
+  if (stream.closed) {
+    stream.destroy();
+    return Promise.resolve();
+  }
+  return new Promise((resolveClosed) => {
+    stream.once('close', resolveClosed);
+    stream.destroy();
   });
 }
 
@@ -153,7 +159,10 @@ export class RecordingFileStore {
     }
 
     this.activeRecordings.delete(sessionId);
-    activeRecording.stream.destroy();
+    // A WriteStream can still be opening when the user cancels. Removing its
+    // path before the handle closes races with that pending open on Windows:
+    // the remove succeeds, then the stream creates an empty file afterward.
+    await destroyStream(activeRecording.stream);
     await rm(activeRecording.session.outputPath, { force: true });
   }
 

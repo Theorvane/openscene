@@ -1,5 +1,6 @@
 import { PROJECT_SCHEMA_VERSION } from '../shared/timelineTypes';
-import type { BrowserAssetMetadata, LocalProjectSnapshot, MediaAsset, MediaKind, TimelineDocument } from '../shared/timelineTypes';
+import { RESULT_ASSET_ORIGIN_KINDS, resultAssetOriginKey, type BrowserAssetMetadata, type LocalProjectSnapshot, type MediaAsset, type MediaKind, type ResultAssetOrigin, type TimelineDocument } from '../shared/timelineTypes';
+import { createEmptyAiProjectDocument, parseAiProjectDocument } from '../shared/aiProjectDomain';
 import { migrateTimelineDocumentV1, migrateTimelineDocumentV2, parseTimelineDocument } from '../shared/timelineValidators';
 import {
   TIMELINE_VALIDATION_LIMITS,
@@ -13,6 +14,7 @@ import {
   isPlainRecord,
   isUnknownArray
 } from '../shared/timelineValidationPrimitives';
+import { trackKindForAsset } from '../shared/timelineStills';
 import { hasDeterministicAssetPath } from './assetLibrarySupport';
 
 function getIsoTimestamp(record: Record<string, unknown>, key: string): string | null {
@@ -37,6 +39,15 @@ function parseMetadata(value: unknown): BrowserAssetMetadata | null {
   return { durationMs, ...(width === undefined ? {} : { width }), ...(height === undefined ? {} : { height }) };
 }
 
+function parseResultOrigin(value: unknown): ResultAssetOrigin | null {
+  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['kind', 'resultId'])) return null;
+  const resultId = getOpaqueId(value, 'resultId');
+  const kind = typeof value.kind === 'string' && (RESULT_ASSET_ORIGIN_KINDS as readonly string[]).includes(value.kind)
+    ? value.kind as ResultAssetOrigin['kind']
+    : null;
+  return kind === null || resultId === null ? null : { kind, resultId };
+}
+
 function parseAsset(value: unknown): MediaAsset | null {
   if (
     !isPlainRecord(value) ||
@@ -48,6 +59,7 @@ function parseAsset(value: unknown): MediaAsset | null {
       'mimeType',
       'byteLength',
       'metadata',
+      'resultOrigin',
       'createdAt',
       'updatedAt'
     ])
@@ -57,10 +69,14 @@ function parseAsset(value: unknown): MediaAsset | null {
   const id = getOpaqueId(value, 'id');
   const displayName = getTrimmedString(value, 'displayName', TIMELINE_VALIDATION_LIMITS.nameLength);
   const projectRelativePath = getRelativePath(value, 'projectRelativePath');
-  const kind = getMediaKind(value, 'kind');
+  // Images are project assets but never timeline track kinds or arbitrary IPC
+  // import requests. Keep that distinction local instead of widening the
+  // shared getMediaKind validator used by those narrower contracts.
+  const kind = value.kind === 'image' ? 'image' : getMediaKind(value, 'kind');
   const mimeType = getMimeType(value, 'mimeType');
   const byteLength = getFiniteNonNegative(value, 'byteLength');
   const metadata = value.metadata === null ? null : parseMetadata(value.metadata);
+  const resultOrigin = value.resultOrigin === undefined ? undefined : parseResultOrigin(value.resultOrigin);
   const createdAt = getIsoTimestamp(value, 'createdAt');
   const updatedAt = getIsoTimestamp(value, 'updatedAt');
   if (
@@ -72,12 +88,16 @@ function parseAsset(value: unknown): MediaAsset | null {
     byteLength === null ||
     !Number.isSafeInteger(byteLength) ||
     (metadata === null && value.metadata !== null) ||
+    resultOrigin === null ||
     createdAt === null ||
     updatedAt === null
   ) {
     return null;
   }
-  const asset = { id, displayName, projectRelativePath, kind, mimeType, byteLength, metadata, createdAt, updatedAt };
+  const asset = {
+    id, displayName, projectRelativePath, kind, mimeType, byteLength, metadata,
+    ...(resultOrigin === undefined ? {} : { resultOrigin }), createdAt, updatedAt
+  };
   return hasDeterministicAssetPath(asset) ? asset : null;
 }
 
@@ -95,9 +115,13 @@ export function findInvalidAssetRelation(
   for (const track of timeline.tracks) {
     for (const clip of track.clips) {
       const asset = assetsById.get(clip.assetId);
-      if (asset === undefined || asset.kind !== track.kind) {
+      if (asset === undefined || trackKindForAsset(asset.kind) !== track.kind) {
         return { clipId: clip.id, trackKind: track.kind, reason: 'unavailable' };
       }
+      // A still is held for the authored clip length. It has no source
+      // duration to compare against, so the ordinary movie bounds checks do
+      // not apply (the clip validator already guarantees positive geometry).
+      if (asset.kind === 'image') continue;
       if (asset.metadata === null) {
         return { clipId: clip.id, trackKind: track.kind, reason: 'metadata_missing' };
       }
@@ -115,6 +139,7 @@ export function findInvalidAssetRelation(
 function parseProjectRecord(
   value: Record<string, unknown>,
   timeline: TimelineDocument,
+  aiValue: unknown,
   expectedProjectId?: string
 ): LocalProjectSnapshot | null {
   const id = getOpaqueId(value, 'id');
@@ -129,29 +154,39 @@ function parseProjectRecord(
   }
   const assets: MediaAsset[] = [];
   const assetIds = new Set<string>();
+  const resultOrigins = new Set<string>();
   for (const rawAsset of value.assets) {
     const asset = parseAsset(rawAsset);
-    if (asset === null || assetIds.has(asset.id)) {
+    const originKey = asset?.resultOrigin === undefined ? undefined : resultAssetOriginKey(asset.resultOrigin);
+    if (asset === null || assetIds.has(asset.id) || (originKey !== undefined && resultOrigins.has(originKey))) {
       return null;
     }
     assetIds.add(asset.id);
+    if (originKey !== undefined) resultOrigins.add(originKey);
     assets.push(asset);
   }
+  const ai = aiValue === undefined
+    ? createEmptyAiProjectDocument()
+    : parseAiProjectDocument(aiValue, assetIds);
+  if (ai === null) {
+    return null;
+  }
   return findInvalidAssetRelation(timeline, assets) === null
-    ? { schemaVersion: PROJECT_SCHEMA_VERSION, id, name, createdAt, updatedAt, assets, timeline }
+    ? { schemaVersion: PROJECT_SCHEMA_VERSION, id, name, createdAt, updatedAt, assets, timeline, ai }
     : null;
 }
 
 export function parsePersistedProject(value: unknown, expectedProjectId?: string): LocalProjectSnapshot | null {
   if (
     !isPlainRecord(value) ||
-    !hasAllowedKeys(value, ['schemaVersion', 'id', 'name', 'createdAt', 'updatedAt', 'assets', 'timeline']) ||
-    value.schemaVersion !== PROJECT_SCHEMA_VERSION
+    !hasAllowedKeys(value, ['schemaVersion', 'id', 'name', 'createdAt', 'updatedAt', 'assets', 'timeline', 'ai']) ||
+    value.schemaVersion !== PROJECT_SCHEMA_VERSION ||
+    value.ai === undefined
   ) {
     return null;
   }
   const timeline = parseTimelineDocument(value.timeline);
-  return timeline === null ? null : parseProjectRecord(value, timeline, expectedProjectId);
+  return timeline === null ? null : parseProjectRecord(value, timeline, value.ai, expectedProjectId);
 }
 
 export function parsePersistedProjectForRead(value: unknown, expectedProjectId?: string): LocalProjectSnapshot | null {
@@ -162,12 +197,14 @@ export function parsePersistedProjectForRead(value: unknown, expectedProjectId?:
   if (
     !isPlainRecord(value) ||
     !hasAllowedKeys(value, ['schemaVersion', 'id', 'name', 'createdAt', 'updatedAt', 'assets', 'timeline']) ||
-    (value.schemaVersion !== 1 && value.schemaVersion !== 2)
+    (value.schemaVersion !== 1 && value.schemaVersion !== 2 && value.schemaVersion !== 3)
   ) {
     return null;
   }
   const timeline = value.schemaVersion === 1
     ? migrateTimelineDocumentV1(value.timeline)
-    : migrateTimelineDocumentV2(value.timeline);
-  return timeline === null ? null : parseProjectRecord(value, timeline, expectedProjectId);
+    : value.schemaVersion === 2
+      ? migrateTimelineDocumentV2(value.timeline)
+      : parseTimelineDocument(value.timeline);
+  return timeline === null ? null : parseProjectRecord(value, timeline, undefined, expectedProjectId);
 }

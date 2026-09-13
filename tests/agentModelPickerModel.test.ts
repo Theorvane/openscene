@@ -64,4 +64,21 @@ describe('Edit Agent model picker groups', () => {
     expect(groups).toHaveLength(1);
     expect(groups[0]?.models.map((model) => model.id)).toEqual([CODEX_MODEL_ID]);
   });
+
+  it('links only session-capable models when a provider exposes mixed API and browser lanes', () => {
+    const groups = buildAgentModelGroups({
+      domain: 'video-generation',
+      activeModelId: 'gemini-omni-1.1-flash',
+      credentialStatus: {},
+      chatGptConnected: false,
+      linkedModelIds: ['gemini-omni-1.1-flash', 'veo-3.1-fast-generate-preview'],
+      isModelVisible: allVisible
+    });
+    const google = groups.find((group) => group.providerId === 'google_gemini');
+    expect(google?.models.map((model) => model.id)).toEqual([
+      'veo-3.1-fast-generate-preview',
+      'gemini-omni-1.1-flash'
+    ]);
+    expect(google?.models.map((model) => model.id)).not.toContain('veo-2.0-generate-001');
+  });
 });

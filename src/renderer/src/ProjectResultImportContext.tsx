@@ -3,6 +3,7 @@ import { createContext, useContext, type ReactElement, type ReactNode } from 're
 import type { MediaAsset } from '../../shared/timelineTypes';
 import type { StatusMessage } from './appTypes';
 import type { TimelineEditorController } from './editor/useTimelineEditor';
+import type { AiResultImportStatus } from './editor/useProjectAssetImports';
 
 type ActiveProjectSummary = {
   readonly id: string;
@@ -15,7 +16,9 @@ type ProjectResultImportContextValue = {
   readonly assets: readonly MediaAsset[];
   readonly isImporting: boolean;
   readonly importRecordingResult: (sessionId: string) => Promise<StatusMessage>;
-  readonly importAiResult: (jobId: string) => Promise<StatusMessage>;
+  readonly importAiResult: (jobId: string) => Promise<AiResultImportStatus>;
+  readonly placeAiAssetOnTimeline: (assetId: string) => boolean;
+  readonly assembleApprovedWriterShots: () => boolean;
 };
 
 type ProjectResultImportProviderProps = {
@@ -31,6 +34,8 @@ export function ProjectResultImportProvider({ children, editor }: ProjectResultI
     assets: editor.project?.assets ?? [],
     importRecordingResult: editor.importRecordingResult,
     importAiResult: editor.importAiResult,
+    placeAiAssetOnTimeline: editor.placeAssetOnTimeline,
+    assembleApprovedWriterShots: editor.assembleApprovedWriterShots,
     isImporting: editor.isBusy
   };
 

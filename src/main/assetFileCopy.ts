@@ -1,8 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, open, realpath, type FileHandle } from 'node:fs/promises';
-import { PassThrough } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 
 import { isInsideDirectory, ProjectStoreError } from './projectStoreSupport';
 
@@ -24,6 +22,41 @@ function isSameFileVersion(
     before.mtimeMs === after.mtimeMs &&
     before.ctimeMs === after.ctimeMs
   );
+}
+
+const COPY_BUFFER_BYTES = 64 * 1_024;
+
+async function hashOpenFile(file: FileHandle): Promise<Buffer> {
+  const hash = createHash('sha256');
+  const buffer = Buffer.allocUnsafe(COPY_BUFFER_BYTES);
+  let position = 0;
+  while (true) {
+    const { bytesRead } = await file.read(buffer, 0, buffer.byteLength, position);
+    if (bytesRead === 0) return hash.digest();
+    hash.update(buffer.subarray(0, bytesRead));
+    position += bytesRead;
+  }
+}
+
+async function copyOpenFiles(source: FileHandle, destination: FileHandle, maximumBytes: number): Promise<Buffer> {
+  const hash = createHash('sha256');
+  const buffer = Buffer.allocUnsafe(COPY_BUFFER_BYTES);
+  let position = 0;
+  while (true) {
+    const { bytesRead } = await source.read(buffer, 0, buffer.byteLength, position);
+    if (bytesRead === 0) return hash.digest();
+    if (position + bytesRead > maximumBytes) {
+      throw new ProjectStoreError(`Asset source exceeds the ${maximumBytes} byte limit.`);
+    }
+    hash.update(buffer.subarray(0, bytesRead));
+    let written = 0;
+    while (written < bytesRead) {
+      const result = await destination.write(buffer, written, bytesRead - written, position + written);
+      if (result.bytesWritten === 0) throw new ProjectStoreError('Asset copy stopped before all bytes were written.');
+      written += result.bytesWritten;
+    }
+    position += bytesRead;
+  }
 }
 
 export async function copyAssetFile(input: CopyAssetFileInput): Promise<number> {
@@ -49,25 +82,21 @@ export async function copyAssetFile(input: CopyAssetFileInput): Promise<number> 
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
       0o600
     );
-    const copiedHash = createHash('sha256');
-    const hashingStream = new PassThrough();
-    hashingStream.on('data', (chunk: Buffer) => copiedHash.update(chunk));
-    await pipeline(
-      source.createReadStream(),
-      hashingStream,
-      destination.createWriteStream()
-    );
+    const copiedHash = await copyOpenFiles(source, destination, input.maximumBytes);
+    // Flush through the writable handle. Windows rejects fsync on a handle
+    // opened O_RDONLY with EPERM, even though POSIX platforms may accept it.
+    // The explicit read/write loop keeps both handles open so the copy can be
+    // durably flushed before the independent verification pass below.
+    await destination.sync();
     verificationSource = await open(input.sourcePath, constants.O_RDONLY | constants.O_NOFOLLOW);
     verificationDestination = await open(input.destinationPath, constants.O_RDONLY | constants.O_NOFOLLOW);
-    await verificationDestination.sync();
     const [sourceAfterCopy, copiedStats, destinationRealPath, directoryAfterCopy] = await Promise.all([
       verificationSource.stat(),
       verificationDestination.stat(),
       realpath(input.destinationPath),
       lstat(input.destinationDirectory)
     ]);
-    const finalSourceHash = createHash('sha256');
-    await pipeline(verificationSource.createReadStream(), finalSourceHash);
+    const finalSourceHash = await hashOpenFile(verificationSource);
     const [sourceAfterHash, destinationAfterHash] = await Promise.all([
       lstat(input.sourcePath),
       lstat(input.destinationPath)
@@ -85,7 +114,7 @@ export async function copyAssetFile(input: CopyAssetFileInput): Promise<number> 
       !isSameFileVersion(beforeCopy, sourceAfterCopy) ||
       !isSameFileVersion(beforeCopy, sourceAfterHash) ||
       !isSameFileVersion(copiedStats, destinationAfterHash) ||
-      !timingSafeEqual(copiedHash.digest(), finalSourceHash.digest()) ||
+      !timingSafeEqual(copiedHash, finalSourceHash) ||
       !destinationStayedInside ||
       !directoryStayedStable
     ) {

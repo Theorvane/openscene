@@ -15,6 +15,7 @@ import { PlanScreen } from './src/screens/PlanScreen';
 import { ProjectsScreen } from './src/screens/ProjectsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { VoiceScreen } from './src/screens/VoiceScreen';
+import { WriterScreen } from './src/screens/WriterScreen';
 import { assetUri, readProject } from './src/lib/projectStore';
 import { useProject } from './src/lib/useProject';
 import { exportReviewSummary } from '@openvideo/shared/exportReview';
@@ -27,6 +28,7 @@ import {
   ClapperIcon,
   GearIcon,
   PictureIcon,
+  PencilIcon,
   SparkIcon,
   StackIcon,
   TimelineIcon,
@@ -47,6 +49,7 @@ import { MIN_TAP, press } from './src/lib/touch';
  */
 const PROJECT_TABS = [
   { id: 'edit', label: 'Edit', Icon: TimelineIcon },
+  { id: 'writer', label: 'Writer', Icon: PencilIcon },
   { id: 'video', label: 'Video', Icon: ClapperIcon },
   { id: 'voice', label: 'Voice', Icon: WaveIcon },
   { id: 'image', label: 'Image', Icon: PictureIcon },
@@ -198,6 +201,7 @@ function Shell() {
       // of one upright clip comes out upright rather than pillarboxed inside a
       // landscape frame, which is what this used to do to every phone video.
       ...(current.frame === undefined ? {} : { frame: current.frame }),
+      ...(current.subtitleDelivery === undefined ? {} : { subtitleDelivery: current.subtitleDelivery }),
       assets: current.assets.map((asset) => ({
         id: asset.id,
         uri: assetUri(current.id, asset),
@@ -340,11 +344,14 @@ function Shell() {
 
       <View style={styles.body} onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}>
         {tab === 'edit' && <EditScreen topInset={0} projectId={route.projectId} />}
+        {tab === 'writer' && (
+          <WriterScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
+        )}
         {tab === 'video' && (
           <PlanScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
         )}
         {tab === 'voice' && (
-          <VoiceScreen topInset={0} keyboardOffset={bodyTop} targetSeconds={pictureSeconds} connectionsVersion={connectionsVersion} />
+          <VoiceScreen topInset={0} keyboardOffset={bodyTop} targetSeconds={pictureSeconds} connectionsVersion={connectionsVersion} projectId={route.projectId} />
         )}
         {tab === 'image' && (
           <ImageScreen

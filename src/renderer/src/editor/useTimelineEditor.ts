@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   addTrack,
@@ -34,12 +34,19 @@ import type {
 } from '../../../shared/timelineTypes';
 import { clipDurationMs, clipTimelineEndMs } from '../../../shared/timelineClipGeometry';
 import { addTitle, removeTitle, titleAt, updateTitle } from '../../../shared/timelineTitleLogic';
+import { applyTitleAppearanceToAutomaticCaptions } from '../../../shared/captionStyle';
+import { applySubtitleCues } from '../../../shared/subtitleWorkflow';
+import type { NarrationPlan } from '../../../shared/narrationPlan';
+import { applyTranscriptionCues, type TranscriptionDraft } from '../../../shared/transcription';
 import { errorMessage, type StatusMessage } from '../appTypes';
 import { createTimelineHistory, pushTimelineHistory, redoTimelineHistory, undoTimelineHistory, type TimelineHistory } from './editorTimelineHistory';
-import { clampPlayheadMs, findClipSelection, findFirstCompatibleTrack, insertionStartForTrack, nextTrackName, placeReadyAssetOnTimeline } from './editorTimelineView';
+import { clampPlayheadMs, findClipSelection, findFirstCompatibleTrack, insertionStartForTrack, mediaAssetReady, nextTrackName, placeReadyAssetOnTimeline } from './editorTimelineView';
 import { metadataProbeFailureMessage } from './mediaLoadFailures';
 import { useProjectAssetImports } from './useProjectAssetImports';
 import { useTimelinePlayback } from './useTimelinePlayback';
+import type { AiProjectDocument } from '../../../shared/aiProjectDomain';
+import { detachVideoAudioOnTimeline } from '../../../shared/detachVideoAudio';
+import { assembleApprovedProductionCut, buildApprovedProductionAssemblyPlan } from '../../../shared/productionWorkflow';
 
 type TimelineUpdate = (timeline: TimelineDocument) => TimelineDocument | null;
 
@@ -62,6 +69,11 @@ export function useTimelineEditor() {
   const [metadataProbeFailuresByAssetId, setMetadataProbeFailuresByAssetId] = useState<Readonly<Record<string, string>>>({});
   const [metadataProbeRetryRevisionsByAssetId, setMetadataProbeRetryRevisionsByAssetId] = useState<Readonly<Record<string, number>>>({});
   const [statusMessage, setStatusMessage] = useState<StatusMessage>({ tone: 'neutral', text: 'Create or open a project to start editing locally.' });
+  const projectRef = useRef<LocalProjectSnapshot | null>(null);
+
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
 
   const selectedAsset = useMemo(
     () => project?.assets.find((asset) => asset.id === selectedAssetId) ?? null,
@@ -81,12 +93,16 @@ export function useTimelineEditor() {
   }, [playback]);
 
   const refreshProjects = useCallback(async () => {
-    const response = await window.videoTool.listProjects();
-    if (response.ok) {
-      setProjects(response.value);
-      return;
+    try {
+      const response = await window.videoTool.listProjects();
+      if (response.ok) {
+        setProjects(response.value);
+        return;
+      }
+      setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
+    } catch (error: unknown) {
+      setStatusMessage({ tone: 'danger', text: error instanceof Error ? error.message : 'Projects could not be listed.' });
     }
-    setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
   }, []);
 
   useEffect(() => {
@@ -116,10 +132,21 @@ export function useTimelineEditor() {
     setMetadataProbeRetryRevisionsByAssetId((current) => ({ ...current, [assetId]: (current[assetId] ?? 0) + 1 }));
   }, [clearMetadataProbeFailure]);
 
-  const openProject = useCallback(async (projectId: string): Promise<boolean> => {
+  const invokeWhileBusy = useCallback(async <T,>(invoke: () => Promise<T>, failureMessage: string): Promise<T | null> => {
     setIsBusy(true);
-    const response = await window.videoTool.openProject({ projectId });
-    setIsBusy(false);
+    try {
+      return await invoke();
+    } catch (error: unknown) {
+      setStatusMessage({ tone: 'danger', text: error instanceof Error ? error.message : failureMessage });
+      return null;
+    } finally {
+      setIsBusy(false);
+    }
+  }, []);
+
+  const openProject = useCallback(async (projectId: string): Promise<boolean> => {
+    const response = await invokeWhileBusy(() => window.videoTool.openProject({ projectId }), 'The project could not be opened.');
+    if (response === null) return false;
     if (response.ok) {
       setLoadedProject(response.value);
       setSelectedAssetId(response.value.assets[0]?.id ?? '');
@@ -130,12 +157,11 @@ export function useTimelineEditor() {
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
     return false;
-  }, []);
+  }, [invokeWhileBusy, setLoadedProject]);
 
   const createProject = useCallback(async (): Promise<boolean> => {
-    setIsBusy(true);
-    const response = await window.videoTool.createProject({ name: newProjectName });
-    setIsBusy(false);
+    const response = await invokeWhileBusy(() => window.videoTool.createProject({ name: newProjectName }), 'The project could not be created.');
+    if (response === null) return false;
     if (response.ok) {
       if (response.value.cancelled) {
         return false;
@@ -151,12 +177,11 @@ export function useTimelineEditor() {
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
     return false;
-  }, [newProjectName, refreshProjects]);
+  }, [invokeWhileBusy, newProjectName, refreshProjects, setLoadedProject]);
 
   const openProjectFolder = useCallback(async (): Promise<boolean> => {
-    setIsBusy(true);
-    const response = await window.videoTool.openProjectFolder();
-    setIsBusy(false);
+    const response = await invokeWhileBusy(() => window.videoTool.openProjectFolder(), 'The project folder could not be opened.');
+    if (response === null) return false;
     if (response.ok) {
       if (response.value.cancelled) {
         return false;
@@ -174,13 +199,12 @@ export function useTimelineEditor() {
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
     return false;
-  }, [refreshProjects]);
+  }, [invokeWhileBusy, refreshProjects, setLoadedProject]);
 
   const deleteCurrentProject = useCallback(async () => {
     if (project === null) return;
-    setIsBusy(true);
-    const response = await window.videoTool.deleteProject({ projectId: project.id });
-    setIsBusy(false);
+    const response = await invokeWhileBusy(() => window.videoTool.deleteProject({ projectId: project.id }), 'The project could not be deleted.');
+    if (response === null) return;
     if (response.ok) {
       setLoadedProject(null);
       setSelectedAssetId('');
@@ -191,7 +215,7 @@ export function useTimelineEditor() {
       return;
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
-  }, [project, refreshProjects, setLoadedProject]);
+  }, [invokeWhileBusy, project, refreshProjects, setLoadedProject]);
 
   const { importAssets, importRecordingResult, importAiResult } = useProjectAssetImports({ project, setIsBusy, setProject, setSelectedAssetId, setStatusMessage });
 
@@ -283,6 +307,35 @@ export function useTimelineEditor() {
     [replaceTimeline]
   );
 
+  const applyTitleStyleToAutomaticCaptions = useCallback(
+    (sourceTitleId: string) => {
+      replaceTimeline(
+        (timeline) => applyTitleAppearanceToAutomaticCaptions(timeline, sourceTitleId),
+        'Applied the title appearance to every automatic caption.',
+        'There are no automatic captions to style.'
+      );
+    },
+    [replaceTimeline]
+  );
+
+  const applyNarrationSubtitles = useCallback((plan: NarrationPlan): boolean => {
+    if (project === null) return false;
+    try {
+      return replaceTimeline(() => applySubtitleCues(project.timeline, plan), `Applied ${plan.cues.length} reviewed subtitle cue(s).`) !== null;
+    } catch {
+      return false;
+    }
+  }, [project, replaceTimeline]);
+
+  const applyTranscriptionSubtitles = useCallback((draft: TranscriptionDraft): boolean => {
+    if (project === null) return false;
+    try {
+      return replaceTimeline(() => applyTranscriptionCues(project.timeline, draft), `Applied ${draft.cues.length} reviewed transcript cue(s).`) !== null;
+    } catch {
+      return false;
+    }
+  }, [project, replaceTimeline]);
+
   /** The title under the playhead, which is the one an inspector should be showing. */
   const titleAtPlayhead = useMemo(
     () => (project === null ? null : titleAt(project.timeline, playback.playheadMs)),
@@ -290,7 +343,7 @@ export function useTimelineEditor() {
   );
 
   const placeSelectedAsset = useCallback(() => {
-    if (project === null || selectedAsset === null || selectedAsset.metadata === null) return;
+    if (project === null || selectedAsset === null || !mediaAssetReady(selectedAsset)) return;
     const track = findFirstCompatibleTrack(project.timeline, selectedAsset.kind);
     if (track === null) return;
     const placement = placeReadyAssetOnTimeline(project.timeline, selectedAsset, track.id, createOpaqueId('clip'), insertionStartForTrack(track));
@@ -300,6 +353,57 @@ export function useTimelineEditor() {
     playback.setPlayheadMs(placement.playheadMs, timeline);
     setSelectedClipId(placement.clip.id);
   }, [playback, project, replaceTimeline, selectedAsset]);
+
+  const placeAssetOnTimeline = useCallback((assetId: string): boolean => {
+    if (project === null) return false;
+    const asset = project.assets.find((candidate) => candidate.id === assetId);
+    if (asset === undefined || !mediaAssetReady(asset)) return false;
+    const track = findFirstCompatibleTrack(project.timeline, asset.kind);
+    if (track === null) return false;
+    const placement = placeReadyAssetOnTimeline(project.timeline, asset, track.id, createOpaqueId('clip'), insertionStartForTrack(track));
+    if (placement === null) return false;
+    const timeline = replaceTimeline(() => placement.timeline, `Placed approved candidate ${asset.displayName} on ${track.name}.`);
+    if (timeline === null) return false;
+    playback.setPlayheadMs(placement.playheadMs, timeline);
+    setSelectedAssetId(asset.id);
+    setSelectedClipId(placement.clip.id);
+    return true;
+  }, [playback, project, replaceTimeline]);
+
+  const assembleApprovedWriterShots = useCallback((): boolean => {
+    if (project === null) return false;
+    const plan = buildApprovedProductionAssemblyPlan(project.ai, project.assets.map((asset) => ({
+      id: asset.id,
+      kind: asset.kind,
+      durationMs: asset.metadata?.durationMs ?? null
+    })));
+    if (!plan.ok) {
+      setStatusMessage({ tone: 'warning', text: plan.reason });
+      return false;
+    }
+    const target = project.timeline.tracks.find((track) => track.kind === 'video');
+    if (target === undefined) {
+      setStatusMessage({ tone: 'warning', text: 'Add a video track before assembling the approved production cut.' });
+      return false;
+    }
+    const assembled = assembleApprovedProductionCut({
+      timeline: project.timeline,
+      plan,
+      targetTrackId: target.id,
+      clipIdForShot: () => createOpaqueId('production-clip')
+    });
+    if (!assembled.ok) {
+      setStatusMessage({ tone: 'warning', text: assembled.reason });
+      return false;
+    }
+    const timeline = replaceTimeline(
+      () => assembled.timeline,
+      `Assembled ${plan.shots.length} approved Writer shot(s) in production order.`
+    );
+    if (timeline === null) return false;
+    playback.setPlayheadMs(Math.max(0, timelineDurationMs(timeline) - plan.totalDurationMs), timeline);
+    return true;
+  }, [playback, project, replaceTimeline]);
 
   const placeAssetOnTrack = useCallback((assetId: string, trackId: string, timelineStartMs: number) => {
     if (project === null) return;
@@ -464,6 +568,67 @@ export function useTimelineEditor() {
     );
   }, [replaceTimeline, selectedClip]);
 
+  const detachSelectedClipAudio = useCallback(async (): Promise<void> => {
+    const sourceProject = projectRef.current;
+    const sourceSelection = selectedClip;
+    if (sourceProject === null || sourceSelection?.asset?.kind !== 'video') return;
+
+    setStatusMessage({ tone: 'neutral', text: 'Extracting the selected video audio with FFmpeg…' });
+    const response = await invokeWhileBusy(() => window.videoTool.detachVideoAudio({
+      projectId: sourceProject.id,
+      assetId: sourceSelection.asset!.id
+    }), 'The video audio extraction request failed.');
+    if (response === null) return;
+    if (!response.ok) {
+      setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
+      return;
+    }
+
+    const current = projectRef.current;
+    if (current === null || current.id !== sourceProject.id) {
+      setStatusMessage({
+        tone: 'warning',
+        text: 'Audio was extracted into the project library, but the project changed before it could be placed.'
+      });
+      return;
+    }
+    const transaction = detachVideoAudioOnTimeline(current.timeline, {
+      sourceClipId: sourceSelection.clip.id,
+      audioAsset: response.value.asset,
+      audioClipId: createOpaqueId('detached-audio'),
+      fallbackAudioTrackId: createOpaqueId('audio-track'),
+      fallbackAudioTrackName: nextTrackName(current.timeline, 'audio')
+    });
+    const assets = current.assets.some((asset) => asset.id === response.value.asset.id)
+      ? current.assets
+      : [...current.assets, response.value.asset];
+    if (transaction === null) {
+      setProject({ ...current, assets });
+      setSelectedAssetId(response.value.asset.id);
+      setStatusMessage({
+        tone: 'warning',
+        text: 'Audio was extracted into the project library, but its synchronized timeline placement was rejected.'
+      });
+      return;
+    }
+
+    const nextProject = { ...current, assets, timeline: transaction.timeline };
+    projectRef.current = nextProject;
+    setProject(nextProject);
+    setTimelineHistory((history) => history === null
+      ? createTimelineHistory(transaction.timeline)
+      : pushTimelineHistory(history, transaction.timeline));
+    playback.clampToTimeline(transaction.timeline);
+    setSelectedAssetId(response.value.asset.id);
+    setSelectedClipId(transaction.audioClip.id);
+    setSelectedClipIds([transaction.audioClip.id]);
+    setHasUnsavedTimeline(true);
+    setStatusMessage({
+      tone: 'success',
+      text: `Detached audio to ${transaction.audioTrackId}. The source video clip is muted to prevent duplicate sound.`
+    });
+  }, [invokeWhileBusy, playback, selectedClip]);
+
   const undoTimeline = useCallback(() => {
     if (timelineHistory === null) return;
     const next = undoTimelineHistory(timelineHistory);
@@ -546,29 +711,56 @@ export function useTimelineEditor() {
     return true;
   }, [project, refreshProjects]);
 
-  const saveTimeline = useCallback(async () => {
-    if (project === null) return;
-    setIsBusy(true);
-    const response = await window.videoTool.saveTimeline({ projectId: project.id, timeline: project.timeline });
-    setIsBusy(false);
+  const saveTimeline = useCallback(async (): Promise<boolean> => {
+    if (project === null) return false;
+    const response = await invokeWhileBusy(
+      () => window.videoTool.saveTimeline({ projectId: project.id, timeline: project.timeline }),
+      'The timeline could not be saved.'
+    );
+    if (response === null) return false;
     if (response.ok) {
       setLoadedProject(response.value);
       setHasUnsavedTimeline(false);
       setStatusMessage({ tone: 'success', text: 'Timeline saved locally.' });
-      return;
+      return true;
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
-  }, [project, setLoadedProject]);
+    return false;
+  }, [invokeWhileBusy, project, setLoadedProject]);
+
+  const saveAiProjectDocument = useCallback(async (ai: AiProjectDocument): Promise<boolean> => {
+    if (project === null) return false;
+    const response = await window.videoTool.saveAiProjectDocument({ projectId: project.id, ai });
+    if (!response.ok) {
+      setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
+      return false;
+    }
+    // Saving a script must not replace unsaved in-memory timeline edits with
+    // the older timeline snapshot that happened to be on disk.
+    setProject((current) => current === null || current.id !== response.value.id ? current : {
+      ...current,
+      // Other main-process AI actions (for example, continuity-frame
+      // extraction) may have added a project asset immediately before this AI
+      // document save. Keep unsaved timeline edits, but accept the authoritative
+      // asset library from the same project snapshot.
+      assets: response.value.assets,
+      ai: response.value.ai,
+      updatedAt: response.value.updatedAt
+    });
+    await refreshProjects();
+    setStatusMessage({ tone: 'success', text: 'AI project data saved locally.' });
+    return true;
+  }, [project, refreshProjects]);
 
   return {
     addTimelineTrack, removeTimelineTrack, renameTimelineTrack, insertTimelineTrack, createProject, deleteCurrentProject, deleteSelectedClip, duplicateSelectedClip, hasUnsavedTimeline, importAssets,
     importRecordingResult, importAiResult, isBusy, metadataProbeFailuresByAssetId, metadataProbeRetryRevisionsByAssetId, moveSelectedClip, newProjectName,
     cutAtPlayhead, transitionAtPlayhead, setTransitionAtPlayhead, removeTransitionAtPlayhead,
-    addTitleAtPlayhead, editTitle, deleteTitle, titleAtPlayhead,
-    openProject, openProjectFolder, renameProject, placeSelectedAsset, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline,
+    addTitleAtPlayhead, editTitle, deleteTitle, applyTitleStyleToAutomaticCaptions, titleAtPlayhead, applyNarrationSubtitles, applyTranscriptionSubtitles,
+    openProject, openProjectFolder, renameProject, placeSelectedAsset, placeAssetOnTimeline, assembleApprovedWriterShots, project, projects, refreshProjects, reportMetadataProbeFailure, retryAssetMetadataProbe, saveTimeline, saveAiProjectDocument,
     clearSelection, goToTimelineEnd, goToTimelineStart, selectAllClips, selectedAsset, selectedAssetId, selectedClip, selectedClipId, selectedClipIds,
     setNewProjectName, setSelectedAssetId, setSelectedClipId: selectClip,
-    splitSelectedClip, statusMessage, trimSelectedClip, updateAssetMetadata, updateSelectedClipEffects,
+    splitSelectedClip, statusMessage, trimSelectedClip, updateAssetMetadata, updateSelectedClipEffects, detachSelectedClipAudio,
     activePlaybackClip: playback.activePlaybackClip, canRedoTimeline: (timelineHistory?.future.length ?? 0) > 0,
     canUndoTimeline: (timelineHistory?.past.length ?? 0) > 0, isPlaying: playback.isPlaying, moveClipToTrack,
     placeAssetOnTrack, playheadMs: playback.playheadMs, redoTimeline, setIsPlaying: playback.setIsPlaying,

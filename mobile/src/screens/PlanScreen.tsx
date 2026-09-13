@@ -1,23 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { planVideoStoryboard, supportedShotSeconds, CONTINUITY_KEYS } from '@openvideo/shared/videoStoryboardPlan';
 import { composeShotPrompt, refineShotPrompt, revisionsOf, takeLabel } from '@openvideo/shared/shotPrompt';
-import { getDomainModels } from '@openvideo/shared/aiDomainModels';
+import { getDomainModels, isDomainModelAvailableOnRuntime } from '@openvideo/shared/aiDomainModels';
+import { approvedWriterShots } from '@openvideo/shared/writerPipeline';
+import {
+  CONTINUITY_REVIEW_FIELDS,
+  type ContinuityReview,
+  type ContinuityReviewField,
+  type ContinuityReviewValue
+} from '@openvideo/shared/aiProjectDomain';
+import { candidateApprovalBlockReason, emptyContinuityReview } from '@openvideo/shared/generationReview';
+import { activeStyleReference, productionShotRows } from '@openvideo/shared/productionWorkflow';
+import { getVideoOperationConstraints, isVideoOperationImplemented, type VideoOperation } from '@openvideo/shared/mediaCapabilityRegistry';
 import { ModelSelect } from '../components/ModelSelect';
 import { supportsReferenceImage, type VideoAspectRatio, type VideoProgressStage } from '@openvideo/shared/videoGeneration';
 import { isFrameExtractionAvailable } from '../../modules/video-export';
 import { readProviderConnections } from '../lib/mediaProviders';
 import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { generateShot } from '../lib/videoGeneration';
-import { appendAssetToTimeline, clipIdForAsset, readProject, replaceTakeInTimeline } from '../lib/projectStore';
+import { appendAssetToTimeline, assembleApprovedWriterShots, assetUri, clipIdForAsset, readProject, replaceTakeInTimeline, saveGeneratedVideoCandidate, type MobileAsset } from '../lib/projectStore';
 import { SpendPrompt } from '../components/SpendPrompt';
 import { FormScreen } from '../components/FormScreen';
 import { useRevealOnFocus } from '../components/KeyboardAwareScroll';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
-
-const RATIOS: readonly VideoAspectRatio[] = ['16:9', '9:16', '1:1'];
 
 /** Per-shot state, so a failure names the shot that failed. */
 type ShotState =
@@ -36,12 +46,36 @@ type ShotState =
 type ShotTake = {
   readonly prompt: string;
   readonly takeNumber: number;
+  readonly assetId: string;
+  readonly decision: 'pending' | 'approved' | 'rejected';
+  readonly continuityReview: ContinuityReview;
+  readonly reviewNotes: string;
   readonly clipId?: string;
+  readonly operation?: VideoOperation;
   /** The frame this shot started from, so a redo continues from the same place. */
   readonly startFrame?: { readonly base64: string; readonly mimeType: string };
+  readonly lastFrame?: { readonly base64: string; readonly mimeType: string };
+  readonly referenceImages?: readonly { readonly base64: string; readonly mimeType: string }[];
 };
 
+const REVIEW_LABELS: Readonly<Record<ContinuityReviewField, string>> = {
+  identity: 'Identity',
+  wardrobeProps: 'Wardrobe / props',
+  settingPalette: 'Setting / palette',
+  motionDirection: 'Motion direction',
+  boundaryMatch: 'Start / end boundary'
+};
+const REVIEW_VALUES: readonly Exclude<ContinuityReviewValue, 'unchecked'>[] = ['pass', 'warning', 'fail'];
+
 const LENGTHS = [8, 16, 30, 45, 60] as const;
+const INPUT_MODES: readonly { readonly id: VideoOperation; readonly label: string }[] = [
+  { id: 'text_to_video', label: 'Text' },
+  { id: 'image_to_video', label: 'First frame' },
+  { id: 'start_end', label: 'Start-End' },
+  { id: 'reference_to_video', label: 'References' },
+  { id: 'motion_control', label: 'Motion · desktop' }
+];
+type PickedReference = { readonly displayName: string; readonly base64: string; readonly mimeType: string };
 
 export function PlanScreen({
   topInset,
@@ -58,9 +92,15 @@ export function PlanScreen({
 }) {
   const catalog = getDomainModels('video-generation');
   const [totalSeconds, setTotalSeconds] = useState<number>(30);
-  const [modelId, setModelId] = useState<string>(() => catalog.find((entry) => entry.available)?.id ?? '');
+  const [modelId, setModelId] = useState<string>(() => catalog.find((entry) => isDomainModelAvailableOnRuntime(entry, 'mobile'))?.id ?? '');
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
   const [prompt, setPrompt] = useState('');
+  const [writerMessage, setWriterMessage] = useState('');
+  const activeProject = projectId === null ? null : readProject(projectId);
+  const writerShots = approvedWriterShots(activeProject?.ai);
+  const productionRows = productionShotRows(activeProject?.ai);
+  const styleReference = activeProject === null || activeProject === undefined ? undefined : activeStyleReference(activeProject.ai);
+  const styleReferenceAsset = activeProject?.assets.find((asset) => asset.id === styleReference?.assetId);
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>('16:9');
   const [shotStates, setShotStates] = useState<readonly ShotState[]>([]);
   // Keyed by shot index, because the plan can change under them and an array
@@ -72,6 +112,10 @@ export function PlanScreen({
   const [redoing, setRedoing] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
   const [continuity, setContinuity] = useState(true);
+  const [operation, setOperation] = useState<VideoOperation>('text_to_video');
+  const [firstFrame, setFirstFrame] = useState<PickedReference | null>(null);
+  const [lastFrame, setLastFrame] = useState<PickedReference | null>(null);
+  const [assetReferences, setAssetReferences] = useState<readonly PickedReference[]>([]);
   const [asking, setAsking] = useState(false);
   const permissions = useSpendPermissions();
   const reveal = useRevealOnFocus();
@@ -85,10 +129,20 @@ export function PlanScreen({
   useEffect(refreshConnections, [refreshConnections, connectionsVersion]);
 
   const model = catalog.find((entry) => entry.id === modelId) ?? catalog[0];
+  const operationConstraints = getVideoOperationConstraints(model.id, operation)
+    ?? getVideoOperationConstraints(model.id, 'text_to_video');
+  const aspectRatioOptions = operationConstraints?.aspectRatios ?? ['16:9'];
+  const effectiveAspectRatio: VideoAspectRatio = aspectRatioOptions.includes(aspectRatio)
+    ? aspectRatio
+    : aspectRatioOptions[0] ?? '16:9';
   const plan = useMemo(
-    () => planVideoStoryboard({ totalSeconds, providerId: model.providerId }),
-    [totalSeconds, model.providerId]
+    () => planVideoStoryboard({ totalSeconds, providerId: model.providerId, modelId: model.id }),
+    [totalSeconds, model.id, model.providerId]
   );
+
+  useEffect(() => {
+    if (!isVideoOperationImplemented(model.id, operation)) setOperation('text_to_video');
+  }, [model.id, operation]);
 
   // Changing anything about the plan clears the last run's results. Leaving them
   // on screen next to a different plan and a different price would misreport
@@ -100,6 +154,27 @@ export function PlanScreen({
     setTakes({});
     setNoteFor(null);
     next();
+  };
+
+  const pickReference = async (target: 'first' | 'last' | 'asset'): Promise<void> => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setWriterMessage('Photo-library permission is required to choose a video reference.');
+      return;
+    }
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'], allowsMultipleSelection: false, quality: 1, base64: true
+    });
+    const file = picked.assets?.[0];
+    if (picked.canceled || file === undefined || !file.base64) return;
+    const image: PickedReference = {
+      displayName: file.fileName ?? `reference-${Date.now()}.jpg`,
+      base64: file.base64,
+      mimeType: file.mimeType ?? 'image/jpeg'
+    };
+    if (target === 'first') setFirstFrame(image);
+    else if (target === 'last') setLastFrame(image);
+    else setAssetReferences((current) => current.length >= 3 ? current : [...current, image]);
   };
 
   /**
@@ -132,15 +207,24 @@ export function PlanScreen({
         ...(descriptions[shot.index]?.trim() ? { description: descriptions[shot.index]!.trim() } : {}),
         continuity: plan.shots.length === 1 ? 'none' : carriedFrame === undefined ? 'restate' : 'from-frame'
       });
-      const startFrame = carriedFrame;
+      const firstShotFrame = index === 0 && (operation === 'image_to_video' || operation === 'start_end')
+        ? firstFrame ?? undefined
+        : carriedFrame;
+      const startFrame = firstShotFrame;
+      const shotOperation: VideoOperation = carriedFrame !== undefined
+        ? 'image_to_video'
+        : index === 0 ? operation : 'text_to_video';
 
       const result = await generateShot({
         projectId,
         modelId: model.id,
         prompt: shotPrompt,
-        aspectRatio,
+        aspectRatio: effectiveAspectRatio,
         durationSeconds: shot.durationSeconds,
-        ...(carriedFrame === undefined ? {} : { referenceImage: carriedFrame }),
+        operation: shotOperation,
+        ...(firstShotFrame === undefined ? {} : { referenceImage: firstShotFrame }),
+        ...(operation === 'start_end' && lastFrame !== null ? { lastFrame } : {}),
+        ...(operation === 'reference_to_video' ? { referenceImages: assetReferences } : {}),
         onProgress: (stage) => mark({ kind: 'running', stage })
       });
 
@@ -158,11 +242,7 @@ export function PlanScreen({
         mark({ kind: 'failed', message: 'The project could not be read to save this shot.' });
         break;
       }
-      const placed = appendAssetToTimeline(project, result.asset);
-      if (placed === null) {
-        mark({ kind: 'failed', message: 'The clip was generated but no video track would take it.' });
-        continue;
-      }
+      saveGeneratedVideoCandidate(project, result.asset);
       // Kept so this shot can be asked for again with a change: the prompt to
       // build on, the clip the next take stands in for, and the frame this one
       // started from.
@@ -171,10 +251,14 @@ export function PlanScreen({
         [shot.index]: {
           prompt: shotPrompt,
           takeNumber: 1,
-          ...(clipIdForAsset(placed, result.asset.id) === null
-            ? {}
-            : { clipId: clipIdForAsset(placed, result.asset.id) as string }),
-          ...(startFrame === undefined ? {} : { startFrame })
+          assetId: result.asset.id,
+          decision: 'pending',
+          continuityReview: emptyContinuityReview(),
+          reviewNotes: '',
+          operation: shotOperation,
+          ...(startFrame === undefined ? {} : { startFrame }),
+          ...(shotOperation === 'start_end' && lastFrame !== null ? { lastFrame } : {}),
+          ...(shotOperation === 'reference_to_video' ? { referenceImages: assetReferences } : {})
         }
       }));
       mark({ kind: 'done' });
@@ -212,11 +296,14 @@ export function PlanScreen({
       projectId,
       modelId: model.id,
       prompt: refined.prompt,
-      aspectRatio,
+      aspectRatio: effectiveAspectRatio,
       durationSeconds: shot.durationSeconds,
+      operation: take.operation ?? (take.startFrame === undefined ? 'text_to_video' : 'image_to_video'),
       // The same frame this shot started from, so a redo continues from where
       // the one before it left off rather than from nothing.
       ...(take.startFrame === undefined ? {} : { referenceImage: take.startFrame }),
+      ...(take.lastFrame === undefined ? {} : { lastFrame: take.lastFrame }),
+      ...(take.referenceImages === undefined ? {} : { referenceImages: take.referenceImages }),
       onProgress: (stage) => mark({ kind: 'running', stage })
     });
     setRedoing(null);
@@ -232,22 +319,9 @@ export function PlanScreen({
       return;
     }
 
-    /*
-      Standing in for the previous take where there is one to stand in for.
-
-      Without a clip to replace — the first take failed, or its clip has since
-      been deleted — the new take is appended instead. Appending is the honest
-      fallback: the take exists and was paid for, so it belongs in the project
-      even when the editor cannot say exactly where.
-    */
-    const placed =
-      take.clipId === undefined
-        ? appendAssetToTimeline(project, result.asset)
-        : replaceTakeInTimeline(project, take.clipId, result.asset) ?? appendAssetToTimeline(project, result.asset);
-    if (placed === null) {
-      mark({ kind: 'failed', message: 'The take was generated but no video track would take it.' });
-      return;
-    }
+    // Keep the new take in the library. The existing approved clip stays on the
+    // timeline until this candidate passes review and the user approves it.
+    saveGeneratedVideoCandidate(project, result.asset);
 
     setTakes((current) => ({
       ...current,
@@ -255,12 +329,57 @@ export function PlanScreen({
         ...take,
         prompt: refined.prompt,
         takeNumber: take.takeNumber + 1,
-        ...(take.clipId === undefined && clipIdForAsset(placed, result.asset.id) !== null
-          ? { clipId: clipIdForAsset(placed, result.asset.id) as string }
-          : {})
+        assetId: result.asset.id,
+        decision: 'pending',
+        continuityReview: emptyContinuityReview(),
+        reviewNotes: ''
       }
     }));
     mark({ kind: 'done' });
+  };
+
+  const reviewTake = (index: number, field: ContinuityReviewField, value: ContinuityReviewValue): void => {
+    setTakes((current) => {
+      const take = current[index];
+      return take === undefined ? current : {
+        ...current,
+        [index]: { ...take, decision: 'pending', continuityReview: { ...take.continuityReview, [field]: value } }
+      };
+    });
+  };
+
+  const approveTake = (index: number): void => {
+    const take = takes[index];
+    if (projectId === null || take === undefined) return;
+    const blocked = candidateApprovalBlockReason({
+      status: 'completed',
+      outputAssetIds: [take.assetId],
+      review: { decision: take.decision, continuity: take.continuityReview, notes: take.reviewNotes }
+    });
+    if (blocked !== null) {
+      setShotStates((current) => current.map((entry, position) => position === index - 1 ? { kind: 'failed', message: blocked } : entry));
+      return;
+    }
+    const project = readProject(projectId);
+    const asset = project?.assets.find((entry) => entry.id === take.assetId);
+    if (project === null || asset === undefined) {
+      setWriterMessage('This candidate is no longer available in the project library.');
+      return;
+    }
+    const placed = take.clipId === undefined
+      ? appendAssetToTimeline(project, asset)
+      : replaceTakeInTimeline(project, take.clipId, asset) ?? appendAssetToTimeline(project, asset);
+    if (placed === null) {
+      setWriterMessage('The candidate is safe in the library, but no video track could accept it.');
+      return;
+    }
+    const clipId = take.clipId ?? clipIdForAsset(placed, asset.id) ?? undefined;
+    setTakes((current) => ({
+      ...current,
+      [index]: { ...take, decision: 'approved', ...(clipId === undefined ? {} : { clipId }) }
+    }));
+    setWriterMessage(`Take ${take.takeNumber} approved and placed on the timeline.`);
+    setShotStates((current) => current.map((entry, position) => position === index - 1 ? { kind: 'done' } : entry));
   };
 
   const start = (): void => {
@@ -290,16 +409,56 @@ export function PlanScreen({
    * user already made when they chose the model and the length.
    */
   /** Chaining needs both a provider that accepts a frame and a build that can read one. */
-  const continuityPossible = isFrameExtractionAvailable && supportsReferenceImage(model?.providerId ?? '');
+  const continuityPossible = operation !== 'reference_to_video' && operation !== 'start_end'
+    && isFrameExtractionAvailable && supportsReferenceImage(model?.id ?? '');
 
   const runLine = `${plan.shots.length} shot${plan.shots.length === 1 ? '' : 's'} · ${plan.totalSeconds}s`;
   const canGenerate =
-    projectId !== null && !running && prompt.trim().length > 0 && connected[model?.providerId ?? ''] === true;
+    projectId !== null && !running && prompt.trim().length > 0 && connected[model?.providerId ?? ''] === true
+    && isVideoOperationImplemented(model.id, operation)
+    && (operation !== 'image_to_video' || firstFrame !== null)
+    && (operation !== 'start_end' || (plan.shots.length === 1 && firstFrame !== null && lastFrame !== null))
+    && (operation !== 'reference_to_video' || (plan.shots.length === 1 && assetReferences.length > 0));
 
   return (
     <FormScreen topInset={topInset} keyboardOffset={keyboardOffset}>
+      {productionRows.length > 0 && <View style={styles.reviewCard}>
+        <Text style={styles.label}>Storyboard production board</Text>
+        <Text style={styles.body}>{productionRows.filter((row) => row.state === 'approved').length}/{productionRows.length} Writer shots approved. Opening and generation remain manual.</Text>
+        <Text style={styles.body}>World/style reference: {styleReferenceAsset?.displayName ?? styleReference?.label ?? 'Not assigned'}</Text>
+        {productionRows.map((row, index) => <View style={styles.shot} key={row.shotId}>
+          <Text style={styles.shotIndex}>{String(index + 1).padStart(2, '0')}</Text>
+          <Text style={styles.shotBody}>{row.label}</Text>
+          <Text style={styles.shotLen}>{row.state.replace('_', ' ')}</Text>
+        </View>)}
+        <Pressable accessibilityRole="button" disabled={running || activeProject === null}
+          onPress={() => {
+            if (activeProject === null) return;
+            const result = assembleApprovedWriterShots(activeProject);
+            setWriterMessage(result.ok
+              ? `Placed ${productionRows.length} approved shots on the timeline in Writer order.`
+              : result.reason);
+          }} style={press([styles.approve, (running || activeProject === null) && styles.approveOff])}>
+          <Text style={styles.approveText}>Assemble approved Writer cut</Text>
+        </Pressable>
+        <Text style={styles.footnote}>Assigning the world/style image and imported storyboard or character images is currently done in the desktop production board; mobile reads the same saved mapping and assembly rules. Batch image/video generation and signed-in browser automation remain desktop-only, so this screen never starts a hidden queue or silently charges a provider.</Text>
+      </View>}
+      {writerShots.length > 0 && <View>
+        <Text style={styles.label}>Approved Writer shots — choose one to load, not generate</Text>
+        {writerShots.map((shot) => <Pressable key={shot.id} accessibilityRole="button" disabled={running || redoing !== null || asking}
+          style={press({ minHeight: MIN_TAP, padding: 10 })} onPress={() => {
+            if (!supportedShotSeconds(model.id).includes(shot.durationSeconds)) {
+              setWriterMessage(`This shot needs ${shot.durationSeconds}s; the model accepts ${supportedShotSeconds(model.id).join('/')}s. Choose a compatible model or revise the Writer shot.`);
+              return;
+            }
+            setPlan(() => { setPrompt(shot.prompt); setTotalSeconds(shot.durationSeconds); setDescriptions({}); });
+            setWriterMessage('Shot loaded, not generated. Review the prompt, references and spend confirmation before rendering.');
+          }}><Text style={{ color: theme.text }}>{shot.label}</Text></Pressable>)}
+        {!!writerMessage && <Text style={{ color: theme.textWeak }}>{writerMessage}</Text>}
+      </View>}
       <Text style={styles.h1}>Plan a video</Text>
       <Text style={styles.sub}>Shot lengths and prices come from the same modules the desktop app uses.</Text>
+      <Text style={styles.body}>Signed-in Google Flow video automation is desktop-only. Grok Imagine browser automation is desktop-only too. Login, CAPTCHA, verification, and account-limit states must be resolved on desktop; mobile continues to use supported official API-key routes.</Text>
 
       <Text style={styles.label}>Model</Text>
       <ModelSelect
@@ -309,6 +468,39 @@ export function PlanScreen({
         onSelect={(next) => setPlan(() => setModelId(next.id))}
         onConnectionChange={refreshConnections}
       />
+
+      <Text style={styles.label}>Input mode</Text>
+      <View style={styles.row}>
+        {INPUT_MODES.map((mode) => (
+          <Chip key={mode.id} label={mode.label} selected={operation === mode.id}
+            disabled={mode.id === 'motion_control' || !isVideoOperationImplemented(model.id, mode.id)}
+            onPress={() => setPlan(() => {
+              setOperation(mode.id);
+              if (mode.id === 'reference_to_video' || mode.id === 'start_end') setContinuity(false);
+            })} />
+        ))}
+      </View>
+      <Text style={styles.body}>Motion Control remains visible here but runs only in the desktop app, where OpenScene can safely read project video files and reach your user-managed ComfyUI worker.</Text>
+      {(operation === 'start_end' || operation === 'reference_to_video') && totalSeconds !== 8 && (
+        <Text style={styles.warn}>Choose 8s for this manual advanced-input render. It runs as one reviewed shot.</Text>
+      )}
+
+      {(operation === 'image_to_video' || operation === 'start_end') && <View>
+        <Text style={styles.label}>First frame</Text>
+        <ReferenceRow value={firstFrame} empty="Required before generation." onPick={() => void pickReference('first')} onRemove={() => setFirstFrame(null)} />
+      </View>}
+      {operation === 'start_end' && <View>
+        <Text style={styles.label}>Last frame</Text>
+        <ReferenceRow value={lastFrame} empty="Required. Veo creates the movement between both frames." onPick={() => void pickReference('last')} onRemove={() => setLastFrame(null)} />
+      </View>}
+      {operation === 'reference_to_video' && <View>
+        <Text style={styles.label}>Character / product references ({assetReferences.length}/3)</Text>
+        {assetReferences.map((image, index) => <ReferenceRow key={`${image.displayName}-${index}`} value={image}
+          empty="" onPick={() => undefined}
+          onRemove={() => setAssetReferences((current) => current.filter((_, position) => position !== index))} />)}
+        {assetReferences.length < 3 && <ReferenceRow value={null} empty="Add 1-3 reviewed images. Nothing is attached automatically."
+          onPick={() => void pickReference('asset')} onRemove={() => undefined} />}
+      </View>}
 
       <Text style={styles.label}>Length</Text>
       <View style={styles.row}>
@@ -324,8 +516,13 @@ export function PlanScreen({
 
       <Text style={styles.label}>Aspect ratio</Text>
       <View style={styles.row}>
-        {RATIOS.map((ratio) => (
-          <Chip key={ratio} label={ratio} selected={ratio === aspectRatio} onPress={() => setPlan(() => setAspectRatio(ratio))} />
+        {aspectRatioOptions.map((ratio) => (
+          <Chip
+            key={ratio}
+            label={ratio}
+            selected={ratio === effectiveAspectRatio}
+            onPress={() => setPlan(() => setAspectRatio(ratio))}
+          />
         ))}
       </View>
 
@@ -344,7 +541,9 @@ export function PlanScreen({
           </Pressable>
           {!continuityPossible && (
             <Text style={styles.body}>
-              {supportsReferenceImage(model?.providerId ?? '')
+              {operation === 'start_end' || operation === 'reference_to_video'
+                ? 'This advanced mode is one reviewed shot. Choose 8s; use First frame for a longer chained storyboard.'
+                : supportsReferenceImage(model?.id ?? '')
                 ? 'This build cannot read a frame out of a clip — rebuild the development client to chain shots.'
                 : `${model?.providerLabel} cannot start from a supplied frame, so shots are generated independently.`}
             </Text>
@@ -367,10 +566,11 @@ export function PlanScreen({
 
       <Text style={styles.label}>
         {plan.shots.length} shot{plan.shots.length === 1 ? '' : 's'} · accepts{' '}
-        {supportedShotSeconds(model.providerId).join('/')}s
+        {supportedShotSeconds(model.id).join('/')}s
       </Text>
       {plan.shots.map((shot) => {
         const take = takes[shot.index];
+        const candidateAsset = take === undefined ? undefined : activeProject?.assets.find((asset) => asset.id === take.assetId);
         const revisions = take === undefined ? [] : revisionsOf(take.prompt);
         return (
           <View key={shot.index}>
@@ -398,7 +598,7 @@ export function PlanScreen({
             {take !== undefined && (
               <View style={styles.takeRow}>
                 <Text style={styles.takeLabel}>
-                  {takeLabel(take.takeNumber)}
+                  {takeLabel(take.takeNumber)} · {take.decision}
                   {revisions.length > 0 ? ` · ${revisions.length} change${revisions.length === 1 ? '' : 's'}` : ''}
                 </Text>
                 <Pressable
@@ -412,6 +612,47 @@ export function PlanScreen({
                 >
                   <Text style={styles.redoText}>{redoing === shot.index ? 'Redoing…' : 'Redo with a note'}</Text>
                 </Pressable>
+              </View>
+            )}
+
+            {take !== undefined && (
+              <View style={styles.reviewCard}>
+                <Text style={styles.label}>Continuity review</Text>
+                {candidateAsset !== undefined && projectId !== null && <CandidateVideo key={candidateAsset.id} projectId={projectId} asset={candidateAsset} />}
+                {CONTINUITY_REVIEW_FIELDS.map((field) => (
+                  <View key={field}>
+                    <Text style={styles.body}>{REVIEW_LABELS[field]}</Text>
+                    <View style={styles.row}>
+                      {REVIEW_VALUES.map((value) => <Chip key={value} label={value}
+                        selected={take.continuityReview[field] === value}
+                        onPress={() => reviewTake(shot.index, field, value)} />)}
+                    </View>
+                  </View>
+                ))}
+                <TextInput
+                  style={styles.shotInput}
+                  value={take.reviewNotes}
+                  onChangeText={(value) => setTakes((current) => ({
+                    ...current,
+                    [shot.index]: { ...take, decision: 'pending', reviewNotes: value }
+                  }))}
+                  placeholder="Review notes; required if you accept a warning"
+                  placeholderTextColor={theme.textWeaker}
+                  multiline
+                  accessibilityLabel={`Review notes for shot ${shot.index}`}
+                />
+                <View style={styles.row}>
+                  <Pressable accessibilityRole="button" disabled={take.decision === 'approved'}
+                    onPress={() => approveTake(shot.index)}
+                    style={press([styles.approve, take.decision === 'approved' && styles.approveOff])}>
+                    <Text style={styles.approveText}>{take.decision === 'approved' ? 'Approved on timeline' : 'Approve to timeline'}</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" disabled={take.decision === 'rejected'}
+                    onPress={() => setTakes((current) => ({ ...current, [shot.index]: { ...take, decision: 'rejected' } }))}
+                    style={press([styles.redo, take.decision === 'rejected' && styles.approveOff])}>
+                    <Text style={styles.redoText}>Reject candidate</Text>
+                  </Pressable>
+                </View>
               </View>
             )}
 
@@ -481,9 +722,10 @@ export function PlanScreen({
         )}
         {shotStates.some((state) => state.kind === 'done') && (
           <Text style={styles.footnote}>
-            Finished shots are appended to the project&apos;s video track — open Edit to see them.
+            Finished candidates are saved in the project library. Review each one above; only an approved take changes the timeline.
           </Text>
         )}
+        <Text style={styles.footnote}>If the phone closes during a provider request, it is never submitted again automatically. Only a returned result saved into the project is treated as completed.</Text>
       </View>
 
       <SpendPrompt
@@ -514,13 +756,36 @@ function ShotStatus({ state }: { readonly state: ShotState }) {
   );
 }
 
-function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+function ReferenceRow({ value, empty, onPick, onRemove }: {
+  readonly value: PickedReference | null;
+  readonly empty: string;
+  readonly onPick: () => void;
+  readonly onRemove: () => void;
+}) {
+  return <View style={styles.referenceRow}>
+    {value !== null && <Image style={styles.referencePreview}
+      source={{ uri: `data:${value.mimeType};base64,${value.base64}` }}
+      accessibilityLabel={`Reference image ${value.displayName}`} />}
+    <Text style={styles.referenceName}>{value?.displayName ?? empty}</Text>
+    <Pressable accessibilityRole="button" onPress={value === null ? onPick : onRemove} style={press(styles.referenceButton)}>
+      <Text style={styles.redoText}>{value === null ? 'Choose image' : 'Remove'}</Text>
+    </Pressable>
+  </View>;
+}
+
+function CandidateVideo({ projectId, asset }: { readonly projectId: string; readonly asset: MobileAsset }) {
+  const player = useVideoPlayer(assetUri(projectId, asset));
+  return <VideoView player={player} style={styles.candidateVideo} contentFit="contain" nativeControls />;
+}
+
+function Chip({ label, selected, disabled = false, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
+      disabled={disabled}
       onPress={onPress}
-      style={press([styles.chip, selected && styles.chipOn])}
+      style={press([styles.chip, selected && styles.chipOn, disabled && styles.toggleOff])}
     >
       <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
     </Pressable>
@@ -571,6 +836,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top'
   },
   takeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
+  reviewCard: { marginTop: 10, padding: 12, gap: 8, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  candidateVideo: { width: '100%', aspectRatio: 16 / 9, borderRadius: 10, backgroundColor: '#000' },
   takeLabel: { flex: 1, color: theme.textWeak, fontSize: 13 },
   redo: {
     justifyContent: 'center',
@@ -582,5 +849,9 @@ const styles = StyleSheet.create({
   },
   redoText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
   approve: { marginTop: 14, minHeight: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accent },
-  approveText: { color: theme.bg, fontSize: 15, fontWeight: '700' }
+  approveText: { color: theme.bg, fontSize: 15, fontWeight: '700' },
+  referenceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: MIN_TAP, borderBottomWidth: 1, borderBottomColor: theme.line },
+  referenceName: { flex: 1, color: theme.textWeak, fontSize: 13 },
+  referencePreview: { width: 56, height: 56, borderRadius: 8, resizeMode: 'cover' },
+  referenceButton: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 12 }
 });

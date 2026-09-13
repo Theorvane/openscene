@@ -46,7 +46,7 @@ describe('trim handle width', () => {
 });
 
 describe('timeline gestures', () => {
-  const read = (path: string) => readFile(new URL(`../mobile/${path}`, import.meta.url), 'utf8');
+  const read = async (path: string) => (await readFile(new URL(`../mobile/${path}`, import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
 
   it('states precedence over the scroller rather than racing it', async () => {
     // The same drag moved a clip once and scrolled the timeline the next time,

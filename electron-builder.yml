@@ -45,6 +45,19 @@ mac:
 win:
   icon: build/icon.png
   # No code-signing certificate either, so Windows SmartScreen warns on first run.
+  #
+  # Said here as well as in the release workflow because it is a fact about the
+  # build, not about the runner: the certificate is handed to the macOS leg
+  # alone. It was once given to every leg, which signed this installer with the
+  # Apple Developer ID — a signature Windows cannot chain to a trusted root.
+  #
+  # And with no signature there must be no signature check. A signed build
+  # writes the certificate's subject into `app-update.yml` as the publisher
+  # name, and `electron-updater` then refuses any installer that does not match
+  # it. Unsigned, the check has nothing to compare against and would refuse
+  # every update. Delete this line the day a real Windows certificate exists,
+  # not before.
+  verifyUpdateCodeSignature: false
   target:
     - target: nsis
       arch: [x64]

@@ -1,6 +1,7 @@
 import { extname, basename } from 'node:path';
 
 import type { ApiResponse } from '../shared/models';
+import { MEDIA_PLAYBACK_SCHEME } from '../shared/mediaPlaybackUrls';
 import type {
   CreateProjectInput,
   CreateProjectResult,
@@ -31,6 +32,7 @@ import { supportedAssetDialogExtensions, supportedAssetFormatForExtension } from
 import { fail, ok } from './ipcResponses';
 import { ProjectStore } from './projectStore';
 import { ProjectStoreError } from './projectStoreSupport';
+import { parseSaveAiProjectDocumentInput } from '../shared/aiProjectDomain';
 
 type NativeFileDialogResult = {
   readonly canceled: boolean;
@@ -216,6 +218,21 @@ export class TimelineIpcService {
     }
   }
 
+  async saveAiProjectDocument(payload: unknown): Promise<ApiResponse<LocalProjectSnapshot>> {
+    const input = parseSaveAiProjectDocumentInput(payload);
+    if (input === null) {
+      return fail('INVALID_INPUT', 'The AI project document payload was not valid.');
+    }
+    try {
+      return ok(await this.dependencies.projects.saveAiProjectDocument(input.projectId, input.ai));
+    } catch (error: unknown) {
+      if (error instanceof ProjectStoreError) {
+        return fail('INVALID_INPUT', error.message);
+      }
+      return safeProjectError(error, 'UNKNOWN_ERROR', 'The AI project document could not be saved.');
+    }
+  }
+
   async getAssetPlaybackUrl(payload: unknown): Promise<ApiResponse<AssetPlaybackUrl>> {
     const input = parseGetAssetPlaybackUrlInput(payload);
     if (input === null) {
@@ -224,7 +241,7 @@ export class TimelineIpcService {
     const playbackSource = await this.resolveAssetPlaybackSource(input.projectId, input.assetId);
     return playbackSource === null
       ? fail('ASSET_NOT_FOUND', 'The requested asset is not available for playback.')
-      : ok({ url: `video-tool-asset://playback/${input.projectId}/${input.assetId}` });
+      : ok({ url: `${MEDIA_PLAYBACK_SCHEME}://playback/${input.projectId}/${input.assetId}` });
   }
 
   async resolveAssetPlaybackSource(projectId: string, assetId: string): Promise<AssetPlaybackSource | null> {

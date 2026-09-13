@@ -26,6 +26,7 @@ export type ImageRequestInput = {
   readonly aspectRatio: ImageAspectRatio;
   readonly negativePrompt?: string;
   readonly referenceImage?: ReferenceImageSelection;
+  readonly referenceImages?: readonly ReferenceImageSelection[];
   readonly fetchImpl?: typeof fetch;
   readonly baseUrl?: string;
 };
@@ -188,39 +189,67 @@ export async function requestOpenAiImage(input: ImageRequestInput): Promise<Gene
   throw new Error('OpenAI Images returned no image data.');
 }
 
-type ImagenResponse = {
-  readonly predictions?: readonly { readonly bytesBase64Encoded?: string; readonly mimeType?: string }[];
+type GeminiImageContent = {
+  readonly type?: string;
+  readonly data?: string;
+  readonly mime_type?: string;
+};
+
+type GeminiImageResponse = {
+  readonly id?: string;
+  /** Present in SDK-shaped/test responses; raw REST responses expose steps. */
+  readonly output_image?: GeminiImageContent;
+  readonly steps?: readonly {
+    readonly type?: string;
+    readonly content?: readonly GeminiImageContent[];
+  }[];
 };
 
 /**
- * Google Imagen over the Gemini API. The key goes in a header rather than the
- * query string so it cannot leak into logs or error messages that echo the URL.
+ * Google Nano Banana over the Gemini Interactions API. The key goes in a header
+ * rather than the query string so it cannot leak into logs or error messages
+ * that echo the URL.
  */
-export async function requestImagenImage(input: ImageRequestInput): Promise<GeneratedImageData> {
+export async function requestNanoBananaImage(input: ImageRequestInput): Promise<GeneratedImageData> {
   const fetchImpl = input.fetchImpl ?? fetch;
+  // Gemini image models do not accept a negativePrompt request field. Keeping
+  // it as plain-language guidance preserves the user's intent without sending
+  // an unsupported option that would reject the whole request.
+  const prompt = input.negativePrompt?.trim()
+    ? `${input.prompt}\n\nDo not include: ${input.negativePrompt.trim()}`
+    : input.prompt;
+  const interactionInput = [
+    { type: 'text', text: prompt },
+    ...(input.referenceImages?.length
+      ? input.referenceImages.map((reference) => ({ type: 'image', mime_type: reference.mimeType, data: reference.base64 }))
+      : input.referenceImage === undefined
+        ? []
+        : [{ type: 'image', mime_type: input.referenceImage.mimeType, data: input.referenceImage.base64 }])
+  ];
   const parsed = (await postJson(
-    `${input.baseUrl ?? 'https://generativelanguage.googleapis.com'}/v1beta/models/${input.modelId}:predict`,
+    `${input.baseUrl ?? 'https://generativelanguage.googleapis.com'}/v1beta/interactions`,
     { 'x-goog-api-key': input.apiKey },
     {
-      instances: [{ prompt: input.prompt }],
-      parameters: {
-        sampleCount: 1,
-        aspectRatio: input.aspectRatio,
-        ...(input.negativePrompt === undefined ? {} : { negativePrompt: input.negativePrompt })
-      }
+      model: input.modelId,
+      input: interactionInput,
+      response_format: { type: 'image', aspect_ratio: input.aspectRatio, image_size: '1K' }
     },
-    'Google Imagen',
+    'Google Nano Banana',
     fetchImpl
-  )) as ImagenResponse;
+  )) as GeminiImageResponse;
 
-  const prediction = parsed.predictions?.[0];
-  if (prediction?.bytesBase64Encoded === undefined) {
-    throw new Error('Google Imagen returned no image data.');
+  const image = parsed.output_image?.data
+    ? parsed.output_image
+    : parsed.steps
+        ?.flatMap((step) => step.content ?? [])
+        .find((content) => content.type === 'image' && typeof content.data === 'string');
+  if (image?.data === undefined) {
+    throw new Error('Google Nano Banana returned no image data.');
   }
   return decodedOrThrow(
-    prediction.bytesBase64Encoded,
-    prediction.mimeType ?? 'image/png',
-    `imagen-${input.modelId}`
+    image.data,
+    image.mime_type ?? 'image/jpeg',
+    parsed.id ?? `nano-banana-${input.modelId}`
   );
 }
 

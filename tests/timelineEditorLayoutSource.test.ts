@@ -11,29 +11,31 @@ const SHORTCUT_PREFERENCE_HOOK_SOURCE_URL = new URL('../src/renderer/src/editor/
 const TIMELINE_SHORTCUTS_SOURCE_URL = new URL('../src/renderer/src/editor/useTimelineShortcuts.ts', import.meta.url);
 const STYLES_SOURCE_URL = new URL('../src/renderer/src/styles.css', import.meta.url);
 
+const normalizedSource = (source: string): string => source.replace(/\r\n/g, '\n');
+
 async function readTimelineEditorSource(): Promise<string> {
   const [timelineEditorSource, layoutControlsSource] = await Promise.all([
     readFile(TIMELINE_EDITOR_SOURCE_URL, 'utf8'),
     readFile(TIMELINE_EDITOR_LAYOUT_CONTROLS_SOURCE_URL, 'utf8')
   ]);
 
-  return `${timelineEditorSource}\n${layoutControlsSource}`;
+  return normalizedSource(`${timelineEditorSource}\n${layoutControlsSource}`);
 }
 
 async function readStylesSource(): Promise<string> {
-  return readFile(STYLES_SOURCE_URL, 'utf8');
+  return normalizedSource(await readFile(STYLES_SOURCE_URL, 'utf8'));
 }
 
 async function readAppShellSource(): Promise<string> {
-  return readFile(APP_SHELL_SOURCE_URL, 'utf8');
+  return normalizedSource(await readFile(APP_SHELL_SOURCE_URL, 'utf8'));
 }
 
 async function readLayoutPreferenceHookSource(): Promise<string> {
-  return readFile(LAYOUT_PREFERENCE_HOOK_SOURCE_URL, 'utf8');
+  return normalizedSource(await readFile(LAYOUT_PREFERENCE_HOOK_SOURCE_URL, 'utf8'));
 }
 
 async function readNativeMenuCommandsSource(): Promise<string> {
-  return readFile(NATIVE_MENU_COMMANDS_SOURCE_URL, 'utf8');
+  return normalizedSource(await readFile(NATIVE_MENU_COMMANDS_SOURCE_URL, 'utf8'));
 }
 
 async function readShortcutSource(): Promise<string> {
@@ -42,7 +44,7 @@ async function readShortcutSource(): Promise<string> {
     readFile(TIMELINE_SHORTCUTS_SOURCE_URL, 'utf8')
   ]);
 
-  return `${hookSource}\n${shortcutsSource}`;
+  return normalizedSource(`${hookSource}\n${shortcutsSource}`);
 }
 
 describe('timeline editor layout source contract', () => {

@@ -22,6 +22,8 @@ describe('LLM provider and model catalog configuration', () => {
     expect(ids).toContain('anthropic/claude-sonnet-5');
     expect(ids).toContain('deepseek/deepseek-chat');
     expect(ids).toContain('openrouter/openai/gpt-4o');
+    expect(ids).toContain('agentrouter/claude-opus-4-8');
+    expect(ids).toContain('agentrouter/gpt-5.6-sol');
 
     for (const model of DEFAULT_LLM_MODELS.slice(0, 200)) {
       expect(model.label.length).toBeGreaterThan(0);
@@ -68,6 +70,11 @@ describe('LLM provider and model catalog configuration', () => {
     expect(getLlmProvider('anthropic')?.credentialKey).toBe('anthropicApiKey');
     expect(getLlmProvider('google_gemini')?.credentialKey).toBe('geminiApiKey');
     expect(getLlmProvider('deepseek')?.credentialKey).toBe('deepseekApiKey');
+    expect(getLlmProvider('agentrouter')).toMatchObject({
+      credentialKey: 'agentRouterApiKey',
+      baseUrl: 'https://agentrouter.org/v1',
+      adapter: 'openai-compatible'
+    });
     expect(isProviderConnected('unknown-provider', { anyKey: true })).toBe(false);
 
     const openAiProviders = LLM_PROVIDERS.filter((provider) => provider.id === 'openai');

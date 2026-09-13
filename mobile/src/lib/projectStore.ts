@@ -5,9 +5,17 @@ import type { FramePreference } from '@openvideo/shared/outputFrame';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '@openvideo/shared/timelineClipPlacement';
 import { placeClip, replaceClipSource } from '@openvideo/shared/timelineClipLogic';
 import { isStill, stillClipSource } from '@openvideo/shared/timelineStills';
+import { assembleApprovedProductionCut, buildApprovedProductionAssemblyPlan } from '@openvideo/shared/productionWorkflow';
+import { parseSubtitleDelivery, type SubtitleDelivery } from '@openvideo/shared/subtitleDelivery';
 
 import { createInitialTimeline } from '@openvideo/shared/timelineLogic';
 import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, type TimelineDocument } from '@openvideo/shared/timelineTypes';
+import {
+  createEmptyAiProjectDocument,
+  parseAiProjectDocument,
+  removeAssetFromAiProjectDocument,
+  type AiProjectDocument
+} from '@openvideo/shared/aiProjectDomain';
 
 /**
  * Projects live inside the app's own storage.
@@ -72,6 +80,7 @@ export type MobileProject = {
   readonly updatedAt: string;
   readonly assets: readonly MobileAsset[];
   readonly timeline: TimelineDocument;
+  readonly ai: AiProjectDocument;
   /**
    * The frame this project exports into.
    *
@@ -81,6 +90,8 @@ export type MobileProject = {
    * the footage already. Absent means the footage decides.
    */
   readonly frame?: FramePreference;
+  /** Mobile currently supports the burn decision; sidecar delivery remains desktop-only. */
+  readonly subtitleDelivery?: SubtitleDelivery;
 };
 
 export type ProjectSummary = { readonly id: string; readonly name: string; readonly updatedAt: string };
@@ -140,11 +151,21 @@ export function readProject(id: string): MobileProject | null {
   try {
     const parsed: unknown = JSON.parse(file.textSync());
     const candidate = parsed as Partial<MobileProject>;
+    const storedSchemaVersion = (parsed as { readonly schemaVersion?: unknown }).schemaVersion;
+    const isLegacyV3 = storedSchemaVersion === 3;
+    if (!isLegacyV3 && storedSchemaVersion !== PROJECT_SCHEMA_VERSION) return null;
     // The timeline goes through the shared validator rather than being trusted:
     // a file edited or truncated between sessions must not become a document the
     // editing rules then operate on.
     const timeline = parseTimelineDocument(candidate.timeline);
     if (timeline === null || typeof candidate.id !== 'string' || typeof candidate.name !== 'string') return null;
+    const assets = dedupeAssets(Array.isArray(candidate.assets) ? (candidate.assets as MobileAsset[]) : []);
+    const ai = isLegacyV3 && candidate.ai === undefined
+      ? createEmptyAiProjectDocument()
+      : parseAiProjectDocument(candidate.ai, new Set(assets.map((asset) => asset.id)));
+    if (ai === null) return null;
+    const subtitleDelivery = candidate.subtitleDelivery === undefined ? undefined : parseSubtitleDelivery(candidate.subtitleDelivery);
+    if (subtitleDelivery === null || subtitleDelivery?.sidecarFormat !== 'none') return null;
     return {
       schemaVersion: PROJECT_SCHEMA_VERSION,
       id: candidate.id,
@@ -154,11 +175,13 @@ export function readProject(id: string): MobileProject | null {
       // Deduplicated on the way in: projects written before the placement bug
       // was fixed hold the same asset twice, which renders as duplicate keys and
       // counts double against the library. The first record wins.
-      assets: dedupeAssets(Array.isArray(candidate.assets) ? (candidate.assets as MobileAsset[]) : []),
+      assets,
       timeline,
+      ai,
       // A stored preference nobody recognises reads as absent, which is the
       // footage deciding — the same answer a project written before this had.
-      ...(isFramePreference(candidate.frame) ? { frame: candidate.frame } : {})
+      ...(isFramePreference(candidate.frame) ? { frame: candidate.frame } : {}),
+      ...(subtitleDelivery === undefined ? {} : { subtitleDelivery })
     };
   } catch {
     // An unreadable project is reported as absent rather than crashing the list;
@@ -181,7 +204,8 @@ export function createProject(name: string): MobileProject {
     createdAt: now,
     updatedAt: now,
     assets: [],
-    timeline: createInitialTimeline()
+    timeline: createInitialTimeline(),
+    ai: createEmptyAiProjectDocument()
   };
   writeProject(project);
   return project;
@@ -191,7 +215,12 @@ export function writeProject(project: MobileProject): void {
   ensureRoot();
   const dir = projectDir(project.id);
   if (!dir.exists) dir.create({ intermediates: true });
-  projectFile(project.id).write(JSON.stringify({ ...project, updatedAt: new Date().toISOString() }));
+  const ai = parseAiProjectDocument(project.ai, new Set(project.assets.map((asset) => asset.id)));
+  if (ai === null) throw new Error('Invalid AI project document.');
+  if (project.subtitleDelivery !== undefined && (parseSubtitleDelivery(project.subtitleDelivery) === null || project.subtitleDelivery.sidecarFormat !== 'none')) {
+    throw new Error('Mobile subtitle delivery must use burn-in or no automatic captions; sidecar files are desktop-only.');
+  }
+  projectFile(project.id).write(JSON.stringify({ ...project, schemaVersion: PROJECT_SCHEMA_VERSION, ai, updatedAt: new Date().toISOString() }));
   announce();
 }
 
@@ -318,6 +347,14 @@ export function importAsset(
   };
 }
 
+/** Saves a generated video in the project library without changing the edit. */
+export function saveGeneratedVideoCandidate(project: MobileProject, asset: MobileAsset): MobileProject {
+  const known = project.assets.some((entry) => entry.id === asset.id);
+  const updated = { ...project, assets: known ? project.assets : [...project.assets, asset] };
+  writeProject(updated);
+  return updated;
+}
+
 /**
  * Appends a stored asset to the project's timeline and saves it.
  *
@@ -373,6 +410,32 @@ export function appendAssetToTimeline(project: MobileProject, asset: MobileAsset
   };
   writeProject(updated);
   return updated;
+}
+
+/** Uses the same all-shots-approved and no-duplicate rule as desktop. */
+export function assembleApprovedWriterShots(project: MobileProject):
+  | { readonly ok: true; readonly project: MobileProject }
+  | { readonly ok: false; readonly reason: string } {
+  const plan = buildApprovedProductionAssemblyPlan(project.ai, project.assets.map((asset) => ({
+    id: asset.id,
+    kind: asset.kind,
+    durationMs: asset.kind === 'video' ? asset.durationMs : null
+  })));
+  if (!plan.ok) return plan;
+  const track = project.timeline.tracks.find((entry) => entry.kind === 'video');
+  if (track === undefined) return { ok: false, reason: 'Add a video track before assembling the approved production cut.' };
+  const assemblyId = Date.now().toString(36);
+  let clipOrder = 0;
+  const assembled = assembleApprovedProductionCut({
+    timeline: project.timeline,
+    plan,
+    targetTrackId: track.id,
+    clipIdForShot: () => `production-${assemblyId}-${++clipOrder}`
+  });
+  if (!assembled.ok) return assembled;
+  const updated = { ...project, timeline: assembled.timeline };
+  writeProject(updated);
+  return { ok: true, project: updated };
 }
 
 /**
@@ -443,7 +506,8 @@ export function deleteAsset(projectId: string, assetId: string): MobileProject |
         ...track,
         clips: track.clips.filter((clip) => clip.assetId !== assetId)
       }))
-    }
+    },
+    ai: removeAssetFromAiProjectDocument(project.ai, assetId)
   };
   writeProject(updated);
   return updated;

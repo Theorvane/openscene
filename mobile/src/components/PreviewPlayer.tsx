@@ -4,6 +4,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { theme } from '../lib/theme';
 import { titlePreviewLayout } from '@openvideo/shared/titlePreviewLayout';
+import { resolvedTitleStyle } from '@openvideo/shared/captionStyle';
 import type { TimelineTitle } from '@openvideo/shared/timelineTypes';
 
 /**
@@ -26,6 +27,7 @@ export function PreviewPlayer({
   onEnded,
   effects,
   frameWidth,
+  frameHeight,
   dimOpacity,
   titles
 }: {
@@ -62,6 +64,7 @@ export function PreviewPlayer({
    * mean two different distances.
    */
   readonly frameWidth?: number;
+  readonly frameHeight?: number;
   /**
    * Black over the whole frame, for a dip-to-black transition.
    *
@@ -163,8 +166,11 @@ export function PreviewPlayer({
     };
   }, [player, onProgress, onEnded]);
 
+  const outputWidth = frameWidth ?? 1920;
+  const outputHeight = frameHeight ?? 1080;
+
   return (
-    <View style={styles.root} onLayout={(event) => setViewWidth(event.nativeEvent.layout.width)}>
+    <View style={[styles.root, { aspectRatio: outputWidth / outputHeight }]} onLayout={(event) => setViewWidth(event.nativeEvent.layout.width)}>
       {uri !== null && still === true ? (
         <Image
           style={[styles.video, composited]}
@@ -187,9 +193,13 @@ export function PreviewPlayer({
         // the shared layout returns the one scale both dimensions share.
         const layout = titlePreviewLayout(
           title,
-          { width: viewWidth, height: (viewWidth * 9) / 16 },
-          { width: frameWidth ?? 1920, height: ((frameWidth ?? 1920) * 9) / 16 }
+          { width: viewWidth, height: viewWidth * outputHeight / outputWidth },
+          { width: outputWidth, height: outputHeight }
         );
+        const titleStyle = resolvedTitleStyle(title);
+        const backgroundColor = titleStyle.backgroundOpacity <= 0
+          ? 'transparent'
+          : `${titleStyle.backgroundColor}${Math.round(titleStyle.backgroundOpacity * 255).toString(16).padStart(2, '0')}`;
         return (
           <View key={title.id} pointerEvents="none" style={styles.titleLayer}>
             <Text
@@ -198,6 +208,13 @@ export function PreviewPlayer({
                 {
                   color: title.color,
                   fontSize: layout.fontSizePx,
+                  fontWeight: titleStyle.fontWeight === 'bold' ? '700' : '400',
+                  backgroundColor,
+                  paddingHorizontal: layout.paddingPx,
+                  paddingVertical: layout.paddingPx,
+                  textShadowColor: layout.outlineWidthPx > 0 ? titleStyle.outlineColor : 'transparent',
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: layout.outlineWidthPx,
                   transform: [{ translateX: layout.offsetXPx }, { translateY: layout.offsetYPx }]
                 }
               ]}
@@ -214,12 +231,10 @@ export function PreviewPlayer({
 const styles = StyleSheet.create({
   // Clipped: a clip scaled past 100% is meant to fill the frame and be cut off
   // by it, exactly as the export crops it — not to paint over the title bar.
-  root: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000000', overflow: 'hidden' },
+  root: { width: '100%', backgroundColor: '#000000', overflow: 'hidden' },
   scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000' },
   titleLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  // The shadow stands in for "readable over any picture", which is what the
-  // export gets for free by burning the words into the frame.
-  title: { fontWeight: '700', textAlign: 'center', paddingHorizontal: 12, textShadowColor: 'rgba(0,0,0,0.65)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  title: { textAlign: 'center' },
   video: { width: '100%', height: '100%' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: theme.textWeaker, fontSize: 12 }

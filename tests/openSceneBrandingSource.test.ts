@@ -64,8 +64,9 @@ describe('OpenScene branding source contract', () => {
     expect(timelineCanvasSource).toContain("'application/x-window-loom-timeline'");
     expect(preloadSource).toContain("exposeInMainWorld('videoTool', videoTool)");
     expect(captureRecorderSource).toContain('window.videoTool');
-    // Media generation is cloud-only; Ollama is the app's only local engine.
+    // VieNeu is the explicit local voice seam; legacy placeholder ids stay absent.
     expect(providerSeamsSource).toContain("'elevenlabs'");
+    expect(providerSeamsSource).toContain("'vieneu_local'");
     expect(providerSeamsSource).not.toContain("'local_qwen'");
     expect(providerSeamsSource).not.toContain("'local_video'");
   });

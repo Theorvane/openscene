@@ -10,6 +10,7 @@ import { cutNearest, removeTransitionAtCut, setTransitionAtCut } from '../shared
 import { clipDurationMs, clipTimelineEndMs } from '../shared/timelineClipGeometry';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '../shared/timelineClipPlacement';
 import type { ExportIpcService } from './exportIpcService';
+import { METADATA_PRIVACY_MODES, type MetadataPrivacyMode } from '../shared/metadataPrivacy';
 import type { ResultAssetImportService } from './resultAssetImportService';
 import type { ProjectStore } from './projectStore';
 import { discoverFfmpeg } from './ffmpegDiscovery';
@@ -157,12 +158,12 @@ export class OpenVideoMcpServer {
       return { success: false, error: `Model ${modelId} is not a video-generation model.` };
     }
 
-    const plan = planVideoStoryboard({ totalSeconds: params.totalSeconds, providerId: model.providerId });
+    const plan = planVideoStoryboard({ totalSeconds: params.totalSeconds, providerId: model.providerId, modelId: model.id });
     return {
       success: true,
       modelId,
       providerLabel: model.providerLabel,
-      supportedShotSeconds: supportedShotSeconds(model.providerId),
+      supportedShotSeconds: supportedShotSeconds(model.id),
       totalSeconds: plan.totalSeconds,
       requestedSeconds: plan.requestedSeconds,
       roundedFrom: plan.roundedFrom,
@@ -307,7 +308,9 @@ export class OpenVideoMcpServer {
       asOf: estimate.asOf,
       summary: formatCostEstimate(estimate),
       message: estimate.priced
-        ? 'Show this to the user and wait for approval before generating.'
+        ? estimate.amountUsd === 0
+          ? 'This model runs locally and creates no provider charge.'
+          : 'Show this to the user and wait for approval before generating.'
         : 'Cost is unknown. Ask the user to confirm they accept an unknown charge before generating.'
     };
   }
@@ -347,13 +350,21 @@ export class OpenVideoMcpServer {
       prompt: z.string().min(1, 'Prompt is required'),
       aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
       // Derived, not a literal: see MAX_SUPPORTED_SHOT_SECONDS.
-      durationSeconds: z.number().min(1).max(MAX_SUPPORTED_SHOT_SECONDS).default(5),
+      durationSeconds: z.number().min(1).max(MAX_SUPPORTED_SHOT_SECONDS).optional(),
       stylePreset: z.string().optional().default('Cinematic'),
       modelId: z.string().optional(),
+      operation: z.enum(['text_to_video', 'image_to_video', 'reference_to_video', 'start_end', 'motion_control']).optional(),
       referenceImageJobId: z
         .string()
         .optional()
-        .describe('A completed createImageJob id. Seeds image-to-video so the shot matches its still.'),
+        .describe('Legacy alias for firstFrameImageJobId.'),
+      firstFrameImageJobId: z.string().optional().describe('Completed createImageJob id used as the first frame.'),
+      lastFrameImageJobId: z.string().optional().describe('Completed createImageJob id used as the ending frame. Requires the first frame.'),
+      referenceImageJobIds: z.array(z.string()).min(1).max(3).optional()
+        .describe('One to three completed createImageJob ids used as Veo asset/character references.'),
+      projectId: z.string().optional().describe('Project containing the driving video for desktop Motion Control.'),
+      drivingVideoAssetId: z.string().optional().describe('Imported project video whose performance drives Motion Control.'),
+      motionMode: z.enum(['move', 'mix']).optional(),
       apiKey: z.string().optional()
     })
   })
@@ -363,30 +374,60 @@ export class OpenVideoMcpServer {
     durationSeconds?: number;
     stylePreset?: string;
     modelId?: string;
+    operation?: 'text_to_video' | 'image_to_video' | 'reference_to_video' | 'start_end' | 'motion_control';
     referenceImageJobId?: string;
+    firstFrameImageJobId?: string;
+    lastFrameImageJobId?: string;
+    referenceImageJobIds?: readonly string[];
+    projectId?: string;
+    drivingVideoAssetId?: string;
+    motionMode?: 'move' | 'mix';
     apiKey?: string;
   }) {
     // The still crosses as inline bytes, exactly as a picked file would, so
     // image-to-video does not care that this seed was generated.
+    const firstFrameJobId = params.firstFrameImageJobId ?? params.referenceImageJobId;
+    if (params.firstFrameImageJobId !== undefined && params.referenceImageJobId !== undefined) {
+      return { success: false, error: 'Use firstFrameImageJobId or its legacy alias referenceImageJobId, not both.' };
+    }
     let referenceImage: { displayName: string; mimeType: string; base64: string } | undefined;
-    if (params.referenceImageJobId !== undefined) {
-      const resolved = getGeneratedImageAsReference(params.referenceImageJobId);
+    if (firstFrameJobId !== undefined) {
+      const resolved = getGeneratedImageAsReference(firstFrameJobId);
       if (resolved === null) {
         return {
           success: false,
-          error: `Image job ${params.referenceImageJobId} has no completed image to use as a reference.`
+          error: `Image job ${firstFrameJobId} has no completed image to use as a first frame.`
         };
       }
       referenceImage = { ...resolved };
     }
 
+    let lastFrame: { displayName: string; mimeType: string; base64: string } | undefined;
+    if (params.lastFrameImageJobId !== undefined) {
+      const resolved = getGeneratedImageAsReference(params.lastFrameImageJobId);
+      if (resolved === null) return { success: false, error: `Image job ${params.lastFrameImageJobId} has no completed image to use as a last frame.` };
+      lastFrame = { ...resolved };
+    }
+    const referenceImages: { displayName: string; mimeType: string; base64: string }[] = [];
+    for (const jobId of params.referenceImageJobIds ?? []) {
+      const resolved = getGeneratedImageAsReference(jobId);
+      if (resolved === null) return { success: false, error: `Image job ${jobId} has no completed image to use as an asset reference.` };
+      referenceImages.push({ ...resolved });
+    }
+
     const job = await createVideoGenerationJob({
       prompt: params.prompt,
       aspectRatio: params.aspectRatio ?? '16:9',
-      durationSeconds: params.durationSeconds ?? 5,
+      ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
       stylePreset: params.stylePreset ?? 'Cinematic',
       ...(params.modelId === undefined ? {} : { modelId: params.modelId }),
-      ...(referenceImage === undefined ? {} : { referenceImage })
+      ...(params.operation === undefined ? {} : { operation: params.operation }),
+      ...(referenceImage === undefined ? {} : { referenceImage }),
+      ...(lastFrame === undefined ? {} : { lastFrame }),
+      ...(referenceImages.length === 0 ? {} : { referenceImages }),
+      ...(params.projectId === undefined ? {} : { projectId: params.projectId }),
+      ...(params.drivingVideoAssetId === undefined ? {} : { drivingVideoAssetId: params.drivingVideoAssetId }),
+      ...(params.motionMode === undefined ? {} : { motionMode: params.motionMode })
     });
 
     return {
@@ -401,13 +442,21 @@ export class OpenVideoMcpServer {
 
   @McpTool({
     description:
-      'Create AI speech job with the selected voice-generation model. Runs against the provider connected ' +
-      'in Settings; none connected fails with an explicit error.',
+      'Create AI speech job with the selected voice-generation model. Cloud models use the provider connected ' +
+      'in Settings; VieNeu v3 Turbo uses the automatically managed local server.',
     input: z.object({
       script: z.string().min(1, 'Script is required'),
       voiceId: z.string().default(''),
       modelId: z.string().optional(),
-      apiKey: z.string().optional()
+      apiKey: z.string().optional(),
+      delivery: z.object({
+        performanceScript: z.string().min(1).max(200_000),
+        stability: z.number().min(0).max(1),
+        similarityBoost: z.number().min(0).max(1),
+        style: z.number().min(0).max(1),
+        speed: z.number().min(0.7).max(1.2),
+        speakerBoost: z.boolean()
+      }).optional()
     })
   })
   async createSpeechJob(params: {
@@ -415,11 +464,13 @@ export class OpenVideoMcpServer {
     voiceId?: string;
     modelId?: string;
     apiKey?: string;
+    delivery?: import('../shared/voiceDelivery').VoiceDeliverySettings;
   }) {
     const job = await createSpeechGenerationJob({
       script: params.script,
       voiceId: params.voiceId ?? '',
-      ...(params.modelId === undefined ? {} : { modelId: params.modelId })
+      ...(params.modelId === undefined ? {} : { modelId: params.modelId }),
+      ...(params.delivery === undefined ? {} : { delivery: params.delivery })
     });
 
     return {
@@ -486,7 +537,6 @@ export class OpenVideoMcpServer {
       success: true,
       jobId: job.id,
       status: job.status,
-      outputFilePath: job.outputFilePath,
       error: job.error
     };
   }
@@ -1125,21 +1175,23 @@ export class OpenVideoMcpServer {
 
   @McpTool({
     // No quality parameter: the export pipeline has no preset concept
-    // (StartExportJobInput carries only size and frame rate), and the tool used
+    // (StartExportJobInput carries size, frame rate and delivery policy), and the tool used
     // to accept one, drop it, and echo it back as if it had applied.
-    description: 'Start FFmpeg MP4 export for an OpenScene project timeline. Exports at the project settings; there is no quality preset.',
+    description: 'Start FFmpeg MP4 export for an OpenScene project timeline. Exports at the project settings; preserve_provenance is the safe metadata default and privacy_clean removes only an explicit personal-container-tag allowlist.',
     input: z.object({
-      projectId: z.string().min(1)
+      projectId: z.string().min(1),
+      metadataPrivacyMode: z.enum(METADATA_PRIVACY_MODES).optional()
     })
   })
-  async exportProjectVideo(params: { projectId: string }) {
+  async exportProjectVideo(params: { projectId: string; metadataPrivacyMode?: MetadataPrivacyMode }) {
     if (!this.exportIpcService) {
       return { success: false, error: 'Export service is not available.' };
     }
 
     try {
       const response = await this.exportIpcService.startExportJob({
-        projectId: params.projectId
+        projectId: params.projectId,
+        ...(params.metadataPrivacyMode === undefined ? {} : { metadataPrivacyMode: params.metadataPrivacyMode })
       });
 
       if (!response.ok) {

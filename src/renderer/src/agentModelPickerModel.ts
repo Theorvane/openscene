@@ -15,6 +15,8 @@ export type AgentModelPickerInput = {
   readonly credentialStatus: Readonly<Record<string, boolean>>;
   readonly chatGptConnected: boolean;
   readonly isModelVisible: (providerId: string, modelId: string) => boolean;
+  /** Models reachable through a non-API session without linking their whole provider. */
+  readonly linkedModelIds?: readonly string[];
 };
 
 /**
@@ -26,9 +28,11 @@ export function isAgentModelLinked(input: {
   readonly modelId: string;
   readonly credentialStatus: Readonly<Record<string, boolean>>;
   readonly chatGptConnected: boolean;
+  readonly linkedModelIds?: readonly string[];
 }): boolean {
   return (
     isProviderConnected(input.providerId, input.credentialStatus) ||
+    input.linkedModelIds?.includes(input.modelId) === true ||
     (input.chatGptConnected && isOpenAiCodexModelKey(input.modelId))
   );
 }
@@ -49,7 +53,8 @@ export function buildAgentModelGroups(input: AgentModelPickerInput): readonly Ag
         providerId: model.providerId,
         modelId: model.id,
         credentialStatus: input.credentialStatus,
-        chatGptConnected: input.chatGptConnected
+        chatGptConnected: input.chatGptConnected,
+        ...(input.linkedModelIds === undefined ? {} : { linkedModelIds: input.linkedModelIds })
       })
     ) {
       return false;

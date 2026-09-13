@@ -17,9 +17,14 @@ describe('preload AI generation IPC contracts', () => {
     expect(source).toContain('aiUseImageAsVideoReference(jobId: string): Promise<ApiResponse<ReferenceImageSelection>>;');
     // The reference image crosses the bridge as bytes, never as a path.
     expect(source).toContain('aiSelectReferenceImage(): Promise<ApiResponse<ReferenceImageSelection | null>>;');
+    expect(source).toContain('aiExtractContinuationFrame(input: ProjectAssetReferenceInput): Promise<ApiResponse<ExtractContinuationFrameResult>>;');
+    expect(source).toContain('aiGetProjectImageReference(input: ProjectAssetReferenceInput): Promise<ApiResponse<ReferenceImageSelection>>;');
+    expect(source).not.toContain('aiExtractContinuationFrame(input: { projectPath');
     expect(source).toContain('aiGenerateVideo(request: VideoGenerationRequest): Promise<ApiResponse<VideoGenerationJob>>;');
     expect(source).toContain('aiGetVideoJob(jobId: string): Promise<ApiResponse<VideoGenerationJob>>;');
+    expect(source).toContain('aiGetComfyUiMotionStatus(): Promise<ApiResponse<ComfyUiMotionWorkerStatus>>;');
     expect(source).toContain('aiGenerateSpeech(request: TextToSpeechRequest): Promise<ApiResponse<TextToSpeechJob>>;');
+    expect(source).toContain('aiListSpeechVoices(modelId: string): Promise<ApiResponse<readonly VoiceChoice[]>>;');
     expect(source).toContain('aiGetSpeechJob(jobId: string): Promise<ApiResponse<TextToSpeechJob>>;');
   });
 });

@@ -87,14 +87,14 @@ export type RefineResult =
   | { readonly ok: true; readonly prompt: string }
   | { readonly ok: false; readonly reason: string };
 
-const REVISION_HEADING = 'Revisions, applied in order to the shot above:';
+export const SHOT_REVISION_HEADING = 'Revisions, applied in order to the shot above:';
 
 /** The notes already on a prompt, so a caller can show them or count them. */
 export function revisionsOf(prompt: string): readonly string[] {
-  const headingAt = prompt.indexOf(REVISION_HEADING);
+  const headingAt = prompt.indexOf(SHOT_REVISION_HEADING);
   if (headingAt < 0) return [];
   return prompt
-    .slice(headingAt + REVISION_HEADING.length)
+    .slice(headingAt + SHOT_REVISION_HEADING.length)
     .split('\n')
     .map((line) => line.replace(/^\s*\d+\.\s*/, '').trim())
     .filter((line) => line.length > 0);
@@ -102,8 +102,23 @@ export function revisionsOf(prompt: string): readonly string[] {
 
 /** The prompt without its revisions — what was asked for in the first place. */
 export function originalOf(prompt: string): string {
-  const headingAt = prompt.indexOf(REVISION_HEADING);
+  const headingAt = prompt.indexOf(SHOT_REVISION_HEADING);
   return (headingAt < 0 ? prompt : prompt.slice(0, headingAt)).trim();
+}
+
+/**
+ * Adds provider-boundary constraints without putting them after the revision
+ * list. Revisions are intentionally the final section so their parser never
+ * mistakes a continuity-lock line for another user-authored change.
+ */
+export function insertBeforeShotRevisions(prompt: string, block: string): string {
+  const trimmedBlock = block.trim();
+  if (trimmedBlock.length === 0) return prompt.trim();
+  const headingAt = prompt.indexOf(SHOT_REVISION_HEADING);
+  if (headingAt < 0) return `${prompt.trim()}\n\n${trimmedBlock}`.trim();
+  return [prompt.slice(0, headingAt).trim(), trimmedBlock, prompt.slice(headingAt).trim()]
+    .filter((part) => part.length > 0)
+    .join('\n\n');
 }
 
 /**
@@ -131,7 +146,7 @@ export function refineShotPrompt(previousPrompt: string, note: string, maxChars 
   const prompt = [
     originalOf(previousPrompt),
     '',
-    REVISION_HEADING,
+    SHOT_REVISION_HEADING,
     ...revisions.map((revision, index) => `${index + 1}. ${revision}`)
   ].join('\n');
 

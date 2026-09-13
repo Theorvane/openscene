@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -9,6 +9,7 @@ import { ProjectLocationRegistry } from '../src/main/projectLocations';
 import { ProjectStore } from '../src/main/projectStore';
 import { TimelineIpcService } from '../src/main/timelineIpcService';
 import { DEFAULT_CLIP_EFFECTS } from '../src/shared/timelineTypes';
+import { createSymlinkOrSkip } from './helpers/symlinkCapability';
 
 async function withTempDirectory<T>(run: (directory: string) => Promise<T>): Promise<T> {
   const directory = await mkdtemp(join(tmpdir(), 'video-timeline-ipc-'));
@@ -340,7 +341,7 @@ describe('timeline IPC service', () => {
     });
   });
 
-  it('given copied media replaced by a symlink, when playback is requested, then the asset URL is denied', async () => {
+  it('given copied media replaced by a symlink, when playback is requested, then the asset URL is denied', async ({ skip }) => {
     await withTempDirectory(async (directory) => {
       // Given
       const root = join(directory, 'projects');
@@ -355,7 +356,7 @@ describe('timeline IPC service', () => {
       const outsidePath = join(directory, 'outside.webm');
       await writeFile(outsidePath, Buffer.from([2]));
       await rm(playbackSource?.filePath ?? '');
-      await symlink(outsidePath, playbackSource?.filePath ?? '');
+      if (!(await createSymlinkOrSkip(outsidePath, playbackSource?.filePath ?? '', skip))) return;
 
       // When / Then
       await expect(service.getAssetPlaybackUrl({ projectId: project.id, assetId: asset.id })).resolves.toEqual({

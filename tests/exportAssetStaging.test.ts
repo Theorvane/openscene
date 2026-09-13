@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { removeExportStaging, stageExportAssets } from '../src/main/exportAssetStaging';
 import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, TIMELINE_SCHEMA_VERSION } from '../src/shared/timelineTypes';
 import type { LocalProjectSnapshot } from '../src/shared/timelineTypes';
+import { createEmptyAiProjectDocument } from '../src/shared/aiProjectDomain';
 
 describe('export asset staging', () => {
   it('copies from the validated open handle when the source path is replaced before staging', async () => {
@@ -23,6 +24,7 @@ describe('export asset staging', () => {
       createdAt: '2026-07-22T00:00:00.000Z',
       updatedAt: '2026-07-22T00:00:00.000Z',
       assets: [],
+      ai: createEmptyAiProjectDocument(),
       timeline: {
         schemaVersion: TIMELINE_SCHEMA_VERSION,
         tracks: [{

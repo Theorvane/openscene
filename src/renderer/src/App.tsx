@@ -10,9 +10,21 @@ import { Tabs } from './ui';
 import { closeProjectTab, openProjectTab, pruneProjectTabs, type ProjectTab } from './projectTabs';
 import { ProjectSettingsDialog } from './ProjectSettingsDialog';
 import { NarrationPanel } from './NarrationPanel';
-import type { ReferenceImageSelection } from '../../shared/providerSeams';
-import { ImageGenerationWorkspace } from './ImageGenerationWorkspace';
+import type { ImageAspectRatio, ReferenceImageSelection } from '../../shared/providerSeams';
+import {
+  attachGeneratedProductionImage,
+  buildCharacterReferenceImageBrief,
+  buildStoryboardImageBrief,
+  productionVisualStyle,
+  PRODUCTION_BATCH_LIMIT,
+  type ProductionImageHandoff,
+  type ProductionImageTarget
+} from '../../shared/productionWorkflow';
+import type { StatusMessage } from './appTypes';
+import { timelineDurationMs } from '../../shared/timelineLogic';
+import { ImageGenerationWorkspace, type ImageGenerationWorkspaceHandle } from './ImageGenerationWorkspace';
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
+import { WriterWorkspace } from './WriterWorkspace';
 import {
   WORKSPACE_TAB_IDS,
   WORKSPACE_TAB_LABELS,
@@ -236,16 +248,16 @@ export function App(): ReactElement {
    */
   const selectProjectTab = useCallback(async (projectId: string): Promise<void> => {
     if (editor.project?.id === projectId) return;
-    if (editor.hasUnsavedTimeline) await editor.saveTimeline();
+    if (editor.hasUnsavedTimeline && !await editor.saveTimeline()) return;
     const opened = await editor.openProject(projectId);
     if (opened) navigateToPage('edit');
   }, [editor, navigateToPage]);
 
   const closeProjectTabById = useCallback(async (projectId: string): Promise<void> => {
     const next = closeProjectTab(projectTabs, projectId, editor.project?.id ?? null);
+    if (editor.project?.id === projectId && editor.hasUnsavedTimeline && !await editor.saveTimeline()) return;
     setProjectTabs(next.tabs);
     if (editor.project?.id !== projectId) return;
-    if (editor.hasUnsavedTimeline) await editor.saveTimeline();
     if (next.activeId === null) {
       navigateToPage('projects');
       return;
@@ -261,6 +273,15 @@ export function App(): ReactElement {
   // Lives here because both studios touch it: the image studio produces a still
   // and the video studio consumes it as an image-to-video seed.
   const [videoReferenceImage, setVideoReferenceImage] = useState<ReferenceImageSelection | null>(null);
+  // A generated image must remember the exact Character or Shot that requested
+  // it. Composer state alone is not enough once several image jobs overlap.
+  const [productionImageHandoff, setProductionImageHandoff] = useState<ProductionImageHandoff | null>(null);
+  const imageGenerationRef = useRef<ImageGenerationWorkspaceHandle | null>(null);
+
+  useEffect(() => {
+    const projectId = editor.project?.id;
+    setProductionImageHandoff((current) => current !== null && current.projectId !== projectId ? null : current);
+  }, [editor.project?.id]);
 
   const selectWorkspaceTab = (tabId: WorkspaceTabId): void => {
     setWorkspaceTabId(tabId);
@@ -269,6 +290,88 @@ export function App(): ReactElement {
     } catch {
       // The in-memory choice stays usable when local storage is unavailable.
     }
+  };
+
+  const openProductionImageBrief = (
+    target: ProductionImageTarget,
+    aspectRatio?: ImageAspectRatio
+  ): string | null => {
+    const project = editor.project;
+    if (project === null) return 'Open a local project before creating production images.';
+    const result = target.kind === 'character_reference'
+      ? buildCharacterReferenceImageBrief(project.ai, target.characterId)
+      : buildStoryboardImageBrief(project.ai, target.shotId, aspectRatio ?? '16:9');
+    if (!result.ok) return result.reason;
+    setProductionImageHandoff({
+      ...result.brief,
+      requestId: crypto.randomUUID(),
+      projectId: project.id
+    });
+    selectWorkspaceTab('image');
+    return null;
+  };
+
+  const generateProductionImages = async (
+    targets: readonly ProductionImageTarget[],
+    aspectRatio?: ImageAspectRatio
+  ): Promise<StatusMessage> => {
+    const project = editor.project;
+    if (project === null) return { tone: 'warning', text: 'Open a local project before creating production images.' };
+    if (targets.length === 0) return { tone: 'neutral', text: 'No missing production images need generation.' };
+    if (targets.length > PRODUCTION_BATCH_LIMIT) return { tone: 'warning', text: `A production image batch is limited to ${PRODUCTION_BATCH_LIMIT} targets.` };
+    const handoffs: ProductionImageHandoff[] = [];
+    const skipped: string[] = [];
+    for (const target of targets) {
+      const result = target.kind === 'character_reference'
+        ? buildCharacterReferenceImageBrief(project.ai, target.characterId)
+        : buildStoryboardImageBrief(project.ai, target.shotId, aspectRatio ?? '16:9');
+      if (!result.ok) {
+        skipped.push(result.reason);
+        continue;
+      }
+      handoffs.push({ ...result.brief, requestId: crypto.randomUUID(), projectId: project.id });
+    }
+    if (handoffs.length === 0) return { tone: 'warning', text: skipped[0] ?? 'No eligible production images need generation.' };
+    const accepted = window.confirm(
+      `Generate ${handoffs.length} production image${handoffs.length === 1 ? '' : 's'} now?\n\n` +
+      'Provider credits may be charged. Browser-session jobs run one at a time. Every result remains unapproved and must be reviewed and attached manually.'
+    );
+    if (!accepted) return { tone: 'neutral', text: 'Production image generation was cancelled before any provider request.' };
+    const controller = imageGenerationRef.current;
+    if (controller === null) return { tone: 'danger', text: 'Image Generation is not ready. Reopen the project and try again.' };
+    const batch = await controller.generateProductionBriefs(handoffs);
+    return {
+      tone: batch.failed === 0 ? 'success' : batch.completed > 0 ? 'warning' : 'danger',
+      text: `${batch.message}${skipped.length > 0 ? ` ${skipped.length} ineligible target(s) were skipped.` : ''}`
+    };
+  };
+
+  const attachProductionImage = async (
+    jobId: string,
+    handoff: ProductionImageHandoff
+  ): Promise<StatusMessage> => {
+    const project = editor.project;
+    if (project === null || project.id !== handoff.projectId) {
+      return { tone: 'warning', text: 'Reopen the project that requested this image before attaching it.' };
+    }
+    const imported = await editor.importAiResult(jobId);
+    if (imported.importedAssetId === undefined) return imported;
+    const mutation = attachGeneratedProductionImage(project.ai, {
+      target: handoff.target,
+      assetId: imported.importedAssetId,
+      referenceId: `generated-production-reference-${crypto.randomUUID()}`
+    });
+    if (!mutation.ok) return { tone: 'warning', text: mutation.reason };
+    const saved = await editor.saveAiProjectDocument(mutation.document);
+    if (!saved) {
+      return {
+        tone: 'danger',
+        text: 'The image was imported safely, but its Character/Storyboard assignment could not be saved. It remains in the project library.'
+      };
+    }
+    setProductionImageHandoff((current) => current?.requestId === handoff.requestId ? null : current);
+    selectWorkspaceTab('video');
+    return { tone: 'success', text: `${handoff.targetLabel} was imported and attached to the production board.` };
   };
 
   return (
@@ -319,7 +422,7 @@ export function App(): ReactElement {
             />
           </section>
           <div className="app-stack local-edit-bay" hidden={!workspaceIsVisible}>
-            {/* Workspace switcher: the editor and the two generation studios
+            {/* Workspace switcher: the editor, Writer, and generation studios
                 share the area, so a generated clip lands on the timeline
                 without leaving the workspace or the agent chat beside it. */}
             <div className="workspace-tab-line">
@@ -356,6 +459,18 @@ export function App(): ReactElement {
                 <TimelineEditor editor={editor} />
               </section>
               <section
+                aria-label={WORKSPACE_TAB_LABELS.writer}
+                className="workspace-studio-panel"
+                hidden={workspaceTabId !== 'writer' || !workspaceIsVisible}
+                role="region"
+                style={APP_WORKSPACE_PANEL_STYLE}
+                tabIndex={-1}
+              >
+                {editor.project !== null && (
+                  <WriterWorkspace key={editor.project.id} document={editor.project.ai} onSave={editor.saveAiProjectDocument} />
+                )}
+              </section>
+              <section
                 aria-label={WORKSPACE_TAB_LABELS.voice}
                 className="workspace-studio-panel"
                 hidden={workspaceTabId !== 'voice' || !workspaceIsVisible}
@@ -363,7 +478,19 @@ export function App(): ReactElement {
                 style={APP_WORKSPACE_PANEL_STYLE}
                 tabIndex={-1}
               >
-                <NarrationPanel />
+                {editor.project !== null && (
+                  <NarrationPanel
+                    key={editor.project.id}
+                    projectId={editor.project.id}
+                    assets={editor.project.assets}
+                    timeline={editor.project.timeline}
+                    document={editor.project.ai}
+                    targetSeconds={timelineDurationMs(editor.project.timeline) / 1_000}
+                    onSaveAi={editor.saveAiProjectDocument}
+                    onApplyCaptions={editor.applyNarrationSubtitles}
+                    onApplyTranscription={editor.applyTranscriptionSubtitles}
+                  />
+                )}
               </section>
               <section
                 aria-label={WORKSPACE_TAB_LABELS.video}
@@ -374,8 +501,16 @@ export function App(): ReactElement {
                 tabIndex={-1}
               >
                 <VideoGenerationWorkspace
+                  writerDocument={editor.project?.ai ?? null}
+                  onSaveAi={editor.saveAiProjectDocument}
+                  projectId={editor.project?.id ?? null}
+                  projectName={editor.projects.find((item) => item.id === editor.project?.id)?.folderName ?? editor.project?.name}
+                  projectAssets={editor.project?.assets ?? []}
                   referenceImage={videoReferenceImage}
                   onReferenceImageChange={setVideoReferenceImage}
+                  onGenerateProductionImage={openProductionImageBrief}
+                  onGenerateProductionImages={generateProductionImages}
+                  onOpenImageResults={() => selectWorkspaceTab('image')}
                 />
               </section>
               <section
@@ -387,6 +522,12 @@ export function App(): ReactElement {
                 tabIndex={-1}
               >
                 <ImageGenerationWorkspace
+                  ref={imageGenerationRef}
+                  key={editor.project?.id ?? 'no-project'}
+                  projectName={editor.projects.find((item) => item.id === editor.project?.id)?.folderName ?? editor.project?.name}
+                  productionHandoff={productionImageHandoff}
+                  synchronizedStyle={editor.project === null ? null : productionVisualStyle(editor.project.ai)}
+                  onAttachToProduction={attachProductionImage}
                   onUseForVideo={(reference) => {
                     setVideoReferenceImage(reference);
                     selectWorkspaceTab('video');

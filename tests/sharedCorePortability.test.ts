@@ -38,11 +38,14 @@ describe('shared core portability', () => {
 
   it('never reaches for the DOM', () => {
     // React Native has no window or document; shared code that touches either
-    // would throw at runtime rather than fail to build.
+    // would throw at runtime rather than fail to build. Domain functions are
+    // allowed to call their AiProjectDocument parameter `document`, so check
+    // actual browser globals/members instead of flagging every property access.
     for (const { name, source } of files) {
       const code = withoutComments(source);
-      expect(code, `${name} touches window`).not.toMatch(/\bwindow\./);
-      expect(code, `${name} touches document`).not.toMatch(/\bdocument\./);
+      expect(code, `${name} touches window`).not.toMatch(/(?:\bglobalThis\.)?\bwindow\./);
+      expect(code, `${name} touches document`).not.toMatch(/(?:\bglobalThis\.)?\bdocument\.(?:body|head|documentElement|cookie|createElement|createTextNode|getElementById|querySelector|querySelectorAll|addEventListener|removeEventListener)\b/);
+      expect(code, `${name} touches navigator`).not.toMatch(/(?:\bglobalThis\.)?\bnavigator\./);
       expect(code, `${name} touches localStorage`).not.toMatch(/\blocalStorage\b/);
     }
   });

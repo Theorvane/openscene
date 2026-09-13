@@ -1,7 +1,10 @@
 package expo.modules.videoexport
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -11,8 +14,12 @@ import android.os.Handler
 import android.os.Looper
 import android.text.SpannableString
 import android.text.Spanned
+import android.text.TextPaint
 import android.text.style.AbsoluteSizeSpan
+import android.text.style.CharacterStyle
 import android.text.style.ForegroundColorSpan
+import android.text.style.LineBackgroundSpan
+import android.text.style.StyleSpan
 import android.util.Base64
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -281,8 +288,39 @@ class VideoExportModule : Module() {
     val sizePx: Int,
     val color: Int,
     val offsetX: Float,
-    val offsetY: Float
+    val offsetY: Float,
+    val bold: Boolean,
+    val outlineColor: Int,
+    val outlineWidthPx: Float,
+    val backgroundColor: Int,
+    val backgroundOpacity: Float,
+    val paddingPx: Float
   )
+
+  private class OutlineShadowSpan(private val color: Int, private val radius: Float) : CharacterStyle() {
+    override fun updateDrawState(textPaint: TextPaint) {
+      if (radius > 0f) textPaint.setShadowLayer(radius, 0f, 0f, color)
+    }
+  }
+
+  /** Per-line box because TextOverlay lays multiline captions out before drawing them. */
+  private class CaptionBackgroundSpan(private val color: Int, private val padding: Float) : LineBackgroundSpan {
+    override fun drawBackground(
+      canvas: Canvas, paint: Paint, left: Int, right: Int, top: Int, baseline: Int, bottom: Int,
+      text: CharSequence, start: Int, end: Int, lineNumber: Int
+    ) {
+      if (Color.alpha(color) == 0) return
+      val width = paint.measureText(text, start, end)
+      val center = (left + right) / 2f
+      val oldColor = paint.color
+      paint.color = color
+      canvas.drawRect(center - width / 2f - padding, top.toFloat() - padding, center + width / 2f + padding, bottom.toFloat() + padding, paint)
+      paint.color = oldColor
+    }
+  }
+
+  private fun colorWithOpacity(color: Int, opacity: Float): Int =
+    Color.argb((255f * opacity.coerceIn(0f, 1f)).toInt(), Color.red(color), Color.green(color), Color.blue(color))
 
   @Suppress("UNCHECKED_CAST")
   private fun titlesOf(request: Map<String, Any?>): List<Title> {
@@ -299,7 +337,13 @@ class VideoExportModule : Module() {
           // refused render over one is not.
           color = runCatching { Color.parseColor(it["color"] as? String ?: "#ffffff") }.getOrDefault(Color.WHITE),
           offsetX = num(it["positionX"], 0f),
-          offsetY = num(it["positionY"], 0f)
+          offsetY = num(it["positionY"], 0f),
+          bold = it["fontWeight"] == "bold",
+          outlineColor = runCatching { Color.parseColor(it["outlineColor"] as? String ?: "#000000") }.getOrDefault(Color.BLACK),
+          outlineWidthPx = num(it["outlineWidthPx"], 0f).coerceIn(0f, 24f),
+          backgroundColor = runCatching { Color.parseColor(it["backgroundColor"] as? String ?: "#000000") }.getOrDefault(Color.BLACK),
+          backgroundOpacity = num(it["backgroundOpacity"], 0f).coerceIn(0f, 1f),
+          paddingPx = num(it["paddingPx"], 0f).coerceIn(0f, 64f)
         )
       }
       .filter { it.text.isNotEmpty() && it.endMs > it.startMs }
@@ -324,6 +368,12 @@ class VideoExportModule : Module() {
     val span = SpannableString(title.text)
     span.setSpan(ForegroundColorSpan(title.color), 0, span.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
     span.setSpan(AbsoluteSizeSpan(title.sizePx), 0, span.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    if (title.bold) span.setSpan(StyleSpan(Typeface.BOLD), 0, span.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    if (title.outlineWidthPx > 0f) span.setSpan(OutlineShadowSpan(title.outlineColor, title.outlineWidthPx), 0, span.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    if (title.backgroundOpacity > 0f) span.setSpan(
+      CaptionBackgroundSpan(colorWithOpacity(title.backgroundColor, title.backgroundOpacity), title.paddingPx),
+      0, span.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+    )
     // Anchors are fractions of the frame from its centre, and the offsets are
     // pixels of the output — so they are divided by half the frame to speak the
     // same units the rest of the plan does.

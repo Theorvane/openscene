@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { chmod, lstat, mkdir, realpath, rm } from 'node:fs/promises';
 import { extname, isAbsolute, join, resolve } from 'node:path';
 
-import type { LocalProjectSnapshot, MediaAsset, MediaKind } from '../shared/timelineTypes';
+import type { LocalProjectSnapshot, MediaAsset, MediaKind, ResultAssetOrigin } from '../shared/timelineTypes';
 import { parseImportMediaInput } from '../shared/timelineValidators';
 import { copyAssetFile } from './assetFileCopy';
 import {
@@ -27,6 +27,8 @@ export type ImportAssetFromPathInput = {
   readonly displayName: string;
   readonly kind: MediaKind;
   readonly mimeType: string;
+  /** Main-process-only idempotency key for completed app results. */
+  readonly resultOrigin?: ResultAssetOrigin;
 };
 
 type PreparedImport = {
@@ -48,6 +50,24 @@ type ImportBatchInput = {
   readonly limits: AssetImportLimits;
   readonly now: Date;
 };
+
+const assetImportGates = new Map<string, Promise<void>>();
+
+async function withAssetImportGate<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const previous = assetImportGates.get(key) ?? Promise.resolve();
+  let release = (): void => undefined;
+  const current = new Promise<void>((resolveGate) => {
+    release = resolveGate;
+  });
+  assetImportGates.set(key, current);
+  await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (assetImportGates.get(key) === current) assetImportGates.delete(key);
+  }
+}
 
 function resolveAssetsDirectory(projectPath: string): string {
   const assetsPath = join(projectPath, PROJECT_ASSETS_DIRECTORY);
@@ -122,6 +142,7 @@ async function prepareImport(
     mimeType: parsedInput.mimeType,
     byteLength: sourceStats.size,
     metadata: null,
+    ...(input.resultOrigin === undefined ? {} : { resultOrigin: input.resultOrigin }),
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -137,13 +158,10 @@ function projectAssetBytes(project: LocalProjectSnapshot): number {
   return project.assets.reduce((total, asset) => total + asset.byteLength, 0);
 }
 
-export async function importAssetBatch(input: ImportBatchInput): Promise<readonly MediaAsset[]> {
-  assertAssetSelectionCount(input.imports.length, input.limits);
-  const firstImport = input.imports[0];
-  if (firstImport === undefined || input.imports.some((candidate) => candidate.projectId !== firstImport.projectId)) {
-    throw new AssetImportValidationError('Asset imports must target one known project.');
-  }
-  assertOpaqueId(firstImport.projectId, 'project id');
+async function importAssetBatchForProject(
+  input: ImportBatchInput,
+  firstImport: ImportAssetFromPathInput
+): Promise<readonly MediaAsset[]> {
   const project = await input.projects.open(firstImport.projectId);
   if (project === null) {
     throw new ProjectStoreError(`Project ${firstImport.projectId} was not found.`);
@@ -186,4 +204,15 @@ export async function importAssetBatch(input: ImportBatchInput): Promise<readonl
     }
     throw error;
   }
+}
+
+export async function importAssetBatch(input: ImportBatchInput): Promise<readonly MediaAsset[]> {
+  assertAssetSelectionCount(input.imports.length, input.limits);
+  const firstImport = input.imports[0];
+  if (firstImport === undefined || input.imports.some((candidate) => candidate.projectId !== firstImport.projectId)) {
+    throw new AssetImportValidationError('Asset imports must target one known project.');
+  }
+  assertOpaqueId(firstImport.projectId, 'project id');
+  const gateKey = JSON.stringify([input.rootDirectory, firstImport.projectId]);
+  return withAssetImportGate(gateKey, () => importAssetBatchForProject(input, firstImport));
 }

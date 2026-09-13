@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 import { compileFfmpegTimeline, escapeDrawtext } from '../src/shared/ffmpegTimelineCompiler';
 import { DEFAULT_TITLE_LENGTH_MS, addTitle, removeTitle, titleAt, updateTitle } from '../src/shared/timelineTitleLogic';
+import { applyCaptionPreset } from '../src/shared/captionStyle';
 import { parseTimelineDocument } from '../src/shared/timelineDocumentValidators';
 import { escapeFontPath, fontCandidates, supportsDrawtext } from '../src/shared/titleFont';
-import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, TIMELINE_SCHEMA_VERSION } from '../src/shared/timelineTypes';
+import { DEFAULT_CLIP_EFFECTS, TIMELINE_SCHEMA_VERSION } from '../src/shared/timelineTypes';
 
 /**
  * Words on the picture.
@@ -70,6 +71,16 @@ describe('reading a document', () => {
     expect(parsed?.titles).toHaveLength(1);
   });
 
+  it('keeps a bounded caption style and refuses malformed nested style data', () => {
+    const styled = applyCaptionPreset(title, 'boxed');
+    expect(parseTimelineDocument({ schemaVersion: TIMELINE_SCHEMA_VERSION, transitions: [], tracks: [], titles: [styled] })?.titles?.[0]?.style)
+      .toEqual(styled.style);
+    expect(parseTimelineDocument({
+      schemaVersion: TIMELINE_SCHEMA_VERSION, transitions: [], tracks: [],
+      titles: [{ ...styled, style: { ...styled.style!, backgroundOpacity: 2 } }]
+    })).toBeNull();
+  });
+
   it('refuses a title with no length, and one with a colour nothing agrees on', () => {
     // A zero-length title is a value no renderer can draw, and a colour every
     // renderer parses differently is a picture that differs per surface.
@@ -109,6 +120,20 @@ describe('drawing with FFmpeg', () => {
     expect(args.indexOf('drawtext')).toBeLessThan(args.indexOf('format=yuv420p'));
   });
 
+  it('renders the materialized font, outline, box and title-safe anchor', () => {
+    const styledTimeline = { ...(timeline as unknown as object), titles: [applyCaptionPreset(title, 'boxed')] } as never;
+    const args = compileFfmpegTimeline({
+      timeline: styledTimeline,
+      assetPaths: new Map([['a', '/tmp/a.mp4']]),
+      titleFontPath: '/regular.ttf',
+      titleBoldFontPath: '/bold.ttf',
+      outputPath: '/tmp/out.mp4', width: 640, height: 360, frameRate: 30
+    }).args.join(' ');
+    expect(args).toContain("fontfile='/bold.ttf'");
+    expect(args).toContain('borderw=0:bordercolor=#000000:box=1:boxcolor=#000000@0.72:boxborderw=16');
+    expect(args).toContain('y=(h-text_h)/2+115');
+  });
+
   it('refuses by name when there is no font, rather than exporting without the words', () => {
     // Silently dropping the titles would hand someone a video that is missing
     // the thing they added last.
@@ -135,6 +160,7 @@ describe('finding a font', () => {
     expect(fontCandidates('darwin')[0]).toMatch(/^\/System\/Library\/Fonts\//);
     expect(fontCandidates('win32')[0]).toMatch(/^C:\\Windows\\Fonts\\/);
     expect(fontCandidates('linux')[0]).toMatch(/^\/usr\/share\/fonts\//);
+    expect(fontCandidates('win32', 'bold')[0]).toContain('arialbd.ttf');
   });
 
   it('spells a Windows path for the filter parser rather than the filesystem', () => {

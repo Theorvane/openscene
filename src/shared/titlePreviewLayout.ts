@@ -1,4 +1,5 @@
 import { EXPORT_DEFAULTS } from './exportTypes';
+import { resolvedTitleStyle, titleOutputPosition } from './captionStyle';
 import type { TimelineTitle } from './timelineTypes';
 
 /**
@@ -22,6 +23,8 @@ export type TitlePreviewLayout = {
   readonly fontSizePx: number;
   readonly offsetXPx: number;
   readonly offsetYPx: number;
+  readonly outlineWidthPx: number;
+  readonly paddingPx: number;
 };
 
 export function titlePreviewLayout(
@@ -33,10 +36,14 @@ export function titlePreviewLayout(
     frame.width > 0 && frame.height > 0 && reference.width > 0 && reference.height > 0
       ? Math.min(frame.width / reference.width, frame.height / reference.height)
       : 0;
+  const position = titleOutputPosition(title, reference);
+  const style = resolvedTitleStyle(title);
   return {
     fontSizePx: title.sizePx * scale,
-    offsetXPx: title.positionX * scale,
-    offsetYPx: title.positionY * scale
+    offsetXPx: position.x * scale,
+    offsetYPx: position.y * scale,
+    outlineWidthPx: style.outlineWidthPx * scale,
+    paddingPx: style.paddingPx * scale
   };
 }
 

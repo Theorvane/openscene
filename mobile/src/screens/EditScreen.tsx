@@ -6,6 +6,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { nextVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
 import { clipDurationMs, clipTimelineEndMs } from '@openvideo/shared/timelineClipGeometry';
 import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
+import { DEFAULT_SUBTITLE_DELIVERY } from '@openvideo/shared/subtitleDelivery';
+import { metadataPrivacyPlan } from '@openvideo/shared/metadataPrivacy';
+import { applyCaptionPreset, CAPTION_PLACEMENTS, CAPTION_STYLE_PRESETS, isAutomaticCaptionId, resolvedTitleStyle, type CaptionPresetId } from '@openvideo/shared/captionStyle';
 import { track } from '../lib/analyticsClient';
 import { theme } from '../lib/theme';
 import { useMobileEditor, type EditorAsset } from '../lib/editorState';
@@ -46,6 +49,8 @@ const FRAME_LABELS: Readonly<Record<FramePreference, string>> = {
   landscape: 'Landscape',
   square: 'Square'
 };
+
+const DESKTOP_PRIVACY_CLEAN_SUMMARY = metadataPrivacyPlan('privacy_clean').summary;
 
 /**
  * Whether this phone's renderer applies a grade.
@@ -158,11 +163,13 @@ export function EditScreen({
   const [transitioning, setTransitioning] = useState(false);
   const [titling, setTitling] = useState(false);
   const [framePreference, setFramePreference] = useState<FramePreference>('source');
+  const [burnAutomaticCaptions, setBurnAutomaticCaptions] = useState(true);
 
   // Read once per project: the choice belongs to the project, not to this screen.
   useEffect(() => {
     if (projectId === null) return;
     setFramePreference(readProject(projectId)?.frame ?? 'source');
+    setBurnAutomaticCaptions(readProject(projectId)?.subtitleDelivery?.burnAutomaticCaptions ?? DEFAULT_SUBTITLE_DELIVERY.burnAutomaticCaptions);
   }, [projectId, reloadToken]);
 
   /*
@@ -197,6 +204,7 @@ export function EditScreen({
   }, [framePreference, projectId]);
   /** The title covering the playhead, which is the one the panel and preview both show. */
   const activeTitle = editor.titleAtPlayhead;
+  const automaticCaptionCount = editor.timeline.titles?.filter((title) => isAutomaticCaptionId(title.id)).length ?? 0;
   const [dragging, setDragging] = useState(false);
   const [zooming, setZooming] = useState(false);
   /** Which track's actions are open, if any. */
@@ -420,6 +428,7 @@ export function EditScreen({
   };
 
   const selected = editor.selectedClip;
+  const selectedAsset = selected === null ? null : editor.assetFor(selected.clip.assetId);
 
   /** How many clips reference each asset, so the library can say what is in use. */
   const usage = useMemo(() => {
@@ -440,8 +449,8 @@ export function EditScreen({
         onProgress={onProgress}
         onEnded={onEnded}
         // What Adjust changes, shown where the change is supposed to be visible.
-        // 1920 is the width `exportComposition` renders into when a project does
-        // not say otherwise, and `positionX/Y` are pixels in that frame.
+        // The same output frame the exporter uses, so safe-area anchors and
+        // pixel offsets stay truthful for portrait, landscape and square cuts.
         effects={
           visible === null
             ? undefined
@@ -458,7 +467,8 @@ export function EditScreen({
                 rotation: visible.clip.effects.rotation
               }
         }
-        frameWidth={1920}
+        frameWidth={exportFrame.width}
+        frameHeight={exportFrame.height}
         // A dip to black sits over everything, the way it does on the desktop.
         dimOpacity={dipToBlackOpacityAt(editor.timeline, editor.playheadMs)}
         titles={titlesAt(editor.timeline.titles, editor.playheadMs)}
@@ -542,6 +552,14 @@ export function EditScreen({
         <Tool label="Import" onPress={() => void importMedia()} disabled={projectId === null} />
         <Tool label="Split" onPress={editor.splitAtPlayhead} disabled={selected === null} />
         <Tool label="Adjust" onPress={() => setInspecting((open) => !open)} disabled={selected === null} />
+        {selectedAsset?.kind === 'video' && (
+          <Tool
+            label="Detach audio"
+            onPress={() => undefined}
+            disabled
+            hint="Desktop only until the mobile native compositor exposes audio extraction"
+          />
+        )}
         <Tool label="Delete" tone="danger" onPress={editor.deleteSelected} disabled={selected === null} />
         {/*
           Transition earns a place in the toolbar rather than the More sheet: it
@@ -783,6 +801,21 @@ export function EditScreen({
               {`Frame: ${FRAME_LABELS[framePreference]} · ${exportFrame.width}×${exportFrame.height}`}
             </Text>
           </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => {
+            if (projectId === null) return;
+            const next = !burnAutomaticCaptions;
+            const current = readProject(projectId);
+            if (current === null) return;
+            writeProject({ ...current, subtitleDelivery: { burnAutomaticCaptions: next, sidecarFormat: 'none' } });
+            setBurnAutomaticCaptions(next);
+          }} style={press(styles.sheetRow)}>
+            <Text style={styles.sheetRowText}>Automatic captions: {burnAutomaticCaptions ? 'burn into video' : 'do not burn'}</Text>
+          </Pressable>
+          <Text style={styles.panelNote}>SRT, VTT and ASS sidecar files are currently desktop-only.</Text>
+          <Pressable accessibilityRole="button" disabled style={press(styles.sheetRow)}>
+            <Text style={[styles.sheetRowText, styles.sheetDisabled]}>Metadata privacy and provenance: desktop-only</Text>
+          </Pressable>
+          <Text style={styles.panelNote}>Mobile does not claim to sanitize or verify metadata, or write provenance.json. Finish this delivery in the desktop app. {DESKTOP_PRIVACY_CLEAN_SUMMARY}</Text>
           <Pressable accessibilityRole="button" onPress={() => setMoreOpen(false)} style={press(styles.sheetRow)}>
             <Text style={styles.sheetRowText}>Close</Text>
           </Pressable>
@@ -829,7 +862,9 @@ export function EditScreen({
         <TitlePanel
           title={activeTitle}
           maxHeight={inspectorMaxHeight}
+          automaticCaptionCount={automaticCaptionCount}
           onChange={(changes) => editor.editTitle(activeTitle.id, changes)}
+          onApplyAutomatic={() => editor.applyTitleStyleToAutomaticCaptions(activeTitle.id)}
           onRemove={() => {
             editor.removeTitle(activeTitle.id);
             setTitling(false);
@@ -988,6 +1023,11 @@ export function EditScreen({
             onDown={() => editor.setSelectedEffects({ volume: Math.max(0, selected.clip.effects.volume - 0.1) })}
             onUp={() => editor.setSelectedEffects({ volume: Math.min(2, selected.clip.effects.volume + 0.1) })}
           />
+          {selectedAsset?.kind === 'video' && (
+            <Text style={styles.panelNote}>
+              Detach audio is currently desktop-only. Mobile keeps the video's embedded sound during preview and export.
+            </Text>
+          )}
         </ScrollView>
       )}
     </View>
@@ -1078,17 +1118,22 @@ function TransitionPanel({
 function TitlePanel({
   title,
   maxHeight,
+  automaticCaptionCount,
   onChange,
+  onApplyAutomatic,
   onRemove,
   onClose
 }: {
   title: TimelineTitle;
   maxHeight: number;
+  automaticCaptionCount: number;
   onChange: (changes: Partial<Omit<TimelineTitle, 'id'>>) => void;
+  onApplyAutomatic: () => void;
   onRemove: () => void;
   onClose: () => void;
 }) {
   const lengthMs = title.timelineEndMs - title.timelineStartMs;
+  const titleStyle = resolvedTitleStyle(title);
   return (
     <ScrollView
       style={[styles.inspector, { maxHeight }]}
@@ -1120,6 +1165,33 @@ function TitlePanel({
           />
         ))}
       </View>
+      <Text style={styles.panelNote}>Style preset</Text>
+      <View style={styles.captionChoiceRow}>
+        {CAPTION_STYLE_PRESETS.map((preset) => (
+          <Pressable key={preset.id} accessibilityRole="button" accessibilityLabel={`Apply ${preset.label} caption preset`}
+            onPress={() => {
+              const next = applyCaptionPreset(title, preset.id as CaptionPresetId);
+              onChange({ sizePx: next.sizePx, color: next.color, positionX: 0, positionY: 0, style: next.style });
+            }} style={press(styles.captionChoice)}>
+            <Text style={styles.captionChoiceText}>{preset.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.panelNote}>Title-safe anchor</Text>
+      <View style={styles.captionChoiceRow}>
+        {CAPTION_PLACEMENTS.map((placement) => (
+          <Pressable key={placement} accessibilityRole="button" accessibilityState={{ selected: titleStyle.placement === placement }}
+            onPress={() => onChange({ style: { ...titleStyle, placement } })}
+            style={press([styles.captionChoice, titleStyle.placement === placement && styles.captionChoiceOn])}>
+            <Text style={styles.captionChoiceText}>{placement}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: titleStyle.fontWeight === 'bold' }}
+        onPress={() => onChange({ style: { ...titleStyle, fontWeight: titleStyle.fontWeight === 'bold' ? 'regular' : 'bold' } })}
+        style={press([styles.tool, titleStyle.fontWeight === 'bold' && styles.captionChoiceOn])}>
+        <Text style={styles.toolText}>Bold: {titleStyle.fontWeight === 'bold' ? 'on' : 'off'}</Text>
+      </Pressable>
       <Stepper
         label="Size"
         value={`${Math.round(title.sizePx)}px`}
@@ -1144,6 +1216,20 @@ function TitlePanel({
         onDown={() => onChange({ timelineEndMs: title.timelineEndMs - 200 })}
         onUp={() => onChange({ timelineEndMs: title.timelineEndMs + 200 })}
       />
+      <Stepper label="Outline" value={`${Math.round(titleStyle.outlineWidthPx)}px`}
+        onDown={() => onChange({ style: { ...titleStyle, outlineWidthPx: Math.max(0, titleStyle.outlineWidthPx - 1) } })}
+        onUp={() => onChange({ style: { ...titleStyle, outlineWidthPx: Math.min(24, titleStyle.outlineWidthPx + 1) } })} />
+      <Stepper label="Box opacity" value={`${Math.round(titleStyle.backgroundOpacity * 100)}%`}
+        onDown={() => onChange({ style: { ...titleStyle, backgroundOpacity: Math.max(0, Number((titleStyle.backgroundOpacity - 0.1).toFixed(2))) } })}
+        onUp={() => onChange({ style: { ...titleStyle, backgroundOpacity: Math.min(1, Number((titleStyle.backgroundOpacity + 0.1).toFixed(2))) } })} />
+      <Stepper label="Box padding" value={`${Math.round(titleStyle.paddingPx)}px`}
+        onDown={() => onChange({ style: { ...titleStyle, paddingPx: Math.max(0, titleStyle.paddingPx - 2) } })}
+        onUp={() => onChange({ style: { ...titleStyle, paddingPx: Math.min(64, titleStyle.paddingPx + 2) } })} />
+      <Pressable accessibilityRole="button" disabled={automaticCaptionCount === 0} onPress={onApplyAutomatic}
+        style={press([styles.tool, automaticCaptionCount === 0 && styles.toolOff])}>
+        <Text style={styles.toolText}>Apply appearance to {automaticCaptionCount} automatic caption{automaticCaptionCount === 1 ? '' : 's'}</Text>
+      </Pressable>
+      <Text style={styles.panelNote}>Safe anchors adapt to landscape, portrait and square exports. X/Y remain fine-tuning offsets.</Text>
       <Pressable accessibilityRole="button" onPress={onRemove} style={press([styles.tool, styles.toolDanger])}>
         <Text style={[styles.toolText, styles.toolDangerText]}>Remove title</Text>
       </Pressable>
@@ -1201,16 +1287,19 @@ function Tool({
   label,
   onPress,
   disabled,
-  tone
+  tone,
+  hint
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   tone?: 'danger';
+  hint?: string;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityHint={hint}
       disabled={disabled === true}
       onPress={onPress}
       style={press([styles.tool, disabled === true && styles.toolOff, tone === 'danger' && styles.toolDanger])}
@@ -1282,6 +1371,10 @@ const styles = StyleSheet.create({
   // 44 tall because it is typed into, and 16pt because iOS zooms a smaller field.
   titleInput: { minHeight: 44, borderWidth: 1, borderColor: theme.line, borderRadius: 10, paddingHorizontal: 12, color: theme.text, fontSize: 16, backgroundColor: theme.bg },
   swatchRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  captionChoiceRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  captionChoice: { borderWidth: 1, borderColor: theme.line, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: theme.surface },
+  captionChoiceOn: { borderColor: theme.accent, backgroundColor: '#2a2340' },
+  captionChoiceText: { color: theme.text, fontSize: 12, textTransform: 'capitalize' },
   swatch: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: theme.line },
   swatchOn: { borderWidth: 3, borderColor: theme.text },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },

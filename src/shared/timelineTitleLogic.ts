@@ -1,4 +1,5 @@
 import { DEFAULT_TITLE, type TimelineDocument, type TimelineTitle } from './timelineTypes';
+import { parseTimelineTitleStyle } from './captionStyle';
 
 /**
  * Adding, editing and removing the words on a cut.
@@ -47,6 +48,7 @@ export function updateTitle(
   if (next.timelineEndMs <= next.timelineStartMs) return null;
   if (next.sizePx <= 0) return null;
   if (!/^#[0-9a-fA-F]{6}$/.test(next.color)) return null;
+  if (next.style !== undefined && parseTimelineTitleStyle(next.style) === null) return null;
 
   return { ...timeline, titles: titles.map((title, at) => (at === index ? next : title)) };
 }

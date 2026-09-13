@@ -87,4 +87,27 @@ describe('FFmpeg timeline compiler', () => {
       frameRate: 30
     })).toThrow('Timeline asset video-asset is unavailable.');
   });
+
+  it('clears only allowlisted personal tags for Privacy Clean and requests no removal for Preserve Provenance', () => {
+    const input = {
+      timeline: TIMELINE,
+      assetPaths: new Map([
+        ['video-asset', '/project/video.webm'],
+        ['audio-asset', '/project/audio.wav']
+      ]),
+      outputPath: '/exports/export_01.mp4',
+      width: 1280,
+      height: 720,
+      frameRate: 30
+    } as const;
+    const preserved = compileFfmpegTimeline({ ...input, metadataPrivacyMode: 'preserve_provenance' });
+    const cleaned = compileFfmpegTimeline({ ...input, metadataPrivacyMode: 'privacy_clean' });
+
+    expect(preserved.args).not.toContain('-metadata');
+    expect(cleaned.args).toContain('author=');
+    expect(cleaned.args).toContain('com.apple.quicktime.location.ISO6709=');
+    expect(cleaned.args).not.toContain('copyright=');
+    expect(cleaned.args.join(' ')).not.toMatch(/c2pa=|synthid=/i);
+    expect(cleaned.args.at(-1)).toBe(input.outputPath);
+  });
 });

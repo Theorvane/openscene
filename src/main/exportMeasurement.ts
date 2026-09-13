@@ -1,6 +1,4 @@
 import { spawn } from 'node:child_process';
-import { basename, dirname, join } from 'node:path';
-
 import type { ExportMeasurement } from '../shared/exportReview';
 
 /**
@@ -18,11 +16,17 @@ const PROBE_TIMEOUT_MS = 15_000;
 
 /** `ffmpeg` and `ffprobe` live in the same directory and share an extension. */
 export function ffprobePathFor(ffmpegPath: string): string {
-  const name = basename(ffmpegPath);
+  // Do not parse this with the host OS path implementation: project tests and
+  // recovered job records can legitimately contain a path written on another
+  // platform. Both separators are unambiguous here because only the final
+  // executable name is replaced.
+  const separatorIndex = Math.max(ffmpegPath.lastIndexOf('/'), ffmpegPath.lastIndexOf('\\'));
+  const directory = ffmpegPath.slice(0, separatorIndex + 1);
+  const name = ffmpegPath.slice(separatorIndex + 1);
   const probeName = name.replace(/ffmpeg/i, (matched) => (matched === matched.toUpperCase() ? 'FFPROBE' : 'ffprobe'));
   // A path whose file name says nothing about ffmpeg is not one to rewrite by
   // guessing; the sibling is the only place worth looking.
-  return probeName === name ? join(dirname(ffmpegPath), 'ffprobe') : join(dirname(ffmpegPath), probeName);
+  return `${directory}${probeName === name ? 'ffprobe' : probeName}`;
 }
 
 export function ffprobeArgs(filePath: string): readonly string[] {

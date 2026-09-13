@@ -4,7 +4,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View 
 import { estimateImageCost } from '@openvideo/shared/mediaGenerationPricing';
 import {
   requestBytePlusImage,
-  requestImagenImage,
+  requestNanoBananaImage,
   requestOpenAiImage,
   type GeneratedImageData
 } from '@openvideo/shared/imageGeneration';
@@ -27,7 +27,7 @@ const RATIOS: readonly ImageAspectRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4'
 /** Which adapter and credential slot each provider id resolves to. */
 const PROVIDER_BINDINGS: Readonly<Record<string, { slot: ProviderSlot; request: (input: never) => Promise<GeneratedImageData> }>> = {
   openai: { slot: 'openaiApiKey', request: requestOpenAiImage as never },
-  google_gemini: { slot: 'geminiApiKey', request: requestImagenImage as never },
+  google_gemini: { slot: 'geminiApiKey', request: requestNanoBananaImage as never },
   byteplus: { slot: 'bytePlusApiKey', request: requestBytePlusImage as never }
 };
 
@@ -156,6 +156,16 @@ export function ImageScreen({
         onSelect={(next) => setModelId(next.id)}
         onConnectionChange={refreshConnections}
       />
+      {model?.providerId === 'google_gemini' && (
+        <Text style={styles.sessionNote}>
+          Signed-in Google Flow automation is desktop-only. Manual login or verification must be resolved on desktop; mobile continues to use the official Gemini API key.
+        </Text>
+      )}
+      {model?.providerId === 'xai' && (
+        <Text style={styles.sessionNote}>
+          Signed-in Grok Imagine automation is desktop-only. Manual login or verification must be resolved on desktop; mobile uses supported official API-key routes only.
+        </Text>
+      )}
 
       <Text style={styles.label}>Aspect ratio</Text>
       <View style={styles.row}>
@@ -257,5 +267,6 @@ const styles = StyleSheet.create({
   error: { color: theme.danger, fontSize: 13, lineHeight: 19, marginTop: 14 },
   resultBox: { marginTop: 20, gap: 8 },
   resultImage: { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: theme.surface },
-  footnote: { color: theme.textWeaker, fontSize: 11 }
+  footnote: { color: theme.textWeaker, fontSize: 11 },
+  sessionNote: { color: theme.textWeaker, fontSize: 12, lineHeight: 18, marginTop: 8 }
 });

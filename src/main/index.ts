@@ -4,6 +4,8 @@ import { copyFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 
 import { AssetLibraryStore } from './assetLibraryStore';
+import { AudioDetachService } from './audioDetachService';
+import { registerAudioDetachIpcHandler } from './audioDetachIpcHandlers';
 import type { AppSettings, CaptureSource } from '../shared/models';
 import type { MediaKind } from '../shared/timelineTypes';
 import { SourceCatalog, type RawCaptureSource } from '../shared/sourceCatalog';
@@ -29,7 +31,9 @@ import { fail, ok } from './ipcResponses';
 import { IPC_CHANNELS } from '../shared/ipc';
 import { installApplicationMenu } from './applicationMenu';
 
-import { createImageGenerationJob, createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getGeneratedImageAsReference, getImageGenerationJob, getSpeechGenerationJob, getVideoGenerationJob, setAiJobManagerCredentialStore, setAiJobManagerSpendStore } from './aiJobManager';
+import { createImageGenerationJob, createSpeechGenerationJob, createVideoGenerationJob, getCompletedAiSource, getGeneratedImageAsReference, getImageGenerationJob, getSpeechGenerationJob, getVideoGenerationJob, initializeVideoJobRecovery, listSpeechVoices, openCompletedSpeechPreviewSource, openCompletedVideoPreviewSource, setAiJobManagerAssetSourceResolver, setAiJobManagerBrowserImageGenerator, setAiJobManagerBrowserVideoGenerator, setAiJobManagerCredentialStore, setAiJobManagerSpendStore, setAiJobManagerVieNeuRuntime } from './aiJobManager';
+import { VideoJobRecoveryStore } from './videoJobRecoveryStore';
+import { getComfyUiMotionWorkerStatus } from './comfyUiMotionAdapter';
 import { CredentialStore } from './credentialStore';
 import { LlmExecutionAdapter } from './llmAdapter';
 import { getOpenVideoMcpDefinition, OpenVideoMcpServer } from './openVideoMcpServer';
@@ -44,6 +48,26 @@ import { registerChatGptOAuthIpcHandlers } from './registerChatGptOAuthIpcHandle
 import { ChatGptCodexAdapter } from './chatGptCodexAdapter';
 import { LlmPromptRouter } from './llmPromptRouter';
 import { registerLlmPromptIpcHandler } from './registerLlmPromptIpcHandler';
+import { registerWriterIpcHandler } from './registerWriterIpcHandler';
+import { BrowserSessionVault } from './browserSessionVault';
+import { BrowserSessionService } from './browserSessionService';
+import { registerBrowserSessionIpcHandlers } from './registerBrowserSessionIpcHandlers';
+import { TranscriptionService } from './transcriptionService';
+import { registerTranscriptionIpcHandlers } from './transcriptionIpcHandlers';
+import { ManagedVieNeuRuntime } from './managedVieNeuRuntime';
+import { ContinuityFrameService } from './continuityFrameService';
+import { registerContinuityFrameIpcHandlers } from './continuityFrameIpcHandlers';
+
+try {
+  // Node loads the developer's local .env without bundling its secrets into
+  // renderer code. Packaged installs normally have no such file and simply use
+  // environment variables supplied by their launcher.
+  if (!app.isPackaged) process.loadEnvFile(join(process.cwd(), '.env'));
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+    console.warn('[OpenScene] Local .env could not be loaded:', error instanceof Error ? error.message : 'unknown error');
+  }
+}
 
 registerTimelineAssetScheme();
 
@@ -52,8 +76,14 @@ const recordingStore = new RecordingFileStore(resolveRecordingsDirectory());
 const projectLocations = new ProjectLocationRegistry(join(app.getPath('userData'), 'project-locations.json'));
 const projectStore = new ProjectStore(join(app.getPath('userData'), 'projects'), projectLocations);
 const assetLibraryStore = new AssetLibraryStore(join(app.getPath('userData'), 'projects'), projectStore);
+const audioDetachService = new AudioDetachService({ projects: projectStore, assets: assetLibraryStore });
+const continuityFrameService = new ContinuityFrameService({ projects: projectStore, assets: assetLibraryStore });
 const exportJobStore = new ExportJobStore();
 const credentialStore = new CredentialStore(app.getPath('userData'));
+const browserSessionService = new BrowserSessionService(
+  new BrowserSessionVault(app.getPath('userData')),
+  app.getPath('temp')
+);
 const updaterController = setupUpdater();
 const updaterPromptIo = {
   showMessageBox: (input: Parameters<typeof dialog.showMessageBox>[0]) => dialog.showMessageBox(input),
@@ -68,6 +98,14 @@ const llmPromptRouter = new LlmPromptRouter({
   chatGptAdapter: new ChatGptCodexAdapter({ oauthService: chatGptOAuthService })
 });
 setAiJobManagerCredentialStore(credentialStore);
+setAiJobManagerBrowserImageGenerator((input) => input.modelId === 'grok-imagine-image'
+  ? browserSessionService.generateGrokImagineImage(input)
+  : browserSessionService.generateGoogleFlowImage(input));
+setAiJobManagerBrowserVideoGenerator((input) => input.modelId === 'grok-imagine-video-1.5'
+  ? browserSessionService.generateGrokImagineVideo(input)
+  : browserSessionService.generateGoogleFlowVideo(input));
+const managedVieNeuRuntime = new ManagedVieNeuRuntime({ workingDirectory: process.cwd() });
+setAiJobManagerVieNeuRuntime(managedVieNeuRuntime);
 /*
   The ceiling on what generation may cost, and the record of what it did.
 
@@ -77,6 +115,7 @@ setAiJobManagerCredentialStore(credentialStore);
 */
 const generationSpendStore = new GenerationSpendStore(join(app.getPath('userData'), 'generation-spend.json'));
 setAiJobManagerSpendStore(generationSpendStore);
+const videoJobRecoveryStore = new VideoJobRecoveryStore(join(app.getPath('userData'), 'video-generation-jobs.json'));
 const timelineIpcService = new TimelineIpcService({
   projects: projectStore,
   assets: assetLibraryStore,
@@ -88,6 +127,21 @@ const timelineIpcService = new TimelineIpcService({
     title: 'Choose a project folder',
     properties: ['openDirectory', 'createDirectory']
   })
+});
+const transcriptionService = new TranscriptionService({
+  getAsset: (projectId, assetId) => projectStore.getAsset(projectId, assetId),
+  openAsset: (projectId, assetId) => timelineIpcService.openAssetPlaybackSource(projectId, assetId)
+});
+setAiJobManagerAssetSourceResolver(async (projectId, assetId) => {
+  const [source, asset] = await Promise.all([
+    timelineIpcService.openAssetPlaybackSource(projectId, assetId),
+    projectStore.getAsset(projectId, assetId)
+  ]);
+  if (source === null || asset === null) {
+    await source?.file.close().catch(() => undefined);
+    return null;
+  }
+  return { ...source, ...(asset.metadata === null ? {} : { durationMs: asset.metadata.durationMs }) };
 });
 const resultAssetImportService = new ResultAssetImportService({
   assets: assetLibraryStore,
@@ -118,6 +172,9 @@ function resolveRecordingsDirectory(): string {
 }
 
 function dialogFilters(acceptedKinds: readonly MediaKind[] | undefined, extensions: readonly string[]): Electron.FileFilter[] {
+  if (acceptedKinds?.length === 1 && acceptedKinds[0] === 'image') {
+    return [{ name: 'Images', extensions: ['jpeg', 'jpg', 'png', 'webp'] }];
+  }
   if (acceptedKinds?.length === 1 && acceptedKinds[0] === 'audio') {
     return [{ name: 'Audio', extensions: ['m4a', 'mp3', 'wav', 'webm'] }];
   }
@@ -182,6 +239,25 @@ function createWindow(): void {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event) => {
     event.preventDefault();
+  });
+  mainWindow.webContents.on('console-message', (details) => {
+    if (details.level !== 'warning' && details.level !== 'error') return;
+    const log = details.level === 'error' ? console.error : console.warn;
+    log(`[OpenScene][Renderer] console.${details.level} ${JSON.stringify({
+      message: details.message,
+      source: details.sourceId,
+      line: details.lineNumber
+    })}`);
+  });
+  mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+    console.error(`[OpenScene][Renderer] preload.failed ${JSON.stringify({ preloadPath, error: error.message })}`);
+  });
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame) return;
+    console.error(`[OpenScene][Renderer] load.failed ${JSON.stringify({ errorCode, errorDescription, url: validatedURL })}`);
+  });
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error(`[OpenScene][Renderer] process.gone ${JSON.stringify({ reason: details.reason, exitCode: details.exitCode })}`);
   });
 
   const devServerUrl = process.env.ELECTRON_RENDERER_URL;
@@ -267,6 +343,9 @@ async function installIpcHandlers(): Promise<void> {
     isSourceStillAvailable
   });
   registerTimelineIpcHandlers(ipcMain, timelineIpcService);
+  registerAudioDetachIpcHandler(ipcMain, audioDetachService);
+  registerContinuityFrameIpcHandlers(ipcMain, continuityFrameService);
+  registerTranscriptionIpcHandlers(ipcMain, transcriptionService);
   registerResultAssetImportHandlers(ipcMain, resultAssetImportService);
   registerUpdaterIpcHandlers(ipcMain, {
     controller: updaterController,
@@ -286,8 +365,16 @@ async function installIpcHandlers(): Promise<void> {
     service: chatGptOAuthService,
     registerHandler: (channel, handler) => ipcMain.handle(channel, (_event, payload: unknown) => handler(payload))
   });
+  registerBrowserSessionIpcHandlers({
+    service: browserSessionService,
+    registerHandler: (channel, handler) => ipcMain.handle(channel, handler)
+  });
   registerLlmPromptIpcHandler({
     router: llmPromptRouter,
+    registerHandler: (channel, handler) => ipcMain.handle(channel, (_event, payload: unknown) => handler(payload))
+  });
+  registerWriterIpcHandler({
+    credentialStore,
     registerHandler: (channel, handler) => ipcMain.handle(channel, (_event, payload: unknown) => handler(payload))
   });
 
@@ -366,16 +453,17 @@ async function installIpcHandlers(): Promise<void> {
   // learns about stills: the user picks the destination, main writes the bytes.
   ipcMain.handle(IPC_CHANNELS.aiSaveImageResult, async (_event, jobId: string) => {
     const job = getImageGenerationJob(jobId);
-    if (job === null || job.status !== 'completed' || job.outputFilePath === undefined) {
+    const source = getCompletedAiSource(jobId);
+    if (job === null || job.status !== 'completed' || source?.kind !== 'image') {
       return fail('JOB_NOT_FOUND', 'No completed image is available for that job.');
     }
-    const suggested = `AI_Image_${job.id.slice(-6)}${extname(job.outputFilePath)}`;
+    const suggested = `AI_Image_${job.id.slice(-6)}${extname(source.sourcePath)}`;
     const choice = await dialog.showSaveDialog({ title: 'Save generated image', defaultPath: suggested });
     if (choice.canceled || choice.filePath === undefined || choice.filePath.length === 0) {
       return ok({ saved: false });
     }
     try {
-      await copyFile(job.outputFilePath, choice.filePath);
+      await copyFile(source.sourcePath, choice.filePath);
       return ok({ saved: true });
     } catch (err) {
       return fail('FILE_WRITE_FAILED', err instanceof Error ? err.message : 'The image could not be saved.');
@@ -388,6 +476,25 @@ async function installIpcHandlers(): Promise<void> {
       return ok(job);
     } catch (err) {
       return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to create speech job');
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.aiGetComfyUiMotionStatus, async () => {
+    try {
+      return ok(await getComfyUiMotionWorkerStatus());
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to inspect the ComfyUI worker.');
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.aiListSpeechVoices, async (_event, modelId: unknown) => {
+    if (typeof modelId !== 'string' || modelId.trim().length === 0) {
+      return fail('INVALID_INPUT', 'A voice model id is required.');
+    }
+    try {
+      return ok(await listSpeechVoices(modelId));
+    } catch (err) {
+      return fail('UNKNOWN_ERROR', err instanceof Error ? err.message : 'Failed to list speech voices.');
     }
   });
 
@@ -487,6 +594,16 @@ app.setAboutPanelOptions({
 });
 
 app.whenReady().then(async () => {
+  // Recovery completes before renderer IPC exists. An interrupted paid request
+  // is surfaced as interrupted and is never submitted again on startup.
+  try {
+    await initializeVideoJobRecovery(videoJobRecoveryStore);
+  } catch {
+    // Editing must still open when the recovery journal is unavailable. New
+    // video jobs remain fail-closed because their queued state must be written
+    // successfully before any provider request starts.
+    console.error('[OpenScene][Video Recovery] startup.failed');
+  }
   installApplicationMenu(() => {
     // The user asked, so an up-to-date or failed answer is reported here where
     // the startup path stays quiet about both.
@@ -495,9 +612,14 @@ app.whenReady().then(async () => {
     });
   });
   installDisplayMediaHandler();
-  registerTimelineAssetProtocol(timelineIpcService);
+  registerTimelineAssetProtocol({
+    openAssetPlaybackSource: (projectId, assetId) => timelineIpcService.openAssetPlaybackSource(projectId, assetId),
+    openGeneratedSpeechSource: (jobId) => openCompletedSpeechPreviewSource(jobId),
+    openGeneratedVideoSource: (jobId) => openCompletedVideoPreviewSource(jobId)
+  });
   await installIpcHandlers();
   createWindow();
+  managedVieNeuRuntime.warmUp();
 
   // Checked after the window exists so the first result has somewhere to land,
   // and left unawaited so a slow or unreachable GitHub never delays startup.
@@ -529,4 +651,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   exportIpcService.cancelAll();
+  managedVieNeuRuntime.stop();
 });

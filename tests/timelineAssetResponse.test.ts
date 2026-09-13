@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, open, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,7 +8,9 @@ import { AssetLibraryStore } from '../src/main/assetLibraryStore';
 import { ProjectStore } from '../src/main/projectStore';
 import { createTimelineAssetRequestHandler } from '../src/main/timelineAssetResponse';
 import { TimelineIpcService } from '../src/main/timelineIpcService';
+import { speechPreviewUrl, videoPreviewUrl } from '../src/shared/mediaPlaybackUrls';
 import { createMp4MediaFixture, type Mp4MediaFixture } from './helpers/mediaFixtures';
+import { createSymlinkOrSkip } from './helpers/symlinkCapability';
 
 let mediaFixture: Mp4MediaFixture | undefined;
 
@@ -54,6 +56,55 @@ async function withPlaybackFixture<T>(run: (fixture: {
 }
 
 describe('timeline asset response', () => {
+  it('streams a generated speech preview by opaque job id without exposing its file path', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'video-speech-preview-'));
+    const speechPath = join(directory, 'generated.wav');
+    const speechBytes = Buffer.from('RIFF-preview-audio');
+    try {
+      await writeFile(speechPath, speechBytes);
+      const handler = createTimelineAssetRequestHandler({
+        openAssetPlaybackSource: async () => null,
+        openGeneratedSpeechSource: async (jobId) => jobId === 'speech-job-1'
+          ? { file: await open(speechPath, 'r'), filePath: speechPath, byteLength: speechBytes.byteLength, mimeType: 'audio/wav' }
+          : null
+      });
+      const url = speechPreviewUrl('speech-job-1');
+
+      const response = await handler(new Request(url, { headers: { Range: 'bytes=5-11' } }));
+
+      expect(response.status).toBe(206);
+      expect(response.headers.get('content-type')).toBe('audio/wav');
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(speechBytes.subarray(5, 12));
+      expect(url).not.toContain(speechPath);
+      expect((await handler(new Request('video-tool-asset://speech-preview/../escape'))).status).toBe(404);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('streams a generated video candidate by opaque job id', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'video-candidate-preview-'));
+    const videoPath = join(directory, 'generated.mp4');
+    const videoBytes = Buffer.from('candidate-video-bytes');
+    try {
+      await writeFile(videoPath, videoBytes);
+      const handler = createTimelineAssetRequestHandler({
+        openAssetPlaybackSource: async () => null,
+        openGeneratedVideoSource: async (jobId) => jobId === 'video-job-1'
+          ? { file: await open(videoPath, 'r'), filePath: videoPath, byteLength: videoBytes.byteLength, mimeType: 'video/mp4' }
+          : null
+      });
+      const url = videoPreviewUrl('video-job-1');
+      const response = await handler(new Request(url));
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toBe('video/mp4');
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(videoBytes);
+      expect(url).not.toContain(videoPath);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('serves a real MP4 imported through the native picker seam without exposing its source path', async () => {
     // Given
     const mp4Fixture = await createMp4MediaFixture();
@@ -170,13 +221,13 @@ describe('timeline asset response', () => {
     });
   });
 
-  it('given a playback URL whose file becomes a symlink, when the protocol serves it, then serve-time validation rejects it', async () => {
+  it('given a playback URL whose file becomes a symlink, when the protocol serves it, then serve-time validation rejects it', async ({ skip }) => {
     await withPlaybackFixture(async ({ request, playbackPath, directory }) => {
       // Given
       const outsidePath = join(directory, 'outside.webm');
       await writeFile(outsidePath, Buffer.from([9, 9, 9, 9, 9, 9, 9, 9, 9, 9]));
       await rm(playbackPath);
-      await symlink(outsidePath, playbackPath);
+      if (!(await createSymlinkOrSkip(outsidePath, playbackPath, skip))) return;
 
       // When
       const response = await request();

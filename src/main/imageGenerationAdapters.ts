@@ -1,6 +1,6 @@
 import {
   requestBytePlusImage,
-  requestImagenImage,
+  requestNanoBananaImage,
   requestOpenAiImage,
   type ImageRequestInput
 } from '../shared/imageGeneration';
@@ -31,8 +31,8 @@ export async function generateOpenAiImage(input: ImageSynthesisInput): Promise<G
   return toBuffer(await requestOpenAiImage(input));
 }
 
-export async function generateImagenImage(input: ImageSynthesisInput): Promise<GeneratedImage> {
-  return toBuffer(await requestImagenImage(input));
+export async function generateNanoBananaImage(input: ImageSynthesisInput): Promise<GeneratedImage> {
+  return toBuffer(await requestNanoBananaImage(input));
 }
 
 export async function generateBytePlusImage(input: ImageSynthesisInput): Promise<GeneratedImage> {

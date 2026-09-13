@@ -3,7 +3,12 @@ import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, V
 
 import { KeyboardAwareScroll } from './KeyboardAwareScroll';
 
-import { getDomainModels, type AiDomain, type AiDomainModelConfig } from '@openvideo/shared/aiDomainModels';
+import {
+  getDomainModels,
+  isDomainModelAvailableOnRuntime,
+  type AiDomain,
+  type AiDomainModelConfig
+} from '@openvideo/shared/aiDomainModels';
 
 import { describeProvider, providersForDomain } from '../lib/mediaProviders';
 import { ProviderConnect } from './ProviderConnect';
@@ -56,7 +61,8 @@ export function ModelSelect({
     );
   }, [models, providers]);
 
-  const needsKey = selected !== undefined && selected.available && connected[selected.providerId] === false;
+  const selectedAvailable = selected !== undefined && isDomainModelAvailableOnRuntime(selected, 'mobile');
+  const needsKey = selectedAvailable && selected?.executionPath === 'api' && connected[selected.providerId] === false;
 
   return (
     <View style={styles.root}>
@@ -136,23 +142,24 @@ export function ModelSelect({
                   <View key={providerId} style={styles.group}>
                     <View style={styles.groupHead}>
                       <Text style={styles.groupTitle}>{group[0]?.providerLabel ?? providerId}</Text>
-                      <Text style={[styles.groupBadge, connected[providerId] === true ? styles.on : styles.off]}>
-                        {connected[providerId] === true ? 'connected' : 'no key'}
+                      <Text style={[styles.groupBadge, group[0]?.executionPath === 'local' || connected[providerId] === true ? styles.on : styles.off]}>
+                        {group[0]?.executionPath === 'local' ? 'local' : connected[providerId] === true ? 'connected' : 'no key'}
                       </Text>
                     </View>
                     {group.map((model) => {
                       const chosen = model.id === selectedId;
+                      const runtimeAvailable = isDomainModelAvailableOnRuntime(model, 'mobile');
                       return (
                         <Pressable
                           key={model.id}
                           accessibilityRole="button"
-                          accessibilityState={{ selected: chosen, disabled: !model.available }}
-                          disabled={!model.available}
+                          accessibilityState={{ selected: chosen, disabled: !runtimeAvailable }}
+                          disabled={!runtimeAvailable}
                           onPress={() => {
                             onSelect(model);
                             setSheet(null);
                           }}
-                          style={press([styles.option, chosen && styles.optionOn, !model.available && styles.optionOff])}
+                          style={press([styles.option, chosen && styles.optionOn, !runtimeAvailable && styles.optionOff])}
                         >
                           <View style={styles.optionText}>
                             <Text style={styles.optionLabel}>{model.label}</Text>
@@ -160,7 +167,7 @@ export function ModelSelect({
                               {/* Unavailable models stay listed with the reason: hiding them
                                   understates the app, and offering them hands the user a tap
                                   they cannot act on. */}
-                              {model.available ? model.description : model.unavailableReason}
+                              {runtimeAvailable ? model.description : model.unavailableReason}
                             </Text>
                           </View>
                           {chosen && <View style={styles.tick} />}

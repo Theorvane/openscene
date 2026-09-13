@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { ExportReview } from '../shared/exportReview';
 import type { ExportJobState, ExportProgress, LocalExportJob } from '../shared/exportTypes';
+import type { MetadataPrivacyVerification } from '../shared/metadataPrivacy';
 
 type ExportJobStoreDependencies = {
   readonly createId?: () => string;
@@ -63,13 +64,24 @@ export class ExportJobStore {
     return this.replace(job, { ...job.state, progress });
   }
 
-  markCompleted(jobId: string, fileName: string, fileSizeBytes: number, review?: ExportReview): LocalExportJob {
+  markCompleted(
+    jobId: string,
+    fileName: string,
+    fileSizeBytes: number,
+    review?: ExportReview,
+    subtitleFileName?: string,
+    provenanceFileName?: string,
+    metadataPrivacyVerification?: MetadataPrivacyVerification
+  ): LocalExportJob {
     const job = this.requireState(jobId, ['running']);
     return this.replace(job, {
       kind: 'completed',
       completedAt: this.now().toISOString(),
       fileName,
       fileSizeBytes,
+      ...(subtitleFileName === undefined ? {} : { subtitleFileName }),
+      ...(provenanceFileName === undefined ? {} : { provenanceFileName }),
+      ...(metadataPrivacyVerification === undefined ? {} : { metadataPrivacyVerification }),
       // Carried only when there is one: a caller with nothing to report should
       // not have to invent an "unchecked" review to say so.
       ...(review === undefined ? {} : { review })

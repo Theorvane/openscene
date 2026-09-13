@@ -14,6 +14,8 @@ import type {
   TimelineTitle,
   TransitionDescriptor
 } from './timelineTypes';
+import { resolvedTitleStyle, titleOutputPosition } from './captionStyle';
+import { DEFAULT_METADATA_PRIVACY_MODE, ffmpegMetadataPrivacyArgs, type MetadataPrivacyMode } from './metadataPrivacy';
 
 export type CompileFfmpegTimelineInput = {
   readonly timeline: TimelineDocument;
@@ -48,10 +50,14 @@ export type CompileFfmpegTimelineInput = {
    * name rather than discovered as a failed export.
    */
   readonly titleFontPath?: string;
+  /** Required when at least one styled title requests bold. */
+  readonly titleBoldFontPath?: string;
   readonly outputPath: string;
   readonly width: number;
   readonly height: number;
   readonly frameRate: number;
+  /** Output-only container metadata policy; source files are never modified. */
+  readonly metadataPrivacyMode?: MetadataPrivacyMode;
 };
 
 export type CompiledFfmpegTimeline = {
@@ -269,16 +275,31 @@ export function escapeDrawtext(text: string): string {
     .replace(/\n/g, ' ');
 }
 
-function titleFilter(title: TimelineTitle, fontPath: string, inputLabel: string, outputLabel: string): string {
+function titleFilter(
+  title: TimelineTitle,
+  fontPath: string,
+  boldFontPath: string | undefined,
+  frame: { readonly width: number; readonly height: number },
+  inputLabel: string,
+  outputLabel: string
+): string {
   // Centred, then offset — the same convention `overlay` uses for a clip, so a
   // number means the same distance wherever it is applied.
-  const x = `(w-text_w)/2+${Math.round(title.positionX)}`;
-  const y = `(h-text_h)/2+${Math.round(title.positionY)}`;
+  const position = titleOutputPosition(title, frame);
+  const style = resolvedTitleStyle(title);
+  const selectedFontPath = style.fontWeight === 'bold' ? (boldFontPath ?? fontPath) : fontPath;
+  const x = `(w-text_w)/2+${Math.round(position.x)}`;
+  const y = `(h-text_h)/2+${Math.round(position.y)}`;
   return [
-    `[${inputLabel}]drawtext=fontfile='${fontPath}'`,
+    `[${inputLabel}]drawtext=fontfile='${selectedFontPath}'`,
     `text='${escapeDrawtext(title.text)}'`,
     `fontsize=${Math.round(title.sizePx)}`,
     `fontcolor=${title.color}`,
+    `borderw=${Math.round(style.outlineWidthPx)}`,
+    `bordercolor=${style.outlineColor}`,
+    `box=${style.backgroundOpacity > 0 ? 1 : 0}`,
+    `boxcolor=${style.backgroundColor}@${Number(style.backgroundOpacity.toFixed(3))}`,
+    `boxborderw=${Math.round(style.paddingPx)}`,
     `x=${x}`,
     `y=${y}`,
     `enable='between(t,${seconds(title.timelineStartMs)},${seconds(title.timelineEndMs)})'[${outputLabel}]`
@@ -405,7 +426,7 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
     }
     titles.forEach((title, index) => {
       const next = `title-${index}`;
-      filters.push(titleFilter(title, input.titleFontPath as string, currentVideoLabel, next));
+      filters.push(titleFilter(title, input.titleFontPath as string, input.titleBoldFontPath, { width: input.width, height: input.height }, currentVideoLabel, next));
       currentVideoLabel = next;
     });
   }
@@ -438,6 +459,7 @@ export function compileFfmpegTimeline(input: CompileFfmpegTimelineInput): Compil
     '-preset', 'medium',
     '-crf', '20',
     '-pix_fmt', 'yuv420p',
+    ...ffmpegMetadataPrivacyArgs(input.metadataPrivacyMode ?? DEFAULT_METADATA_PRIVACY_MODE),
     '-movflags', '+faststart',
     '-t', seconds(durationMs),
     input.outputPath

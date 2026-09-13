@@ -61,6 +61,12 @@ export type NativeTitle = {
   color: string;
   positionX: number;
   positionY: number;
+  fontWeight: 'regular' | 'bold';
+  outlineColor: string;
+  outlineWidthPx: number;
+  backgroundColor: string;
+  backgroundOpacity: number;
+  paddingPx: number;
 };
 
 export type NativeExportResult = { uri: string; durationMs: number };

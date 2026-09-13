@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { audioProbeArgs, probeSaysAudible } from '../src/shared/audibleAssets';
 import { buildCompositionPlan } from '../src/shared/videoCompositionPlan';
 import { compileFfmpegTimeline } from '../src/shared/ffmpegTimelineCompiler';
-import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, type TimelineDocument } from '../src/shared/timelineTypes';
+import { DEFAULT_CLIP_EFFECTS, TIMELINE_SCHEMA_VERSION, type TimelineDocument } from '../src/shared/timelineTypes';
 
 /**
  * A video clip's own sound.
@@ -16,7 +16,7 @@ import { DEFAULT_CLIP_EFFECTS, PROJECT_SCHEMA_VERSION, type TimelineDocument } f
 
 function timelineWith(clip: { assetId: string; startMs: number; volume?: number }): TimelineDocument {
   return {
-    schemaVersion: PROJECT_SCHEMA_VERSION,
+    schemaVersion: TIMELINE_SCHEMA_VERSION,
     tracks: [
       {
         id: 'video-1',

@@ -210,7 +210,8 @@ describe('mobile touch and keyboard source contract', () => {
     expect(store).not.toContain('id: `clip-${asset.id}`');
     // And a project already holding the duplicate is repaired when it is read.
     expect(store).toContain('function dedupeAssets(');
-    expect(store).toContain('assets: dedupeAssets(');
+    expect(store).toContain('const assets = dedupeAssets(');
+    expect(store).toMatch(/return \{[\s\S]*?\r?\n\s+assets,\r?\n/);
   });
 
   it('places a still, shows it, and refuses to export one it cannot render', async () => {

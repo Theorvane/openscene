@@ -14,6 +14,7 @@ import { createInitialTimeline } from '../src/shared/timelineLogic';
 import { parseTimelineDocument } from '../src/shared/timelineDocumentValidators';
 import { DEFAULT_CLIP_EFFECTS, type TimelineDocument } from '../src/shared/timelineTypes';
 import { discoverFfmpeg } from '../src/main/ffmpegDiscovery';
+import { ffprobePathFor } from '../src/main/exportMeasurement';
 
 const execFileAsync = promisify(execFile);
 
@@ -300,7 +301,7 @@ describe('a rendered retime', () => {
     await execFileAsync(discovery.executablePath, args);
 
     const read = async (stream: 'v' | 'a'): Promise<number> => {
-      const { stdout } = await execFileAsync(discovery.executablePath.replace(/ffmpeg$/, 'ffprobe'), [
+      const { stdout } = await execFileAsync(ffprobePathFor(discovery.executablePath), [
         '-v', 'error', '-select_streams', stream, '-show_entries', 'stream=duration', '-of', 'csv=p=0', outputPath
       ]);
       return Number(stdout.trim().split('\n')[0]);

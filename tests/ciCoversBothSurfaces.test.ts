@@ -1,6 +1,8 @@
-import { readFile, readlink } from 'node:fs/promises';
+import { lstat, readFile, readlink } from 'node:fs/promises';
 
 import { describe, expect, it } from 'vitest';
+
+const readSource = async (url: URL): Promise<string> => (await readFile(url, 'utf8')).replace(/\r\n/g, '\n');
 
 /**
  * That CI checks the mobile app at all.
@@ -22,7 +24,7 @@ describe('the release pipeline', () => {
     // build and submits nothing; the Android job goes live to every user. Run
     // in parallel, an iOS failure after Play had already published left the
     // release shipped and untagged, and the retry collided on `versionCode`.
-    const release = await readFile(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
+    const release = await readSource(new URL('../.github/workflows/release.yml', import.meta.url));
 
     expect(release).toMatch(/google-play:\n(?:.*\n)*?\s+needs: \[check, build, app-store-connect\]/);
     // And the tag still waits for both, or a failed upload would be recorded as
@@ -46,7 +48,7 @@ describe('the release pipeline', () => {
 const VERIFYING_WORKFLOWS = ['ci.yml', 'release.yml'] as const;
 
 describe.each(VERIFYING_WORKFLOWS)('%s', (workflow) => {
-  const read = async () => readFile(new URL(`../.github/workflows/${workflow}`, import.meta.url), 'utf8');
+  const read = async () => readSource(new URL(`../.github/workflows/${workflow}`, import.meta.url));
 
   it('installs the mobile app before running the suite', async () => {
     const yaml = await read();
@@ -82,7 +84,7 @@ describe.each(VERIFYING_WORKFLOWS)('%s', (workflow) => {
  * copy is the one nobody updates.
  */
 describe('the iOS signing step', () => {
-  const read = () => readFile(new URL('../.github/workflows/ios-app-store-connect.yml', import.meta.url), 'utf8');
+  const read = () => readSource(new URL('../.github/workflows/ios-app-store-connect.yml', import.meta.url));
 
   it('takes the profile name from the profile', async () => {
     const yaml = await read();
@@ -121,7 +123,7 @@ describe('the iOS signing step', () => {
  * half the native code, and a review had to point that out rather than a check.
  */
 describe('the iOS module', () => {
-  const read = () => readFile(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const read = () => readSource(new URL('../.github/workflows/ci.yml', import.meta.url));
 
   it('is built on every pull request', async () => {
     const yaml = await read();
@@ -150,7 +152,7 @@ describe('the iOS module', () => {
  * them assemble anything. A review asked for build evidence and was right to.
  */
 describe('the Android module', () => {
-  const read = () => readFile(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const read = () => readSource(new URL('../.github/workflows/ci.yml', import.meta.url));
 
   it('is assembled on every pull request', async () => {
     const yaml = await read();
@@ -178,8 +180,31 @@ describe('the Android module', () => {
   });
 });
 
+describe('the AI approval auto-merge workflow', () => {
+  const read = () => readSource(new URL('../.github/workflows/ai-approved-automerge.yml', import.meta.url));
+
+  it('polls on the trusted default branch instead of relying on a fork review event token', async () => {
+    const yaml = await read();
+    expect(yaml).toContain('schedule:');
+    expect(yaml).toContain("cron: '*/5 * * * *'");
+    expect(yaml).toContain('workflow_dispatch:');
+    expect(yaml).not.toContain('pull_request_review:');
+    expect(yaml).not.toContain('github.event.review');
+  });
+
+  it('merges only current-head approvals from the dedicated reviewer without checking out PR code', async () => {
+    const yaml = await read();
+    expect(yaml).toContain('.author.login == "sjungwon03-ai"');
+    expect(yaml).toContain('as $pr');
+    expect(yaml).toContain('.commit.oid == $pr.headRefOid');
+    expect(yaml).toContain('.baseRefName == "dev" or .baseRefName == "main"');
+    expect(yaml).toContain('gh pr merge "$number" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch');
+    expect(yaml).not.toContain('actions/checkout');
+  });
+});
+
 describe('the iOS renderer', () => {
-  const read = () => readFile(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const read = () => readSource(new URL('../.github/workflows/ci.yml', import.meta.url));
 
   it('is exported from and measured, not only compiled', async () => {
     // Compiling proves a line exists. Every rendering bug this project has had
@@ -196,7 +221,12 @@ describe('the iOS renderer', () => {
     // The package's source is a symlink to `ios/VideoComposer.swift`. A copy
     // would drift, and a drifting copy passing its tests is worse than no
     // tests: it says the renderer works when what works is the copy.
-    const link = await readlink(new URL('../mobile/modules/video-export/composer-tests/Sources/VideoComposer/VideoComposer.swift', import.meta.url));
-    expect(link).toContain('ios/VideoComposer.swift');
+    const source = new URL('../mobile/modules/video-export/composer-tests/Sources/VideoComposer/VideoComposer.swift', import.meta.url);
+    const stats = await lstat(source);
+    // Git checks out a symlink as a small file containing its target when the
+    // Windows checkout cannot create links. In both representations, verify
+    // the package still points at the app source rather than a drifting copy.
+    const target = stats.isSymbolicLink() ? await readlink(source) : (await readFile(source, 'utf8')).trim();
+    expect(target).toContain('ios/VideoComposer.swift');
   });
 });

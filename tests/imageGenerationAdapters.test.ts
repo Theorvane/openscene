@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   bytePlusSizeFor,
   generateBytePlusImage,
-  generateImagenImage,
+  generateNanoBananaImage,
   generateOpenAiImage,
   imageExtensionFor,
   openAiSizeFor
@@ -131,26 +131,30 @@ describe('OpenAI image adapter', () => {
   });
 });
 
-describe('Google Imagen adapter', () => {
-  it('carries the key in a header and the ratio as a ratio', async () => {
+describe('Google Nano Banana adapter', () => {
+  it('uses Gemini Interactions with a header key, 1K output and plain-language exclusions', async () => {
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
-      expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict');
+      expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/interactions');
       // A key in the query string ends up in logs and in echoed error text.
       expect(url).not.toContain('gemini-key');
       expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('gemini-key');
       expect(JSON.parse(init.body as string)).toEqual({
-        instances: [{ prompt: 'a harbour' }],
-        parameters: { sampleCount: 1, aspectRatio: '9:16', negativePrompt: 'blurry' }
+        model: 'gemini-3.1-flash-image',
+        input: [{ type: 'text', text: 'a harbour\n\nDo not include: blurry' }],
+        response_format: { type: 'image', aspect_ratio: '9:16', image_size: '1K' }
       });
       return new Response(
-        JSON.stringify({ predictions: [{ bytesBase64Encoded: PNG_BASE64, mimeType: 'image/jpeg' }] }),
+        JSON.stringify({
+          id: 'interaction-1',
+          steps: [{ type: 'model_output', content: [{ type: 'image', data: PNG_BASE64, mime_type: 'image/jpeg' }] }]
+        }),
         { status: 200 }
       );
     });
 
-    const result = await generateImagenImage({
+    const result = await generateNanoBananaImage({
       apiKey: 'gemini-key',
-      modelId: 'imagen-4.0-generate-001',
+      modelId: 'gemini-3.1-flash-image',
       prompt: 'a harbour',
       aspectRatio: '9:16',
       negativePrompt: 'blurry',
@@ -158,22 +162,53 @@ describe('Google Imagen adapter', () => {
     });
 
     expect(result.mimeType).toBe('image/jpeg');
+    expect(result.providerJobId).toBe('interaction-1');
     expect([...result.bytes]).toEqual([1, 2, 3, 4]);
   });
 
-  it('omits negativePrompt entirely when there is none', async () => {
+  it('passes a reference image and accepts the convenience output shape', async () => {
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
-      expect(JSON.parse(init.body as string).parameters).not.toHaveProperty('negativePrompt');
-      return new Response(JSON.stringify({ predictions: [{ bytesBase64Encoded: PNG_BASE64 }] }), { status: 200 });
+      expect(JSON.parse(init.body as string).input).toEqual([
+        { type: 'text', text: 'restyle this' },
+        { type: 'image', mime_type: 'image/png', data: 'QUJD' }
+      ]);
+      return new Response(JSON.stringify({ output_image: { type: 'image', data: PNG_BASE64 } }), { status: 200 });
     });
 
-    await generateImagenImage({
+    await generateNanoBananaImage({
       apiKey: 'k',
-      modelId: 'imagen-4.0-generate-001',
-      prompt: 'x',
+      modelId: 'gemini-3.1-flash-lite-image',
+      prompt: 'restyle this',
       aspectRatio: '1:1',
+      referenceImage: { displayName: 'seed.png', mimeType: 'image/png', base64: 'QUJD' },
       fetchImpl: fetchMock as unknown as typeof fetch
     });
+  });
+
+  it('passes multiple approved references to Nano Banana in order', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string).input).toEqual([
+        { type: 'text', text: 'keep both characters' },
+        { type: 'image', mime_type: 'image/jpeg', data: 'ONE' },
+        { type: 'image', mime_type: 'image/png', data: 'TWO' }
+      ]);
+      return new Response(JSON.stringify({ output_image: { type: 'image', data: PNG_BASE64 } }), { status: 200 });
+    });
+    await generateNanoBananaImage({
+      apiKey: 'k', modelId: 'gemini-3.1-flash-image', prompt: 'keep both characters', aspectRatio: '16:9',
+      referenceImages: [
+        { displayName: 'one.jpeg', mimeType: 'image/jpeg', base64: 'ONE' },
+        { displayName: 'two.png', mimeType: 'image/png', base64: 'TWO' }
+      ], fetchImpl: fetchMock as unknown as typeof fetch
+    });
+  });
+
+  it('reports a missing output instead of writing an empty image', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'empty' }), { status: 200 }));
+    await expect(generateNanoBananaImage({
+      apiKey: 'k', modelId: 'gemini-3-pro-image', prompt: 'x', aspectRatio: '1:1',
+      fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/Nano Banana returned no image data/);
   });
 });
 

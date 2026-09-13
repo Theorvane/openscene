@@ -3,7 +3,7 @@ import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { createInitialTimeline } from '../shared/timelineLogic';
-import { PROJECT_SCHEMA_VERSION } from '../shared/timelineTypes';
+import { PROJECT_SCHEMA_VERSION, resultAssetOriginKey } from '../shared/timelineTypes';
 import type {
   CreateProjectInput,
   LocalProjectSnapshot,
@@ -13,6 +13,7 @@ import type {
   UpdateAssetMetadataInput
 } from '../shared/timelineTypes';
 import { parseCreateProjectInput, parseTimelineDocument, parseUpdateAssetMetadataInput } from '../shared/timelineValidators';
+import { createEmptyAiProjectDocument, parseAiProjectDocument, type AiProjectDocument } from '../shared/aiProjectDomain';
 import { assertAssetImportQuota, DEFAULT_ASSET_IMPORT_LIMITS, type AssetImportLimits } from './assetImportPolicy';
 import {
   PROJECT_FILE_NAME,
@@ -103,7 +104,8 @@ export class ProjectStore {
       createdAt: timestamp,
       updatedAt: timestamp,
       assets: [],
-      timeline: createInitialTimeline()
+      timeline: createInitialTimeline(),
+      ai: createEmptyAiProjectDocument()
     };
 
     let directory: string | null = null;
@@ -178,7 +180,8 @@ export class ProjectStore {
       createdAt: timestamp,
       updatedAt: timestamp,
       assets: [],
-      timeline: createInitialTimeline()
+      timeline: createInitialTimeline(),
+      ai: createEmptyAiProjectDocument()
     };
     try {
       await writeProjectSnapshotAtDirectory(resolved, snapshot);
@@ -208,7 +211,8 @@ export class ProjectStore {
       createdAt: timestamp,
       updatedAt: timestamp,
       assets: [],
-      timeline: createInitialTimeline()
+      timeline: createInitialTimeline(),
+      ai: createEmptyAiProjectDocument()
     };
     await mkdir(directory, { mode: 0o700 });
     try {
@@ -287,6 +291,17 @@ export class ProjectStore {
     });
   }
 
+  async saveAiProjectDocument(projectId: string, ai: AiProjectDocument, now = new Date()): Promise<LocalProjectSnapshot> {
+    return this.mutateProject(projectId, async () => {
+      const current = await this.requireProject(projectId);
+      const parsedAi = parseAiProjectDocument(ai, new Set(current.assets.map((asset) => asset.id)));
+      if (parsedAi === null) {
+        throw new ProjectStoreError('Invalid AI project document.');
+      }
+      return this.persist({ ...current, updatedAt: now.toISOString(), ai: parsedAi });
+    });
+  }
+
   async registerAsset(projectId: string, asset: MediaAsset, now = new Date()): Promise<MediaAsset> {
     const registered = await this.registerAssets(
       { projectId, assets: [asset], limits: DEFAULT_ASSET_IMPORT_LIMITS },
@@ -305,6 +320,11 @@ export class ProjectStore {
       const incomingIds = new Set(input.assets.map((asset) => asset.id));
       if (incomingIds.size !== input.assets.length || current.assets.some((asset) => incomingIds.has(asset.id))) {
         throw new ProjectStoreError('Asset registration contains a duplicate asset id.');
+      }
+      const currentOrigins = new Set(current.assets.flatMap((asset) => asset.resultOrigin === undefined ? [] : [resultAssetOriginKey(asset.resultOrigin)]));
+      const incomingOrigins = input.assets.flatMap((asset) => asset.resultOrigin === undefined ? [] : [resultAssetOriginKey(asset.resultOrigin)]);
+      if (new Set(incomingOrigins).size !== incomingOrigins.length || incomingOrigins.some((origin) => currentOrigins.has(origin))) {
+        throw new ProjectStoreError('That completed result is already registered in this project.');
       }
       assertAssetImportQuota(
         {

@@ -2,7 +2,7 @@ import { constants } from 'node:fs';
 import { lstat, open, realpath, type FileHandle } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import type { MediaAsset, UpdateAssetMetadataInput } from '../shared/timelineTypes';
+import { resultAssetOriginKey, type MediaAsset, type ResultAssetOrigin, type UpdateAssetMetadataInput } from '../shared/timelineTypes';
 import { DEFAULT_ASSET_IMPORT_LIMITS, type AssetImportLimits } from './assetImportPolicy';
 import { importAssetBatch, type ImportAssetFromPathInput } from './assetImportTransaction';
 import type { ProjectStore } from './projectStore';
@@ -58,6 +58,15 @@ export class AssetLibraryStore {
 
   async updateMetadata(input: UpdateAssetMetadataInput, now = new Date()): Promise<MediaAsset> {
     return this.projects.updateAssetMetadata(input, now);
+  }
+
+  async findByResultOrigin(projectId: string, origin: ResultAssetOrigin): Promise<MediaAsset | null> {
+    assertOpaqueId(projectId, 'project id');
+    assertOpaqueId(origin.resultId, 'result id');
+    const project = await this.projects.open(projectId);
+    if (project === null) return null;
+    const key = resultAssetOriginKey(origin);
+    return project.assets.find((asset) => asset.resultOrigin !== undefined && resultAssetOriginKey(asset.resultOrigin) === key) ?? null;
   }
 
   async getPlaybackSource(projectId: string, assetId: string): Promise<AssetPlaybackSource | null> {

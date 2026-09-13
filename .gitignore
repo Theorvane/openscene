@@ -16,6 +16,7 @@ pnpm-debug.log*
 .codegraph
 .omo/
 .playwright-mcp/
+.local-runtimes/
 window-loom*.png
 video-qa*.png
 *-snapshot.md

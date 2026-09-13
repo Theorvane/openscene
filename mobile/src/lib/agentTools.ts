@@ -4,16 +4,16 @@ import { planVideoStoryboard } from '@openvideo/shared/videoStoryboardPlan';
 import { timelineDurationMs } from '@openvideo/shared/timelineLogic';
 import {
   requestBytePlusImage,
-  requestImagenImage,
+  requestNanoBananaImage,
   requestOpenAiImage,
   type GeneratedImageData
 } from '@openvideo/shared/imageGeneration';
 import type { ImageAspectRatio } from '@openvideo/shared/providerSeams';
 
-import { getDomainModels } from '@openvideo/shared/aiDomainModels';
+import { getDomainModels, isDomainModelAvailableOnRuntime } from '@openvideo/shared/aiDomainModels';
 import type { VideoAspectRatio } from '@openvideo/shared/videoGeneration';
 import { readKey, type ProviderSlot } from './credentials';
-import { appendAssetToTimeline, readProject, saveGeneratedImage } from './projectStore';
+import { readProject, saveGeneratedImage, saveGeneratedVideoCandidate } from './projectStore';
 import { generateShot } from './videoGeneration';
 import type { SpendFeature } from './permissions';
 import type { ToolSchema } from './agentChatClient';
@@ -52,7 +52,10 @@ export type ToolContext = {
 
 const IMAGE_BINDINGS: Readonly<Record<string, { slot: ProviderSlot; request: (input: never) => Promise<GeneratedImageData> }>> = {
   'gpt-image-1': { slot: 'openaiApiKey', request: requestOpenAiImage as never },
-  'imagen-4.0-generate-001': { slot: 'geminiApiKey', request: requestImagenImage as never },
+  'gemini-3.1-flash-image': { slot: 'geminiApiKey', request: requestNanoBananaImage as never },
+  'gemini-3.1-flash-lite-image': { slot: 'geminiApiKey', request: requestNanoBananaImage as never },
+  'gemini-3-pro-image': { slot: 'geminiApiKey', request: requestNanoBananaImage as never },
+  'gemini-2.5-flash-image': { slot: 'geminiApiKey', request: requestNanoBananaImage as never },
   'seedream-3-0-t2i-250415': { slot: 'bytePlusApiKey', request: requestBytePlusImage as never }
 };
 
@@ -63,13 +66,13 @@ const number = (args: Record<string, unknown>, key: string, fallback: number): n
   typeof args[key] === 'number' && Number.isFinite(args[key]) ? (args[key] as number) : fallback;
 
 const VIDEO_MODEL_IDS = getDomainModels('video-generation')
-  .filter((model) => model.available)
+  .filter((model) => isDomainModelAvailableOnRuntime(model, 'mobile'))
   .map((model) => model.id);
 
 export const GENERATE_VIDEO_TOOL: AgentTool = {
   name: 'generate_video',
   description:
-    'Generate one video shot and append it to the open project. This charges your provider account. Plan and price first.',
+    'Generate one video candidate and save it to the open project for human continuity review. This charges your provider account. Plan and price first.',
   parameters: {
     type: 'object',
     properties: {
@@ -100,12 +103,8 @@ export const GENERATE_VIDEO_TOOL: AgentTool = {
     if (!result.ok) return { summary: result.message };
     const project = readProject(context.projectId);
     if (project === null) return { summary: 'The shot was generated but the project could not be read to save it.' };
-    return {
-      summary:
-        appendAssetToTimeline(project, result.asset) === null
-          ? 'The shot was generated but no video track would take it.'
-          : `Generated and appended "${result.asset.displayName}" to the timeline.`
-    };
+    saveGeneratedVideoCandidate(project, result.asset);
+    return { summary: `Generated "${result.asset.displayName}" and saved it as a candidate. Open Video to review it before changing the timeline.` };
   }
 };
 
@@ -128,7 +127,12 @@ export const AGENT_TOOLS: readonly AgentTool[] = [
     run: async (args) => {
       const providerId = text(args, 'providerId', 'openai');
       const modelId = text(args, 'modelId', 'sora-2');
-      const plan = planVideoStoryboard({ totalSeconds: number(args, 'totalSeconds', 30), providerId });
+      const model = getDomainModels('video-generation').find((entry) => entry.id === modelId);
+      const plan = planVideoStoryboard({
+        totalSeconds: number(args, 'totalSeconds', 30),
+        providerId: model?.providerId ?? providerId,
+        ...(model === undefined ? {} : { modelId: model.id })
+      });
       const cost = estimateVideoPlanCost(
         plan.shots.map((shot) => ({ modelId, durationSeconds: shot.durationSeconds }))
       );

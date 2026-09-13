@@ -2,7 +2,10 @@ import { useState, type ReactElement, type ReactNode } from 'react';
 
 import { CLIP_EFFECT_RANGES, DEFAULT_CLIP_EFFECTS, TRANSITION_TYPES } from '../../../shared/timelineTypes';
 import type { TransitionType } from '../../../shared/timelineTypes';
+import type { TimelineTitleStyle } from '../../../shared/timelineTypes';
+import { applyCaptionPreset, CAPTION_FONT_WEIGHTS, CAPTION_PLACEMENTS, CAPTION_STYLE_PRESETS, isAutomaticCaptionId, resolvedTitleStyle, type CaptionPresetId } from '../../../shared/captionStyle';
 import { clipDurationMs } from '../../../shared/timelineClipGeometry';
+import { STILL_DEFAULT_HOLD_MS } from '../../../shared/timelineStills';
 import { formatDuration, formatTimestamp } from '../format';
 import { Button, MetadataList, PanelHeading, TabPanel, Tabs } from '../ui';
 import type { TabDefinition } from '../ui';
@@ -146,6 +149,8 @@ function TransitionControls({ editor }: InspectorContentProps): ReactElement {
 */
 function TitleControls({ editor }: InspectorContentProps): ReactElement {
   const title = editor.titleAtPlayhead;
+  const automaticCaptionCount = editor.project?.timeline.titles?.filter((entry) => isAutomaticCaptionId(entry.id)).length ?? 0;
+  const style = title === null ? null : resolvedTitleStyle(title);
 
   return (
     <PropertyGroup title="Titles">
@@ -191,6 +196,66 @@ function TitleControls({ editor }: InspectorContentProps): ReactElement {
               onChange={(event) => editor.editTitle(title.id, { color: event.currentTarget.value })}
             />
           </PropertyRow>
+          <PropertyRow label="Preset">
+            <select
+              className="property-text-input"
+              aria-label="Caption style preset"
+              value=""
+              onChange={(event) => {
+                const next = applyCaptionPreset(title, event.currentTarget.value as CaptionPresetId);
+                editor.editTitle(title.id, {
+                  sizePx: next.sizePx,
+                  color: next.color,
+                  positionX: next.positionX,
+                  positionY: next.positionY,
+                  ...(next.style === undefined ? {} : { style: next.style })
+                });
+              }}
+            >
+              <option value="" disabled>Choose preset…</option>
+              {CAPTION_STYLE_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+            </select>
+          </PropertyRow>
+          {style !== null && (
+            <>
+              <PropertyRow label="Anchor">
+                <select
+                  className="property-text-input"
+                  aria-label="Title safe-area anchor"
+                  value={style.placement}
+                  onChange={(event) => editor.editTitle(title.id, { style: { ...style, placement: event.currentTarget.value as TimelineTitleStyle['placement'] } })}
+                >
+                  {CAPTION_PLACEMENTS.map((placement) => <option key={placement} value={placement}>{placement[0]?.toUpperCase()}{placement.slice(1)}</option>)}
+                </select>
+              </PropertyRow>
+              <PropertyRow label="Weight">
+                <select
+                  className="property-text-input"
+                  aria-label="Title font weight"
+                  value={style.fontWeight}
+                  onChange={(event) => editor.editTitle(title.id, { style: { ...style, fontWeight: event.currentTarget.value as TimelineTitleStyle['fontWeight'] } })}
+                >
+                  {CAPTION_FONT_WEIGHTS.map((weight) => <option key={weight} value={weight}>{weight[0]?.toUpperCase()}{weight.slice(1)}</option>)}
+                </select>
+              </PropertyRow>
+              <PropertyRow label="Outline">
+                <input className="property-color-input" type="color" aria-label="Title outline colour" value={style.outlineColor}
+                  onChange={(event) => editor.editTitle(title.id, { style: { ...style, outlineColor: event.currentTarget.value } })} />
+                <input className="property-number-input" type="number" aria-label="Title outline width" min={0} max={24} step={1} value={style.outlineWidthPx}
+                  onChange={(event) => editor.editTitle(title.id, { style: { ...style, outlineWidthPx: Number(event.currentTarget.value) } })} />
+              </PropertyRow>
+              <PropertyRow label="Background">
+                <input className="property-color-input" type="color" aria-label="Title background colour" value={style.backgroundColor}
+                  onChange={(event) => editor.editTitle(title.id, { style: { ...style, backgroundColor: event.currentTarget.value } })} />
+                <input className="property-number-input" type="number" aria-label="Title background opacity" min={0} max={1} step={0.05} value={style.backgroundOpacity}
+                  onChange={(event) => editor.editTitle(title.id, { style: { ...style, backgroundOpacity: Number(event.currentTarget.value) } })} />
+              </PropertyRow>
+              <PropertyRow label="Padding">
+                <input className="property-number-input" type="number" aria-label="Title background padding" min={0} max={64} step={1} value={style.paddingPx}
+                  onChange={(event) => editor.editTitle(title.id, { style: { ...style, paddingPx: Number(event.currentTarget.value) } })} />
+              </PropertyRow>
+            </>
+          )}
           <PropertyRow label="Position">
             <span className="property-axis-label" aria-hidden="true">X</span>
             <input
@@ -229,6 +294,14 @@ function TitleControls({ editor }: InspectorContentProps): ReactElement {
               Lengthen +0.5s
             </Button>
           </div>
+          <Button
+            className="inspector-action caption-style-apply"
+            disabled={automaticCaptionCount === 0}
+            onClick={() => editor.applyTitleStyleToAutomaticCaptions(title.id)}
+          >
+            Apply appearance to {automaticCaptionCount} automatic caption{automaticCaptionCount === 1 ? '' : 's'}
+          </Button>
+          <p className="caption-style-note">Top, center and bottom anchors stay inside the title-safe region when the export aspect ratio changes. X/Y remain fine-tuning offsets.</p>
         </>
       )}
     </PropertyGroup>
@@ -420,6 +493,18 @@ function SelectionInspector({ editor }: InspectorContentProps): ReactElement {
               />
               <span className="property-value-chip">{volumeDb} dB</span>
             </PropertyRow>
+            {clip.asset?.kind === 'video' && (
+              <PropertyRow label="Embedded">
+                <Button
+                  className="inspector-action"
+                  disabled={editor.isBusy}
+                  title="Extract the native sound, align it on an audio track, and mute this video clip"
+                  onClick={() => void editor.detachSelectedClipAudio()}
+                >
+                  {editor.isBusy ? 'Extracting…' : 'Detach audio'}
+                </Button>
+              </PropertyRow>
+            )}
           </PropertyGroup>
         </>
       )}
@@ -454,8 +539,10 @@ function AssetInspector({ editor }: InspectorContentProps): ReactElement {
       <PropertyGroup title="Details">
         <PropertyRow label="Imported"><span className="property-value-chip">{formatTimestamp(asset.createdAt)}</span></PropertyRow>
         <PropertyRow label="Kind"><span className="property-value-chip property-value-chip--capitalize">{asset.kind}</span></PropertyRow>
-        <PropertyRow label="Duration">
-          <span className="property-value-chip">{asset.metadata === null ? 'Pending' : formatDuration(asset.metadata.durationMs)}</span>
+        <PropertyRow label={asset.kind === 'image' ? 'Default hold' : 'Duration'}>
+          <span className="property-value-chip">
+            {asset.kind === 'image' ? formatDuration(STILL_DEFAULT_HOLD_MS) : asset.metadata === null ? 'Pending' : formatDuration(asset.metadata.durationMs)}
+          </span>
         </PropertyRow>
       </PropertyGroup>
     </section>

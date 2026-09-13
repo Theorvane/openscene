@@ -103,7 +103,6 @@ describe('OpenScene TypeMCP Server and Tool declarations', () => {
     const result = await server.createVideoJob({
       prompt: 'Cinematic intro shot of Seoul skyline',
       aspectRatio: '16:9',
-      durationSeconds: 5,
       modelId: 'sora-2'
     });
 
@@ -412,6 +411,7 @@ describe('OpenScene TypeMCP Server and Tool declarations', () => {
 
   it('validates exportProjectVideo error propagation when export service fails or succeeds', async () => {
     const server = new OpenVideoMcpServer();
+    const receivedInputs: unknown[] = [];
 
     // 1. Missing ExportIpcService
     const noExportServiceResult = await server.exportProjectVideo({
@@ -434,23 +434,27 @@ describe('OpenScene TypeMCP Server and Tool declarations', () => {
 
     // 3. Mock succeeding ExportIpcService
     const mockSuccessExportService = {
-      startExportJob: async () =>
-        ok({
+      startExportJob: async (input: unknown) => {
+        receivedInputs.push(input);
+        return ok({
           id: 'export-job-999',
           projectId: 'proj-123',
           status: 'queued',
           progressRatio: 0,
           outputFilePath: '/tmp/output.mp4',
           error: null
-        })
+        });
+      }
     } as any;
 
     server.setServices(projectStore, mockSuccessExportService);
     const successResult = await server.exportProjectVideo({
-      projectId: 'proj-123'
+      projectId: 'proj-123',
+      metadataPrivacyMode: 'privacy_clean'
     });
     expect(successResult.success).toBe(true);
     expect(successResult.exportJobId).toBe('export-job-999');
+    expect(receivedInputs).toEqual([{ projectId: 'proj-123', metadataPrivacyMode: 'privacy_clean' }]);
   });
 
   it('handles job creation, status polling, and timeline clip placement end-to-end workflow', async () => {
@@ -461,7 +465,7 @@ describe('OpenScene TypeMCP Server and Tool declarations', () => {
     const jobResult = await server.createVideoJob({
       prompt: 'Cinematic intro shot',
       aspectRatio: '16:9',
-      durationSeconds: 5,
+      durationSeconds: 4,
       modelId: 'sora-2'
     });
     expect(jobResult.success).toBe(true);
@@ -475,6 +479,7 @@ describe('OpenScene TypeMCP Server and Tool declarations', () => {
     });
     expect(statusResult.success).toBe(true);
     expect(statusResult.status).toBeDefined();
+    expect(statusResult).not.toHaveProperty('outputFilePath');
 
     // 3. Register asset & add to real project timeline
     const project = await projectStore.create({ name: 'Copilot Workflow Project' });

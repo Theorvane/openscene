@@ -21,6 +21,7 @@ import type { FramePreference } from '../../../shared/outputFrame';
  */
 
 export const EXPORT_FRAME_STORAGE_KEY = 'openscene.export.frame.v1';
+export const EXPORT_FRAME_CHANGE_EVENT = 'openscene-export-frame-change';
 
 export const EXPORT_FRAME_PREFERENCES: readonly FramePreference[] = ['source', 'portrait', 'landscape', 'square'];
 
@@ -64,4 +65,24 @@ export function serializeExportFramePreferences(preferences: Readonly<Record<str
   // storing it would grow the record by one line per project ever opened.
   const kept = Object.entries(preferences).filter(([, preference]) => preference !== DEFAULT_EXPORT_FRAME);
   return JSON.stringify(Object.fromEntries(kept));
+}
+
+export function readExportFramePreference(projectId: string): FramePreference {
+  if (typeof window === 'undefined') return DEFAULT_EXPORT_FRAME;
+  try {
+    return parseExportFramePreferences(window.localStorage.getItem(EXPORT_FRAME_STORAGE_KEY))[projectId] ?? DEFAULT_EXPORT_FRAME;
+  } catch {
+    return DEFAULT_EXPORT_FRAME;
+  }
+}
+
+export function writeExportFramePreference(projectId: string, preference: FramePreference): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const stored = parseExportFramePreferences(window.localStorage.getItem(EXPORT_FRAME_STORAGE_KEY));
+    window.localStorage.setItem(EXPORT_FRAME_STORAGE_KEY, serializeExportFramePreferences({ ...stored, [projectId]: preference }));
+  } catch {
+    // A preference that could not be saved still applies to this export.
+  }
+  window.dispatchEvent(new CustomEvent(EXPORT_FRAME_CHANGE_EVENT, { detail: { projectId, preference } }));
 }

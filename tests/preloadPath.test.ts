@@ -7,5 +7,6 @@ describe('preload path resolution', () => {
     expect(resolvePreloadScriptPath('/Users/jungwon/Dev/video/out/main')).toBe(
       '/Users/jungwon/Dev/video/out/preload/index.cjs'
     );
+    expect(resolvePreloadScriptPath('C:\\OpenScene\\out\\main')).toBe('C:\\OpenScene\\out\\preload\\index.cjs');
   });
 });

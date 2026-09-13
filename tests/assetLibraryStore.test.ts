@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, stat, symlink, truncate, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { AssetLibraryStore, DEFAULT_ASSET_IMPORT_LIMITS } from '../src/main/assetLibraryStore';
 import { ProjectStore } from '../src/main/projectStore';
 import { DEFAULT_AUDIO_TRACK_MIX, DEFAULT_CLIP_EFFECTS } from '../src/shared/timelineTypes';
+import { createSymlinkOrSkip } from './helpers/symlinkCapability';
 
 async function withTempDirectory<T>(run: (directory: string) => Promise<T>): Promise<T> {
   const directory = await mkdtemp(join(tmpdir(), 'video-asset-library-'));
@@ -87,7 +88,7 @@ describe('asset library store', () => {
     });
   });
 
-  it('given files that are unsafe or unsupported, when import is attempted, then every source is rejected and no asset is registered', async () => {
+  it('given files that are unsafe or unsupported, when import is attempted, then every source is rejected and no asset is registered', async ({ skip }) => {
     await withTempDirectory(async (directory) => {
       // Given
       const root = join(directory, 'projects');
@@ -98,7 +99,7 @@ describe('asset library store', () => {
       const unsupportedPath = join(directory, 'take.txt');
       await writeFile(regularPath, Buffer.from([1]));
       await writeFile(unsupportedPath, Buffer.from([1]));
-      await symlink(regularPath, symlinkPath);
+      if (!(await createSymlinkOrSkip(regularPath, symlinkPath, skip))) return;
       await mkdir(directoryPath);
       await writeFile(oversizedPath, Buffer.from([1]));
       await truncate(oversizedPath, DEFAULT_ASSET_IMPORT_LIMITS.maximumFileBytes + 1);
@@ -200,7 +201,7 @@ describe('asset library store', () => {
     });
   });
 
-  it('given a copied file replaced by a symlink, when playback is resolved, then lookup fails closed', async () => {
+  it('given a copied file replaced by a symlink, when playback is resolved, then lookup fails closed', async ({ skip }) => {
     await withTempDirectory(async (directory) => {
       // Given
       const root = join(directory, 'projects');
@@ -220,7 +221,7 @@ describe('asset library store', () => {
       const outsidePath = join(directory, 'outside.webm');
       await writeFile(outsidePath, Buffer.from([2]));
       await rm(playback?.filePath ?? '');
-      await symlink(outsidePath, playback?.filePath ?? '');
+      if (!(await createSymlinkOrSkip(outsidePath, playback?.filePath ?? '', skip))) return;
 
       // When / Then
       await expect(assets.getPlaybackSource(project.id, asset.id)).resolves.toBeNull();

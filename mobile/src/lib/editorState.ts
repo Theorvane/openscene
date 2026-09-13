@@ -26,6 +26,7 @@ import type { ClipEffects } from '@openvideo/shared/timelineTypes';
 import { DEFAULT_CLIP_EFFECTS } from '@openvideo/shared/timelineTypes';
 import { resolveTimelineTrackForAsset, trackAppendStartMs } from '@openvideo/shared/timelineClipPlacement';
 import { addTitle, removeTitle, titleAt, updateTitle } from '@openvideo/shared/timelineTitleLogic';
+import { applyTitleAppearanceToAutomaticCaptions } from '@openvideo/shared/captionStyle';
 import type { MediaAsset, TimelineDocument, TimelineTitle, TransitionType } from '@openvideo/shared/timelineTypes';
 
 /**
@@ -494,6 +495,13 @@ export function useMobileEditor(persist?: (timeline: TimelineDocument) => void) 
         'Edit title',
         (current) => updateTitle(current, id, changes),
         'That change would leave the title with nothing to draw.'
+      ),
+
+    applyTitleStyleToAutomaticCaptions: (sourceTitleId: string) =>
+      apply(
+        'Style automatic captions',
+        (current) => applyTitleAppearanceToAutomaticCaptions(current, sourceTitleId),
+        'There are no automatic captions to style.'
       ),
 
     removeTitle: (id: string) =>

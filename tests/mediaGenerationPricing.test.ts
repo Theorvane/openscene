@@ -14,7 +14,7 @@ import {
 describe('video cost estimates', () => {
   it('multiplies the recorded per-second rate by the requested length', () => {
     // Given / When
-    const estimate = estimateVideoCost({ modelId: 'veo-3.0-generate-001', durationSeconds: 8 });
+    const estimate = estimateVideoCost({ modelId: 'veo-3.1-generate-preview', durationSeconds: 8 });
 
     // Then
     expect(estimate.priced).toBe(true);
@@ -49,15 +49,18 @@ describe('video cost estimates', () => {
 
   it('always says the figure is a dated list price rather than a quote', () => {
     // Given / When / Then
-    const estimate = estimateVideoCost({ modelId: 'veo-3.0-fast-generate-001', durationSeconds: 6 });
+    const estimate = estimateVideoCost({ modelId: 'veo-3.1-fast-generate-preview', durationSeconds: 6 });
     expect(estimate.caveat).toContain(PRICING_AS_OF);
     expect(estimate.caveat).toMatch(/estimate, not a quote/);
+    expect(estimate.amountUsd).toBe(0.6);
+    expect(estimateVideoCost({ modelId: 'veo-3.1-lite-generate-preview', durationSeconds: 8 }).amountUsd).toBe(0.4);
   });
 });
 
 describe('image and speech cost estimates', () => {
   it('prices images per image', () => {
-    expect(estimateImageCost({ modelId: 'imagen-4.0-ultra-generate-001', imageCount: 3 }).amountUsd).toBe(0.18);
+    expect(estimateImageCost({ modelId: 'gemini-3-pro-image', imageCount: 3 }).amountUsd).toBe(0.4);
+    expect(estimateImageCost({ modelId: 'gemini-3.1-flash-image', imageCount: 1 }).amountUsd).toBe(0.07);
     expect(estimateImageCost({ modelId: 'gpt-image-1', imageCount: 1 }).basis).toBe('1 × $0.04/image');
   });
 
@@ -71,6 +74,12 @@ describe('image and speech cost estimates', () => {
     const estimate = estimateSpeechCost({ modelId: 'eleven_v3' });
     expect(estimate.priced).toBe(false);
     expect(estimate.amountUsd).toBeUndefined();
+  });
+
+  it('reports the managed VieNeu runtime as zero provider cost', () => {
+    const estimate = estimateSpeechCost({ modelId: 'vieneu-v3-turbo' });
+    expect(estimate).toMatchObject({ priced: true, amountUsd: 0, basis: 'local runtime' });
+    expect(formatCostEstimate(estimate)).toContain('~$0.00');
   });
 });
 

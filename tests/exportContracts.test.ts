@@ -12,6 +12,15 @@ describe('export contracts', () => {
       frameRate: 30
     });
     expect(parseStartExportJobInput({ projectId: 'project_01' })).toEqual({ projectId: 'project_01' });
+    expect(parseStartExportJobInput({ projectId: 'project_01', metadataPrivacyMode: 'privacy_clean' })).toEqual({
+      projectId: 'project_01', metadataPrivacyMode: 'privacy_clean'
+    });
+    expect(parseStartExportJobInput({ projectId: 'project_01', metadataPrivacyMode: 'remove_everything' })).toBeNull();
+    expect(parseStartExportJobInput({
+      projectId: 'project_01',
+      subtitleDelivery: { burnAutomaticCaptions: false, sidecarFormat: 'vtt' }
+    })).toEqual({ projectId: 'project_01', subtitleDelivery: { burnAutomaticCaptions: false, sidecarFormat: 'vtt' } });
+    expect(parseStartExportJobInput({ projectId: 'project_01', subtitleDelivery: { burnAutomaticCaptions: true, sidecarFormat: 'txt' } })).toBeNull();
     expect(parseStartExportJobInput({ projectId: '../outside' })).toBeNull();
     expect(parseStartExportJobInput({ projectId: 'project_01', width: 1279, height: 720 })).toBeNull();
     expect(parseStartExportJobInput({ projectId: 'project_01', outputPath: '/tmp/escape.mp4' })).toBeNull();

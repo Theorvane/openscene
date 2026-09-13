@@ -5,6 +5,7 @@ import type { GenerationSpendView } from '../shared/generationSpend';
 import type { UpdaterState } from '../shared/updater';
 import type { ExportJobActionInput, LocalExportJob, LocalFfmpegRuntimeStatus, StartExportJobInput } from '../shared/exportTypes';
 import type { ImageGenerationJob, ImageGenerationRequest, ReferenceImageSelection, TextToSpeechJob, TextToSpeechRequest, VideoGenerationJob, VideoGenerationRequest } from '../shared/providerSeams';
+import type { VoiceChoice } from '../shared/voiceCatalog';
 import type {
   AbortRecordingInput,
   ApiResponse,
@@ -24,6 +25,8 @@ import type {
 import type {
   CreateProjectInput,
   CreateProjectResult,
+  DetachVideoAudioInput,
+  DetachVideoAudioResult,
   DeleteProjectInput,
   GetAssetPlaybackUrlInput,
   ImportProjectAssetsInput,
@@ -49,6 +52,12 @@ import type {
   AgentChatTurnState
 } from '../shared/agentChat';
 import type { ChatGptOAuthStatus, OpenAiAuthMode } from '../shared/openAiAuth';
+import type { BrowserSessionProviderId, BrowserSessionStatus } from '../shared/browserSession';
+import type { SaveAiProjectDocumentInput } from '../shared/aiProjectDomain';
+import type { WriterDraft, WriterGenerationInput } from '../shared/writerWorkflow';
+import type { ComfyUiMotionWorkerStatus } from '../shared/comfyUiMotion';
+import type { StartTranscriptionInput, TranscriptionJob, WhisperCppRuntimeStatus } from '../shared/transcription';
+import type { ExtractContinuationFrameResult, ProjectAssetReferenceInput } from '../shared/continuityFrame';
 
 type ImportProjectAssetsResult = {
   readonly assets: readonly MediaAsset[];
@@ -83,8 +92,10 @@ export interface VideoToolApi {
   importRecordingResultAsset(input: ImportRecordingResultAssetInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
   importAiResultAsset(input: { projectId: string; jobId: string }): Promise<ApiResponse<ImportProjectAssetsResult>>;
   updateAssetMetadata(input: UpdateAssetMetadataInput): Promise<ApiResponse<MediaAsset>>;
+  detachVideoAudio(input: DetachVideoAudioInput): Promise<ApiResponse<DetachVideoAudioResult>>;
   getAssetPlaybackUrl(input: GetAssetPlaybackUrlInput): Promise<ApiResponse<AssetPlaybackUrl>>;
   saveTimeline(input: SaveTimelineInput): Promise<ApiResponse<LocalProjectSnapshot>>;
+  saveAiProjectDocument(input: SaveAiProjectDocumentInput): Promise<ApiResponse<LocalProjectSnapshot>>;
   getFfmpegRuntimeStatus(): Promise<ApiResponse<LocalFfmpegRuntimeStatus>>;
   startExportJob(input: StartExportJobInput): Promise<ApiResponse<LocalExportJob>>;
   getExportJob(input: ExportJobActionInput): Promise<ApiResponse<LocalExportJob>>;
@@ -92,16 +103,27 @@ export interface VideoToolApi {
   openExportResult(input: ExportJobActionInput): Promise<ApiResponse<{ readonly opened: boolean }>>;
   revealExportResult(input: ExportJobActionInput): Promise<ApiResponse<{ readonly revealed: boolean }>>;
   aiGenerateVideo(request: VideoGenerationRequest): Promise<ApiResponse<VideoGenerationJob>>;
+  aiGetComfyUiMotionStatus(): Promise<ApiResponse<ComfyUiMotionWorkerStatus>>;
   aiSelectReferenceImage(): Promise<ApiResponse<ReferenceImageSelection | null>>;
+  aiExtractContinuationFrame(input: ProjectAssetReferenceInput): Promise<ApiResponse<ExtractContinuationFrameResult>>;
+  aiGetProjectImageReference(input: ProjectAssetReferenceInput): Promise<ApiResponse<ReferenceImageSelection>>;
   aiGetVideoJob(jobId: string): Promise<ApiResponse<VideoGenerationJob>>;
   aiGenerateSpeech(request: TextToSpeechRequest): Promise<ApiResponse<TextToSpeechJob>>;
+  aiListSpeechVoices(modelId: string): Promise<ApiResponse<readonly VoiceChoice[]>>;
   aiGetSpeechJob(jobId: string): Promise<ApiResponse<TextToSpeechJob>>;
+  getTranscriptionRuntimeStatus(): Promise<ApiResponse<WhisperCppRuntimeStatus>>;
+  startTranscription(input: StartTranscriptionInput): Promise<ApiResponse<TranscriptionJob>>;
+  getTranscriptionJob(jobId: string): Promise<ApiResponse<TranscriptionJob>>;
+  cancelTranscriptionJob(jobId: string): Promise<ApiResponse<{ readonly cancelled: boolean }>>;
   getProviderCredentialStatus(): Promise<ApiResponse<Record<string, boolean>>>;
   setProviderCredential(provider: string, apiKey: string): Promise<ApiResponse<{ readonly updated: boolean }>>;
   getChatGptOAuthStatus(): Promise<ApiResponse<ChatGptOAuthStatus>>;
   startChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
   cancelChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
   logoutChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
+  getBrowserSessionStatuses(): Promise<ApiResponse<readonly BrowserSessionStatus[]>>;
+  startBrowserSession(providerId: BrowserSessionProviderId): Promise<ApiResponse<BrowserSessionStatus>>;
+  clearBrowserSession(providerId: BrowserSessionProviderId): Promise<ApiResponse<BrowserSessionStatus>>;
   executeLlmPrompt(request: {
     modelId: string;
     prompt: string;
@@ -109,6 +131,7 @@ export interface VideoToolApi {
     ollamaBaseUrl?: string;
     openAiAuthMode?: OpenAiAuthMode;
   }): Promise<ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>>;
+  generateWriterDraft(input: WriterGenerationInput): Promise<ApiResponse<WriterDraft>>;
   mcpGetTools(): Promise<ApiResponse<unknown>>;
   mcpExecuteTool(toolName: string, params: unknown): Promise<ApiResponse<unknown>>;
   agentChatSend(input: AgentChatSendInput): Promise<ApiResponse<AgentChatTurnState>>;
@@ -192,9 +215,13 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.projectAiResultImport, input) as Promise<ApiResponse<ImportProjectAssetsResult>>,
   updateAssetMetadata: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.projectAssetMetadataUpdate, input) as Promise<ApiResponse<MediaAsset>>,
+  detachVideoAudio: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectAssetDetachAudio, input) as Promise<ApiResponse<DetachVideoAudioResult>>,
   getAssetPlaybackUrl: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.projectAssetPlaybackUrl, input) as Promise<ApiResponse<AssetPlaybackUrl>>,
   saveTimeline: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectTimelineSave, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
+  saveAiProjectDocument: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectAiDocumentSave, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
   getFfmpegRuntimeStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getFfmpegRuntimeStatus) as Promise<ApiResponse<LocalFfmpegRuntimeStatus>>,
   startExportJob: (input) => ipcRenderer.invoke(IPC_CHANNELS.startExportJob, input) as Promise<ApiResponse<LocalExportJob>>,
   getExportJob: (input) => ipcRenderer.invoke(IPC_CHANNELS.getExportJob, input) as Promise<ApiResponse<LocalExportJob>>,
@@ -205,10 +232,21 @@ const videoTool: VideoToolApi = {
   revealExportResult: (input) =>
     ipcRenderer.invoke(IPC_CHANNELS.revealExportResult, input) as Promise<ApiResponse<{ readonly revealed: boolean }>>,
   aiGenerateVideo: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateVideo, request) as Promise<ApiResponse<VideoGenerationJob>>,
+  aiGetComfyUiMotionStatus: () => ipcRenderer.invoke(IPC_CHANNELS.aiGetComfyUiMotionStatus) as Promise<ApiResponse<ComfyUiMotionWorkerStatus>>,
   aiSelectReferenceImage: () => ipcRenderer.invoke(IPC_CHANNELS.aiSelectReferenceImage) as Promise<ApiResponse<ReferenceImageSelection | null>>,
+  aiExtractContinuationFrame: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiExtractContinuationFrame, input) as Promise<ApiResponse<ExtractContinuationFrameResult>>,
+  aiGetProjectImageReference: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiGetProjectImageReference, input) as Promise<ApiResponse<ReferenceImageSelection>>,
   aiGetVideoJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetVideoJob, jobId) as Promise<ApiResponse<VideoGenerationJob>>,
   aiGenerateSpeech: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateSpeech, request) as Promise<ApiResponse<TextToSpeechJob>>,
+  aiListSpeechVoices: (modelId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiListSpeechVoices, modelId) as Promise<ApiResponse<readonly VoiceChoice[]>>,
   aiGetSpeechJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetSpeechJob, jobId) as Promise<ApiResponse<TextToSpeechJob>>,
+  getTranscriptionRuntimeStatus: () => ipcRenderer.invoke(IPC_CHANNELS.transcriptionRuntimeStatus) as Promise<ApiResponse<WhisperCppRuntimeStatus>>,
+  startTranscription: (input) => ipcRenderer.invoke(IPC_CHANNELS.transcriptionStart, input) as Promise<ApiResponse<TranscriptionJob>>,
+  getTranscriptionJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.transcriptionGetJob, jobId) as Promise<ApiResponse<TranscriptionJob>>,
+  cancelTranscriptionJob: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.transcriptionCancelJob, jobId) as Promise<ApiResponse<{ readonly cancelled: boolean }>>,
   getProviderCredentialStatus: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getProviderCredentials) as Promise<ApiResponse<Record<string, boolean>>>,
   setProviderCredential: (provider, apiKey) =>
@@ -221,10 +259,18 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.cancelChatGptOAuth) as Promise<ApiResponse<ChatGptOAuthStatus>>,
   logoutChatGptOAuth: () =>
     ipcRenderer.invoke(IPC_CHANNELS.logoutChatGptOAuth) as Promise<ApiResponse<ChatGptOAuthStatus>>,
+  getBrowserSessionStatuses: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.getBrowserSessionStatuses) as Promise<ApiResponse<readonly BrowserSessionStatus[]>>,
+  startBrowserSession: (providerId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.startBrowserSession, providerId) as Promise<ApiResponse<BrowserSessionStatus>>,
+  clearBrowserSession: (providerId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.clearBrowserSession, providerId) as Promise<ApiResponse<BrowserSessionStatus>>,
   executeLlmPrompt: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.executeLlmPrompt, request) as Promise<
       ApiResponse<{ ok: boolean; modelId: string; providerId: string; completion?: string; error?: string }>
     >,
+  generateWriterDraft: (input) =>
+    ipcRenderer.invoke(IPC_CHANNELS.writerGenerate, input) as Promise<ApiResponse<WriterDraft>>,
   mcpGetTools: () => ipcRenderer.invoke(IPC_CHANNELS.mcpGetTools) as Promise<ApiResponse<unknown>>,
   mcpExecuteTool: (toolName: string, params: unknown) =>
     ipcRenderer.invoke(IPC_CHANNELS.mcpExecuteTool, toolName, params) as Promise<ApiResponse<unknown>>,

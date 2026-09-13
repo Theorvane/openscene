@@ -1,6 +1,12 @@
 import AVFoundation
+#if canImport(AppKit)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 import CoreGraphics
 import CoreImage
+import CoreText
 import QuartzCore
 
 /**
@@ -126,6 +132,12 @@ public struct ComposerTitle {
   public var color: String
   public var positionX: Double
   public var positionY: Double
+  public var bold: Bool
+  public var outlineColor: String
+  public var outlineWidthPx: Double
+  public var backgroundColor: String
+  public var backgroundOpacity: Double
+  public var paddingPx: Double
 
   public init(
     text: String,
@@ -134,7 +146,13 @@ public struct ComposerTitle {
     sizePx: Double = 72,
     color: String = "#ffffff",
     positionX: Double = 0,
-    positionY: Double = 0
+    positionY: Double = 0,
+    bold: Bool = false,
+    outlineColor: String = "#000000",
+    outlineWidthPx: Double = 0,
+    backgroundColor: String = "#000000",
+    backgroundOpacity: Double = 0,
+    paddingPx: Double = 0
   ) {
     self.text = text
     self.timelineStartMs = timelineStartMs
@@ -143,6 +161,12 @@ public struct ComposerTitle {
     self.color = color
     self.positionX = positionX
     self.positionY = positionY
+    self.bold = bold
+    self.outlineColor = outlineColor
+    self.outlineWidthPx = outlineWidthPx
+    self.backgroundColor = backgroundColor
+    self.backgroundOpacity = backgroundOpacity
+    self.paddingPx = paddingPx
   }
 }
 
@@ -706,22 +730,44 @@ public enum VideoComposer {
 
       for title in request.titles where !title.text.isEmpty && title.timelineEndMs > title.timelineStartMs {
         let text = CATextLayer()
-        text.string = title.text
-        text.fontSize = CGFloat(title.sizePx)
-        text.foregroundColor = parseHexColor(title.color)
+        let fontSize = CGFloat(title.sizePx)
+        let font = CTFontCreateWithName((title.bold ? "Helvetica-Bold" : "Helvetica") as CFString, fontSize, nil)
+        var attributes: [NSAttributedString.Key: Any] = [
+          NSAttributedString.Key(rawValue: kCTFontAttributeName as String): font,
+          NSAttributedString.Key(rawValue: kCTForegroundColorAttributeName as String): parseHexColor(title.color)
+        ]
+        if title.outlineWidthPx > 0 {
+          attributes[NSAttributedString.Key(rawValue: kCTStrokeColorAttributeName as String)] = parseHexColor(title.outlineColor)
+          // Negative CoreText stroke widths draw both fill and outline. The unit
+          // is a percentage of font size, while the shared contract is pixels.
+          attributes[NSAttributedString.Key(rawValue: kCTStrokeWidthAttributeName as String)] = -100 * title.outlineWidthPx / max(1, title.sizePx)
+        }
+        let attributed = NSAttributedString(string: title.text, attributes: attributes)
+        text.string = attributed
         text.alignmentMode = .center
         text.isWrapped = true
         text.contentsScale = 1
         // Centred, then offset, the way every other placement in the plan works.
         // Core Animation's y grows upward and the plan's grows downward.
-        let height = CGFloat(title.sizePx) * 1.6
+        let padding = CGFloat(max(0, min(64, title.paddingPx)))
+        let measured = attributed.boundingRect(
+          with: CGSize(width: renderSize.width * 0.8, height: renderSize.height),
+          options: [.usesLineFragmentOrigin, .usesFontLeading],
+          context: nil
+        )
+        let width = min(renderSize.width, ceil(measured.width) + padding * 2)
+        let height = min(renderSize.height, ceil(measured.height) + padding * 2)
+        let centerX = renderSize.width / 2 + CGFloat(title.positionX)
+        let centerY = renderSize.height / 2 - CGFloat(title.positionY)
         text.frame = CGRect(
-          x: 0,
-          y: renderSize.height / 2 - height / 2 - CGFloat(title.positionY),
-          width: renderSize.width,
+          x: centerX - width / 2,
+          y: centerY - height / 2,
+          width: width,
           height: height
         )
-        text.position = CGPoint(x: renderSize.width / 2 + CGFloat(title.positionX), y: text.position.y)
+        if title.backgroundOpacity > 0 {
+          text.backgroundColor = parseHexColor(title.backgroundColor).copy(alpha: CGFloat(max(0, min(1, title.backgroundOpacity))))
+        }
 
         text.beginTime = AVCoreAnimationBeginTimeAtZero + title.timelineStartMs / 1000
         text.duration = (title.timelineEndMs - title.timelineStartMs) / 1000

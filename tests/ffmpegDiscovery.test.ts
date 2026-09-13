@@ -15,9 +15,12 @@ describe('FFmpeg discovery', () => {
   it('uses a configured absolute executable and resolves symlinks', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ffmpeg-discovery-'));
     const target = join(root, 'ffmpeg-real');
-    const configured = join(root, 'ffmpeg-link');
+    const configured = process.platform === 'win32' ? target : join(root, 'ffmpeg-link');
     await executable(target);
-    await symlink(target, configured);
+    // Ordinary Windows developer accounts cannot create symlinks. The same
+    // configured-path contract is still exercised there; macOS/Linux CI also
+    // verifies that a link is canonicalized to its target.
+    if (process.platform !== 'win32') await symlink(target, configured);
 
     await expect(discoverFfmpeg({ environment: { VIDEO_TOOL_FFMPEG_PATH: configured }, platform: 'darwin' })).resolves.toEqual({
       kind: 'configured',

@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 
 import type { LocalExportJob } from '../../../shared/exportTypes';
+import { DEFAULT_METADATA_PRIVACY_MODE, METADATA_PRIVACY_MODES, metadataPrivacyPlan, metadataPrivacyVerificationSummary, type MetadataPrivacyMode } from '../../../shared/metadataPrivacy';
+import { automaticCaptionTitles, DEFAULT_SUBTITLE_DELIVERY, SUBTITLE_SIDECAR_FORMATS, type SubtitleDelivery, type SubtitleSidecarFormat } from '../../../shared/subtitleDelivery';
 import { outputFrameFor, type FramePreference } from '../../../shared/outputFrame';
 import {
   DEFAULT_EXPORT_FRAME,
   EXPORT_FRAME_LABELS,
   EXPORT_FRAME_PREFERENCES,
-  EXPORT_FRAME_STORAGE_KEY,
-  parseExportFramePreferences,
-  serializeExportFramePreferences
+  readExportFramePreference,
+  writeExportFramePreference
 } from './exportFramePreference';
 import { errorMessage, type StatusMessage } from '../appTypes';
 import { Button, StatusCard } from '../ui';
@@ -30,28 +31,6 @@ function getActionStatus(responseMessage: string): StatusMessage {
  * preferences live. A storage that refuses to answer is the default, not an
  * error: the worst that costs is exporting the shape the footage already is.
  */
-function readFramePreference(projectId: string): FramePreference {
-  if (typeof window === 'undefined') return DEFAULT_EXPORT_FRAME;
-  try {
-    return parseExportFramePreferences(window.localStorage.getItem(EXPORT_FRAME_STORAGE_KEY))[projectId] ?? DEFAULT_EXPORT_FRAME;
-  } catch {
-    return DEFAULT_EXPORT_FRAME;
-  }
-}
-
-function writeFramePreference(projectId: string, preference: FramePreference): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const stored = parseExportFramePreferences(window.localStorage.getItem(EXPORT_FRAME_STORAGE_KEY));
-    window.localStorage.setItem(
-      EXPORT_FRAME_STORAGE_KEY,
-      serializeExportFramePreferences({ ...stored, [projectId]: preference })
-    );
-  } catch {
-    // A preference that could not be saved still applies to this export.
-  }
-}
-
 export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
   const [job, setJob] = useState<LocalExportJob | null>(null);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -64,10 +43,24 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
   const project = editor.project;
   const hasProject = project !== null;
   const [framePreference, setFramePreference] = useState<FramePreference>(DEFAULT_EXPORT_FRAME);
+  const [subtitleDelivery, setSubtitleDelivery] = useState<SubtitleDelivery>(DEFAULT_SUBTITLE_DELIVERY);
+  const [metadataPrivacyMode, setMetadataPrivacyMode] = useState<MetadataPrivacyMode>(DEFAULT_METADATA_PRIVACY_MODE);
 
   useEffect(() => {
-    setFramePreference(project === null ? DEFAULT_EXPORT_FRAME : readFramePreference(project.id));
+    setFramePreference(project === null ? DEFAULT_EXPORT_FRAME : readExportFramePreference(project.id));
+    setSubtitleDelivery(DEFAULT_SUBTITLE_DELIVERY);
+    setMetadataPrivacyMode(DEFAULT_METADATA_PRIVACY_MODE);
   }, [project?.id]);
+
+  const automaticCaptionCount = useMemo(
+    () => project === null ? 0 : automaticCaptionTitles(project.timeline).length,
+    [project]
+  );
+  useEffect(() => {
+    if (automaticCaptionCount === 0) {
+      setSubtitleDelivery((current) => current.sidecarFormat === 'none' ? current : { ...current, sidecarFormat: 'none' });
+    }
+  }, [automaticCaptionCount]);
 
   /*
     The frame this cut goes into, decided by the rule both surfaces share.
@@ -89,6 +82,8 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
     () => getExportActionState({ hasProject, hasUnsavedTimeline: editor.hasUnsavedTimeline, isStarting, job }),
     [editor.hasUnsavedTimeline, hasProject, isStarting, job]
   );
+  const privacyPlan = useMemo(() => metadataPrivacyPlan(metadataPrivacyMode), [metadataPrivacyMode]);
+  const completedPrivacyVerification = job?.state.kind === 'completed' ? job.state.metadataPrivacyVerification : undefined;
   const statusView = useMemo(
     () => getExportStatusView({
       hasProject,
@@ -126,7 +121,9 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
       projectId: project.id,
       // Sent explicitly: the main process falls back to the first video asset's
       // size, which is the answer this control exists to replace.
-      ...(frame === null ? {} : { width: frame.width, height: frame.height })
+      ...(frame === null ? {} : { width: frame.width, height: frame.height }),
+      subtitleDelivery,
+      metadataPrivacyMode
     });
     setIsStarting(false);
     if (response.ok) {
@@ -134,7 +131,7 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
       return;
     }
     setUnavailableReason(errorMessage(response.error));
-  }, [actionState.canStart, frame, project]);
+  }, [actionState.canStart, frame, metadataPrivacyMode, project, subtitleDelivery]);
 
   const cancelExport = useCallback(async (): Promise<void> => {
     if (job === null || !actionState.canCancel) return;
@@ -201,7 +198,7 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
               onChange={(event) => {
                 const next = event.target.value as FramePreference;
                 setFramePreference(next);
-                if (project !== null) writeFramePreference(project.id, next);
+                if (project !== null) writeExportFramePreference(project.id, next);
               }}
             >
               {EXPORT_FRAME_PREFERENCES.map((preference) => (
@@ -212,6 +209,45 @@ export function ExportPanel({ editor }: ExportPanelProps): ReactElement {
                 what the file will be. */}
             <span className="export-panel__frame-size">{frame === null ? '—' : `${frame.width} × ${frame.height}`}</span>
           </label>
+          <fieldset className="export-panel__captions" disabled={!hasProject || isStarting || actionState.canCancel}>
+            <legend>Automatic captions ({automaticCaptionCount})</legend>
+            <label>
+              <input type="checkbox" checked={subtitleDelivery.burnAutomaticCaptions}
+                onChange={(event) => setSubtitleDelivery((current) => ({ ...current, burnAutomaticCaptions: event.target.checked }))} />
+              Burn approved captions into MP4
+            </label>
+            <label htmlFor="export-subtitle-sidecar">
+              Subtitle sidecar
+              <select id="export-subtitle-sidecar" value={subtitleDelivery.sidecarFormat}
+                onChange={(event) => setSubtitleDelivery((current) => ({ ...current, sidecarFormat: event.target.value as SubtitleSidecarFormat }))}>
+                {SUBTITLE_SIDECAR_FORMATS.map((format) => <option key={format} value={format} disabled={format !== 'none' && automaticCaptionCount === 0}>
+                  {format === 'none' ? 'None' : format.toUpperCase()}
+                </option>)}
+              </select>
+            </label>
+            <span>Sidecars contain automatic captions only; manual timeline titles remain in the MP4.</span>
+          </fieldset>
+          <fieldset className="export-panel__privacy" disabled={!hasProject || isStarting || actionState.canCancel}>
+            <legend>Metadata and provenance</legend>
+            <label htmlFor="export-metadata-privacy">
+              Delivery preset
+              <select id="export-metadata-privacy" value={metadataPrivacyMode}
+                onChange={(event) => setMetadataPrivacyMode(event.target.value as MetadataPrivacyMode)}>
+                {METADATA_PRIVACY_MODES.map((mode) => <option key={mode} value={mode}>{metadataPrivacyPlan(mode).label}</option>)}
+              </select>
+            </label>
+            <span>{privacyPlan.summary}</span>
+            {privacyPlan.removedFields.length > 0 && <details>
+              <summary>Planned removal: clear {privacyPlan.removedFields.length} allowlisted personal tags</summary>
+              <p>{privacyPlan.removedFields.map((field) => field.label).join(', ')}.</p>
+            </details>}
+            {completedPrivacyVerification !== undefined && <details open>
+              <summary>Verified metadata before/after</summary>
+              <p>{metadataPrivacyVerificationSummary(completedPrivacyVerification)}</p>
+            </details>}
+            <span>Always writes an export-ID.provenance.json manifest with the MP4 checksum and project revision. It contains no prompts, credentials, rights-note text or local paths.</span>
+            <span>Never targets Content Credentials/C2PA, SynthID, required provider labels or visible watermarks.</span>
+          </fieldset>
           <div className="export-popover__actions" role="toolbar" aria-label="MP4 export actions">
             <Button variant="primary" onClick={() => void startExport()} disabled={!actionState.canStart || isStarting}>Export MP4</Button>
             <Button variant="stop" onClick={() => void cancelExport()} disabled={!actionState.canCancel || isCancelling}>Cancel</Button>
