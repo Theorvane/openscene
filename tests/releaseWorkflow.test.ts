@@ -34,7 +34,7 @@ describe('release workflow', () => {
   });
 
   it('packages each platform on its own runner', () => {
-    for (const os of ['macos-latest', 'windows-latest', 'ubuntu-latest']) {
+    for (const os of ['macos-15', 'windows-latest', 'ubuntu-latest']) {
       expect(workflow).toContain(`os: ${os}`);
     }
     expect(workflow).toContain('npx electron-builder --${{ matrix.platform }} --publish never');
