@@ -1,9 +1,8 @@
-Change one shot without redoing the rest, and let the app check its own work.
+Plan, review, and assemble your story one step at a time.
 
-• Every shot in a plan can carry its own description
-• Redo one shot with a note — "slower, no text on screen"
-• Set a monthly limit on what generation may spend, and see the total
-• A cut that cannot come out right is refused before the export starts
-• The finished file is read back and compared with your cut
+• Writer Studio now moves from idea to screenplay, scenes, and video prompts with approval at each stage.
+• Review narration timing and subtitle cues before applying captions.
+• Add first/last-frame or image references to supported video shots.
+• Assemble approved Writer shots in order.
 
-Fixes: a short, silent or wrongly shaped export no longer reports success.
+Fixes: image reference imports and short shot timing.
