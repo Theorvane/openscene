@@ -15,6 +15,7 @@ import {
   CHATGPT_CODEX_DEVICE_AUTH,
   ChatGptOAuthService
 } from '../src/main/chatGptOAuthService';
+import { ChatGptOAuthTokenStore } from '../src/main/chatGptOAuthTokenStore';
 
 const NOW = 1_800_000_000_000;
 
@@ -123,5 +124,41 @@ describe('ChatGptOAuthService device authorization', () => {
     }), { status: 200 }));
 
     await eventually(() => expect(service.getStatus()).resolves.toEqual({ kind: 'disconnected' }));
+  });
+
+  it('clears a token save that was already in flight when logout began', async () => {
+    const saveStarted = createDeferred<void>();
+    const unblockSave = createDeferred<void>();
+    const originalSave = ChatGptOAuthTokenStore.prototype.save;
+    vi.spyOn(ChatGptOAuthTokenStore.prototype, 'save').mockImplementationOnce(async function (this: ChatGptOAuthTokenStore, tokens) {
+      saveStarted.resolve();
+      await unblockSave.promise;
+      await originalSave.call(this, tokens);
+    });
+    const service = new ChatGptOAuthService(tempDir, {
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url === CHATGPT_CODEX_DEVICE_AUTH.userCodeUrl) {
+          return new Response(JSON.stringify({ device_auth_id: 'device-123', user_code: 'ABCD-EFGH', interval: '0' }), { status: 200 });
+        }
+        if (url === CHATGPT_CODEX_DEVICE_AUTH.tokenPollUrl) {
+          return new Response(JSON.stringify({ authorization_code: 'authorization-code', code_verifier: 'device-code-verifier' }), { status: 200 });
+        }
+        return new Response(JSON.stringify({
+          access_token: createJwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'account-123' } }),
+          refresh_token: 'refresh-token',
+          expires_in: 3600
+        }), { status: 200 });
+      },
+      now: () => NOW
+    });
+
+    await service.startDeviceAuthorization();
+    await saveStarted.promise;
+    const logout = service.logout();
+    unblockSave.resolve();
+    await logout;
+
+    await expect(service.getStatus()).resolves.toEqual({ kind: 'disconnected' });
   });
 });

@@ -81,6 +81,7 @@ export class ChatGptOAuthService {
   private readonly now: () => number;
   private activeAuthorization: AbortController | null = null;
   private activeStatus: ChatGptOAuthStatus | null = null;
+  private credentialOperation: Promise<void> = Promise.resolve();
 
   constructor(directory: string, dependencies: ChatGptOAuthServiceDependencies = {}) {
     this.tokenStore = new ChatGptOAuthTokenStore(directory);
@@ -151,14 +152,20 @@ export class ChatGptOAuthService {
           signal: AbortSignal.timeout(30_000)
         })
       : stored;
-    if (tokens !== stored) await this.tokenStore.save(tokens);
+    if (tokens !== stored) await this.serializeCredentialOperation(() => this.tokenStore.save(tokens));
     return { accessToken: tokens.accessToken, accountId: tokens.accountId };
   }
 
   async logout(): Promise<ChatGptOAuthStatus> {
     this.cancelAuthorization();
-    await this.tokenStore.clear();
+    await this.serializeCredentialOperation(() => this.tokenStore.clear());
     return { kind: 'disconnected' };
+  }
+
+  private serializeCredentialOperation(action: () => Promise<void>): Promise<void> {
+    const next = this.credentialOperation.then(action, action);
+    this.credentialOperation = next.catch(() => undefined);
+    return next;
   }
 
   private async completeDeviceAuthorization(device: { readonly deviceAuthId: string; readonly userCode: string; readonly interval: number }, controller: AbortController): Promise<void> {
@@ -185,10 +192,12 @@ export class ChatGptOAuthService {
           now: this.now,
           signal: controller.signal
         });
-        if (controller.signal.aborted || this.activeAuthorization !== controller) {
-          throw new DOMException('The operation was aborted.', 'AbortError');
-        }
-        await this.tokenStore.save(tokens);
+        await this.serializeCredentialOperation(async () => {
+          if (controller.signal.aborted || this.activeAuthorization !== controller) {
+            throw new DOMException('The operation was aborted.', 'AbortError');
+          }
+          await this.tokenStore.save(tokens);
+        });
         return;
       }
       if (response.status !== 403 && response.status !== 404) {
