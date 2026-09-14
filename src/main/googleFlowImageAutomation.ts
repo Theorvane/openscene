@@ -14,6 +14,17 @@ const FLOW_PROJECT_RENAME_TIMEOUT_MS = 5_000;
 const FLOW_PROJECT_DISCOVERY_GRACE_MS = 4_000;
 const FLOW_REFERENCE_UPLOAD_TIMEOUT_MS = 5_000;
 const FLOW_REFERENCE_UPLOAD_POLL_MS = 250;
+const GOOGLE_FLOW_UPLOAD_ACTION_LABELS = [
+  'upload',
+  'upload image',
+  'upload media',
+  'upload media files',
+  'upload files',
+  'tai len',
+  'tai tep len',
+  'tai noi dung nghe nhin len',
+  'tai noi dung da phuong tien len'
+] as const;
 
 type RectangleWithText = {
   readonly rectangle: Rectangle;
@@ -131,6 +142,7 @@ export function buildGoogleFlowStateProbeScript(): string {
     const projectLink = projectLinks.find(({ rectangle }) => rectangle.width > 50 && rectangle.height > 30);
     const normalized = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[đĐ]/g, 'd').toLowerCase();
+    const uploadActionLabels = ${JSON.stringify(GOOGLE_FLOW_UPLOAD_ACTION_LABELS)};
     const interactive = visible('button, [role="button"], a, [tabindex="0"]');
     const projectCandidates = [];
     const seenProjectElements = new Set();
@@ -198,10 +210,20 @@ export function buildGoogleFlowStateProbeScript(): string {
     // The current Flow composer opens a second menu after the + button. Its
     // explicit Upload/Tai len action must be selected before Flow creates the
     // file input used by the reference importer.
-    const uploadChoiceEntry = visible('button, [role="button"], [role="menuitem"], [role="option"], [tabindex="0"]')
+    // Flow's current asset library renders the Upload media action as a
+    // clickable container with its readable label in a nested span. Search
+    // visible text containers as well as semantic controls; clicking the label
+    // center bubbles to the library action without relying on CSS classes.
+    const uploadChoiceEntry = visible('button, [role="button"], [role="menuitem"], [role="option"], [tabindex], div, span')
       .filter(({ element }) => {
-        const text = normalized(label(element) + ' ' + (element.getAttribute('aria-label') || ''));
-        return /^(upload|upload image|tai len)$/.test(text);
+        const labels = [
+          label(element),
+          element.getAttribute('aria-label') || '',
+          element.getAttribute('title') || ''
+        ].map((value) => normalized(value).replace(/\\s+/g, ' ').trim()).filter(Boolean);
+        return labels.some((text) => uploadActionLabels.some((candidate) =>
+          text === candidate || text.startsWith(candidate + ' ') || text.endsWith(' ' + candidate)
+        ));
       })
       .sort((left, right) => (left.rectangle.width * left.rectangle.height) - (right.rectangle.width * right.rectangle.height))[0];
 
@@ -437,6 +459,13 @@ async function readState(webContents: WebContents): Promise<AutomationState> {
 
 function normalizedLabel(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase();
+}
+
+export function flowUploadActionLabelMatches(value: string): boolean {
+  const normalized = normalizedLabel(value).replace(/\s+/g, ' ').trim();
+  return GOOGLE_FLOW_UPLOAD_ACTION_LABELS.some((candidate) =>
+    normalized === candidate || normalized.startsWith(`${candidate} `) || normalized.endsWith(` ${candidate}`)
+  );
 }
 
 function actionRequiredError(kind: NonNullable<AutomationState['actionRequired']>): Error {
@@ -833,12 +862,16 @@ async function attachImageReferences(
     throw new Error('Google Flow Image does not expose an upload control for the selected reference images.');
   }
 
-  if (state.uploadChoice === undefined) clickAt(webContents, state.uploadLauncher!);
+  if (state.uploadChoice === undefined) {
+    onDiagnostic({ step: 'picker_launcher' });
+    clickAt(webContents, state.uploadLauncher!);
+  }
 
   const deadline = Date.now() + FLOW_REFERENCE_UPLOAD_TIMEOUT_MS;
   while (Date.now() < deadline) {
     state = await readState(webContents);
     if (state.uploadChoice !== undefined) {
+      onDiagnostic({ step: 'picker_upload_action' });
       const upload = await uploadReferencesThroughChromiumFileChooser(
         webContents,
         references,
@@ -856,7 +889,7 @@ async function attachImageReferences(
     await delay(FLOW_REFERENCE_UPLOAD_POLL_MS);
   }
 
-  throw new Error('Google Flow opened its image picker, but Chromium could not assign the selected reference images. Retry after closing Flow DevTools or import the references manually.');
+  throw new Error('Google Flow opened its media library, but OpenScene could not find the Upload media action. The Flow UI may have changed; close the worker and retry after updating OpenScene.');
 }
 
 async function fillPrompt(webContents: WebContents, prompt: string, deadline: number): Promise<AutomationState> {

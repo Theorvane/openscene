@@ -14,6 +14,8 @@ export type ChromiumFileChooserUpload = {
 
 export type ChromiumFileChooserDiagnostic = {
   readonly step:
+    | 'picker_launcher'
+    | 'picker_upload_action'
     | 'debugger_attached'
     | 'page_enabled'
     | 'interception_enabled'

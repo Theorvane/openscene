@@ -7,6 +7,7 @@ import {
   automateGoogleFlowImageGeneration,
   buildGoogleFlowStateProbeScript,
   detectDownloadedImageMime,
+  flowUploadActionLabelMatches,
   flowConfigurationHasExactModel,
   flowOrientationForAspectRatio,
   renameGoogleFlowProject
@@ -23,6 +24,8 @@ describe('Google Flow browser image automation', () => {
     expect(script).toContain('attentionText');
     expect(script).toContain('uploadLauncherEntry');
     expect(script).toContain('uploadChoiceEntry');
+    expect(script).toContain('[tabindex], div, span');
+    expect(script).toContain('tai noi dung nghe nhin len');
     expect(script).not.toContain("/rate limit|usage limit|not enough credits|insufficient credits|hết tín dụng|đã đạt giới hạn/.test(body)");
   });
 
@@ -33,6 +36,13 @@ describe('Google Flow browser image automation', () => {
       0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50
     ]))).toBe('image/webp');
     expect(detectDownloadedImageMime(new TextEncoder().encode('<html>sign in</html>'))).toBeNull();
+  });
+
+  it('recognizes current Flow upload labels without combining duplicate accessible names', () => {
+    expect(flowUploadActionLabelMatches('Upload media')).toBe(true);
+    expect(flowUploadActionLabelMatches('Tải nội dung nghe nhìn lên')).toBe(true);
+    expect(flowUploadActionLabelMatches('Upload media Upload media')).toBe(true);
+    expect(flowUploadActionLabelMatches('Open media library')).toBe(false);
   });
 
   it('maps exact ratios onto the coarse orientation available in Flow', () => {
@@ -248,7 +258,8 @@ describe('Google Flow browser image automation', () => {
     expect(flattenedDocumentReads).toBe(2);
     expect(interceptionEnabled).toBe(false);
     expect(referenceUploadSteps).toEqual(expect.arrayContaining([
-      'page_enabled', 'interception_enabled', 'chooser_event_timeout', 'dom_fallback', 'files_assigned'
+      'picker_launcher', 'picker_upload_action', 'page_enabled', 'interception_enabled',
+      'chooser_event_timeout', 'dom_fallback', 'files_assigned'
     ]));
     const mouseDownEvents = sendInputEvent.mock.calls.map(([event]) => event)
       .filter((event) => event.type === 'mouseDown');
