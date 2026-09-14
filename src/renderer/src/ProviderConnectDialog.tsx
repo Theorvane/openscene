@@ -120,7 +120,9 @@ export function ProviderConnectDialog({ provider, onConnect, onClose, oauthMetho
             </p>
             {oauthMethod.deviceAuthorization !== undefined && (
               <div className="provider-connect-dialog__device-code">
-                <a href={oauthMethod.deviceAuthorization.verificationUrl}>{oauthMethod.deviceAuthorization.verificationUrl}</a>
+                <Button variant="ghost" type="button" onClick={() => void window.videoTool.openChatGptDeviceAuthorizationPage()}>
+                  Open {oauthMethod.deviceAuthorization.verificationUrl}
+                </Button>
                 <strong>{oauthMethod.deviceAuthorization.userCode}</strong>
               </div>
             )}

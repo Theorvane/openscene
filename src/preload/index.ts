@@ -121,6 +121,7 @@ export interface VideoToolApi {
   startChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
   cancelChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
   logoutChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;
+  openChatGptDeviceAuthorizationPage(): Promise<ApiResponse<{ readonly opened: boolean }>>;
   getBrowserSessionStatuses(): Promise<ApiResponse<readonly BrowserSessionStatus[]>>;
   startBrowserSession(providerId: BrowserSessionProviderId): Promise<ApiResponse<BrowserSessionStatus>>;
   clearBrowserSession(providerId: BrowserSessionProviderId): Promise<ApiResponse<BrowserSessionStatus>>;
@@ -259,6 +260,8 @@ const videoTool: VideoToolApi = {
     ipcRenderer.invoke(IPC_CHANNELS.cancelChatGptOAuth) as Promise<ApiResponse<ChatGptOAuthStatus>>,
   logoutChatGptOAuth: () =>
     ipcRenderer.invoke(IPC_CHANNELS.logoutChatGptOAuth) as Promise<ApiResponse<ChatGptOAuthStatus>>,
+  openChatGptDeviceAuthorizationPage: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.openChatGptDeviceAuthorizationPage) as Promise<ApiResponse<{ readonly opened: boolean }>>,
   getBrowserSessionStatuses: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getBrowserSessionStatuses) as Promise<ApiResponse<readonly BrowserSessionStatus[]>>,
   startBrowserSession: (providerId) =>

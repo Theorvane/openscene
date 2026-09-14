@@ -361,6 +361,7 @@ async function installIpcHandlers(): Promise<void> {
   registerExportIpcHandlers(ipcMain, exportIpcService);
   registerChatGptOAuthIpcHandlers({
     service: chatGptOAuthService,
+    openDeviceAuthorizationPage: (url) => shell.openExternal(url),
     registerHandler: (channel, handler) => ipcMain.handle(channel, (_event, payload: unknown) => handler(payload))
   });
   registerBrowserSessionIpcHandlers({
