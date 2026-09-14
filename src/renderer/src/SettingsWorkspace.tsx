@@ -177,9 +177,10 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
     isProviderKeyStored(provider) || (provider.id === 'openai' && chatGptAuth.isConnected);
 
   const chatGptSignInMethod: ProviderOAuthMethod = {
-    label: 'ChatGPT Pro/Plus',
-    description: 'Sign in with your ChatGPT account to run Codex-family models.',
+    label: 'Codex device authorization',
+    description: 'Sign in with ChatGPT on another device to run Codex-family models.',
     isConnecting: chatGptAuth.state === 'connecting',
+    ...(chatGptAuth.deviceAuthorization === undefined ? {} : { deviceAuthorization: chatGptAuth.deviceAuthorization }),
     ...(chatGptAuth.error === undefined ? {} : { error: chatGptAuth.error }),
     onSignIn: chatGptAuth.connect,
     onCancel: chatGptAuth.cancel

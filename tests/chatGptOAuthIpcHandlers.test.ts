@@ -14,7 +14,7 @@ function createFixture() {
   const handlers = new Map<string, RegisteredHandler>();
   const service = {
     getStatus: vi.fn(async () => CONNECTED),
-    authorize: vi.fn(async () => CONNECTED),
+    startDeviceAuthorization: vi.fn(async () => CONNECTED),
     cancelAuthorization: vi.fn(),
     logout: vi.fn(async () => DISCONNECTED)
   };
@@ -57,7 +57,7 @@ describe('registerChatGptOAuthIpcHandlers', () => {
 
     // Then
     expect(response).toEqual({ ok: true, value: CONNECTED });
-    expect(service.authorize).toHaveBeenCalledTimes(1);
+    expect(service.startDeviceAuthorization).toHaveBeenCalledTimes(1);
   });
 
   it('cancels an active authorization and returns the current coarse status', async () => {
@@ -100,6 +100,6 @@ describe('registerChatGptOAuthIpcHandlers', () => {
       ok: false,
       error: { code: 'INVALID_INPUT', message: 'ChatGPT OAuth actions do not accept a payload.' }
     });
-    expect(service.authorize).not.toHaveBeenCalled();
+    expect(service.startDeviceAuthorization).not.toHaveBeenCalled();
   });
 });

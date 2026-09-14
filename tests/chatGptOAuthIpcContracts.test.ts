@@ -37,8 +37,9 @@ describe('ChatGPT OAuth renderer contract', () => {
     expect(preload).toContain('cancelChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;');
     expect(preload).toContain('logoutChatGptOAuth(): Promise<ApiResponse<ChatGptOAuthStatus>>;');
     expect(mainIndex).toContain("new ChatGptOAuthService(app.getPath('userData')");
-    expect(mainIndex).toContain('openExternal: (url) => shell.openExternal(url)');
-    expect(mainIndex).toContain('registerChatGptOAuthIpcHandlers({');
+    expect(mainIndex).not.toContain("openExternal: (url) => shell.openExternal(url)");
+    expect(ipcHandler).toContain('startDeviceAuthorization');
+    expect(sharedContract).toContain("readonly kind: 'pending'; readonly verificationUrl: string; readonly userCode: string");
     expect(ipcHandler).toContain("return fail('INVALID_INPUT', 'ChatGPT OAuth actions do not accept a payload.');");
     expect(publicContract).not.toMatch(/accessToken|refreshToken|accountId|verifier|callback/i);
   });

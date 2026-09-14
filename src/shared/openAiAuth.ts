@@ -13,7 +13,8 @@ export type ReasoningEffort = string;
 
 export type ChatGptOAuthStatus =
   | { readonly kind: 'connected' }
-  | { readonly kind: 'disconnected' };
+  | { readonly kind: 'disconnected' }
+  | { readonly kind: 'pending'; readonly verificationUrl: string; readonly userCode: string };
 
 /**
  * Models the ChatGPT Codex backend actually serves:
