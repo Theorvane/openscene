@@ -1,8 +1,3 @@
-Plan, review, and assemble your story one step at a time.
+OpenScene 0.7.1 maintenance update.
 
-• Writer Studio now moves from idea to screenplay, scenes, and video prompts with approval at each stage.
-• Review narration timing and subtitle cues before applying captions.
-• Add first/last-frame or image references to supported video shots.
-• Assemble approved Writer shots in order.
-
-Fixes: image reference imports and short shot timing.
+Mobile editing tools and workflows are unchanged in this release.
