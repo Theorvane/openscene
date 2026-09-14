@@ -22,6 +22,14 @@ function createJwt(payload: object): string {
   return `header.${Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')}.signature`;
 }
 
+function createDeferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+  let resolvePromise: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
+}
+
 async function eventually(expectation: () => void | Promise<void>): Promise<void> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
@@ -86,5 +94,34 @@ describe('ChatGptOAuthService device authorization', () => {
     await eventually(() => expect(pollCount).toBe(2));
     await eventually(() => expect(service.getStatus()).resolves.toEqual({ kind: 'connected' }));
     await expect(service.acquireCredentials()).resolves.toEqual({ accessToken, accountId: 'account-123' });
+  });
+
+  it.each(['cancel', 'logout'] as const)('does not persist tokens when %s wins the exchange race', async (action) => {
+    const exchange = createDeferred<Response>();
+    const service = new ChatGptOAuthService(tempDir, {
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url === CHATGPT_CODEX_DEVICE_AUTH.userCodeUrl) {
+          return new Response(JSON.stringify({ device_auth_id: 'device-123', user_code: 'ABCD-EFGH', interval: '0' }), { status: 200 });
+        }
+        if (url === CHATGPT_CODEX_DEVICE_AUTH.tokenPollUrl) {
+          return new Response(JSON.stringify({ authorization_code: 'authorization-code', code_verifier: 'device-code-verifier' }), { status: 200 });
+        }
+        return exchange.promise;
+      },
+      now: () => NOW
+    });
+
+    await service.startDeviceAuthorization();
+    await eventually(() => expect(service.getStatus()).resolves.toMatchObject({ kind: 'pending' }));
+    if (action === 'cancel') service.cancelAuthorization();
+    else await service.logout();
+    exchange.resolve(new Response(JSON.stringify({
+      access_token: createJwt({ 'https://api.openai.com/auth': { chatgpt_account_id: 'account-123' } }),
+      refresh_token: 'refresh-token',
+      expires_in: 3600
+    }), { status: 200 }));
+
+    await eventually(() => expect(service.getStatus()).resolves.toEqual({ kind: 'disconnected' }));
   });
 });

@@ -185,6 +185,9 @@ export class ChatGptOAuthService {
           now: this.now,
           signal: controller.signal
         });
+        if (controller.signal.aborted || this.activeAuthorization !== controller) {
+          throw new DOMException('The operation was aborted.', 'AbortError');
+        }
         await this.tokenStore.save(tokens);
         return;
       }
