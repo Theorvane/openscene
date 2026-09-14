@@ -89,9 +89,7 @@ const updaterPromptIo = {
   showMessageBox: (input: Parameters<typeof dialog.showMessageBox>[0]) => dialog.showMessageBox(input),
   openExternal: (url: string) => shell.openExternal(url)
 };
-const chatGptOAuthService = new ChatGptOAuthService(app.getPath('userData'), {
-  openExternal: (url) => shell.openExternal(url)
-});
+const chatGptOAuthService = new ChatGptOAuthService(app.getPath('userData'));
 const llmExecutionAdapter = new LlmExecutionAdapter(credentialStore);
 const llmPromptRouter = new LlmPromptRouter({
   apiKeyAdapter: llmExecutionAdapter,
@@ -363,6 +361,7 @@ async function installIpcHandlers(): Promise<void> {
   registerExportIpcHandlers(ipcMain, exportIpcService);
   registerChatGptOAuthIpcHandlers({
     service: chatGptOAuthService,
+    openDeviceAuthorizationPage: (url) => shell.openExternal(url),
     registerHandler: (channel, handler) => ipcMain.handle(channel, (_event, payload: unknown) => handler(payload))
   });
   registerBrowserSessionIpcHandlers({

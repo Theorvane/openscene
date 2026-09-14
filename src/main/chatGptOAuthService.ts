@@ -1,21 +1,14 @@
-import { createHash, randomBytes as nodeRandomBytes } from 'node:crypto';
-
 import { ChatGptOAuthTokenStore } from './chatGptOAuthTokenStore';
-import { receiveAuthorizationCode } from './chatGptOAuthCallback';
 import { exchangeAuthorizationCode, refreshTokens } from './chatGptOAuthProtocol';
 import type { ChatGptOAuthStatus } from '../shared/openAiAuth';
 
-/**
- * The authorization server only accepts the loopback callback registered for
- * this client, so the port and host are fixed rather than freely chosen.
- */
-export const CHATGPT_OAUTH_REDIRECT_URI = 'http://localhost:1455/auth/callback';
-
-const CHATGPT_OAUTH = {
+export const CHATGPT_CODEX_DEVICE_AUTH = {
   clientId: 'app_EMoamEEZ73f0CkXaXp7hrann',
-  issuer: 'https://auth.openai.com',
-  redirectUri: CHATGPT_OAUTH_REDIRECT_URI,
-  scope: 'openid profile email offline_access'
+  userCodeUrl: 'https://auth.openai.com/api/accounts/deviceauth/usercode',
+  tokenPollUrl: 'https://auth.openai.com/api/accounts/deviceauth/token',
+  tokenExchangeUrl: 'https://auth.openai.com/oauth/token',
+  verificationUrl: 'https://auth.openai.com/codex/device',
+  redirectUri: 'https://auth.openai.com/deviceauth/callback'
 } as const;
 
 export const CHATGPT_CODEX_ENDPOINT_METADATA = {
@@ -24,16 +17,6 @@ export const CHATGPT_CODEX_ENDPOINT_METADATA = {
   accountIdHeader: 'ChatGPT-Account-Id'
 } as const;
 
-/**
- * How this app identifies itself to OpenAI. The Codex backend rejects requests
- * that do not identify the calling client the way the Codex CLI does — a bare
- * 400 with no body — and it is the same string the authorize URL carries, so
- * both places read this one constant.
- *
- * Note the client id itself is still Codex's: ChatGPT-subscription OAuth has no
- * public app registration, so the sign-in cannot present an OpenScene client.
- * Only the originator and User-Agent are ours.
- */
 export const CHATGPT_CLIENT_ORIGINATOR = 'openvideo';
 
 export function chatGptCodexClientHeaders(sessionId: string): Readonly<Record<string, string>> {
@@ -44,97 +27,111 @@ export function chatGptCodexClientHeaders(sessionId: string): Readonly<Record<st
   };
 }
 
-const AUTHORIZATION_TIMEOUT_MS = 5 * 60 * 1_000;
 const REFRESH_WINDOW_MS = 5 * 60 * 1_000;
+const DEVICE_AUTH_TIMEOUT_MS = 15 * 60 * 1_000;
 
 type ChatGptCodexCredentials = {
   readonly accessToken: string;
   readonly accountId: string;
 };
 
+type UserCodeResponse = {
+  readonly device_auth_id: string;
+  readonly user_code?: string;
+  readonly usercode?: string;
+  readonly interval?: string | number;
+};
+
+type DeviceTokenResponse = {
+  readonly authorization_code: string;
+  readonly code_verifier: string;
+};
+
 export type ChatGptOAuthServiceDependencies = {
   readonly fetchImpl?: typeof fetch;
   readonly now?: () => number;
-  readonly randomBytes?: (size: number) => Buffer;
-  readonly openExternal: (url: string) => Promise<void>;
-  readonly authorizationTimeoutMs?: number;
 };
 
 export class ChatGptOAuthServiceError extends Error {
   override readonly name = 'ChatGptOAuthServiceError';
 
-  constructor(readonly reason: 'authorization_in_progress' | 'not_authenticated', message: string) {
-    super(message);
+  constructor(readonly reason: 'authorization_in_progress' | 'not_authenticated' | 'device_authorization_failed', message: string, options?: ErrorOptions) {
+    super(message, options);
   }
 }
 
-type AuthorizationRequest = {
-  readonly url: string;
-  readonly verifier: string;
-  readonly state: string;
-};
+function intervalMs(value: string | number | undefined): number {
+  const seconds = typeof value === 'number' ? value : Number.parseInt(value ?? '', 10);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1_000 : 5_000;
+}
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => {
+      clearTimeout(timer);
+      reject(new DOMException('The operation was aborted.', 'AbortError'));
+    }, { once: true });
+  });
+}
 
 export class ChatGptOAuthService {
   private readonly tokenStore: ChatGptOAuthTokenStore;
   private readonly fetchImpl: typeof fetch;
   private readonly now: () => number;
-  private readonly randomBytes: (size: number) => Buffer;
-  private readonly openExternal: (url: string) => Promise<void>;
-  private readonly authorizationTimeoutMs: number;
   private activeAuthorization: AbortController | null = null;
+  private activeStatus: ChatGptOAuthStatus | null = null;
+  private credentialOperation: Promise<void> = Promise.resolve();
 
-  constructor(directory: string, dependencies: ChatGptOAuthServiceDependencies) {
+  constructor(directory: string, dependencies: ChatGptOAuthServiceDependencies = {}) {
     this.tokenStore = new ChatGptOAuthTokenStore(directory);
     this.fetchImpl = dependencies.fetchImpl ?? fetch;
     this.now = dependencies.now ?? Date.now;
-    this.randomBytes = dependencies.randomBytes ?? nodeRandomBytes;
-    this.openExternal = dependencies.openExternal;
-    this.authorizationTimeoutMs = dependencies.authorizationTimeoutMs ?? AUTHORIZATION_TIMEOUT_MS;
   }
 
   async getStatus(): Promise<ChatGptOAuthStatus> {
+    if (this.activeStatus !== null) return this.activeStatus;
     const tokens = await this.tokenStore.load();
     return tokens === null ? { kind: 'disconnected' } : { kind: 'connected' };
   }
 
-  async authorize(signal?: AbortSignal): Promise<ChatGptOAuthStatus> {
+  async startDeviceAuthorization(): Promise<ChatGptOAuthStatus> {
     if (this.activeAuthorization !== null) {
-      throw new ChatGptOAuthServiceError('authorization_in_progress', 'ChatGPT authorization is already in progress.');
+      throw new ChatGptOAuthServiceError('authorization_in_progress', 'Codex device authorization is already in progress.');
     }
-
     const controller = new AbortController();
     this.activeAuthorization = controller;
-    const cancel = (): void => controller.abort();
-    signal?.addEventListener('abort', cancel, { once: true });
-    if (signal?.aborted === true) {
-      controller.abort();
-    }
-
     try {
-      const authorization = this.createAuthorizationRequest();
-      const code = await receiveAuthorizationCode({
-        redirectUri: CHATGPT_OAUTH.redirectUri,
-        expectedState: authorization.state,
-        authorizationUrl: authorization.url,
-        timeoutMs: this.authorizationTimeoutMs,
-        signal: controller.signal,
-        openExternal: this.openExternal
-      });
-      const tokens = await exchangeAuthorizationCode({
-        tokenEndpoint: `${CHATGPT_OAUTH.issuer}/oauth/token`,
-        clientId: CHATGPT_OAUTH.clientId,
-        redirectUri: CHATGPT_OAUTH.redirectUri,
-        code,
-        verifier: authorization.verifier,
-        fetchImpl: this.fetchImpl,
-        now: this.now,
+      const response = await this.fetchImpl(CHATGPT_CODEX_DEVICE_AUTH.userCodeUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ client_id: CHATGPT_CODEX_DEVICE_AUTH.clientId }),
         signal: controller.signal
       });
-      await this.tokenStore.save(tokens);
-      return { kind: 'connected' };
-    } finally {
-      signal?.removeEventListener('abort', cancel);
-      this.activeAuthorization = null;
+      if (!response.ok) throw new ChatGptOAuthServiceError('device_authorization_failed', `Codex device code request failed with HTTP ${response.status}.`);
+      const payload = await response.json() as UserCodeResponse;
+      const userCode = payload.user_code ?? payload.usercode;
+      if (typeof payload.device_auth_id !== 'string' || payload.device_auth_id.length === 0 || typeof userCode !== 'string' || userCode.length === 0) {
+        throw new ChatGptOAuthServiceError('device_authorization_failed', 'Codex returned an invalid device code response.');
+      }
+      const pending: ChatGptOAuthStatus = {
+        kind: 'pending',
+        verificationUrl: CHATGPT_CODEX_DEVICE_AUTH.verificationUrl,
+        userCode
+      };
+      this.activeStatus = pending;
+      void this.completeDeviceAuthorization({ deviceAuthId: payload.device_auth_id, userCode, interval: intervalMs(payload.interval) }, controller)
+        .catch(() => undefined)
+        .finally(() => {
+          if (this.activeAuthorization === controller) {
+            this.activeAuthorization = null;
+            this.activeStatus = null;
+          }
+        });
+      return pending;
+    } catch (error) {
+      if (this.activeAuthorization === controller) this.activeAuthorization = null;
+      throw error;
     }
   }
 
@@ -144,49 +141,70 @@ export class ChatGptOAuthService {
 
   async acquireCredentials(): Promise<ChatGptCodexCredentials> {
     const stored = await this.tokenStore.load();
-    if (stored === null) {
-      throw new ChatGptOAuthServiceError('not_authenticated', 'ChatGPT is not connected.');
-    }
-
+    if (stored === null) throw new ChatGptOAuthServiceError('not_authenticated', 'Codex is not connected.');
     const tokens = stored.expiresAt - this.now() <= REFRESH_WINDOW_MS
       ? await refreshTokens({
-          tokenEndpoint: `${CHATGPT_OAUTH.issuer}/oauth/token`,
-          clientId: CHATGPT_OAUTH.clientId,
+          tokenEndpoint: CHATGPT_CODEX_DEVICE_AUTH.tokenExchangeUrl,
+          clientId: CHATGPT_CODEX_DEVICE_AUTH.clientId,
           refreshToken: stored.refreshToken,
           fetchImpl: this.fetchImpl,
           now: this.now,
           signal: AbortSignal.timeout(30_000)
         })
       : stored;
-    if (tokens !== stored) {
-      await this.tokenStore.save(tokens);
-    }
+    if (tokens !== stored) await this.serializeCredentialOperation(() => this.tokenStore.save(tokens));
     return { accessToken: tokens.accessToken, accountId: tokens.accountId };
   }
 
   async logout(): Promise<ChatGptOAuthStatus> {
     this.cancelAuthorization();
-    await this.tokenStore.clear();
+    await this.serializeCredentialOperation(() => this.tokenStore.clear());
     return { kind: 'disconnected' };
   }
 
-  private createAuthorizationRequest(): AuthorizationRequest {
-    const verifier = this.randomBytes(32).toString('base64url');
-    const state = this.randomBytes(32).toString('base64url');
-    const challenge = createHash('sha256').update(verifier).digest('base64url');
-    const url = new URL(`${CHATGPT_OAUTH.issuer}/oauth/authorize`);
-    url.search = new URLSearchParams({
-      response_type: 'code',
-      client_id: CHATGPT_OAUTH.clientId,
-      redirect_uri: CHATGPT_OAUTH.redirectUri,
-      scope: CHATGPT_OAUTH.scope,
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-      state,
-      id_token_add_organizations: 'true',
-      codex_cli_simplified_flow: 'true',
-      originator: CHATGPT_CLIENT_ORIGINATOR
-    }).toString();
-    return { url: url.toString(), verifier, state };
+  private serializeCredentialOperation(action: () => Promise<void>): Promise<void> {
+    const next = this.credentialOperation.then(action, action);
+    this.credentialOperation = next.catch(() => undefined);
+    return next;
+  }
+
+  private async completeDeviceAuthorization(device: { readonly deviceAuthId: string; readonly userCode: string; readonly interval: number }, controller: AbortController): Promise<void> {
+    const deadline = this.now() + DEVICE_AUTH_TIMEOUT_MS;
+    while (this.now() < deadline) {
+      const response = await this.fetchImpl(CHATGPT_CODEX_DEVICE_AUTH.tokenPollUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ device_auth_id: device.deviceAuthId, user_code: device.userCode }),
+        signal: controller.signal
+      });
+      if (response.ok) {
+        const payload = await response.json() as DeviceTokenResponse;
+        if (typeof payload.authorization_code !== 'string' || typeof payload.code_verifier !== 'string') {
+          throw new ChatGptOAuthServiceError('device_authorization_failed', 'Codex returned an invalid device authorization result.');
+        }
+        const tokens = await exchangeAuthorizationCode({
+          tokenEndpoint: CHATGPT_CODEX_DEVICE_AUTH.tokenExchangeUrl,
+          clientId: CHATGPT_CODEX_DEVICE_AUTH.clientId,
+          redirectUri: CHATGPT_CODEX_DEVICE_AUTH.redirectUri,
+          code: payload.authorization_code,
+          verifier: payload.code_verifier,
+          fetchImpl: this.fetchImpl,
+          now: this.now,
+          signal: controller.signal
+        });
+        await this.serializeCredentialOperation(async () => {
+          if (controller.signal.aborted || this.activeAuthorization !== controller) {
+            throw new DOMException('The operation was aborted.', 'AbortError');
+          }
+          await this.tokenStore.save(tokens);
+        });
+        return;
+      }
+      if (response.status !== 403 && response.status !== 404) {
+        throw new ChatGptOAuthServiceError('device_authorization_failed', `Codex device authorization failed with HTTP ${response.status}.`);
+      }
+      await sleep(Math.min(device.interval, Math.max(0, deadline - this.now())), controller.signal);
+    }
+    throw new ChatGptOAuthServiceError('device_authorization_failed', 'Codex device authorization timed out.');
   }
 }

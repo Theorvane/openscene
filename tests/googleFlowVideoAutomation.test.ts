@@ -40,16 +40,18 @@ describe('Google Flow browser video automation', () => {
       .mockResolvedValueOnce(home)
       .mockResolvedValueOnce(matchingHome)
       .mockResolvedValueOnce(editor);
+    const loadURL = vi.fn(async () => undefined);
     const sendInputEvent = vi.fn();
     const operation = waitForGoogleFlowProjectEditor(
-      { executeJavaScript, sendInputEvent } as unknown as WebContents,
+      { executeJavaScript, loadURL, sendInputEvent } as unknown as WebContents,
       Date.now() + 10_000,
       'nhanvat ai'
     );
 
     await vi.runAllTimersAsync();
     await expect(operation).resolves.toMatchObject({ createdProject: false, state: editor });
-    expect(sendInputEvent).toHaveBeenCalledWith({
+    expect(loadURL).toHaveBeenCalledWith('https://flow.google.com/project/existing');
+    expect(sendInputEvent).not.toHaveBeenCalledWith({
       type: 'mouseDown', x: 420, y: 260, button: 'left', clickCount: 1
     });
     expect(sendInputEvent).not.toHaveBeenCalledWith({
@@ -86,6 +88,45 @@ describe('Google Flow browser video automation', () => {
     await expect(operation).resolves.toMatchObject({ createdProject: false, state: editor });
     expect(loadURL).toHaveBeenCalledWith('https://flow.google.com/project/remembered');
     expect(sendInputEvent).not.toHaveBeenCalled();
+  });
+
+  it('retries the exact project URL when Flow remains on the project list after the first navigation', async () => {
+    vi.useFakeTimers();
+    const project = {
+      rectangle: { x: 300, y: 200, width: 240, height: 120 },
+      text: 'nhanvat ai Chinh sua tieu de du an Xoa du an',
+      href: 'https://flow.google.com/project/existing'
+    };
+    const home = {
+      url: 'https://flow.google.com/',
+      projectCandidates: [project],
+      tabs: [], menuItems: []
+    };
+    const editor = {
+      url: project.href,
+      input: { x: 20, y: 700, width: 300, height: 50 },
+      configButton: { rectangle: { x: 20, y: 800, width: 300, height: 40 }, text: 'Video 720p 8s x1' },
+      tabs: [], menuItems: []
+    };
+    const executeJavaScript = vi.fn()
+      .mockResolvedValueOnce(home)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(home)
+      .mockResolvedValueOnce(home)
+      .mockResolvedValueOnce(home)
+      .mockResolvedValueOnce(editor);
+    const loadURL = vi.fn(async () => undefined);
+    const operation = waitForGoogleFlowProjectEditor(
+      { executeJavaScript, loadURL, sendInputEvent: vi.fn() } as unknown as WebContents,
+      Date.now() + 10_000,
+      'nhanvat ai'
+    );
+
+    await vi.runAllTimersAsync();
+    await expect(operation).resolves.toMatchObject({ createdProject: false, state: editor });
+    expect(loadURL).toHaveBeenCalledTimes(2);
+    expect(loadURL).toHaveBeenNthCalledWith(1, project.href);
+    expect(loadURL).toHaveBeenNthCalledWith(2, project.href);
   });
 
   it('recognizes MP4 family signatures instead of trusting a filename or MIME header', () => {

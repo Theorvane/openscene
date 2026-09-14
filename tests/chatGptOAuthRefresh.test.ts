@@ -53,8 +53,7 @@ describe('ChatGptOAuthService token refresh', () => {
     });
     const service = new ChatGptOAuthService(tempDir, {
       fetchImpl,
-      now: () => NOW,
-      openExternal: async () => undefined
+      now: () => NOW
     });
 
     // When
@@ -81,8 +80,7 @@ describe('ChatGptOAuthService token refresh', () => {
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
     const service = new ChatGptOAuthService(tempDir, {
       fetchImpl,
-      now: () => NOW,
-      openExternal: async () => undefined
+      now: () => NOW
     });
 
     // When

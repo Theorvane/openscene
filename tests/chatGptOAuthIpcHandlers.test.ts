@@ -5,7 +5,7 @@ import { IPC_CHANNELS } from '../src/shared/ipc';
 import type { ApiResponse } from '../src/shared/models';
 import type { ChatGptOAuthStatus } from '../src/shared/openAiAuth';
 
-type RegisteredHandler = (payload?: unknown) => Promise<ApiResponse<ChatGptOAuthStatus>>;
+type RegisteredHandler = (payload?: unknown) => Promise<ApiResponse<unknown>>;
 
 const CONNECTED: ChatGptOAuthStatus = { kind: 'connected' };
 const DISCONNECTED: ChatGptOAuthStatus = { kind: 'disconnected' };
@@ -14,12 +14,14 @@ function createFixture() {
   const handlers = new Map<string, RegisteredHandler>();
   const service = {
     getStatus: vi.fn(async () => CONNECTED),
-    authorize: vi.fn(async () => CONNECTED),
+    startDeviceAuthorization: vi.fn(async () => CONNECTED),
     cancelAuthorization: vi.fn(),
-    logout: vi.fn(async () => DISCONNECTED)
+    logout: vi.fn(async () => DISCONNECTED),
+    openDeviceAuthorizationPage: vi.fn(async () => undefined)
   };
   registerChatGptOAuthIpcHandlers({
     service,
+    openDeviceAuthorizationPage: service.openDeviceAuthorizationPage,
     registerHandler: (channel, handler) => handlers.set(channel, handler)
   });
   return { handlers, service };
@@ -57,7 +59,7 @@ describe('registerChatGptOAuthIpcHandlers', () => {
 
     // Then
     expect(response).toEqual({ ok: true, value: CONNECTED });
-    expect(service.authorize).toHaveBeenCalledTimes(1);
+    expect(service.startDeviceAuthorization).toHaveBeenCalledTimes(1);
   });
 
   it('cancels an active authorization and returns the current coarse status', async () => {
@@ -87,6 +89,32 @@ describe('registerChatGptOAuthIpcHandlers', () => {
     expect(service.logout).toHaveBeenCalledTimes(1);
   });
 
+  it('opens only the fixed Codex device authorization page', async () => {
+    // Given
+    const { handlers, service } = createFixture();
+    const handler = getHandler(handlers, IPC_CHANNELS.openChatGptDeviceAuthorizationPage);
+
+    // When
+    const response = await handler();
+
+    // Then
+    expect(response).toEqual({ ok: true, value: { opened: true } });
+    expect(service.openDeviceAuthorizationPage).toHaveBeenCalledWith('https://auth.openai.com/codex/device');
+  });
+
+  it('rejects unexpected payload data before opening the Codex device page', async () => {
+    // Given
+    const { handlers, service } = createFixture();
+    const handler = getHandler(handlers, IPC_CHANNELS.openChatGptDeviceAuthorizationPage);
+
+    // When
+    const response = await handler({ url: 'https://attacker.example' });
+
+    // Then
+    expect(response).toEqual({ ok: false, error: { code: 'INVALID_INPUT', message: 'Codex device page actions do not accept a payload.' } });
+    expect(service.openDeviceAuthorizationPage).not.toHaveBeenCalled();
+  });
+
   it('rejects unexpected payload data before invoking the OAuth service', async () => {
     // Given
     const { handlers, service } = createFixture();
@@ -100,6 +128,6 @@ describe('registerChatGptOAuthIpcHandlers', () => {
       ok: false,
       error: { code: 'INVALID_INPUT', message: 'ChatGPT OAuth actions do not accept a payload.' }
     });
-    expect(service.authorize).not.toHaveBeenCalled();
+    expect(service.startDeviceAuthorization).not.toHaveBeenCalled();
   });
 });

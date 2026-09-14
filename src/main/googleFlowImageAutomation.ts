@@ -4,6 +4,7 @@ import type { ReferenceImageSelection } from '../shared/providerSeams';
 import { BrowserGenerationActionRequiredError } from './browserGenerationAction';
 import {
   uploadReferencesThroughChromiumFileChooser,
+  type ChromiumFileChooserDiagnostic,
   type ChromiumFileChooserUpload
 } from './chromiumFileChooserUpload';
 
@@ -13,6 +14,17 @@ const FLOW_PROJECT_RENAME_TIMEOUT_MS = 5_000;
 const FLOW_PROJECT_DISCOVERY_GRACE_MS = 4_000;
 const FLOW_REFERENCE_UPLOAD_TIMEOUT_MS = 5_000;
 const FLOW_REFERENCE_UPLOAD_POLL_MS = 250;
+const GOOGLE_FLOW_UPLOAD_ACTION_LABELS = [
+  'upload',
+  'upload image',
+  'upload media',
+  'upload media files',
+  'upload files',
+  'tai len',
+  'tai tep len',
+  'tai noi dung nghe nhin len',
+  'tai noi dung da phuong tien len'
+] as const;
 
 type RectangleWithText = {
   readonly rectangle: Rectangle;
@@ -130,6 +142,7 @@ export function buildGoogleFlowStateProbeScript(): string {
     const projectLink = projectLinks.find(({ rectangle }) => rectangle.width > 50 && rectangle.height > 30);
     const normalized = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[đĐ]/g, 'd').toLowerCase();
+    const uploadActionLabels = ${JSON.stringify(GOOGLE_FLOW_UPLOAD_ACTION_LABELS)};
     const interactive = visible('button, [role="button"], a, [tabindex="0"]');
     const projectCandidates = [];
     const seenProjectElements = new Set();
@@ -197,10 +210,20 @@ export function buildGoogleFlowStateProbeScript(): string {
     // The current Flow composer opens a second menu after the + button. Its
     // explicit Upload/Tai len action must be selected before Flow creates the
     // file input used by the reference importer.
-    const uploadChoiceEntry = visible('button, [role="button"], [role="menuitem"], [role="option"], [tabindex="0"]')
+    // Flow's current asset library renders the Upload media action as a
+    // clickable container with its readable label in a nested span. Search
+    // visible text containers as well as semantic controls; clicking the label
+    // center bubbles to the library action without relying on CSS classes.
+    const uploadChoiceEntry = visible('button, [role="button"], [role="menuitem"], [role="option"], [tabindex], div, span')
       .filter(({ element }) => {
-        const text = normalized(label(element) + ' ' + (element.getAttribute('aria-label') || ''));
-        return /^(upload|upload image|tai len)$/.test(text);
+        const labels = [
+          label(element),
+          element.getAttribute('aria-label') || '',
+          element.getAttribute('title') || ''
+        ].map((value) => normalized(value).replace(/\\s+/g, ' ').trim()).filter(Boolean);
+        return labels.some((text) => uploadActionLabels.some((candidate) =>
+          text === candidate || text.startsWith(candidate + ' ') || text.endsWith(' ' + candidate)
+        ));
       })
       .sort((left, right) => (left.rectangle.width * left.rectangle.height) - (right.rectangle.width * right.rectangle.height))[0];
 
@@ -438,6 +461,13 @@ function normalizedLabel(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase();
 }
 
+export function flowUploadActionLabelMatches(value: string): boolean {
+  const normalized = normalizedLabel(value).replace(/\s+/g, ' ').trim();
+  return GOOGLE_FLOW_UPLOAD_ACTION_LABELS.some((candidate) =>
+    normalized === candidate || normalized.startsWith(`${candidate} `) || normalized.endsWith(` ${candidate}`)
+  );
+}
+
 function actionRequiredError(kind: NonNullable<AutomationState['actionRequired']>): Error {
   if (kind === 'sign_in') {
     return new BrowserGenerationActionRequiredError('sign_in', 'The Google Flow session has expired. Open Settings, sign in to Google Flow again, then start a new generation.');
@@ -474,10 +504,10 @@ export async function waitForGoogleFlowProjectEditor(
   projectName: string | undefined,
   onProject: (details?: Readonly<Record<string, unknown>>) => void = () => undefined
 ): Promise<{ readonly state: AutomationState; readonly createdProject: boolean }> {
-  let enteredProject = false;
   let createdProject = false;
   let rememberedProjectAttempted = false;
   let projectDiscoveryStartedAt: number | undefined;
+  let lastProjectOpenAttemptAt = 0;
   let lastHeartbeat = Date.now();
   const readinessDetails = (state: AutomationState): Readonly<Record<string, unknown>> => ({
     projectCandidates: state.projectCandidates?.length ?? 0,
@@ -503,6 +533,7 @@ export async function waitForGoogleFlowProjectEditor(
       continue;
     }
     throwForAction(state);
+    const projectPage = isFlowProjectUrl(state.url);
     if (state.agentSettingsOpen === true) {
       if (state.agentSettingsClose !== undefined) clickAt(webContents, state.agentSettingsClose);
       else pressKey(webContents, 'ESCAPE');
@@ -517,19 +548,19 @@ export async function waitForGoogleFlowProjectEditor(
       continue;
     }
     if (state.input !== undefined && state.configButton !== undefined) return { state, createdProject };
-    if (!enteredProject && !rememberedProjectAttempted && projectName !== undefined) {
+    if (!projectPage && !rememberedProjectAttempted && projectName !== undefined) {
       rememberedProjectAttempted = true;
       const rememberedUrl = await readRememberedProjectUrl(webContents, projectName).catch(() => undefined);
       if (rememberedUrl !== undefined) {
         onProject({ rememberedProject: true, requestedProject: projectName });
-        enteredProject = true;
-        await webContents.loadURL(rememberedUrl);
+        lastProjectOpenAttemptAt = Date.now();
+        await webContents.loadURL(rememberedUrl).catch(() => undefined);
         lastHeartbeat = Date.now();
         await delay(500);
         continue;
       }
     }
-    if (!enteredProject && state.dismiss !== undefined) {
+    if (!projectPage && state.dismiss !== undefined) {
       clickAt(webContents, state.dismiss);
       await delay(500);
       continue;
@@ -538,7 +569,7 @@ export async function waitForGoogleFlowProjectEditor(
     const matchingProject = target === undefined || target.length === 0
       ? undefined
       : (state.projectCandidates ?? []).find((candidate) => candidateMatchesProjectName(candidate.text, projectName!));
-    if (!enteredProject && target !== undefined && target.length > 0 && state.newProject !== undefined && matchingProject === undefined) {
+    if (!projectPage && target !== undefined && target.length > 0 && state.newProject !== undefined && matchingProject === undefined) {
       projectDiscoveryStartedAt ??= Date.now();
     }
     const projectDiscoveryComplete = projectDiscoveryStartedAt !== undefined
@@ -550,17 +581,29 @@ export async function waitForGoogleFlowProjectEditor(
       ?? (target === undefined || target.length === 0
         ? state.existingProject ?? state.newProject
         : projectDiscoveryComplete ? state.newProject : undefined);
-    if (!enteredProject && projectTarget !== undefined) {
-      enteredProject = true;
+    if (!projectPage && projectTarget !== undefined && Date.now() - lastProjectOpenAttemptAt >= 2_000) {
+      lastProjectOpenAttemptAt = Date.now();
       createdProject = matchingProject === undefined && state.newProject !== undefined && projectTarget === state.newProject;
       onProject({
         ...readinessDetails(state),
         matchingProject: matchingProject?.text ?? '',
         creatingProject: createdProject,
-        waitingForProjectList: !projectDiscoveryComplete && matchingProject === undefined
+        waitingForProjectList: !projectDiscoveryComplete && matchingProject === undefined,
+        openingByUrl: matchingProject?.href !== undefined
       });
       lastHeartbeat = Date.now();
-      clickAt(webContents, projectTarget);
+      // Current Flow places the project name outside the small "Open project"
+      // anchor. A synthetic coordinate click can hit the card overlay without
+      // navigating, while the anchor's own href remains authoritative. Load
+      // that exact visible href and retain a timed click fallback for older
+      // cards which do not expose one.
+      if (matchingProject?.href !== undefined && isFlowProjectUrl(matchingProject.href)) {
+        await webContents.loadURL(matchingProject.href).catch(() => undefined);
+      } else {
+        clickAt(webContents, projectTarget);
+      }
+      await delay(500);
+      continue;
     }
     if (Date.now() - lastHeartbeat >= 10_000) {
       lastHeartbeat = Date.now();
@@ -811,24 +854,30 @@ async function injectImageFiles(webContents: WebContents, references: readonly R
 
 async function attachImageReferences(
   webContents: WebContents,
-  references: readonly ReferenceImageSelection[]
+  references: readonly ReferenceImageSelection[],
+  onDiagnostic: (details: ChromiumFileChooserDiagnostic) => void
 ): Promise<ChromiumFileChooserUpload | null> {
   let state = await readState(webContents);
   if (state.uploadLauncher === undefined && state.uploadChoice === undefined) {
     throw new Error('Google Flow Image does not expose an upload control for the selected reference images.');
   }
 
-  if (state.uploadChoice === undefined) clickAt(webContents, state.uploadLauncher!);
+  if (state.uploadChoice === undefined) {
+    onDiagnostic({ step: 'picker_launcher' });
+    clickAt(webContents, state.uploadLauncher!);
+  }
 
   const deadline = Date.now() + FLOW_REFERENCE_UPLOAD_TIMEOUT_MS;
   while (Date.now() < deadline) {
     state = await readState(webContents);
     if (state.uploadChoice !== undefined) {
+      onDiagnostic({ step: 'picker_upload_action' });
       const upload = await uploadReferencesThroughChromiumFileChooser(
         webContents,
         references,
         () => clickAt(webContents, state.uploadChoice!),
-        Math.max(1, deadline - Date.now())
+        Math.max(1, deadline - Date.now()),
+        onDiagnostic
       );
       if (upload !== null) return upload;
       // Older Flow builds expose a page-owned multiple file input. Keep that
@@ -840,7 +889,7 @@ async function attachImageReferences(
     await delay(FLOW_REFERENCE_UPLOAD_POLL_MS);
   }
 
-  throw new Error('Google Flow opened its image picker, but Chromium could not assign the selected reference images. Retry after closing Flow DevTools or import the references manually.');
+  throw new Error('Google Flow opened its media library, but OpenScene could not find the Upload media action. The Flow UI may have changed; close the worker and retry after updating OpenScene.');
 }
 
 async function fillPrompt(webContents: WebContents, prompt: string, deadline: number): Promise<AutomationState> {
@@ -911,7 +960,14 @@ export async function automateGoogleFlowImageGeneration(
       : input.referenceImage === undefined ? [] : [input.referenceImage];
     if (references.length > 0) {
       input.onProgress?.('configuring', Date.now() - startedAt, { step: 'references', referenceCount: references.length });
-      referenceUpload = await attachImageReferences(webContents, references);
+      referenceUpload = await attachImageReferences(webContents, references, (details) => {
+        const { step: referenceUploadStep, ...safeDetails } = details;
+        input.onProgress?.('configuring', Date.now() - startedAt, {
+          step: 'reference_upload',
+          referenceUploadStep,
+          ...safeDetails
+        });
+      });
     }
 
     ready = await fillPrompt(webContents, input.prompt, deadline);

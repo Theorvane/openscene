@@ -12,6 +12,7 @@ export type ProviderOAuthMethod = {
   readonly label: string;
   readonly description: string;
   readonly isConnecting: boolean;
+  readonly deviceAuthorization?: { readonly verificationUrl: string; readonly userCode: string } | undefined;
   readonly error?: string | undefined;
   readonly onSignIn: () => Promise<boolean>;
   readonly onCancel: () => Promise<void>;
@@ -72,9 +73,7 @@ export function ProviderConnectDialog({ provider, onConnect, onClose, oauthMetho
     const connected = await oauthMethod.onSignIn();
     if (connected) {
       onClose();
-      return;
     }
-    setStep('method');
   };
 
   return (
@@ -115,8 +114,18 @@ export function ProviderConnectDialog({ provider, onConnect, onClose, oauthMetho
         {step === 'oauth' && oauthMethod !== undefined && (
           <>
             <p className="provider-connect-dialog__description">
-              Finish signing in to {oauthMethod.label} in your browser. This window updates automatically.
+              {oauthMethod.deviceAuthorization === undefined
+                ? 'Requesting a Codex device code…'
+                : 'Open this URL on any browser-capable device, sign in, and enter the one-time code.'}
             </p>
+            {oauthMethod.deviceAuthorization !== undefined && (
+              <div className="provider-connect-dialog__device-code">
+                <Button variant="ghost" type="button" onClick={() => void window.videoTool.openChatGptDeviceAuthorizationPage()}>
+                  Open {oauthMethod.deviceAuthorization.verificationUrl}
+                </Button>
+                <strong>{oauthMethod.deviceAuthorization.userCode}</strong>
+              </div>
+            )}
             <div className="provider-connect-dialog__actions">
               <Button
                 variant="ghost"

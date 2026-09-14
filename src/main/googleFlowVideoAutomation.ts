@@ -9,6 +9,7 @@ import type { VideoOperation } from '../shared/mediaCapabilityRegistry';
 import { BrowserGenerationActionRequiredError } from './browserGenerationAction';
 import {
   uploadReferencesThroughChromiumFileChooser,
+  type ChromiumFileChooserDiagnostic,
   type ChromiumFileChooserUpload
 } from './chromiumFileChooserUpload';
 import {
@@ -204,7 +205,11 @@ async function injectImageFile(webContents: WebContents, reference: ReferenceIma
   await delay(800);
 }
 
-async function attachReferences(webContents: WebContents, input: GoogleFlowVideoAutomationInput): Promise<ChromiumFileChooserUpload> {
+async function attachReferences(
+  webContents: WebContents,
+  input: GoogleFlowVideoAutomationInput,
+  onDiagnostic: (details: ChromiumFileChooserDiagnostic) => void
+): Promise<ChromiumFileChooserUpload> {
   const references = input.operation === 'reference_to_video'
     ? input.referenceImages ?? []
     : [input.referenceImage, input.lastFrame].filter((entry): entry is ReferenceImageSelection => entry !== undefined);
@@ -220,7 +225,9 @@ async function attachReferences(webContents: WebContents, input: GoogleFlowVideo
       const upload = await uploadReferencesThroughChromiumFileChooser(
         webContents,
         [references[index]!],
-        () => clickAt(webContents, target.rectangle)
+        () => clickAt(webContents, target.rectangle),
+        5_000,
+        onDiagnostic
       );
       if (upload !== null) {
         uploads.push(upload);
@@ -289,7 +296,14 @@ export async function automateGoogleFlowVideoGeneration(webContents: WebContents
     input.onProgress?.('configuring', Date.now() - startedAt, { model: googleFlowVideoModelLabel(input.model) });
     if (input.operation !== 'text_to_video') {
       input.onProgress?.('uploading', Date.now() - startedAt, { referenceCount: input.operation === 'reference_to_video' ? input.referenceImages?.length ?? 0 : input.operation === 'start_end' ? 2 : 1 });
-      referenceUpload = await attachReferences(webContents, input);
+      referenceUpload = await attachReferences(webContents, input, (details) => {
+        const { step: referenceUploadStep, ...safeDetails } = details;
+        input.onProgress?.('uploading', Date.now() - startedAt, {
+          step: 'reference_upload',
+          referenceUploadStep,
+          ...safeDetails
+        });
+      });
     }
     ready = await fillPrompt(webContents, input.prompt, deadline);
     const existingVideos = new Set((ready.videos ?? []).map((video) => video.src));

@@ -56,6 +56,7 @@ export const IPC_CHANNELS = {
   startChatGptOAuth: 'chatgpt-oauth:start',
   cancelChatGptOAuth: 'chatgpt-oauth:cancel',
   logoutChatGptOAuth: 'chatgpt-oauth:logout',
+  openChatGptDeviceAuthorizationPage: 'chatgpt-oauth:open-device-page',
   getBrowserSessionStatuses: 'browser-session:statuses',
   startBrowserSession: 'browser-session:start',
   clearBrowserSession: 'browser-session:clear',

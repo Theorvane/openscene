@@ -7,6 +7,7 @@ import {
   automateGoogleFlowImageGeneration,
   buildGoogleFlowStateProbeScript,
   detectDownloadedImageMime,
+  flowUploadActionLabelMatches,
   flowConfigurationHasExactModel,
   flowOrientationForAspectRatio,
   renameGoogleFlowProject
@@ -23,6 +24,8 @@ describe('Google Flow browser image automation', () => {
     expect(script).toContain('attentionText');
     expect(script).toContain('uploadLauncherEntry');
     expect(script).toContain('uploadChoiceEntry');
+    expect(script).toContain('[tabindex], div, span');
+    expect(script).toContain('tai noi dung nghe nhin len');
     expect(script).not.toContain("/rate limit|usage limit|not enough credits|insufficient credits|hết tín dụng|đã đạt giới hạn/.test(body)");
   });
 
@@ -33,6 +36,13 @@ describe('Google Flow browser image automation', () => {
       0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50
     ]))).toBe('image/webp');
     expect(detectDownloadedImageMime(new TextEncoder().encode('<html>sign in</html>'))).toBeNull();
+  });
+
+  it('recognizes current Flow upload labels without combining duplicate accessible names', () => {
+    expect(flowUploadActionLabelMatches('Upload media')).toBe(true);
+    expect(flowUploadActionLabelMatches('Tải nội dung nghe nhìn lên')).toBe(true);
+    expect(flowUploadActionLabelMatches('Upload media Upload media')).toBe(true);
+    expect(flowUploadActionLabelMatches('Open media library')).toBe(false);
   });
 
   it('maps exact ratios onto the coarse orientation available in Flow', () => {
@@ -184,8 +194,10 @@ describe('Google Flow browser image automation', () => {
       return states.shift() ?? { ...editorState, submit, images: [oldImage, newImage] };
     });
     const insertText = vi.fn(async () => undefined);
+    const referenceUploadSteps: string[] = [];
     let attached = false;
     let interceptionEnabled = false;
+    let flattenedDocumentReads = 0;
     const messageListeners = new Set<(event: unknown, method: string, params: unknown, sessionId: string) => void>();
     const debuggerApi = {
       isAttached: vi.fn(() => attached),
@@ -193,6 +205,12 @@ describe('Google Flow browser image automation', () => {
       detach: vi.fn(() => { attached = false; }),
       sendCommand: vi.fn(async (method: string, params?: { enabled?: boolean }) => {
         if (method === 'Page.setInterceptFileChooserDialog') interceptionEnabled = params?.enabled === true;
+        if (method === 'DOM.getFlattenedDocument') {
+          flattenedDocumentReads += 1;
+          return flattenedDocumentReads === 1
+            ? { nodes: [] }
+            : { nodes: [{ backendNodeId: 73, nodeName: 'INPUT', attributes: ['type', 'file', 'accept', 'image/*', 'multiple', ''] }] };
+        }
         return {};
       }),
       on: vi.fn((event: string, listener: (event: unknown, method: string, params: unknown, sessionId: string) => void) => {
@@ -202,13 +220,7 @@ describe('Google Flow browser image automation', () => {
         if (event === 'message') messageListeners.delete(listener);
       })
     };
-    const sendInputEvent = vi.fn((event: { type: string; x?: number; y?: number }) => {
-      if (event.type === 'mouseDown' && event.x === 105 && event.y === 708 && interceptionEnabled) {
-        for (const listener of messageListeners) {
-          listener({}, 'Page.fileChooserOpened', { backendNodeId: 73, mode: 'selectMultiple' }, '');
-        }
-      }
-    });
+    const sendInputEvent = vi.fn();
     const operation = automateGoogleFlowImageGeneration({
       executeJavaScript,
       insertText,
@@ -220,7 +232,10 @@ describe('Google Flow browser image automation', () => {
         { displayName: 'world-style.png', mimeType: 'image/png', base64: 'V09STEQ=' },
         { displayName: 'thok.jpeg', mimeType: 'image/jpeg', base64: 'VEhPSw==' },
         { displayName: 'buk.webp', mimeType: 'image/webp', base64: 'QlVL' }
-      ]
+      ],
+      onProgress: (_stage, _elapsedMs, details) => {
+        if (typeof details?.referenceUploadStep === 'string') referenceUploadSteps.push(details.referenceUploadStep);
+      }
     });
 
     await expect(operation).resolves.toBe(newImage.src);
@@ -235,7 +250,17 @@ describe('Google Flow browser image automation', () => {
     ]);
     expect(existsSync(dirname(files[0]!))).toBe(false);
     expect(debuggerApi.attach).toHaveBeenCalledWith('1.3');
+    expect(debuggerApi.sendCommand).toHaveBeenCalledWith(
+      'Page.enable',
+      { enableFileChooserOpenedEvent: true }
+    );
     expect(debuggerApi.detach).toHaveBeenCalledOnce();
+    expect(flattenedDocumentReads).toBe(2);
+    expect(interceptionEnabled).toBe(false);
+    expect(referenceUploadSteps).toEqual(expect.arrayContaining([
+      'picker_launcher', 'picker_upload_action', 'page_enabled', 'interception_enabled',
+      'chooser_event_timeout', 'dom_fallback', 'files_assigned'
+    ]));
     const mouseDownEvents = sendInputEvent.mock.calls.map(([event]) => event)
       .filter((event) => event.type === 'mouseDown');
     expect(mouseDownEvents.filter((event) => event.x === 53 && event.y === 828)).toHaveLength(1);

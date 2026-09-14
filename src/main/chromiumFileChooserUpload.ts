@@ -12,9 +12,35 @@ export type ChromiumFileChooserUpload = {
   readonly cleanup: () => Promise<void>;
 };
 
+export type ChromiumFileChooserDiagnostic = {
+  readonly step:
+    | 'picker_launcher'
+    | 'picker_upload_action'
+    | 'debugger_attached'
+    | 'page_enabled'
+    | 'interception_enabled'
+    | 'references_staged'
+    | 'chooser_event'
+    | 'chooser_event_timeout'
+    | 'dom_fallback'
+    | 'files_assigned'
+    | 'cdp_unavailable';
+  readonly referenceCount?: number;
+  readonly candidateCount?: number;
+  readonly reusedDebugger?: boolean;
+  readonly fallbackPageEnable?: boolean;
+  readonly failedStep?: string;
+};
+
 type FileChooserOpenedParameters = {
   readonly backendNodeId?: number;
   readonly mode?: 'selectSingle' | 'selectMultiple';
+};
+
+type CdpNode = {
+  readonly backendNodeId?: number;
+  readonly nodeName?: string;
+  readonly attributes?: readonly string[];
 };
 
 function delay(milliseconds: number): Promise<void> {
@@ -85,6 +111,27 @@ function waitForFileChooser(debuggerApi: Debugger, timeoutMs: number): Promise<F
   });
 }
 
+function nodeAttributes(node: CdpNode): Readonly<Record<string, string>> {
+  const values = node.attributes ?? [];
+  const result: Record<string, string> = {};
+  for (let index = 0; index + 1 < values.length; index += 2) {
+    result[values[index]!.toLowerCase()] = values[index + 1]!;
+  }
+  return result;
+}
+
+async function listFileInputNodes(debuggerApi: Debugger): Promise<readonly CdpNode[]> {
+  const response = await debuggerApi.sendCommand('DOM.getFlattenedDocument', { depth: -1, pierce: true }) as {
+    readonly nodes?: readonly CdpNode[];
+  };
+  return (response.nodes ?? []).filter((node) => {
+    if (node.nodeName?.toUpperCase() !== 'INPUT' || node.backendNodeId === undefined) return false;
+    const attributes = nodeAttributes(node);
+    return attributes.type?.toLowerCase() === 'file'
+      && (attributes.accept === undefined || attributes.accept.length === 0 || attributes.accept.toLowerCase().includes('image'));
+  });
+}
+
 /**
  * Assign local reference files to Chromium's real file chooser through the
  * DevTools protocol. Current Google Flow deliberately keeps the chooser's file
@@ -98,7 +145,8 @@ export async function uploadReferencesThroughChromiumFileChooser(
   webContents: WebContents,
   references: readonly ReferenceImageSelection[],
   triggerChooser: () => void,
-  timeoutMs = 5_000
+  timeoutMs = 5_000,
+  onDiagnostic: (details: ChromiumFileChooserDiagnostic) => void = () => undefined
 ): Promise<ChromiumFileChooserUpload | null> {
   if (references.length === 0) return null;
   const debuggerApi = webContents.debugger;
@@ -106,37 +154,70 @@ export async function uploadReferencesThroughChromiumFileChooser(
 
   let ownsDebugger = false;
   let interceptionEnabled = false;
+  let currentStep = 'attach';
   let staged: Awaited<ReturnType<typeof stageReferences>> | undefined;
   try {
     if (!debuggerApi.isAttached()) {
       debuggerApi.attach('1.3');
       ownsDebugger = true;
     }
-    await debuggerApi.sendCommand('Page.enable');
+    onDiagnostic({ step: 'debugger_attached', reusedDebugger: !ownsDebugger });
+    currentStep = 'page_enable';
+    let fallbackPageEnable = false;
+    try {
+      // Chromium requires this opt-in on builds where chooser interception and
+      // chooser event delivery are independently gated.
+      await debuggerApi.sendCommand('Page.enable', { enableFileChooserOpenedEvent: true });
+    } catch {
+      fallbackPageEnable = true;
+      await debuggerApi.sendCommand('Page.enable');
+    }
+    onDiagnostic({ step: 'page_enabled', fallbackPageEnable });
+    currentStep = 'dom_enable';
     await debuggerApi.sendCommand('DOM.enable');
+    currentStep = 'intercept_enable';
     await debuggerApi.sendCommand('Page.setInterceptFileChooserDialog', { enabled: true });
     interceptionEnabled = true;
+    onDiagnostic({ step: 'interception_enabled' });
+    currentStep = 'stage_references';
     staged = await stageReferences(references);
+    onDiagnostic({ step: 'references_staged', referenceCount: staged.files.length });
 
-    const chooserPromise = waitForFileChooser(debuggerApi, timeoutMs);
+    // Snapshot existing inputs so the fallback cannot accidentally populate a
+    // stale upload slot from an earlier style/character reference.
+    const inputsBefore = await listFileInputNodes(debuggerApi).catch(() => []);
+    const existingBackendIds = new Set(inputsBefore.flatMap((node) => node.backendNodeId === undefined ? [] : [node.backendNodeId]));
+
+    currentStep = 'trigger_chooser';
+    const chooserPromise = waitForFileChooser(debuggerApi, Math.min(timeoutMs, 1_000));
     triggerChooser();
     const chooser = await chooserPromise;
-    if (chooser === null) {
-      await rm(staged.directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => undefined);
-      staged = undefined;
-      return null;
+    let backendNodeId = chooser?.backendNodeId;
+    if (chooser !== null) {
+      onDiagnostic({ step: 'chooser_event' });
+      if (references.length > 1 && chooser.mode !== 'selectMultiple') {
+        throw new Error('Google Flow opened a single-file chooser, so OpenScene refused to silently drop reference images.');
+      }
+    } else {
+      onDiagnostic({ step: 'chooser_event_timeout' });
+      currentStep = 'dom_fallback';
+      const inputsAfter = await listFileInputNodes(debuggerApi).catch(() => []);
+      const newInputs = inputsAfter.filter((node) => node.backendNodeId !== undefined && !existingBackendIds.has(node.backendNodeId));
+      const candidates = newInputs.length > 0 ? newInputs : inputsAfter;
+      const compatible = candidates.filter((node) => references.length === 1 || Object.hasOwn(nodeAttributes(node), 'multiple'));
+      backendNodeId = compatible.at(-1)?.backendNodeId;
+      onDiagnostic({ step: 'dom_fallback', candidateCount: compatible.length });
     }
-    if (chooser.backendNodeId === undefined) {
+    if (backendNodeId === undefined) {
       throw new Error('Google Flow opened a file chooser without an assignable upload control.');
     }
-    if (references.length > 1 && chooser.mode !== 'selectMultiple') {
-      throw new Error('Google Flow opened a single-file chooser, so OpenScene refused to silently drop reference images.');
-    }
 
+    currentStep = 'set_files';
     await debuggerApi.sendCommand('DOM.setFileInputFiles', {
       files: staged.files,
-      backendNodeId: chooser.backendNodeId
+      backendNodeId
     });
+    onDiagnostic({ step: 'files_assigned', referenceCount: staged.files.length });
     // Allow Flow's change handler to take ownership before the debugger is
     // detached. Files themselves remain staged until the generation exits.
     await delay(800);
@@ -151,7 +232,10 @@ export async function uploadReferencesThroughChromiumFileChooser(
     }
     // Failure to attach or enable interception means an older Electron/Flow
     // combination may still be served by the caller's DOM fallback.
-    if (!interceptionEnabled) return null;
+    if (!interceptionEnabled) {
+      onDiagnostic({ step: 'cdp_unavailable', failedStep: currentStep });
+      return null;
+    }
     throw error;
   } finally {
     if (interceptionEnabled) {
