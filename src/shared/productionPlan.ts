@@ -3,7 +3,7 @@ import { applyWriterPipeline, approvedWriterShots, pipelineMatchesBrief, saveWri
 import { batchableProductionVideoShotIds, planProductionVideoReferences } from './productionWorkflow';
 import { DEFAULT_VIDEO_CONTINUITY_CONTROLS } from './videoContinuitySettings';
 import { getVideoOperationConstraints, isVideoOperationImplemented } from './mediaCapabilityRegistry';
-import { parseWriterPipelineState, WRITER_STAGES, type WriterPipelineState } from './writerStages';
+import { parseWriterPipelineState, WRITER_STAGES, type WriterPipelineState, type WriterStage } from './writerStages';
 import { validateWriterDraft, type WriterDraft, type WriterRequest } from './writerWorkflow';
 
 /** One proposal, no implied approvals. The user reviews the whole package. */
@@ -32,6 +32,25 @@ export function approveProductionPlan(document: AiProjectDocument, request: Writ
     if (!artifact) throw new Error('The production plan is incomplete.');
     approved = saveWriterArtifact(approved, artifact, true);
   }
+  const result = applyWriterPipeline(document, approved, createdAt, id);
+  if (!result.ok) throw new Error(result.message);
+  return result.document;
+}
+
+export function nextProductionCheckpoint(proposal: WriterPipelineState | undefined): WriterStage | null {
+  if (!proposal || proposal.appliedScriptId) return null;
+  return WRITER_STAGES.find(stage => !proposal.artifacts.some(artifact => artifact.stage === stage && artifact.approved)) ?? null;
+}
+
+/** Approve only the displayed checkpoint; final approval materializes the shots. */
+export function approveProductionCheckpoint(document: AiProjectDocument, request: WriterRequest, proposal: WriterPipelineState, stage: WriterStage, createdAt: string, id: string): AiProjectDocument {
+  if (!pipelineMatchesBrief(proposal, request)) throw new Error('The brief changed. Generate a revised plan before approval.');
+  if (proposal.appliedScriptId) throw new Error('This plan is already applied.');
+  if (nextProductionCheckpoint(proposal) !== stage) throw new Error('Approve the current checkpoint before advancing.');
+  const artifact = proposal.artifacts.find(item => item.stage === stage);
+  if (!artifact) throw new Error('The checkpoint is missing from this proposal.');
+  const approved = saveWriterArtifact(proposal, artifact, true);
+  if (stage !== 'prompts') return { ...document, writerPipeline: approved };
   const result = applyWriterPipeline(document, approved, createdAt, id);
   if (!result.ok) throw new Error(result.message);
   return result.document;

@@ -10,6 +10,8 @@ import type { WriterModelId, WriterRequest } from '@openvideo/shared/writerWorkf
 import { readSlot } from '../lib/credentials';
 import { readProviderConnections } from '../lib/mediaProviders';
 import { ModelSelect } from './ModelSelect';
+import { nextProductionCheckpoint } from '@openvideo/shared/productionPlan';
+import { WRITER_STAGES, WRITER_STAGE_LABELS, WRITER_STAGE_CHECKLISTS } from '@openvideo/shared/writerStages';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
 const useProductionPlan = createUseProductionPlan({ useEffect, useRef, useState });
@@ -32,6 +34,8 @@ export function ProductionPlanComposer({ document, onSave, disabled, connections
   const valid = !!request.sourceText && !!request.language && Number.isSafeInteger(request.targetDurationSeconds) && request.targetDurationSeconds >= 4 && request.targetDurationSeconds <= 7200;
   const matches = pipelineMatchesBrief(flow.proposal, request);
   const applied = !!document.writerPipeline?.appliedScriptId;
+  const checkpoint = nextProductionCheckpoint(flow.proposal);
+  useEffect(() => { if (checkpoint) setExpanded(checkpoint); }, [checkpoint]);
   const action = (label: string, callback: () => void, off = false) => <Pressable accessibilityRole="button" disabled={off} onPress={callback} style={press([styles.button, off && { opacity: .5 }])}><Text style={styles.text}>{label}</Text></Pressable>;
   return <View style={styles.card}>
     <Text style={styles.title}>What video should we make?</Text>
@@ -52,10 +56,14 @@ export function ProductionPlanComposer({ document, onSave, disabled, connections
       } }]);
     }, busy || !valid || !model || !isDomainModelAvailableOnRuntime(model, 'mobile') || !connected[model.providerId])}
     {flow.proposal && <>
-      {flow.proposal.artifacts.map(artifact => <View key={artifact.stage}>{action(`${artifact.stage} · ${artifact.title}`, () => setExpanded(expanded === artifact.stage ? null : artifact.stage))}{expanded === artifact.stage && <Text selectable style={styles.text}>{artifact.content}</Text>}</View>)}
+      <Text style={styles.text}>{WRITER_STAGES.map(stage => `${flow.proposal!.artifacts.some(item => item.stage === stage && item.approved) ? '✓' : checkpoint === stage ? '→' : '○'} ${WRITER_STAGE_LABELS[stage]}`).join('\n')}</Text>
+      {flow.proposal.artifacts.map(artifact => <View key={artifact.stage}>{action(`${WRITER_STAGE_LABELS[artifact.stage]} · ${artifact.approved ? 'Approved' : 'Review required'}`, () => setExpanded(expanded === artifact.stage ? null : artifact.stage))}{expanded === artifact.stage && <><Text selectable style={styles.text}>{artifact.content}</Text><Text style={styles.text}>{WRITER_STAGE_CHECKLISTS[artifact.stage].join('\n')}</Text></>}</View>)}
       {!matches && <Text style={styles.text}>Brief changed. Generate a revised plan before approval.</Text>}
       {flow.unsaved && action('Retry saving proposal', () => Alert.alert('Replace planning draft?', 'Save the retained proposal over the current draft?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Save', onPress: () => { void flow.saveDraft(); } }]), busy)}
-      {action(applied ? 'Plan approved' : 'Approve plan & prepare shots', () => Alert.alert('Approve entire plan?', 'Approve the displayed brief, screenplay, scene breakdown and shot prompts. Media generation still needs cost approval.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Approve plan', onPress: () => { void flow.approve(request); } }]), busy || !matches || applied || flow.unsaved)}
+      {action(applied ? 'Plan approved' : checkpoint ? `Approve ${WRITER_STAGE_LABELS[checkpoint]}` : 'No checkpoint to approve', () => {
+        if (!checkpoint) return;
+        Alert.alert(`Approve ${WRITER_STAGE_LABELS[checkpoint]}?`, checkpoint === 'prompts' ? 'Prepare production shots. Media generation still needs cost approval.' : 'Approve this checkpoint only, then review the next stage.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Approve checkpoint', onPress: () => { void flow.approve(request, checkpoint); } }]);
+      }, busy || !matches || applied || flow.unsaved || !checkpoint)}
     </>}
     {!!flow.message && <Text accessibilityRole="alert" style={styles.text}>{flow.message}</Text>}
   </View>;

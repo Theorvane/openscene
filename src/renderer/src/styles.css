@@ -733,6 +733,9 @@ button {
 .production-plan-composer { display: grid; gap: 12px; padding: 12px; }
 .production-plan-composer h2, .production-plan-composer p { margin: 0; }
 .production-plan-review { display: grid; gap: 10px; }
+.production-checkpoint-rail { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; list-style: none; padding: 0; margin: 0; font-size: 11px; }
+.production-checkpoint-rail li { border: 1px solid var(--border); padding: 8px; border-radius: 3px; color: var(--text-weak); }
+.production-checkpoint-rail li[aria-current="step"] { border-color: var(--primary); color: var(--foreground); background: var(--surface-control-selected); }
 .production-plan-review pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font: inherit; }
 .production-advanced-tools { flex-basis: 100%; }
 .production-prompt-pane > .workspace-studio-panel { height: 100%; overflow: auto; }

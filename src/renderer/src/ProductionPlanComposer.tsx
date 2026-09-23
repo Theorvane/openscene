@@ -7,6 +7,8 @@ import { getLlmProvider } from '../../shared/llmProviders';
 import { useAiDomainModel } from './AiDomainModelContext';
 import { useLlmModel } from './LlmProviderContext';
 import { DomainModelPicker } from './DomainModelPicker';
+import { nextProductionCheckpoint } from '../../shared/productionPlan';
+import { WRITER_STAGES, WRITER_STAGE_LABELS, WRITER_STAGE_CHECKLISTS } from '../../shared/writerStages';
 const useProductionPlan = createUseProductionPlan({ useEffect, useRef, useState });
 
 export function ProductionPlanComposer({ document, onSave, disabled }: {
@@ -27,6 +29,7 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
   const valid = !!request.sourceText && !!request.language && Number.isSafeInteger(request.targetDurationSeconds) && request.targetDurationSeconds >= 4 && request.targetDurationSeconds <= 7200;
   const matches = pipelineMatchesBrief(flow.proposal, request);
   const applied = !!document.writerPipeline?.appliedScriptId;
+  const checkpoint = nextProductionCheckpoint(flow.proposal);
   return <section className="production-plan-composer" aria-label="Guided production">
     <header><p className="section-kicker">BRIEF → PLAN APPROVAL → GENERATE → REVIEW → ASSEMBLE</p><h2>What video should we make?</h2>
       <p>Describe the story once. Review the complete script, scenes and shot prompts before generating media.</p></header>
@@ -49,12 +52,13 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
     {!connected && <p>Connect the selected writing provider in Settings to propose a plan.</p>}
     {flow.proposal && <div className="production-plan-review">
       <h3>{applied && matches ? 'Approved production plan' : 'Review proposed plan'}</h3>
-      {flow.proposal.artifacts.map(artifact => <details key={artifact.stage} open={artifact.stage === 'screenplay'}><summary>{artifact.stage} · {artifact.title}</summary><pre>{artifact.content}</pre></details>)}
+      <ol className="production-checkpoint-rail" aria-label="Plan checkpoints">{WRITER_STAGES.map(stage => <li key={stage} aria-current={checkpoint === stage ? 'step' : undefined}>{flow.proposal!.artifacts.some(item => item.stage === stage && item.approved) ? '✓ ' : ''}{WRITER_STAGE_LABELS[stage]}</li>)}</ol>
+      {flow.proposal.artifacts.map(artifact => <details key={artifact.stage + ':' + checkpoint} open={artifact.stage === checkpoint}><summary>{WRITER_STAGE_LABELS[artifact.stage]} · {artifact.approved ? 'Approved' : 'Review required'}</summary><pre>{artifact.content}</pre><ul>{WRITER_STAGE_CHECKLISTS[artifact.stage].map(item => <li key={item}>{item}</li>)}</ul></details>)}
       {!matches && <p role="alert">The brief changed. Generate a revised plan before approval.</p>}
       {flow.unsaved && <button className="button" disabled={busy} onClick={() => { if (window.confirm('Replace the saved planning draft with this retained proposal?')) void flow.saveDraft(); }}>Retry saving proposal</button>}
-      <button className="button" disabled={busy || !matches || applied || flow.unsaved} onClick={() => {
-        if (window.confirm('Approve the entire displayed brief, screenplay, scene breakdown and shot prompts? This prepares production shots. Generating media still requires cost approval.')) void flow.approve(request);
-      }}>{applied ? 'Plan approved' : 'Approve plan & prepare shots'}</button>
+      <button className="button" disabled={busy || !matches || applied || flow.unsaved || !checkpoint} onClick={() => {
+        if (checkpoint && window.confirm(`Approve ${WRITER_STAGE_LABELS[checkpoint]}? ${checkpoint === 'prompts' ? 'This prepares the production shots. Media generation still requires cost approval.' : 'Only this checkpoint will be approved. Review the next stage separately.'}`)) void flow.approve(request, checkpoint);
+      }}>{applied ? 'Plan approved' : checkpoint ? `Approve ${WRITER_STAGE_LABELS[checkpoint]}` : 'No checkpoint to approve'}</button>
     </div>}
     {flow.message && <p role="status">{flow.message}</p>}
   </section>;
