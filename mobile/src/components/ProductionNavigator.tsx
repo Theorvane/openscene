@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { AiProjectDocument } from '@openvideo/shared/aiProjectDomain';
+import type { TimelineDocument } from '@openvideo/shared/timelineTypes';
 import { PRODUCTION_LANES, inspectProductionTime, productionPlanDuration, productionReadiness, productionEditorItems, type ProductionEditorItem } from '@openvideo/shared/productionEditor';
 import { assetUri, type MobileAsset } from '../lib/projectStore';
 import { theme } from '../lib/theme';
@@ -22,13 +23,14 @@ function Preview({ projectId, asset, active, offsetMs }: { projectId: string; as
   }, [player, offsetMs]);
   return <VideoView player={player} nativeControls contentFit="contain" style={styles.preview} />;
 }
-export function ProductionNavigator({ projectId, document, assets, active, busy, onLoad }: {
+export function ProductionNavigator({ projectId, document, assets, timeline, active, busy, onLoad, onPlaceVoice }: {
   projectId: string; document: AiProjectDocument; assets: readonly MobileAsset[]; active: boolean; busy: boolean;
   onLoad: (item: ProductionEditorItem) => void;
+  timeline: TimelineDocument; onPlaceVoice: (assetId: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState('');
   const [inspectionMs, setInspectionMs] = useState<number | null>(null);
-  const items = productionEditorItems(document, assets);
+  const items = productionEditorItems(document, assets, timeline);
   const inspection = inspectProductionTime(items, inspectionMs ?? 0);
   const selected = inspectionMs === null ? items.find(item => item.id === selectedId) ?? items[0] : inspection.video;
   const durationMs = productionPlanDuration(items);
@@ -45,12 +47,13 @@ export function ProductionNavigator({ projectId, document, assets, active, busy,
     </View>}
     {inspectionMs !== null && <Text style={styles.hint}>Caption at inspected time: {inspection.captions.map(item => item.prompt).join(' ') || 'None'}</Text>}
     {selected && <><Text style={styles.title}>{selected.label}</Text><Text style={styles.hint}>{selected.status}</Text>
+      {selected.lane === 'voice' && selected.assetId && selected.startMs === undefined && <Pressable accessibilityRole="button" disabled={busy} onPress={() => onPlaceVoice(selected.assetId!)} style={press(styles.action)}><Text style={styles.text}>Append voice and save</Text></Pressable>}
       {(selected.recipeId || selected.shotId) && <Pressable accessibilityRole="button" disabled={busy} onPress={() => onLoad(selected)} style={press(styles.action)}><Text style={styles.text}>Edit selected prompt</Text></Pressable>}
     </>}
     {PRODUCTION_LANES.map(lane => <View key={lane}><Text style={styles.title}>{lane}</Text>
       <ScrollView horizontal accessibilityLabel={lane + ' track'}>
         {items.filter(item => item.lane === lane).map(item => <Pressable accessibilityRole="button" accessibilityState={{ selected: selected?.id === item.id }} key={item.id}
-          onPress={() => { if (item.startMs !== undefined) setInspectionMs(item.startMs); else { setInspectionMs(null); setSelectedId(item.id); } }} style={press([styles.item, selected?.id === item.id && styles.selected])}>
+          onPress={() => { if (item.startMs !== undefined && item.lane !== 'voice') setInspectionMs(item.startMs); else { setInspectionMs(null); setSelectedId(item.id); } }} style={press([styles.item, selected?.id === item.id && styles.selected])}>
           <Text style={styles.hint}>{item.startMs === undefined ? 'Unplaced' : (item.startMs / 1000).toFixed(1) + 's'}{item.durationMs === undefined ? '' : ' · ' + item.durationMs / 1000 + 's'}</Text>
           <Text numberOfLines={2} style={styles.text}>{item.label}</Text>
         </Pressable>)}

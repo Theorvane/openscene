@@ -10,6 +10,10 @@ This first slice is a plan navigator and single-source preview, not a synchroniz
 
 Timed Writer shots and narration cues use their start/duration rather than uniform card widths on desktop. Unplaced media remains outside that plan. A slider selects a planned instant; mobile offers one-second stepping and direct segment selection. Half-open intervals choose exactly one adjacent shot at a cut, and no shot at the total end. Source-relative seek pauses preview and clamps to available media duration. Captions are labelled as belonging to the inspected instant, not a running subtitle overlay. Native source controls still play one original asset, not the assembled plan. Readiness counts distinguish missing media, unreviewed takes and approved shots, without approving or generating anything.
 
+## Voice placement
+
+Saved audio can be explicitly appended to the first audio track using existing timeline placement rules. Desktop placement participates in editor undo/unsaved state; **Save arrangement** saves the current timeline, including other pending edits. Mobile appends and saves immediately using its existing project store. Both navigators read placed audio from the real timeline, preserving repeated clips, source trim, and speed-adjusted duration; unplaced audio stays separate. Selecting a placed voice previews its source from the trim start on desktop, not a processed/mixed render. Mobile inline audio remains unavailable. Plan scrubbing still inspects video/captions only. Arbitrary voice positioning, multitrack playback, and copying this arrangement during the generation-to-editing handoff are not implemented in this slice.
+
 ## Reference and reuse decision
 
 Reviewed https://github.com/calesthio/OpenMontage and its README on 2026-09-23. Its staged script/scene/media/composition workflow informed the interaction discussion. Its repository declares AGPL-3.0 while OpenScene declares MIT. No source, assets, skills, dependencies or scripts were copied or installed; no license conversion was attempted. Direct code integration requires a separate licensing/distribution decision. This implementation is original code over OpenScene contracts.

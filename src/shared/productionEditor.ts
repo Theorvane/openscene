@@ -1,11 +1,14 @@
 import type { AiProjectDocument } from './aiProjectDomain';
 import { approvedWriterShots } from './writerPipeline';
+import type { TimelineDocument } from './timelineTypes';
+import { clipDurationMs } from './timelineClipGeometry';
 
 export type ProductionEditorAsset = { readonly id: string; readonly kind: string; readonly displayName: string };
 export type ProductionEditorItem = {
   readonly id: string; readonly lane: 'video' | 'voice' | 'subtitles'; readonly label: string;
   readonly prompt: string; readonly startMs?: number; readonly durationMs?: number;
   readonly assetId?: string; readonly shotId?: string; readonly recipeId?: string; readonly status: string;
+  readonly sourceStartMs?: number;
 };
 export const PRODUCTION_LANES = ['video', 'voice', 'subtitles'] as const;
 export function isTimedProductionItem(item: ProductionEditorItem): boolean {
@@ -31,10 +34,21 @@ export function productionReadiness(items: readonly ProductionEditorItem[]) {
     approved: shots.filter(item => item.assetId && item.status === 'Approved take').length };
 }
 /** A read-only plan navigator, never a claim that unplaced assets are synchronized. */
-export function productionEditorItems(document: AiProjectDocument, assets: readonly ProductionEditorAsset[]): readonly ProductionEditorItem[] {
+export function productionEditorItems(document: AiProjectDocument, assets: readonly ProductionEditorAsset[], timeline?: TimelineDocument | null): readonly ProductionEditorItem[] {
   const items: ProductionEditorItem[] = [];
   const available = new Map(assets.map(asset => [asset.id, asset]));
   const used = new Set<string>();
+  for (const track of timeline?.tracks ?? []) {
+    if (track.kind !== 'audio') continue;
+    for (const clip of track.clips) {
+      const asset = available.get(clip.assetId);
+      if (asset?.kind !== 'audio') continue;
+      used.add(asset.id);
+      items.push({ id: 'clip:' + clip.id, lane: 'voice', label: asset.displayName, prompt: '', assetId: asset.id,
+        startMs: clip.timelineStartMs, durationMs: clipDurationMs(clip),
+        sourceStartMs: clip.sourceStartMs, status: 'Placed audio' });
+    }
+  }
   let startMs = 0;
   for (const shot of approvedWriterShots(document)) {
     const candidates = document.generations.filter(item => item.shotId === shot.id && item.status === 'completed');

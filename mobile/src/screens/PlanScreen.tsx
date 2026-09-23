@@ -451,6 +451,13 @@ export function PlanScreen({
   return (
     <FormScreen topInset={topInset} keyboardOffset={keyboardOffset}>
       {projectId !== null && activeProject !== null && <ProductionNavigator key={projectId} projectId={projectId} document={activeProject.ai} assets={activeProject.assets}
+        timeline={activeProject.timeline} onPlaceVoice={assetId => {
+          try {
+            const latest = readProject(projectId);
+            const asset = latest?.assets.find(entry => entry.id === assetId && entry.kind === 'audio');
+            setWriterMessage(latest && asset && appendAssetToTimeline(latest, asset) ? 'Voice appended and arrangement saved locally.' : 'Could not place audio. Check media duration and available audio track.');
+          } catch { setWriterMessage('Could not save the audio placement. Please try again.'); }
+        }}
         active={active} busy={running || asking || redoing !== null} onLoad={item => {
           const load = () => {
             setPlan(() => { setPrompt(item.prompt); setRecipeParentId(item.recipeId); setDescriptions({}); });
