@@ -35,8 +35,10 @@ export function buildProductionMemory(projectId: string, document: AiProjectDocu
     pipeline.artifacts.some(artifact => artifact.stage === stage && artifact.approved));
   // Gate only script-derived scenes, shots and reviewed generation candidates.
   if (!pipelineApproved) return { entries, truncated };
-  const script = pipeline?.appliedScriptId !== undefined
-    ? document.scripts.find(item => item.id === pipeline.appliedScriptId && item.status === 'approved')
+  // Writer approval belongs to its stages; applied scripts are persisted as draft.
+  // An existing pipeline must identify its applied lineage, never fall back to an unrelated script.
+  const script = pipeline !== undefined
+    ? document.scripts.find(item => item.id === pipeline.appliedScriptId)
     : document.scripts.filter(item => item.status === 'approved').slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))[0];
   if (script !== undefined) {

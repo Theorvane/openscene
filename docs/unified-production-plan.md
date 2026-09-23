@@ -41,7 +41,11 @@ It stores no credentials or media bytes. Reopening reconstructs the index;
 deleting project source records removes them from subsequent searches.
 
 Only the active approved script lineage and completed approved generation
-candidates are searched. Current character/style definitions are labeled as
+candidates are searched. For Writer projects, approval means all four stages
+are approved and `appliedScriptId` selects an existing script; that script's
+independent status may still be `draft`. A missing applied ID never falls back
+to another script. Projects without a Writer pipeline retain the explicit
+approved-script status rule. Current character/style definitions are labeled as
 project definitions, not historical success evidence. Revoked Writer approval
 disables script/shot/candidate retrieval until approval is restored. Full-text
 chunks and total corpus size are bounded; UI states the limits rather than
