@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 
 import type { AgentChatHistoryEntry } from '../../shared/agentChat';
+import { CreationStageNav } from './CreationStageNav';
 import { modeForProjectType, projectTypeForMode } from '../../shared/projectTypes';
 import { CREATION_TOOLS, WORKSPACE_MODES, WORKSPACE_MODE_LABELS, WORKSPACE_EXPERIENCES, isCreationTool, workspaceModeForTab, workspaceTabForMode, type CreationTool } from '../../shared/workspaceModes';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
@@ -485,15 +486,7 @@ export function App(): ReactElement {
             </div>
             {workspaceMode === 'create' && (
               <div className="workspace-creation-tools">
-                <Tabs
-                  activeTabId={workspaceTabId}
-                  idBase="workspace"
-                  tabs={(['writer', 'image', 'video', 'voice'] as const).map((id, index) => ({ id, label: `${index + 1}. ${WORKSPACE_TAB_LABELS[id]}` }))}
-                  onActiveTabChange={selectWorkspaceTab}
-                  className="workspace-tabs"
-                  aria-label="AI creation tools"
-                />
-                <span className="workspace-mode-hint">Build your story, prepare frames, generate shots, then add a voice. You can start at any step.</span>
+                <CreationStageNav tool={isCreationTool(workspaceTabId) ? workspaceTabId : 'video'} onSelect={selectWorkspaceTab} document={editor.project?.ai} assets={editor.project?.assets ?? []} />
                 <details className="workspace-media-library">
                   <summary>Project media ({editor.project?.assets.length ?? 0})</summary>
                   <div className="workspace-media-library__list">
@@ -527,52 +520,75 @@ export function App(): ReactElement {
                 <TimelineEditor editor={editor} />
               </section>
               <section
-                aria-label={WORKSPACE_TAB_LABELS.writer}
-                id="workspace-writer-panel"
-                className="workspace-studio-panel"
-                hidden={workspaceTabId !== 'writer' || !workspaceIsVisible}
-                role="region"
-                style={APP_WORKSPACE_PANEL_STYLE}
-                tabIndex={-1}
-              >
-                {editor.project !== null && (
-                  <WriterWorkspace key={editor.project.id} document={editor.project.ai} onSave={editor.saveAiProjectDocument} />
-                )}
-              </section>
-              <section
-                aria-label={WORKSPACE_TAB_LABELS.voice}
-                id="workspace-voice-panel"
-                className="workspace-studio-panel"
-                hidden={workspaceTabId !== 'voice' || !workspaceIsVisible}
-                role="region"
-                style={APP_WORKSPACE_PANEL_STYLE}
-                tabIndex={-1}
-              >
-                {editor.project !== null && (
-                  <NarrationPanel
-                    key={editor.project.id}
-                    projectId={editor.project.id}
-                    assets={editor.project.assets}
-                    timeline={editor.project.timeline}
-                    document={editor.project.ai}
-                    targetSeconds={timelineDurationMs(editor.project.timeline) / 1_000}
-                    onSaveAi={editor.saveAiProjectDocument}
-                    onApplyCaptions={editor.applyNarrationSubtitles}
-                    onApplyTranscription={editor.applyTranscriptionSubtitles}
-                  />
-                )}
-              </section>
-              <section
-                aria-label={WORKSPACE_TAB_LABELS.video}
+                aria-label="Production studio"
                 id="workspace-video-panel"
                 className="workspace-studio-panel"
-                hidden={workspaceTabId !== 'video' || !workspaceIsVisible}
+                hidden={workspaceMode !== 'create' || !workspaceIsVisible}
                 role="region"
                 style={APP_WORKSPACE_PANEL_STYLE}
                 tabIndex={-1}
               >
                 <VideoGenerationWorkspace
-                  active={workspaceTabId === 'video' && workspaceIsVisible}
+                  active={workspaceMode === 'create' && workspaceIsVisible}
+                  toolActive={workspaceTabId === 'video'}
+                  onActivateVideo={() => selectWorkspaceTab('video')}
+                  tools={<>
+                    <section
+                      aria-label={WORKSPACE_TAB_LABELS.writer}
+                      id="workspace-writer-panel"
+                      className="workspace-studio-panel"
+                      hidden={workspaceTabId !== 'writer' || !workspaceIsVisible}
+                      role="region"
+                      tabIndex={-1}
+                    >
+                      {editor.project !== null && (
+                        <WriterWorkspace key={editor.project.id} document={editor.project.ai} onSave={editor.saveAiProjectDocument} />
+                      )}
+                    </section>
+                    <section
+                      aria-label={WORKSPACE_TAB_LABELS.voice}
+                      id="workspace-voice-panel"
+                      className="workspace-studio-panel"
+                      hidden={workspaceTabId !== 'voice' || !workspaceIsVisible}
+                      role="region"
+                      tabIndex={-1}
+                    >
+                      {editor.project !== null && (
+                        <NarrationPanel
+                          key={editor.project.id}
+                          projectId={editor.project.id}
+                          assets={editor.project.assets}
+                          timeline={editor.project.timeline}
+                          document={editor.project.ai}
+                          targetSeconds={timelineDurationMs(editor.project.timeline) / 1_000}
+                          onSaveAi={editor.saveAiProjectDocument}
+                          onApplyCaptions={editor.applyNarrationSubtitles}
+                          onApplyTranscription={editor.applyTranscriptionSubtitles}
+                        />
+                      )}
+                    </section>
+                    <section
+                      aria-label={WORKSPACE_TAB_LABELS.image}
+                      id="workspace-image-panel"
+                      className="workspace-studio-panel"
+                      hidden={workspaceTabId !== 'image' || !workspaceIsVisible}
+                      role="region"
+                      tabIndex={-1}
+                    >
+                      <ImageGenerationWorkspace
+                        ref={imageGenerationRef}
+                        key={editor.project?.id ?? 'no-project'}
+                        projectName={editor.projects.find((item) => item.id === editor.project?.id)?.folderName ?? editor.project?.name}
+                        productionHandoff={productionImageHandoff}
+                        synchronizedStyle={editor.project === null ? null : productionVisualStyle(editor.project.ai)}
+                        onAttachToProduction={attachProductionImage}
+                        onUseForVideo={(reference) => {
+                          setVideoReferenceImage(reference);
+                          selectWorkspaceTab('video');
+                        }}
+                      />
+                    </section>
+                  </>}
                   writerDocument={editor.project?.ai ?? null}
                   onSaveAi={editor.saveAiProjectDocument}
                   projectId={editor.project?.id ?? null}
@@ -584,28 +600,6 @@ export function App(): ReactElement {
                   onGenerateProductionImages={generateProductionImages}
                   onOpenImageResults={() => selectWorkspaceTab('image')}
                   onOpenEditor={() => void sendToEditing()}
-                />
-              </section>
-              <section
-                aria-label={WORKSPACE_TAB_LABELS.image}
-                id="workspace-image-panel"
-                className="workspace-studio-panel"
-                hidden={workspaceTabId !== 'image' || !workspaceIsVisible}
-                role="region"
-                style={APP_WORKSPACE_PANEL_STYLE}
-                tabIndex={-1}
-              >
-                <ImageGenerationWorkspace
-                  ref={imageGenerationRef}
-                  key={editor.project?.id ?? 'no-project'}
-                  projectName={editor.projects.find((item) => item.id === editor.project?.id)?.folderName ?? editor.project?.name}
-                  productionHandoff={productionImageHandoff}
-                  synchronizedStyle={editor.project === null ? null : productionVisualStyle(editor.project.ai)}
-                  onAttachToProduction={attachProductionImage}
-                  onUseForVideo={(reference) => {
-                    setVideoReferenceImage(reference);
-                    selectWorkspaceTab('video');
-                  }}
                 />
               </section>
             </div>

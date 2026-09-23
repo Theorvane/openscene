@@ -17,9 +17,10 @@ describe('app page shell source contract', () => {
     expect(app).toContain('const [activePageId, setActivePageId] = useState<AppPageId>(() => getDefaultAppPageId());');
     expect(app).toContain('const [activeWorkspaceId, setActiveWorkspaceId] = useState<AppWorkspaceId>(() => getDefaultAppWorkspaceId());');
     expect(app).toContain('const workspaceIsVisible = isWorkspacePageId(activePageId);');
-    // The menu page is gone; workspace tabs switch the surfaces it used to list.
+    // The studio keeps creation tools inside one shared workspace frame.
     expect(app).not.toContain('<HomePage');
-    expect(app).toContain('idBase="workspace"');
+    expect(app).toContain('<CreationStageNav');
+    expect(app).toContain('aria-label="Production studio"');
     expect(app).toContain('<SettingsWorkspace onReplayFirstRunOnboarding={replayFirstRunOnboarding} />');
     expect(app).toContain('hidden={!workspaceIsVisible}');
   });
