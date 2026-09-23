@@ -36,7 +36,9 @@ describe('the phone', () => {
 
   it('keeps the old cut until the new take is reviewed, then replaces it in place', async () => {
     const plan = await readRepo('mobile/src/screens/PlanScreen.tsx');
-    expect(plan).toContain('saveGeneratedVideoCandidate(project, result.asset)');
+    expect(plan).toContain('saveGeneratedVideoCandidate(project, result.asset, {');
+    expect(plan).toContain('prompt: refined.prompt');
+    expect(plan).toContain('parentId: take.assetId');
     expect(plan).toContain('replaceTakeInTimeline(project, take.clipId, asset)');
     expect(plan).toContain("candidateApprovalBlockReason({");
     expect(plan).toContain('referenceImage: take.startFrame');

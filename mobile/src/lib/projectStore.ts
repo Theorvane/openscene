@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { recordVideoRecipe } from '@openvideo/shared/videoRecipeHistory';
 
 import { parseTimelineDocument } from '@openvideo/shared/timelineDocumentValidators';
 import type { FramePreference } from '@openvideo/shared/outputFrame';
@@ -348,9 +349,10 @@ export function importAsset(
 }
 
 /** Saves a generated video in the project library without changing the edit. */
-export function saveGeneratedVideoCandidate(project: MobileProject, asset: MobileAsset): MobileProject {
+export function saveGeneratedVideoCandidate(project: MobileProject, asset: MobileAsset, recipe?: import('@openvideo/shared/videoRecipeHistory').VideoRecipe): MobileProject {
   const known = project.assets.some((entry) => entry.id === asset.id);
-  const updated = { ...project, assets: known ? project.assets : [...project.assets, asset] };
+  const updated = { ...project, assets: known ? project.assets : [...project.assets, asset],
+    ai: recipe === undefined ? project.ai : recordVideoRecipe(project.ai, recipe) };
   writeProject(updated);
   return updated;
 }
