@@ -46,6 +46,7 @@ import { VideoRecipeHistory } from './VideoRecipeHistory';
 import { PromptProductionLayout } from './PromptProductionLayout';
 import { ProductionPlanComposer } from './ProductionPlanComposer';
 import { ProductionCompanions } from './ProductionCompanions';
+import { createProductionQueueControl } from '../../shared/productionQueueControl';
 import type { ComfyUiMotionWorkerStatus, MotionControlMode } from '../../shared/comfyUiMotion';
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
@@ -247,6 +248,8 @@ export function VideoGenerationWorkspace({
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+  const productionQueue = useRef(createProductionQueueControl());
+  const [batchStopRequested, setBatchStopRequested] = useState(false);
   const previousVideoModelId = useRef(videoModel.id);
   // Which take is being refined, and what to change about it. A note belongs to
   // one job: applying the last one to a different take would be a change nobody
@@ -963,9 +966,17 @@ export function VideoGenerationWorkspace({
   };
 
   const generateProductionVideoBatch = async (): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
-    if (isBatchGenerating || isGenerating) return { tone: 'warning', text: 'Another video generation job is already running.' };
+    if (isGenerating || !productionQueue.current.begin()) return { tone: 'warning', text: 'Another video generation job is already running.' };
+    setBatchStopRequested(false);
+    setIsBatchGenerating(true);
+    try { return await runProductionVideoBatch(); }
+    finally { productionQueue.current.finish(); setIsBatchGenerating(false); }
+  };
+
+  const runProductionVideoBatch = async (): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
     const approvedPlan = JSON.stringify(documentRef.current?.writerPipeline);
     const plan = await prepareProductionVideoBatch();
+    if (!productionQueue.current.canSubmit()) return { tone: 'neutral', text: 'Production stopped before any provider job was submitted.' };
     if (plan.items.length === 0) {
       return { tone: 'neutral', text: plan.skipped[0] ?? 'No not-started or failed production shots need a new candidate.' };
     }
@@ -983,12 +994,11 @@ export function VideoGenerationWorkspace({
       `Generate ${plan.items.length} production video(s) sequentially with ${videoModel.label}?\n\n${price}\n${adjusted > 0 ? `${adjusted} shot duration(s) will use the nearest supported model duration.\n` : ''}${plan.skipped.length > 0 ? `${plan.skipped.length} target(s) will be skipped.\n` : ''}\nEach result still requires import and continuity review. Browser-session credits may be consumed.`
     );
     if (!confirmed) return { tone: 'neutral', text: 'Production video batch cancelled before any provider job was submitted.' };
-    setIsBatchGenerating(true);
     let completed = 0;
     let failed = 0;
     let attempted = 0;
-    try {
-      for (const [index, item] of plan.items.entries()) {
+    for (const [index, item] of plan.items.entries()) {
+        if (!productionQueue.current.canSubmit()) break;
         if (activeProjectIdRef.current !== projectId || JSON.stringify(documentRef.current?.writerPipeline) !== approvedPlan) {
           failed += 1;
           break;
@@ -1029,12 +1039,9 @@ export function VideoGenerationWorkspace({
           failed += 1;
           break;
         }
-      }
-    } finally {
-      setIsBatchGenerating(false);
     }
     const notSubmitted = plan.items.length - attempted;
-    const text = `${completed}/${attempted} submitted production video job(s) completed${failed > 0 ? `; ${failed} failed or need attention` : ''}${notSubmitted > 0 ? `; ${notSubmitted} not submitted after the queue stopped` : ''}${plan.skipped.length > 0 ? `; ${plan.skipped.length} ineligible target(s) skipped` : ''}. Import and review every candidate before approval.`;
+    const text = `${completed}/${attempted} submitted production video job(s) completed${failed > 0 ? `; ${failed} failed or need attention` : ''}${notSubmitted > 0 ? `; ${notSubmitted} not submitted after the queue stopped` : ''}${plan.skipped.length > 0 ? `; ${plan.skipped.length} ineligible target(s) skipped` : ''}. Completed results were saved with their prompts. Review every candidate before approval.${productionQueue.current.wasStopped() ? ' Stop requested; submitted jobs may still incur charges. Starting again requires fresh cost approval.' : ''}`;
     setStatusMsg({ tone: failed === 0 ? 'success' : completed > 0 ? 'warning' : 'danger', text });
     return { tone: failed === 0 ? 'success' : completed > 0 ? 'warning' : 'danger', text };
   };
@@ -1106,6 +1113,7 @@ export function VideoGenerationWorkspace({
         setStatusMsg({ tone: 'neutral', text: 'Saved prompt loaded. Reselect model, duration and reference inputs before generating a new take.' });
       }}>
     {tools}
+    {isBatchGenerating && <div role="status" className="production-director-toolbar"><span>{batchStopRequested ? 'Stopping after the submitted job is saved…' : 'Production queue running. Submitted jobs may incur charges.'}</span><button className="button" disabled={batchStopRequested} onClick={() => { productionQueue.current.requestStop(); setBatchStopRequested(true); }}>Stop after current shot</button></div>}
     {toolActive && <div className="production-director-toolbar"><strong>Production</strong><button className="button" onClick={() => setShowAdvanced(value => !value)}>{showAdvanced ? 'Back to production plan' : 'Advanced generation settings'}</button></div>}
     <div className="production-director" hidden={!toolActive || showAdvanced}>
       {writerDocument && onSaveAi && <ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} />}

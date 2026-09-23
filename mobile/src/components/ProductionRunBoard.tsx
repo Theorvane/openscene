@@ -4,6 +4,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { CONTINUITY_REVIEW_FIELDS } from '@openvideo/shared/aiProjectDomain';
 import { approvedWriterShots } from '@openvideo/shared/writerPipeline';
 import { productionTextBatch } from '@openvideo/shared/productionPlan';
+import { createProductionQueueControl } from '@openvideo/shared/productionQueueControl';
 import { addGenerationCandidate, updateGenerationCandidate, setCandidateContinuity, decideGenerationCandidate, type GenerationReviewResult } from '@openvideo/shared/generationReview';
 import { estimateVideoPlanCost, PRICING_AS_OF } from '@openvideo/shared/mediaGenerationPricing';
 import { generateShot } from '../lib/videoGeneration';
@@ -24,6 +25,8 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const [message, setMessage] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const lock = useRef(false);
+  const queueControl = useRef(createProductionQueueControl());
+  const [stopRequested, setStopRequested] = useState(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const permissions = useSpendPermissions();
@@ -52,9 +55,12 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
     const cost = estimate.fullyPriced ? `Estimated $${estimate.totalUsd?.toFixed(2)} (rates as of ${PRICING_AS_OF}; actual charges may differ).` : 'The provider cost is unknown. Continue only if you accept unknown charges.';
     Alert.alert('Approve generation cost', `${queue.length} shots · ${model.label}\n${cost}\nResults will be saved with prompts, then wait for your review.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Generate shots', onPress: () => { void (async () => {
       if (lock.current || !mounted.current) return;
+      if (!queueControl.current.begin()) return;
+      setStopRequested(false);
       lock.current = true; onBusy(true);
       try {
         for (const shot of queue) {
+          if (!queueControl.current.canSubmit()) break;
           const latest = readProject(projectId);
           if (!mounted.current || !latest || JSON.stringify(latest.ai.writerPipeline) !== fingerprint) throw new Error('Plan changed or screen closed. Remaining shots were not submitted.');
           const rechecked = productionTextBatch(latest.ai, model.id);
@@ -77,14 +83,15 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
           if (!completed.ok) throw new Error(completed.reason);
           writeProject({ ...saved, ai: completed.document });
         }
-        if (mounted.current) setMessage('Takes saved with their prompts. Review each take before assembling.');
+        if (mounted.current) setMessage(queueControl.current.wasStopped() ? 'Stopped after saving the submitted take. Remaining shots were not submitted. Submitted jobs may incur charges; starting again requires fresh cost approval.' : 'Takes saved with their prompts. Review each take before assembling.');
       } catch (error) { if (mounted.current) setMessage(error instanceof Error ? error.message : 'Production stopped.'); }
-      finally { lock.current = false; if (mounted.current) onBusy(false); }
+      finally { queueControl.current.finish(); lock.current = false; if (mounted.current) onBusy(false); }
     })(); } }]);
   };
   return <View style={{ gap: 10 }}>
     <Text style={{ color: theme.text, fontWeight: '600' }}>Approved plan · {shots.length} shots · {model.label}</Text>
     {action('Price & generate pending shots', start)}
+    {lock.current && <><Text style={{ color: theme.textWeak }}>{stopRequested ? 'Stopping after the submitted take is saved…' : 'Stopping does not cancel submitted provider jobs or charges.'}</Text><Pressable accessibilityRole="button" disabled={stopRequested} onPress={() => { queueControl.current.requestStop(); setStopRequested(true); }} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>Stop after current shot</Text></Pressable></>}
     {project.ai.generations.filter(candidate => shots.some(shot => shot.id === candidate.shotId) && candidate.status === 'completed').map(candidate => {
       const asset = project.assets.find(item => candidate.outputAssetIds.includes(item.id));
       return <View key={candidate.id} style={{ gap: 6 }}><Text style={{ color: theme.text }}>{shots.find(shot => shot.id === candidate.shotId)?.label} · {candidate.review?.decision ?? 'pending'}</Text>
