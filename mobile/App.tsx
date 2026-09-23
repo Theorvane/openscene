@@ -6,7 +6,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { timelineDurationMs } from '@openvideo/shared/timelineLogic';
-import { WORKSPACE_MODES, WORKSPACE_MODE_LABELS, isCreationTool, isTabInWorkspace, workspaceModeForTab, workspaceTabForMode, type CreationTool, type WorkspaceMode } from '@openvideo/shared/workspaceModes';
+import { WORKSPACE_MODES, WORKSPACE_MODE_LABELS, WORKSPACE_EXPERIENCES, isCreationTool, isTabInWorkspace, workspaceModeForTab, workspaceTabForMode, type CreationTool, type WorkspaceMode } from '@openvideo/shared/workspaceModes';
 import { AgentScreen } from './src/screens/AgentScreen';
 import { EditScreen } from './src/screens/EditScreen';
 import { ImageScreen } from './src/screens/ImageScreen';
@@ -166,10 +166,10 @@ function Shell() {
         <ProjectsScreen
           topInset={insets.top}
           activeProjectId={null}
-          onOpen={(id) => {
+          onOpen={(id, mode) => {
             setRoute({ name: 'project', projectId: id });
-            setTab('edit');
-            setWorkspaceMode('edit');
+            setTab(WORKSPACE_EXPERIENCES[mode].entryTab);
+            setWorkspaceMode(mode);
             setLastCreationTool('video');
             setExportState({ kind: 'idle' });
           }}
@@ -352,6 +352,7 @@ function Shell() {
         </Pressable>
       )}
 
+      <Text style={styles.workspaceIdentity}>OPENSCENE / {workspaceMode === 'edit' ? 'EDIT' : 'CREATE'} · {WORKSPACE_EXPERIENCES[workspaceMode].title}</Text>
       <View accessibilityRole="tablist" style={styles.modeBar}>
         {WORKSPACE_MODES.map((mode) => (
           <Pressable key={mode} accessibilityRole="tab"
@@ -450,6 +451,7 @@ function SettingsModal({ open, onClose, topInset, bottomInset }: { open: boolean
 }
 
 const styles = StyleSheet.create({
+  workspaceIdentity: { color: theme.textWeak, fontSize: 12, paddingHorizontal: 12, paddingTop: 8 },
   modeBar: { flexDirection: 'row', padding: 8, gap: 8 },
   modeButton: { flex: 1, minHeight: MIN_TAP, justifyContent: 'center', alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: theme.line },
   modeButtonOn: { borderColor: theme.accent },

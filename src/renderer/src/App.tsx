@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 
 import type { AgentChatHistoryEntry } from '../../shared/agentChat';
-import { CREATION_TOOLS, WORKSPACE_MODES, WORKSPACE_MODE_LABELS, isCreationTool, workspaceModeForTab, workspaceTabForMode, type CreationTool } from '../../shared/workspaceModes';
+import { CREATION_TOOLS, WORKSPACE_MODES, WORKSPACE_MODE_LABELS, WORKSPACE_EXPERIENCES, isCreationTool, workspaceModeForTab, workspaceTabForMode, type CreationTool } from '../../shared/workspaceModes';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import { AppShell } from './AppShell';
 import type { AgentChatRestoreRequest } from './AgentChatContext';
@@ -420,13 +420,13 @@ export function App(): ReactElement {
               project={editor.project}
               projects={editor.projects}
               chats={chatHistory}
-              onOpenProject={async (projectId) => {
+              onOpenProject={async (projectId, mode) => {
                 const opened = await editor.openProject(projectId);
-                if (opened) navigateToPage('edit');
+                if (opened) { selectWorkspaceTab(WORKSPACE_EXPERIENCES[mode].entryTab); navigateToPage('edit'); }
               }}
-              onOpenProjectFolder={async () => {
+              onOpenProjectFolder={async (mode) => {
                 const opened = await editor.openProjectFolder();
-                if (opened) navigateToPage('edit');
+                if (opened) { selectWorkspaceTab(WORKSPACE_EXPERIENCES[mode].entryTab); navigateToPage('edit'); }
               }}
               onOpenChat={openChatFromHistory}
               onRemoveProject={removeProject}
@@ -436,6 +436,11 @@ export function App(): ReactElement {
             />
           </section>
           <div className={`app-stack local-edit-bay${workspaceMode === 'create' ? ' local-edit-bay--create' : ''}`} hidden={!workspaceIsVisible}>
+            <header className={`workspace-identity workspace-identity--${workspaceMode}`}>
+              <span className="workspace-entrance__eyebrow">OPENSCENE / {workspaceMode === 'edit' ? 'EDIT' : 'CREATE'}</span>
+              <h1>{WORKSPACE_EXPERIENCES[workspaceMode].title}</h1>
+              <p>{WORKSPACE_EXPERIENCES[workspaceMode].description}</p>
+            </header>
             {/* Workspace switcher: the editor, Writer, and generation studios
                 share the area, so a generated clip lands on the timeline
                 without leaving the workspace or the agent chat beside it. */}

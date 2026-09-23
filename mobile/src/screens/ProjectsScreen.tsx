@@ -17,6 +17,7 @@ import { CloseIcon, GearIcon, PencilIcon } from '../components/Icon';
 import { FormScreen } from '../components/FormScreen';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
+import { WORKSPACE_MODES, WORKSPACE_EXPERIENCES, type WorkspaceMode } from '@openvideo/shared/workspaceModes';
 
 export function ProjectsScreen({
   topInset,
@@ -26,11 +27,12 @@ export function ProjectsScreen({
 }: {
   readonly topInset: number;
   readonly activeProjectId: string | null;
-  readonly onOpen: (projectId: string) => void;
+  readonly onOpen: (projectId: string, mode: WorkspaceMode) => void;
   readonly onOpenSettings?: () => void;
 }) {
   const [projects, setProjects] = useState<readonly ProjectSummary[]>([]);
   const [draftName, setDraftName] = useState('');
+  const [entrance, setEntrance] = useState<WorkspaceMode>('edit');
   /** The project being renamed, and the name being typed for it. */
   const [renaming, setRenaming] = useState<{ readonly project: ProjectSummary; readonly name: string } | null>(null);
 
@@ -70,7 +72,7 @@ export function ProjectsScreen({
     track('project_created');
     setDraftName('');
     refresh();
-    onOpen(project.id);
+    onOpen(project.id, entrance);
   };
 
   return (
@@ -97,6 +99,15 @@ export function ProjectsScreen({
         from your library.
       </Text>
 
+      <Text style={styles.cardTitle}>Choose your workspace</Text>
+      {WORKSPACE_MODES.map(mode => <Pressable key={mode} accessibilityRole="button"
+        accessibilityState={{ selected: entrance === mode }}
+        onPress={() => setEntrance(mode)} style={press([styles.entrance, entrance === mode && styles.cardActive])}>
+        <Text style={styles.cardTitle}>{WORKSPACE_EXPERIENCES[mode].title}{entrance === mode ? ' · Selected' : ''}</Text>
+        <Text style={styles.sub}>{WORKSPACE_EXPERIENCES[mode].description}</Text>
+        <Text style={styles.cardMeta}>{WORKSPACE_EXPERIENCES[mode].tools}</Text>
+      </Pressable>)}
+      <Text style={styles.sub}>Projects open in {WORKSPACE_EXPERIENCES[entrance].title}. Both spaces share your media; you can switch later.</Text>
       <View style={styles.newRow}>
         <TextInput
           style={styles.input}
@@ -114,11 +125,11 @@ export function ProjectsScreen({
       </View>
 
       {projects.length === 0 ? (
-        <Text style={styles.empty}>No projects yet. Create one to start editing.</Text>
+        <Text style={styles.empty}>No projects yet. Create one to get started.</Text>
       ) : (
         projects.map((project) => (
           <View key={project.id} style={[styles.card, project.id === activeProjectId && styles.cardActive]}>
-            <Pressable style={press(styles.cardMain)} accessibilityRole="button" onPress={() => onOpen(project.id)}>
+            <Pressable style={press(styles.cardMain)} accessibilityRole="button" onPress={() => onOpen(project.id, entrance)}>
               <Text style={styles.cardTitle}>{project.name}</Text>
               <Text style={styles.cardMeta}>
                 {project.id === activeProjectId ? 'open · ' : ''}
@@ -217,6 +228,7 @@ const styles = StyleSheet.create({
   empty: { color: theme.textWeak, fontSize: 14, marginTop: 12 },
   card: { flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingVertical: 6, paddingRight: 4, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
   cardActive: { borderColor: theme.accent },
+  entrance: { padding: 16, gap: 8, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
   cardMain: { flex: 1, justifyContent: 'center', minHeight: MIN_TAP, paddingVertical: 4 },
   cardTitle: { color: theme.text, fontSize: 15, fontWeight: '600' },
   cardMeta: { color: theme.textWeaker, fontSize: 12, marginTop: 3 },

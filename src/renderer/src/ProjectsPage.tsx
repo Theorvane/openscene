@@ -1,4 +1,5 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
+import { WORKSPACE_MODES, WORKSPACE_EXPERIENCES, type WorkspaceMode } from '../../shared/workspaceModes';
 
 import type { AgentChatHistoryEntry } from '../../shared/agentChat';
 import type { LocalProjectSnapshot, LocalProjectSummary } from '../../shared/timelineTypes';
@@ -10,8 +11,8 @@ type ProjectsPageProps = {
   readonly project?: LocalProjectSnapshot | null;
   readonly projects?: readonly LocalProjectSummary[];
   readonly chats?: readonly AgentChatHistoryEntry[];
-  readonly onOpenProject?: (projectId: string) => Promise<void>;
-  readonly onOpenProjectFolder?: () => Promise<void>;
+  readonly onOpenProject?: (projectId: string, mode: WorkspaceMode) => Promise<void>;
+  readonly onOpenProjectFolder?: (mode: WorkspaceMode) => Promise<void>;
   readonly onOpenChat?: (entry: AgentChatHistoryEntry) => Promise<void>;
   readonly onRemoveProject?: (projectId: string) => Promise<void>;
   readonly onDeleteChat?: (entry: AgentChatHistoryEntry) => Promise<void>;
@@ -50,9 +51,28 @@ export function ProjectsPage({
   isBusy = false
 }: ProjectsPageProps): ReactElement {
   const chatGroups = groupAgentChatHistory(chats, new Date());
+  const [entrance, setEntrance] = useState<WorkspaceMode>('edit');
 
   return (
     <div className="projects-home">
+      <section className="workspace-entrances" aria-label="Choose your workspace">
+        <div className="workspace-entrances__intro">
+          <h2>What would you like to make?</h2>
+          <p>Two workspaces. One project library. Choose a space, then open or create a project below.</p>
+        </div>
+        <div className="workspace-entrances__cards">
+          {WORKSPACE_MODES.map(mode => <button key={mode} type="button"
+            className={`workspace-entrance workspace-entrance--${mode}`}
+            aria-pressed={entrance === mode} disabled={isBusy} onClick={() => setEntrance(mode)}>
+            <span className="workspace-entrance__eyebrow">{mode === 'edit' ? 'EDIT' : 'CREATE'}</span>
+            <strong>{WORKSPACE_EXPERIENCES[mode].title}</strong>
+            <span>{WORKSPACE_EXPERIENCES[mode].description}</span>
+            <small>{WORKSPACE_EXPERIENCES[mode].tools}</small>
+            <span className="workspace-entrance__selection">{entrance === mode ? 'Selected workspace' : 'Choose workspace →'}</span>
+          </button>)}
+        </div>
+        <p role="status">Projects open in {WORKSPACE_EXPERIENCES[entrance].title}. You can switch later without moving your media.</p>
+      </section>
       <aside className="projects-home__sidebar" aria-label="Project folders">
         <div className="projects-home__heading-row">
           <h1 id="projects-page-title" className="projects-home__heading">Projects</h1>
@@ -61,7 +81,7 @@ export function ProjectsPage({
             className="projects-home__add-button"
             aria-label="Choose or create a project folder"
             title="Choose or create a project folder"
-            onClick={() => void onOpenProjectFolder?.()}
+            onClick={() => void onOpenProjectFolder?.(entrance)}
             disabled={isBusy}
           >
             <FolderPlusIcon />
@@ -79,7 +99,7 @@ export function ProjectsPage({
                   <button
                     type="button"
                     className={`projects-home__project${isSelected ? ' projects-home__project--active' : ''}`}
-                    onClick={() => void onOpenProject?.(item.id)}
+                    onClick={() => void onOpenProject?.(item.id, entrance)}
                     disabled={isBusy}
                     aria-current={isSelected ? 'true' : undefined}
                   >
