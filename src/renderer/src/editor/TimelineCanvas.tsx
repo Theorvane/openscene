@@ -7,6 +7,7 @@ import { useClipThumbnails } from './clipThumbnails';
 import { useClipWaveform } from './clipWaveform';
 import type { ThumbnailClip } from '../../../shared/clipThumbnails';
 import { clipDurationMs } from '../../../shared/timelineClipGeometry';
+import { snapTimelinePosition } from '../../../shared/timelineSnapping';
 import type { TimelineEditorController } from './useTimelineEditor';
 
 type TimelineCanvasProps = {
@@ -34,6 +35,8 @@ function readTimelineDrag(event: DragEvent): TimelineDragPayload | null {
 }
 
 function writeTimelineDrag(event: DragEvent, payload: TimelineDragPayload): void {
+  // A trim handle lives inside a draggable clip. Do not overwrite its payload.
+  event.stopPropagation();
   event.dataTransfer.setData(TIMELINE_DRAG_TYPE, JSON.stringify(payload));
   event.dataTransfer.effectAllowed = 'move';
 }
@@ -273,20 +276,31 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
   const [lockedTracks, setLockedTracks] = useState<Record<string, boolean>>({});
   const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
-  const snapMs = snappingEnabled ? 100 : 10;
+  const snapMs = 1;
   const selectedClip = editor.selectedClip;
 
   const onLaneDrop = (event: DragEvent<HTMLDivElement>, trackId: string): void => {
-    if (view === null) return;
+    if (view === null || project === null) return;
     event.preventDefault();
     setDragOverTrackId(null);
     const payload = readTimelineDrag(event);
     if (payload === null) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const atMs = clientXToTimelineMs({ clientX: event.clientX, laneLeft: rect.left, laneWidth: rect.width, durationMs: view.durationMs, snapMs });
-    if (payload.kind === 'asset') editor.placeAssetOnTrack(payload.assetId, trackId, atMs);
-    if (payload.kind === 'clip') editor.moveClipToTrack(payload.clipId, trackId, Math.max(0, atMs - payload.offsetMs));
-    if (payload.kind === 'trim') editor.trimClipTo(payload.clipId, payload.edge, atMs);
+    const clip = payload.kind === 'asset' ? undefined
+      : project.timeline.tracks.flatMap((track) => track.clips).find((item) => item.id === payload.clipId);
+    const position = snapTimelinePosition({
+      timeline: project.timeline,
+      positionMs: payload.kind === 'clip' ? atMs - payload.offsetMs : atMs,
+      pixelsPerMs: rect.width / view.durationMs,
+      playheadMs: editor.playheadMs,
+      enabled: snappingEnabled && !event.altKey,
+      ...(clip === undefined ? {} : { excludeClipId: clip.id }),
+      ...(payload.kind === 'clip' && clip !== undefined ? { movingDurationMs: clipDurationMs(clip) } : {})
+    });
+    if (payload.kind === 'asset') editor.placeAssetOnTrack(payload.assetId, trackId, position);
+    if (payload.kind === 'clip') editor.moveClipToTrack(payload.clipId, trackId, position);
+    if (payload.kind === 'trim') editor.trimClipTo(payload.clipId, payload.edge, position);
   };
 
   const scrubLane = (event: React.PointerEvent<HTMLDivElement>): void => {
@@ -553,7 +567,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
             style={snappingEnabled ? ACTIVE_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
             aria-pressed={snappingEnabled}
             aria-label="Toggle snapping"
-            title={snappingEnabled ? 'Snapping on' : 'Snapping off'}
+            title={snappingEnabled ? 'Snap to clip edges and playhead (hold Alt to bypass)' : 'Snapping off'}
           >
             {ICONS.magnet}
           </button>
@@ -937,7 +951,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                             laneLeft: event.currentTarget.parentElement?.getBoundingClientRect().left ?? 0,
                             laneWidth: event.currentTarget.parentElement?.getBoundingClientRect().width ?? 1,
                             durationMs: view.durationMs,
-                            snapMs: 100
+                            snapMs: 1
                           }) - block.clip.timelineStartMs
                         });
                       }}
