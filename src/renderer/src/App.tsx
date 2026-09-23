@@ -486,7 +486,8 @@ export function App(): ReactElement {
             </div>
             {workspaceMode === 'create' && (
               <div className="workspace-creation-tools">
-                <CreationStageNav tool={isCreationTool(workspaceTabId) ? workspaceTabId : 'video'} onSelect={selectWorkspaceTab} document={editor.project?.ai} assets={editor.project?.assets ?? []} />
+                <details className="production-advanced-tools"><summary>Advanced tools · script, frames, voice</summary><CreationStageNav tool={isCreationTool(workspaceTabId) ? workspaceTabId : 'video'} onSelect={selectWorkspaceTab} document={editor.project?.ai} assets={editor.project?.assets ?? []} /></details>
+                {workspaceTabId !== 'video' && <button className="button" onClick={() => selectWorkspaceTab('video')}>Back to production</button>}
                 <details className="workspace-media-library">
                   <summary>Project media ({editor.project?.assets.length ?? 0})</summary>
                   <div className="workspace-media-library__list">
@@ -532,6 +533,7 @@ export function App(): ReactElement {
                   active={workspaceMode === 'create' && workspaceIsVisible}
                   toolActive={workspaceTabId === 'video'}
                   onActivateVideo={() => selectWorkspaceTab('video')}
+                  onSelectProductionTool={selectWorkspaceTab}
                   tools={<>
                     <section
                       aria-label={WORKSPACE_TAB_LABELS.writer}

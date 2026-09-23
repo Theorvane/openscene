@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ProductionNavigator } from '../components/ProductionNavigator';
+import { ProductionPlanComposer } from '../components/ProductionPlanComposer';
+import { ProductionRunBoard } from '../components/ProductionRunBoard';
+import { ProductionCompanions } from '../components/ProductionCompanions';
+import { writeProject } from '../lib/projectStore';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
@@ -84,7 +88,8 @@ export function PlanScreen({
   topInset,
   keyboardOffset,
   projectId,
-  connectionsVersion
+  connectionsVersion,
+  onSelectProductionTool
 }: {
   readonly active?: boolean;
   readonly topInset: number;
@@ -93,6 +98,7 @@ export function PlanScreen({
   readonly projectId: string | null;
   /** Changes when Settings closes, so stored keys are picked up. */
   readonly connectionsVersion: number;
+  readonly onSelectProductionTool?: (tool: 'image' | 'voice') => void;
 }) {
   const catalog = getDomainModels('video-generation');
   const [totalSeconds, setTotalSeconds] = useState<number>(30);
@@ -450,6 +456,14 @@ export function PlanScreen({
 
   return (
     <FormScreen topInset={topInset} keyboardOffset={keyboardOffset}>
+      {projectId && activeProject && <ProductionPlanComposer key={'plan-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
+        const latest = readProject(projectId);
+        if (!latest) return false;
+        writeProject({ ...latest, ai });
+        return true;
+      }} />}
+      {projectId && <ProductionRunBoard key={'run-' + projectId} projectId={projectId} model={model} aspectRatio={effectiveAspectRatio} disabled={running || asking || redoing !== null} connected={connected[model.providerId] === true} onBusy={setRunning} active={active} />}
+      {activeProject && onSelectProductionTool && <ProductionCompanions project={activeProject} disabled={running || asking || redoing !== null} onSelect={onSelectProductionTool} />}
       {projectId !== null && activeProject !== null && <ProductionNavigator key={projectId} projectId={projectId} document={activeProject.ai} assets={activeProject.assets}
         timeline={activeProject.timeline} onPlaceVoice={assetId => {
           try {

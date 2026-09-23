@@ -1,0 +1,68 @@
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import type { AiProjectDocument } from '@openvideo/shared/aiProjectDomain';
+import { createUseProductionPlan } from '@openvideo/shared/useProductionPlan';
+import { pipelineBaseRequest, pipelineMatchesBrief } from '@openvideo/shared/writerPipeline';
+import { getDomainModels, isDomainModelAvailableOnRuntime } from '@openvideo/shared/aiDomainModels';
+import { getLlmProvider } from '@openvideo/shared/llmProviders';
+import { requestWriter } from '@openvideo/shared/writerGeneration';
+import type { WriterModelId, WriterRequest } from '@openvideo/shared/writerWorkflow';
+import { readSlot } from '../lib/credentials';
+import { readProviderConnections } from '../lib/mediaProviders';
+import { ModelSelect } from './ModelSelect';
+import { theme } from '../lib/theme';
+import { MIN_TAP, press } from '../lib/touch';
+const useProductionPlan = createUseProductionPlan({ useEffect, useRef, useState });
+
+export function ProductionPlanComposer({ document, onSave, disabled, connectionsVersion }: {
+  document: AiProjectDocument; onSave: (document: AiProjectDocument) => Promise<boolean>; disabled: boolean; connectionsVersion: number;
+}) {
+  const base = pipelineBaseRequest(document.writerPipeline);
+  const [brief, setBrief] = useState(base?.sourceText ?? '');
+  const [seconds, setSeconds] = useState(String(base?.targetDurationSeconds ?? 60));
+  const [language, setLanguage] = useState(base?.language ?? 'Korean');
+  const [modelId, setModelId] = useState(getDomainModels('writer')[0]?.id ?? '');
+  const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
+  useEffect(() => { let current = true; void readProviderConnections().then(result => { if (current) setConnected(result); }); return () => { current = false; }; }, [connectionsVersion]);
+  const model = getDomainModels('writer').find(item => item.id === modelId);
+  const flow = useProductionPlan(document, onSave);
+  const [expanded, setExpanded] = useState<string | null>('screenplay');
+  const request: WriterRequest = { ...(base ?? { mode: 'idea_to_script', audience: 'General audience', tone: 'Cinematic and engaging' }), sourceText: brief.trim(), targetDurationSeconds: Number(seconds), language: language.trim() };
+  const busy = disabled || flow.busy;
+  const valid = !!request.sourceText && !!request.language && Number.isSafeInteger(request.targetDurationSeconds) && request.targetDurationSeconds >= 4 && request.targetDurationSeconds <= 7200;
+  const matches = pipelineMatchesBrief(flow.proposal, request);
+  const applied = !!document.writerPipeline?.appliedScriptId;
+  const action = (label: string, callback: () => void, off = false) => <Pressable accessibilityRole="button" disabled={off} onPress={callback} style={press([styles.button, off && { opacity: .5 }])}><Text style={styles.text}>{label}</Text></Pressable>;
+  return <View style={styles.card}>
+    <Text style={styles.title}>What video should we make?</Text>
+    <Text style={styles.text}>Brief → plan approval → generate → review → assemble</Text>
+    <TextInput accessibilityLabel="Production brief" placeholder="Describe the story, characters and ending…" placeholderTextColor={theme.textWeak} multiline value={brief} onChangeText={setBrief} editable={!busy} style={[styles.input, { minHeight: 110 }]} />
+    <Text style={styles.text}>Target seconds</Text><TextInput accessibilityLabel="Target seconds" value={seconds} onChangeText={setSeconds} keyboardType="number-pad" editable={!busy} style={styles.input} />
+    <Text style={styles.text}>Dialogue language</Text><TextInput accessibilityLabel="Dialogue language" value={language} onChangeText={setLanguage} editable={!busy} style={styles.input} />
+    <ModelSelect domain="writer" selectedId={modelId} connected={connected} onSelect={item => setModelId(item.id)} onConnectionChange={() => { void readProviderConnections().then(setConnected); }} />
+    {action(flow.busy ? 'Working…' : flow.proposal ? 'Revise complete plan' : 'Propose complete plan', () => {
+      if (!model) return;
+      Alert.alert('Generate production plan?', 'Text-model charges may apply. This replaces the planning draft, not existing media. No video generation starts.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Propose plan', onPress: () => {
+        void flow.generate(request, model.id, async input => {
+          const provider = getLlmProvider(model.providerId);
+          const apiKey = provider?.credentialKey ? await readSlot(provider.credentialKey) : null;
+          if (!apiKey) throw new Error('Connect the writing provider in Settings.');
+          return requestWriter({ apiKey, modelId: model.id as WriterModelId, request: input });
+        });
+      } }]);
+    }, busy || !valid || !model || !isDomainModelAvailableOnRuntime(model, 'mobile') || !connected[model.providerId])}
+    {flow.proposal && <>
+      {flow.proposal.artifacts.map(artifact => <View key={artifact.stage}>{action(`${artifact.stage} · ${artifact.title}`, () => setExpanded(expanded === artifact.stage ? null : artifact.stage))}{expanded === artifact.stage && <Text selectable style={styles.text}>{artifact.content}</Text>}</View>)}
+      {!matches && <Text style={styles.text}>Brief changed. Generate a revised plan before approval.</Text>}
+      {flow.unsaved && action('Retry saving proposal', () => Alert.alert('Replace planning draft?', 'Save the retained proposal over the current draft?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Save', onPress: () => { void flow.saveDraft(); } }]), busy)}
+      {action(applied ? 'Plan approved' : 'Approve plan & prepare shots', () => Alert.alert('Approve entire plan?', 'Approve the displayed brief, screenplay, scene breakdown and shot prompts. Media generation still needs cost approval.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Approve plan', onPress: () => { void flow.approve(request); } }]), busy || !matches || applied || flow.unsaved)}
+    </>}
+    {!!flow.message && <Text accessibilityRole="alert" style={styles.text}>{flow.message}</Text>}
+  </View>;
+}
+const styles = StyleSheet.create({
+  card: { gap: 10, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 12 },
+  title: { color: theme.text, fontSize: 20, fontWeight: '600' }, text: { color: theme.text, fontSize: 13 },
+  input: { color: theme.text, borderWidth: 1, borderColor: theme.line, borderRadius: 8, padding: 10, minHeight: MIN_TAP },
+  button: { borderWidth: 1, borderColor: theme.accent, borderRadius: 8, padding: 10, minHeight: MIN_TAP, justifyContent: 'center' }
+});

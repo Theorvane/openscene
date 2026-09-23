@@ -52,6 +52,15 @@ function ProjectWriterScreen({ topInset, keyboardOffset, projectId, connectionsV
     return true;
   };
   const flow = useWriterPipeline(project?.ai ?? createEmptyAiProjectDocument(), persist);
+  useEffect(() => {
+    if (flow.busy || flow.dirty) return;
+    const current = pipelineBaseRequest(project?.ai.writerPipeline);
+    if (!current) return;
+    setMode(current.mode); setSourceText(current.sourceText); setLanguage(current.language);
+    setAudience(current.audience); setTone(current.tone); setDurationText(String(current.targetDurationSeconds));
+    setVideoStyle(current.videoStyle ?? ''); setCustomVideoStyle(current.customVideoStyle ?? '');
+    setEmotionalGoal(current.emotionalGoal ?? ''); setParentScriptId(current.parentScriptId ?? '');
+  }, [project?.ai.writerPipeline?.requestJson, flow.busy, flow.dirty]);
   const refresh = useCallback((): void => { void readProviderConnections().then(setConnected); }, []);
   useEffect(refresh, [connectionsVersion, refresh]);
   const model = catalog.find((entry) => entry.id === modelId) ?? catalog[0];

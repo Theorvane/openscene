@@ -394,7 +394,7 @@ function Shell() {
           <WriterScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
         </RetainedScreen>
         <RetainedScreen active={tab === 'video'}>
-          <PlanScreen active={tab === 'video'} topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
+          <PlanScreen active={tab === 'video'} topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} onSelectProductionTool={selectTab} />
         </RetainedScreen>
         <RetainedScreen active={tab === 'voice'}>
           <VoiceScreen topInset={0} keyboardOffset={bodyTop} targetSeconds={pictureSeconds} connectionsVersion={connectionsVersion} projectId={route.projectId} />

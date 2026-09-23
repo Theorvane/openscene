@@ -37,6 +37,15 @@ export function WriterWorkspace({ document, onSave }: {
   const [parentScriptId, setParentScriptId] = useState(initial?.parentScriptId ?? '');
   const [notes, setNotes] = useState('');
   const flow = useWriterPipeline(document, onSave);
+  useEffect(() => {
+    if (flow.busy || flow.dirty) return;
+    const current = pipelineBaseRequest(document.writerPipeline);
+    if (!current) return;
+    setMode(current.mode); setSourceText(current.sourceText); setLanguage(current.language);
+    setAudience(current.audience); setTone(current.tone); setTargetDurationSeconds(current.targetDurationSeconds);
+    setVideoStyle(current.videoStyle ?? ''); setCustomVideoStyle(current.customVideoStyle ?? '');
+    setEmotionalGoal(current.emotionalGoal ?? ''); setParentScriptId(current.parentScriptId ?? '');
+  }, [document.writerPipeline, flow.busy, flow.dirty]);
   const selectedParent = document.scripts.find((script) => script.id === parentScriptId);
   const provider = model ? getLlmProvider(model.providerId) : undefined;
   const connected = provider?.credentialKey !== undefined && credentialStatus[provider.credentialKey] === true;

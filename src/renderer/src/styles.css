@@ -705,6 +705,19 @@ button {
    and a composer pinned to the bottom where the action lives. */
 .prompt-production-editor { display: grid; grid-template-columns: minmax(330px, .85fr) minmax(300px, 1.15fr); grid-template-rows: minmax(0, 1fr) 230px; height: 100%; min-height: 0; gap: 12px; }
 .production-prompt-pane { min-height: 0; min-width: 0; overflow: hidden; }
+.production-prompt-pane { display: flex; flex-direction: column; gap: 8px; }
+.production-prompt-pane > .studio-surface, .production-prompt-pane > .workspace-studio-panel { flex: 1; min-height: 0; }
+.production-director { flex: 1; min-height: 0; overflow: auto; }
+.production-director .production-board { margin-top: 12px; }
+.production-director .production-board__header { flex-wrap: wrap; }
+.production-director .production-board__shots { list-style: none; }
+.production-director .production-board__shot-heading { flex-wrap: wrap; }
+.production-director-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.production-plan-composer { display: grid; gap: 12px; padding: 12px; }
+.production-plan-composer h2, .production-plan-composer p { margin: 0; }
+.production-plan-review { display: grid; gap: 10px; }
+.production-plan-review pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font: inherit; }
+.production-advanced-tools { flex-basis: 100%; }
 .production-prompt-pane > .workspace-studio-panel { height: 100%; overflow: auto; }
 .production-prompt-pane .writer-workspace { height: auto; min-height: 100%; overflow: visible; }
 .production-prompt-pane .ai-workspace__header { flex-wrap: wrap; }
@@ -6819,6 +6832,18 @@ button {
 .production-board__state--needs_import,
 .production-board__state--generating {
   color: var(--color-warning);
+}
+
+.production-companions {
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.production-companions h3, .production-companions h4, .production-companions p {
+  margin: 0 0 8px;
 }
 
 .production-board__state--failed {
