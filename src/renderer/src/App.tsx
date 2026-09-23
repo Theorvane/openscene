@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 
 import type { AgentChatHistoryEntry } from '../../shared/agentChat';
+import { CREATION_TOOLS, WORKSPACE_MODES, WORKSPACE_MODE_LABELS, isCreationTool, workspaceModeForTab, workspaceTabForMode, type CreationTool } from '../../shared/workspaceModes';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import { AppShell } from './AppShell';
 import type { AgentChatRestoreRequest } from './AgentChatContext';
@@ -26,7 +27,6 @@ import { ImageGenerationWorkspace, type ImageGenerationWorkspaceHandle } from '.
 import { VideoGenerationWorkspace } from './VideoGenerationWorkspace';
 import { WriterWorkspace } from './WriterWorkspace';
 import {
-  WORKSPACE_TAB_IDS,
   WORKSPACE_TAB_LABELS,
   WORKSPACE_TAB_STORAGE_KEY,
   parseWorkspaceTabId,
@@ -44,6 +44,14 @@ import { readFirstRunOnboardingCompletion, resetFirstRunOnboardingCompletion, wr
 import { useTimelineEditor } from './editor/useTimelineEditor';
 
 const [EDIT_WORKSPACE] = APP_WORKSPACES;
+
+function readWorkspaceTab(): WorkspaceTabId {
+  try {
+    return parseWorkspaceTabId(window.localStorage.getItem(WORKSPACE_TAB_STORAGE_KEY));
+  } catch {
+    return 'edit';
+  }
+}
 
 const APP_WORKSPACE_PANEL_STYLE = {
   height: '100%',
@@ -267,8 +275,13 @@ export function App(): ReactElement {
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   // Which workspace surface is showing; remembered across launches.
   const [workspaceTabId, setWorkspaceTabId] = useState<WorkspaceTabId>(() =>
-    typeof window === 'undefined' ? 'edit' : parseWorkspaceTabId(window.localStorage.getItem(WORKSPACE_TAB_STORAGE_KEY))
+    readWorkspaceTab()
   );
+  const [lastCreationTool, setLastCreationTool] = useState<CreationTool>(() => {
+    const tab = readWorkspaceTab();
+    return isCreationTool(tab) ? tab : 'video';
+  });
+  const workspaceMode = workspaceModeForTab(workspaceTabId);
 
   // Lives here because both studios touch it: the image studio produces a still
   // and the video studio consumes it as an image-to-video seed.
@@ -285,6 +298,7 @@ export function App(): ReactElement {
 
   const selectWorkspaceTab = (tabId: WorkspaceTabId): void => {
     setWorkspaceTabId(tabId);
+    if (isCreationTool(tabId)) setLastCreationTool(tabId);
     try {
       window.localStorage.setItem(WORKSPACE_TAB_STORAGE_KEY, tabId);
     } catch {
@@ -421,18 +435,18 @@ export function App(): ReactElement {
               isBusy={editor.isBusy}
             />
           </section>
-          <div className="app-stack local-edit-bay" hidden={!workspaceIsVisible}>
+          <div className={`app-stack local-edit-bay${workspaceMode === 'create' ? ' local-edit-bay--create' : ''}`} hidden={!workspaceIsVisible}>
             {/* Workspace switcher: the editor, Writer, and generation studios
                 share the area, so a generated clip lands on the timeline
                 without leaving the workspace or the agent chat beside it. */}
             <div className="workspace-tab-line">
               <Tabs
-                activeTabId={workspaceTabId}
-                idBase="workspace"
-                tabs={WORKSPACE_TAB_IDS.map((id) => ({ id, label: WORKSPACE_TAB_LABELS[id] }))}
-                onActiveTabChange={selectWorkspaceTab}
+                activeTabId={workspaceMode}
+                idBase="workspace-mode"
+                tabs={WORKSPACE_MODES.map((id) => ({ id, label: WORKSPACE_MODE_LABELS[id] }))}
+                onActiveTabChange={(mode) => selectWorkspaceTab(workspaceTabForMode(mode, lastCreationTool))}
                 className="workspace-tabs"
-                aria-label="Workspace sections"
+                aria-label="Project workspace"
               />
               <button
                 type="button"
@@ -445,7 +459,36 @@ export function App(): ReactElement {
                 <SettingsGlyph />
               </button>
             </div>
-            <div className="app-workspace-panel-stack">
+            {workspaceMode === 'create' && (
+              <div className="workspace-creation-tools">
+                <Tabs
+                  activeTabId={workspaceTabId}
+                  idBase="workspace"
+                  tabs={CREATION_TOOLS.map((id) => ({ id, label: WORKSPACE_TAB_LABELS[id] }))}
+                  onActiveTabChange={selectWorkspaceTab}
+                  className="workspace-tabs"
+                  aria-label="AI creation tools"
+                />
+                <span className="workspace-mode-hint">Generate a clip directly, or start with Writer. Results belong to this project.</span>
+                <details className="workspace-media-library">
+                  <summary>Project media ({editor.project?.assets.length ?? 0})</summary>
+                  <div className="workspace-media-library__list">
+                    {(editor.project?.assets.length ?? 0) === 0 && <p>Import a result to this project to use it in your edit.</p>}
+                    {editor.project?.assets.map((asset) => (
+                      <div className="workspace-media-library__row" key={asset.id}>
+                        <span>{asset.displayName}</span>
+                        <button type="button" className="button" disabled={editor.isBusy}
+                          onClick={() => {
+                            if (editor.placeAssetOnTimeline(asset.id)) selectWorkspaceTab('edit');
+                          }}>Add & open editor</button>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+                <button type="button" className="button" onClick={() => selectWorkspaceTab('edit')}>Open in editor</button>
+              </div>
+            )}
+            <div className="app-workspace-panel-stack" id={`workspace-mode-${workspaceMode}-panel`} role="tabpanel" aria-labelledby={`workspace-mode-${workspaceMode}-tab`}>
               <section
                 aria-labelledby={EDIT_WORKSPACE.navId}
                 hidden={workspaceTabId !== 'edit' || activeWorkspaceId !== EDIT_WORKSPACE.id || !workspaceIsVisible}
@@ -460,6 +503,7 @@ export function App(): ReactElement {
               </section>
               <section
                 aria-label={WORKSPACE_TAB_LABELS.writer}
+                id="workspace-writer-panel"
                 className="workspace-studio-panel"
                 hidden={workspaceTabId !== 'writer' || !workspaceIsVisible}
                 role="region"
@@ -472,6 +516,7 @@ export function App(): ReactElement {
               </section>
               <section
                 aria-label={WORKSPACE_TAB_LABELS.voice}
+                id="workspace-voice-panel"
                 className="workspace-studio-panel"
                 hidden={workspaceTabId !== 'voice' || !workspaceIsVisible}
                 role="region"
@@ -494,6 +539,7 @@ export function App(): ReactElement {
               </section>
               <section
                 aria-label={WORKSPACE_TAB_LABELS.video}
+                id="workspace-video-panel"
                 className="workspace-studio-panel"
                 hidden={workspaceTabId !== 'video' || !workspaceIsVisible}
                 role="region"
@@ -511,10 +557,12 @@ export function App(): ReactElement {
                   onGenerateProductionImage={openProductionImageBrief}
                   onGenerateProductionImages={generateProductionImages}
                   onOpenImageResults={() => selectWorkspaceTab('image')}
+                  onOpenEditor={() => selectWorkspaceTab('edit')}
                 />
               </section>
               <section
                 aria-label={WORKSPACE_TAB_LABELS.image}
+                id="workspace-image-panel"
                 className="workspace-studio-panel"
                 hidden={workspaceTabId !== 'image' || !workspaceIsVisible}
                 role="region"

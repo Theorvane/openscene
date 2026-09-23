@@ -48,12 +48,14 @@ function describe(asset: MobileAsset, bytes: number | null): string {
 export function LibraryScreen({
   topInset,
   keyboardOffset,
-  projectId
+  projectId,
+  onOpenEditor
 }: {
   readonly topInset: number;
   /** Height of the chrome above this screen; see FormScreen. */
   readonly keyboardOffset: number;
   readonly projectId: string | null;
+  readonly onOpenEditor?: () => void;
 }) {
   const [assets, setAssets] = useState<readonly MobileAsset[]>([]);
   const [usage, setUsage] = useState<Readonly<Record<string, number>>>({});
@@ -82,14 +84,16 @@ export function LibraryScreen({
     if (projectId === null) return;
     const project = readProject(projectId);
     if (project === null) return;
+    const placed = appendAssetToTimeline(project, asset) !== null;
     setNote(
-      appendAssetToTimeline(project, asset) === null
+      !placed
         ? 'No video track would take that clip.'
         : asset.kind === 'image'
           ? `${asset.displayName} added, held for ${STILL_DEFAULT_HOLD_MS / 1000}s — trim it on the Edit tab.`
           : `${asset.displayName} added to the timeline.`
     );
     refresh();
+    if (placed) onOpenEditor?.();
   };
 
   /** The photo library, or the share sheet — the same route a finished export takes. */
@@ -213,7 +217,7 @@ export function LibraryScreen({
 
               <View style={styles.actions}>
                 <Pressable accessibilityRole="button" onPress={() => place(asset)} style={press(styles.action)}>
-                  <Text style={styles.actionText}>Add to timeline</Text>
+                  <Text style={styles.actionText}>Add & open editor</Text>
                 </Pressable>
                 <Pressable accessibilityRole="button" onPress={() => void keep(asset)} style={press(styles.action)}>
                   <Text style={styles.actionText}>Save or share</Text>

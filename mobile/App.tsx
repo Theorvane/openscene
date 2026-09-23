@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -6,6 +6,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { timelineDurationMs } from '@openvideo/shared/timelineLogic';
+import { WORKSPACE_MODES, WORKSPACE_MODE_LABELS, isCreationTool, isTabInWorkspace, workspaceModeForTab, workspaceTabForMode, type CreationTool, type WorkspaceMode } from '@openvideo/shared/workspaceModes';
 import { AgentScreen } from './src/screens/AgentScreen';
 import { EditScreen } from './src/screens/EditScreen';
 import { ImageScreen } from './src/screens/ImageScreen';
@@ -87,6 +88,13 @@ function Shell() {
   const insets = useSafeAreaInsets();
   const [route, setRoute] = useState<Route>({ name: 'projects' });
   const [tab, setTab] = useState<ProjectTab>('edit');
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('edit');
+  const [lastCreationTool, setLastCreationTool] = useState<CreationTool>('video');
+  const selectTab = (next: ProjectTab): void => {
+    setTab(next);
+    setWorkspaceMode((current) => workspaceModeForTab(next, current));
+    if (isCreationTool(next)) setLastCreationTool(next);
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   /**
    * Bumped when Settings closes.
@@ -161,6 +169,8 @@ function Shell() {
           onOpen={(id) => {
             setRoute({ name: 'project', projectId: id });
             setTab('edit');
+            setWorkspaceMode('edit');
+            setLastCreationTool('video');
             setExportState({ kind: 'idle' });
           }}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -342,27 +352,42 @@ function Shell() {
         </Pressable>
       )}
 
-      <View style={styles.body} onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}>
-        {tab === 'edit' && <EditScreen topInset={0} projectId={route.projectId} />}
-        {tab === 'writer' && (
+      <View accessibilityRole="tablist" style={styles.modeBar}>
+        {WORKSPACE_MODES.map((mode) => (
+          <Pressable key={mode} accessibilityRole="tab"
+            accessibilityState={{ selected: workspaceMode === mode }}
+            onPress={() => selectTab(workspaceTabForMode(mode, lastCreationTool))}
+            style={press([styles.modeButton, workspaceMode === mode && styles.modeButtonOn])}>
+            <Text style={[styles.modeLabel, workspaceMode === mode && styles.tabOn]}>{WORKSPACE_MODE_LABELS[mode]}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {workspaceMode === 'create' && (
+        <Pressable accessibilityRole="button" onPress={() => selectTab('edit')} style={press(styles.editorLink)}>
+          <Text style={styles.tabOn}>Open in editor →</Text>
+        </Pressable>
+      )}
+      <View key={route.projectId} style={styles.body} onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}>
+        <RetainedScreen active={tab === 'edit'}><EditScreen active={tab === 'edit'} topInset={0} projectId={route.projectId} /></RetainedScreen>
+        <RetainedScreen active={tab === 'writer'}>
           <WriterScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
-        )}
-        {tab === 'video' && (
-          <PlanScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
-        )}
-        {tab === 'voice' && (
+        </RetainedScreen>
+        <RetainedScreen active={tab === 'video'}>
+          <PlanScreen active={tab === 'video'} topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
+        </RetainedScreen>
+        <RetainedScreen active={tab === 'voice'}>
           <VoiceScreen topInset={0} keyboardOffset={bodyTop} targetSeconds={pictureSeconds} connectionsVersion={connectionsVersion} projectId={route.projectId} />
-        )}
-        {tab === 'image' && (
+        </RetainedScreen>
+        <RetainedScreen active={tab === 'image'}>
           <ImageScreen
             topInset={0}
             keyboardOffset={bodyTop}
             projectId={route.projectId}
             connectionsVersion={connectionsVersion}
           />
-        )}
+        </RetainedScreen>
         {tab === 'agent' && <AgentScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} />}
-        {tab === 'library' && <LibraryScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} />}
+        {tab === 'library' && <LibraryScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} onOpenEditor={() => selectTab('edit')} />}
       </View>
 
       {/* Above the bar rather than over the content: it never covers the
@@ -370,7 +395,7 @@ function Shell() {
       <AdBanner />
 
       <View accessibilityRole="tablist" style={[styles.tabBar, { paddingBottom: insets.bottom, height: 60 + insets.bottom }]}>
-        {PROJECT_TABS.map(({ id, label, Icon }) => {
+        {PROJECT_TABS.filter(({ id }) => isTabInWorkspace(id, workspaceMode)).map(({ id, label, Icon }) => {
           const selected = id === tab;
           return (
             <Pressable
@@ -378,7 +403,7 @@ function Shell() {
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               accessibilityLabel={label}
-              onPress={() => setTab(id)}
+              onPress={() => selectTab(id)}
               style={press(styles.tab)}
             >
               <View style={[styles.tabIcon, selected && styles.tabIconOn]}>
@@ -393,6 +418,17 @@ function Shell() {
       <SettingsModal open={settingsOpen} onClose={() => closeSettings()} topInset={insets.top} bottomInset={insets.bottom} />
     </View>
   );
+}
+
+/** Mount on first visit; hidden studios retain drafts and in-flight jobs. */
+function RetainedScreen({ active, children }: { active: boolean; children: ReactNode }) {
+  const [visited, setVisited] = useState(active);
+  useEffect(() => { if (active) setVisited(true); }, [active]);
+  if (!active && !visited) return null;
+  return <View style={{ flex: 1, display: active ? 'flex' : 'none' }}
+    accessibilityElementsHidden={!active} importantForAccessibility={active ? 'auto' : 'no-hide-descendants'}>
+    {children}
+  </View>;
 }
 
 function SettingsModal({ open, onClose, topInset, bottomInset }: { open: boolean; onClose: () => void; topInset: number; bottomInset: number }) {
@@ -414,6 +450,11 @@ function SettingsModal({ open, onClose, topInset, bottomInset }: { open: boolean
 }
 
 const styles = StyleSheet.create({
+  modeBar: { flexDirection: 'row', padding: 8, gap: 8 },
+  modeButton: { flex: 1, minHeight: MIN_TAP, justifyContent: 'center', alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: theme.line },
+  modeButtonOn: { borderColor: theme.accent },
+  modeLabel: { color: theme.textWeaker, fontSize: 14, fontWeight: '600' },
+  editorLink: { minHeight: MIN_TAP, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 16 },
   root: { flex: 1, backgroundColor: theme.bg },
   bar: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: theme.line },
   barButton: { width: MIN_TAP, height: MIN_TAP, alignItems: 'center', justifyContent: 'center' },

@@ -143,21 +143,28 @@ function formatMs(ms: number): string {
 
 export function EditScreen({
   topInset,
-  projectId
+  projectId,
+  active = true
 }: {
   readonly topInset: number;
   readonly projectId: string | null;
+  readonly active?: boolean;
 }) {
+  const loadedSnapshot = useRef('');
   const editor = useMobileEditor((timeline) => {
     if (projectId === null) return;
     const project = readProject(projectId);
-    if (project !== null) writeProject({ ...project, timeline });
+    if (project !== null) {
+      writeProject({ ...project, timeline });
+      loadedSnapshot.current = JSON.stringify([timeline, project.assets]);
+    }
   });
 
   const [pxPerSecond, setPxPerSecond] = useState(28);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [storedAssets, setStoredAssets] = useState<readonly MobileAsset[]>([]);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => { if (!active) setPlaying(false); }, [active]);
   const [reloadToken, setReloadToken] = useState(0);
   const [inspecting, setInspecting] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
@@ -235,9 +242,13 @@ export function EditScreen({
   // Opening a project replaces the editor's document and its undo history.
   const { loadProject } = editor;
   useEffect(() => {
+    if (!active) return;
     if (projectId === null) return;
     const project = readProject(projectId);
     if (project === null) return;
+    const snapshot = JSON.stringify([project.timeline, project.assets]);
+    if (loadedSnapshot.current === snapshot) return;
+    loadedSnapshot.current = snapshot;
     setStoredAssets(project.assets);
     loadProject(
       project.timeline,
@@ -254,7 +265,7 @@ export function EditScreen({
         metadata: { durationMs: asset.durationMs, width: asset.width, height: asset.height }
       }))
     );
-  }, [projectId, loadProject, reloadToken]);
+  }, [projectId, loadProject, reloadToken, active]);
 
   const timelineWidth = useMemo(
     () => Math.max(240, editor.durationMs * pxPerMs + 80),

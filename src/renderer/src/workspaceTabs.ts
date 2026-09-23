@@ -1,12 +1,7 @@
 /**
- * The workspace area shows one of five surfaces, chosen by the tab strip in its
- * top-left corner: the timeline editor, or the voice, video, and image
- * generation studios. They are tabs rather than pages so producing a clip and
- * placing it on the timeline never leaves the workspace, and the Edit Agent chat
- * stays open beside all of them.
- *
- * Image sits last because it feeds the others: a generated still is most often
- * the seed for image-to-video rather than an end in itself.
+ * Stable surface identifiers retained beneath the two workspace modes.
+ * Existing preferences must still open the same tool. Visible creation-tool
+ * order and mode membership live in shared/workspaceModes for both surfaces.
  */
 export const WORKSPACE_TAB_IDS = ['edit', 'writer', 'voice', 'video', 'image'] as const;
 
