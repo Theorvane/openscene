@@ -2849,7 +2849,10 @@ button {
   grid-area: program;
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  /* The former branding header is visually hidden and takes no grid row. */
+  grid-template-rows: minmax(0, 1fr);
+  grid-auto-rows: auto;
   gap: var(--space-2);
   min-width: 0;
   min-height: 0;
@@ -3718,6 +3721,7 @@ button {
 
 .editor-preview-frame {
   display: grid;
+  min-width: 0;
   place-items: center;
   height: 100%;
   min-height: 0;
@@ -3742,6 +3746,8 @@ button {
 }
 
 .program-monitor {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   /* The picture owns the flexible row, not the transport controls. */
   grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--space-3);
