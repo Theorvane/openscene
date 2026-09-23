@@ -156,6 +156,7 @@ describe('project store', () => {
         schemaVersion: 4,
         id: created.id,
         name: 'Product demo',
+        projectType: 'editing',
         createdAt: createdAt.toISOString(),
         updatedAt: createdAt.toISOString(),
         assets: [],
@@ -167,6 +168,7 @@ describe('project store', () => {
         {
           id: created.id,
           name: created.name,
+          projectType: 'editing',
           createdAt: created.createdAt,
           updatedAt: created.updatedAt,
           storage: 'internal'
@@ -364,6 +366,7 @@ describe('folder-backed project store', () => {
         {
           id: created.id,
           name: 'My Cutdown',
+          projectType: 'editing',
           createdAt: created.createdAt,
           updatedAt: created.updatedAt,
           storage: 'external',

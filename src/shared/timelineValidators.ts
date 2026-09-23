@@ -30,11 +30,12 @@ export { migrateTimelineDocumentV1, migrateTimelineDocumentV2, parseTimelineDocu
 import { parseTimelineDocument } from './timelineDocumentValidators';
 
 export function parseCreateProjectInput(value: unknown): CreateProjectInput | null {
-  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['name'])) {
+  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['name', 'projectType'])) {
     return null;
   }
   const name = getTrimmedString(value, 'name', TIMELINE_VALIDATION_LIMITS.nameLength);
-  return name === null ? null : { name };
+  if (value.projectType !== undefined && value.projectType !== 'editing' && value.projectType !== 'generation') return null;
+  return name === null ? null : { name, ...(value.projectType === undefined ? {} : { projectType: value.projectType }) };
 }
 
 export function parseListProjectsInput(value: unknown): ListProjectsInput | null {

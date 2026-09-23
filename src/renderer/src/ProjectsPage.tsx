@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { WORKSPACE_MODES, WORKSPACE_EXPERIENCES, type WorkspaceMode } from '../../shared/workspaceModes';
+import { modeForProjectType } from '../../shared/projectTypes';
 
 import type { AgentChatHistoryEntry } from '../../shared/agentChat';
 import type { LocalProjectSnapshot, LocalProjectSummary } from '../../shared/timelineTypes';
@@ -52,13 +53,14 @@ export function ProjectsPage({
 }: ProjectsPageProps): ReactElement {
   const chatGroups = groupAgentChatHistory(chats, new Date());
   const [entrance, setEntrance] = useState<WorkspaceMode>('edit');
+  const visibleProjects = projects.filter(item => modeForProjectType(item.projectType, entrance) === entrance);
 
   return (
     <div className="projects-home">
       <section className="workspace-entrances" aria-label="Choose your workspace">
         <div className="workspace-entrances__intro">
           <h2>What would you like to make?</h2>
-          <p>Two workspaces. One project library. Choose a space, then open or create a project below.</p>
+          <p>Two project types. Choose what you are making, then create or open a project below.</p>
         </div>
         <div className="workspace-entrances__cards">
           {WORKSPACE_MODES.map(mode => <button key={mode} type="button"
@@ -68,10 +70,10 @@ export function ProjectsPage({
             <strong>{WORKSPACE_EXPERIENCES[mode].title}</strong>
             <span>{WORKSPACE_EXPERIENCES[mode].description}</span>
             <small>{WORKSPACE_EXPERIENCES[mode].tools}</small>
-            <span className="workspace-entrance__selection">{entrance === mode ? 'Selected workspace' : 'Choose workspace →'}</span>
+            <span className="workspace-entrance__selection">{entrance === mode ? 'Selected project type' : 'Browse projects →'}</span>
           </button>)}
         </div>
-        <p role="status">Projects open in {WORKSPACE_EXPERIENCES[entrance].title}. You can switch later without moving your media.</p>
+        <p role="status">New projects are saved as {WORKSPACE_EXPERIENCES[entrance].title}. Existing mixed projects appear in both lists without changing their data.</p>
       </section>
       <aside className="projects-home__sidebar" aria-label="Project folders">
         <div className="projects-home__heading-row">
@@ -90,9 +92,9 @@ export function ProjectsPage({
         {errorText !== undefined && errorText.length > 0 && (
           <p role="alert" className="projects-home__error">{errorText}</p>
         )}
-        {projects.length > 0 ? (
+        {visibleProjects.length > 0 ? (
           <ul className="projects-home__list">
-            {projects.map((item) => {
+            {visibleProjects.map((item) => {
               const isSelected = project?.id === item.id;
               return (
                 <li key={item.id} className="projects-home__row">
@@ -108,6 +110,7 @@ export function ProjectsPage({
                     </span>
                     <span className="projects-home__project-body">
                       <span className="projects-home__project-name">{item.name}</span>
+                      <span className="projects-home__type-badge">{item.projectType === undefined ? 'Legacy · mixed' : item.projectType === 'editing' ? 'Editing' : 'AI Generation'}</span>
                       <span className="projects-home__project-meta">
                         {item.storage === 'external' && item.folderName ? item.folderName : formatTimestamp(item.updatedAt)}
                       </span>

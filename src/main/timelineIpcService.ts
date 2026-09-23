@@ -1,4 +1,5 @@
 import { extname, basename } from 'node:path';
+import { parseProjectType } from '../shared/projectTypes';
 
 import type { ApiResponse } from '../shared/models';
 import { MEDIA_PLAYBACK_SCHEME } from '../shared/mediaPlaybackUrls';
@@ -98,7 +99,7 @@ export class TimelineIpcService {
       if (dialogResult.canceled || parentDirectory === undefined) {
         return ok({ cancelled: true });
       }
-      const project = await this.dependencies.projects.createInFolder({ name: input.name, parentDirectory });
+      const project = await this.dependencies.projects.createInFolder({ ...input, parentDirectory });
       return ok({ cancelled: false, project });
     } catch (error: unknown) {
       return safeProjectError(error, 'FILE_WRITE_FAILED', 'The project could not be created.');
@@ -106,22 +107,53 @@ export class TimelineIpcService {
   }
 
   async openProjectFolder(payload: unknown): Promise<ApiResponse<OpenProjectFolderResult>> {
-    if (payload !== undefined && (typeof payload !== 'object' || payload === null)) {
+    if (payload !== undefined && (typeof payload !== 'object' || payload === null || Array.isArray(payload) || Object.keys(payload).some(key => key !== 'projectType'))) {
       return fail('INVALID_INPUT', 'The project folder payload was not valid.');
     }
+    const projectType = parseProjectType((payload as { projectType?: unknown } | undefined)?.projectType);
+    if (projectType === null) return fail('INVALID_INPUT', 'Invalid project type.');
     try {
       const dialogResult = await this.selectProjectDirectory();
       const directory = dialogResult.filePaths[0];
       if (dialogResult.canceled || directory === undefined) {
         return ok({ cancelled: true });
       }
-      const result = await this.dependencies.projects.openOrInitializeFolder(directory);
+      const result = await this.dependencies.projects.openOrInitializeFolder(directory, new Date(), projectType ?? 'editing');
       if (result === null) {
         return fail('INVALID_INPUT', 'The selected folder has a project file that could not be read, so it was left untouched.');
       }
       return ok({ cancelled: false, created: result.created, project: result.project });
     } catch (error: unknown) {
       return safeProjectError(error, 'UNKNOWN_ERROR', 'The project folder could not be opened.');
+    }
+  }
+
+  /** Copy media only into a new private editing project; never modify the source. */
+  async createEditingCopy(payload: unknown): Promise<ApiResponse<LocalProjectSnapshot>> {
+    const input = parseOpenProjectInput(payload);
+    if (input === null) return fail('INVALID_INPUT', 'Invalid source project.');
+    let destination: LocalProjectSnapshot | null = null;
+    try {
+      const source = await this.dependencies.projects.open(input.projectId);
+      if (source === null) return projectMissing(input.projectId);
+      if (source.projectType === 'editing') return fail('INVALID_INPUT', 'Choose a generation project to send to editing.');
+      if (source.assets.length === 0) return fail('INVALID_INPUT', 'Save media to the project before sending it to editing.');
+      const sources = await Promise.all(source.assets.map(async asset => {
+        const playback = await this.dependencies.assets.getPlaybackSource(source.id, asset.id);
+        if (playback === null) throw new ProjectStoreError('A source asset is missing or unavailable. Nothing was moved.');
+        return { asset, playback };
+      }));
+      destination = await this.dependencies.projects.create({ name: `${source.name.slice(0, 65)} - Edit`, projectType: 'editing' });
+      await this.dependencies.assets.importMany(sources.map(({ asset, playback }) => ({
+        projectId: destination!.id, sourcePath: playback.filePath, displayName: asset.displayName,
+        kind: asset.kind, mimeType: asset.mimeType
+      })));
+      const saved = await this.dependencies.projects.open(destination.id);
+      if (saved === null) throw new ProjectStoreError('The editing copy could not be reopened.');
+      return ok(saved);
+    } catch (error) {
+      if (destination !== null) await this.dependencies.projects.delete(destination.id).catch(() => undefined);
+      return safeProjectError(error, 'FILE_WRITE_FAILED', 'Media could not be copied. The source project is unchanged.');
     }
   }
 

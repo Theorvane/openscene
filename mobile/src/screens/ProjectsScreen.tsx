@@ -18,6 +18,7 @@ import { FormScreen } from '../components/FormScreen';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
 import { WORKSPACE_MODES, WORKSPACE_EXPERIENCES, type WorkspaceMode } from '@openvideo/shared/workspaceModes';
+import { modeForProjectType, projectTypeForMode } from '@openvideo/shared/projectTypes';
 
 export function ProjectsScreen({
   topInset,
@@ -33,6 +34,7 @@ export function ProjectsScreen({
   const [projects, setProjects] = useState<readonly ProjectSummary[]>([]);
   const [draftName, setDraftName] = useState('');
   const [entrance, setEntrance] = useState<WorkspaceMode>('edit');
+  const visibleProjects = projects.filter(project => modeForProjectType(project.projectType, entrance) === entrance);
   /** The project being renamed, and the name being typed for it. */
   const [renaming, setRenaming] = useState<{ readonly project: ProjectSummary; readonly name: string } | null>(null);
 
@@ -66,7 +68,7 @@ export function ProjectsScreen({
   };
 
   const create = (): void => {
-    const project = createProject(draftName);
+    const project = createProject(draftName, projectTypeForMode(entrance));
     // No name: what someone calls their project is theirs, and `name` is a
     // forbidden key besides.
     track('project_created');
@@ -99,7 +101,7 @@ export function ProjectsScreen({
         from your library.
       </Text>
 
-      <Text style={styles.cardTitle}>Choose your workspace</Text>
+      <Text style={styles.cardTitle}>Choose a project type</Text>
       {WORKSPACE_MODES.map(mode => <Pressable key={mode} accessibilityRole="button"
         accessibilityState={{ selected: entrance === mode }}
         onPress={() => setEntrance(mode)} style={press([styles.entrance, entrance === mode && styles.cardActive])}>
@@ -107,7 +109,7 @@ export function ProjectsScreen({
         <Text style={styles.sub}>{WORKSPACE_EXPERIENCES[mode].description}</Text>
         <Text style={styles.cardMeta}>{WORKSPACE_EXPERIENCES[mode].tools}</Text>
       </Pressable>)}
-      <Text style={styles.sub}>Projects open in {WORKSPACE_EXPERIENCES[entrance].title}. Both spaces share your media; you can switch later.</Text>
+      <Text style={styles.sub}>New projects keep this type. Send generated media to a separate editing project when ready. Legacy mixed projects appear in both lists.</Text>
       <View style={styles.newRow}>
         <TextInput
           style={styles.input}
@@ -124,13 +126,14 @@ export function ProjectsScreen({
         </Pressable>
       </View>
 
-      {projects.length === 0 ? (
+      {visibleProjects.length === 0 ? (
         <Text style={styles.empty}>No projects yet. Create one to get started.</Text>
       ) : (
-        projects.map((project) => (
+        visibleProjects.map((project) => (
           <View key={project.id} style={[styles.card, project.id === activeProjectId && styles.cardActive]}>
             <Pressable style={press(styles.cardMain)} accessibilityRole="button" onPress={() => onOpen(project.id, entrance)}>
               <Text style={styles.cardTitle}>{project.name}</Text>
+              <Text style={styles.cardMeta}>{project.projectType ?? 'Legacy · mixed'}</Text>
               <Text style={styles.cardMeta}>
                 {project.id === activeProjectId ? 'open · ' : ''}
                 edited {project.updatedAt.slice(0, 16).replace('T', ' ')}

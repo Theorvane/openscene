@@ -1,9 +1,13 @@
-# Editing and AI creation entrances
+# Editing and generation project types
 
-The project home offers two product-level entrances: Video Editing and AI Creation. Select one, then create or open a project. Desktop folder selection and mobile project creation honor the same selection as reopening an existing project. Merely choosing an entrance never opens a provider or starts a paid job.
+New projects persist `projectType: editing | generation`. The home cards select the type for creation and filter existing projects. Opening an existing folder always honors its stored type; selecting a different card never rewrites it. Editor projects open the timeline; generation projects expose the numbered Script → Images → Video → Voice workflow and shared media library. Project type cannot be switched in the UI.
 
-Video Editing opens the timeline. AI Creation opens video generation, with Writer, image and voice tools in its own secondary navigation. Each space has its own identity header. The existing workspace switcher stays available, and retained panels preserve in-session drafts while switching. Returning to creation within a project restores the last creation tool; opening from home starts at that entrance's primary tool.
+Legacy projects without this field remain mixed projects, visibly labelled in both lists with their existing workspace switcher. No type is inferred from assets or AI fields, so mixed projects do not silently lose access to either workflow. Their timelines, prompts and assets are preserved on read/save. Unknown explicit types fail validation. This additive field remains under schema 4; older strict desktop versions may reject typed projects, so keep backups before downgrading.
 
-These are two views over the same project, not incompatible project formats or separate applications. Assets and timelines are not copied, filtered away or migrated. Generated media can still be handed to the editor explicitly. Existing persisted workspace identifiers are unchanged. Home entrance selection is session-local and initially editing; it is not a permanent project classification. Chat history retains its existing conversation-opening behavior.
+## Send to editing
 
-The same entrance definitions and routing targets live in `src/shared/workspaceModes.ts` and are consumed by desktop and mobile. Native mobile screen exercise remains required before merge when a development client is available.
+The generation workspace offers **Create editing project**. After confirmation it copies all saved project media bytes into a new editing project. It never moves or deletes the source. The editing timeline starts empty: this is a media handoff, not an automatic assembly or timeline clone. Prompts and generation history stay in the source project. Desktop uses the private local project store; mobile uses app storage. Disk space is needed for the copies. Missing media fails visibly; partial new destinations are cleaned up when possible, with the source unchanged. There is no live synchronization between projects.
+
+Navigation type is a product workflow boundary, not an IPC authorization boundary. Existing agent/storage timeline operations remain available; they are not reclassified as security permissions.
+
+Desktop and mobile share type resolution rules. Existing persisted navigation keys are unchanged. No provider is called by creation, navigation or media handoff. Native mobile screen and file-copy exercise remains required before merge when a development client is connected.
