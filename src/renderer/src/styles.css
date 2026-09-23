@@ -6834,6 +6834,18 @@ button {
   color: var(--color-warning);
 }
 
+.production-companions {
+  padding: 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.production-companions h3, .production-companions h4, .production-companions p {
+  margin: 0 0 8px;
+}
+
 .production-board__state--failed {
   color: var(--color-danger);
 }

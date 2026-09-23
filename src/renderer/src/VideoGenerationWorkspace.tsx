@@ -45,6 +45,7 @@ import { recordVideoRecipe } from '../../shared/videoRecipeHistory';
 import { VideoRecipeHistory } from './VideoRecipeHistory';
 import { PromptProductionLayout } from './PromptProductionLayout';
 import { ProductionPlanComposer } from './ProductionPlanComposer';
+import { ProductionCompanions } from './ProductionCompanions';
 import type { ComfyUiMotionWorkerStatus, MotionControlMode } from '../../shared/comfyUiMotion';
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
@@ -113,6 +114,7 @@ type VideoGenerationWorkspaceProps = {
   readonly tools?: ReactNode;
   readonly toolActive?: boolean;
   readonly onActivateVideo?: () => void;
+  readonly onSelectProductionTool?: (tool: 'image' | 'voice') => void;
   readonly active?: boolean;
   readonly writerDocument?: AiProjectDocument | null;
   readonly projectId?: string | null;
@@ -149,6 +151,7 @@ export function VideoGenerationWorkspace({
   tools,
   toolActive = true,
   onActivateVideo,
+  onSelectProductionTool,
   active = true,
   writerDocument,
   onSaveAi,
@@ -1106,6 +1109,7 @@ export function VideoGenerationWorkspace({
     {toolActive && <div className="production-director-toolbar"><strong>Production</strong><button className="button" onClick={() => setShowAdvanced(value => !value)}>{showAdvanced ? 'Back to production plan' : 'Advanced generation settings'}</button></div>}
     <div className="production-director" hidden={!toolActive || showAdvanced}>
       {writerDocument && onSaveAi && <ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} />}
+      {writerDocument && onSelectProductionTool && <ProductionCompanions document={writerDocument} assets={projectAssets} disabled={isGenerating || isBatchGenerating || isSavingCandidate} onSelect={onSelectProductionTool} />}
         {writerDocument !== null && writerDocument !== undefined && onSaveAi !== undefined && projectId !== null && projectId !== undefined &&
           <ProductionBoard
             document={writerDocument}

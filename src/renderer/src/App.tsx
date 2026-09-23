@@ -533,6 +533,7 @@ export function App(): ReactElement {
                   active={workspaceMode === 'create' && workspaceIsVisible}
                   toolActive={workspaceTabId === 'video'}
                   onActivateVideo={() => selectWorkspaceTab('video')}
+                  onSelectProductionTool={selectWorkspaceTab}
                   tools={<>
                     <section
                       aria-label={WORKSPACE_TAB_LABELS.writer}

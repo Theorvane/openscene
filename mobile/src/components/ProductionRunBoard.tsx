@@ -33,8 +33,11 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const action = (label: string, run: () => void) => <Pressable accessibilityRole="button" disabled={disabled || lock.current} onPress={run} style={press({ minHeight: MIN_TAP, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{label}</Text></Pressable>;
   const save = (result: GenerationReviewResult) => {
     if (!result.ok) { setMessage(result.reason); return; }
-    const current = readProject(projectId);
-    if (current) { writeProject({ ...current, ai: result.document }); setMessage('Review saved.'); }
+    try {
+      const current = readProject(projectId);
+      if (!current) throw new Error('Project is no longer available.');
+      writeProject({ ...current, ai: result.document }); setMessage('Review saved.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Review could not be saved. Retry before assembling.'); }
   };
   const start = () => {
     if (lock.current || disabled) return;
@@ -91,7 +94,14 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
         {action('Approve reviewed take', () => { const latest = readProject(projectId); if (latest) save(decideGenerationCandidate(latest.ai, candidate.id, 'approved', candidate.review?.notes ?? '', new Date().toISOString())); })}
       </View>;
     })}
-    {action('Assemble approved cut', () => { const latest = readProject(projectId); if (!latest) return; const result = assembleApprovedWriterShots(latest); setMessage(result.ok ? 'Approved cut assembled and saved.' : result.reason); })}
+    {action('Assemble approved cut', () => {
+      try {
+        const latest = readProject(projectId);
+        if (!latest) throw new Error('Project is no longer available.');
+        const result = assembleApprovedWriterShots(latest);
+        setMessage(result.ok ? 'Approved cut assembled and saved.' : result.reason);
+      } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save the assembled cut.'); }
+    })}
     {!!message && <Text accessibilityRole="alert" style={{ color: theme.textWeak }}>{message}</Text>}
   </View>;
 }

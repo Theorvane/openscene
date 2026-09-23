@@ -4,10 +4,37 @@ import { addGenerationCandidate } from '../src/shared/generationReview';
 import { createEmptyAiProjectDocument, parseAiProjectDocument } from '../src/shared/aiProjectDomain';
 import { approvedWriterShots } from '../src/shared/writerPipeline';
 import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
+import { productionCompanions } from '../src/shared/productionCompanions';
+import { createNarrationPlan } from '../src/shared/subtitleWorkflow';
 const request: WriterRequest = { mode: 'idea_to_script', sourceText: 'A traveler finds a lost letter.', targetDurationSeconds: 8, language: 'Korean', audience: 'General', tone: 'Cinematic' };
 const draft: WriterDraft = { title: 'Letter', screenplay: 'A traveler opens the letter at dawn.', characters: [], styleBible: { palette: ['blue'], lighting: 'Dawn', cameraGrammar: 'Wide', texture: 'Film', forbiddenChanges: [] }, scenes: [{ title: 'Station', objective: 'Find the letter', setting: 'Station', timeOfDay: 'Dawn', characterNames: [], continuityNotes: 'Same station', shots: [{ durationSeconds: 8, framing: 'Wide', cameraMotion: 'Static', action: 'A traveler opens the letter', dialogue: '', audioCues: [], negativePrompt: '' }] }] };
 const date = '2026-09-24T00:00:00.000Z';
 describe('guided production plan', () => {
+  it('derives frame availability from saved image evidence, not a dangling reference', () => {
+    const approved = approveProductionPlan(createEmptyAiProjectDocument(), request, proposeProductionPlan(request, draft, 'test'), date, 'frames');
+    const document = { ...approved, shots: approved.shots.map(shot => ({ ...shot, referenceAssetIds: ['frame'] })), referenceAssets: [{ id: 'frame', assetId: 'image', role: 'start_frame' as const, label: 'First frame' }] };
+    expect(productionCompanions(document, []).frames).toBe(0);
+    expect(productionCompanions(document, [{ id: 'image', kind: 'video', displayName: 'Wrong kind' }]).frames).toBe(0);
+    expect(productionCompanions(document, [{ id: 'image', kind: 'image', displayName: 'Frame' }]).frames).toBe(1);
+  });
+  it('distinguishes approved dialogue, drafts, approval and outdated narration without implying synthesis', () => {
+    const spoken = { ...draft, scenes: draft.scenes.map(scene => ({ ...scene, shots: scene.shots.map(shot => ({ ...shot, dialogue: 'Narrator: The letter arrived.' })) })) };
+    const approved = approveProductionPlan(createEmptyAiProjectDocument(), request, proposeProductionPlan(request, spoken, 'test'), date, 'voice');
+    expect(productionCompanions(approved, []).voiceState).toBe('available');
+    const narrationPlan = createNarrationPlan({ ai: approved, durationMs: 8000, voiceModelId: 'test', voiceId: 'test' });
+    const document = { ...approved, narrationPlan };
+    expect(productionCompanions(document, []).voiceState).toBe('draft');
+    const ready = { ...document, narrationPlan: { ...narrationPlan, status: 'approved' as const } };
+    const before = JSON.stringify(ready);
+    const status = productionCompanions(ready, [{ id: 'audio', kind: 'audio', displayName: 'Unplaced voice' }]);
+    expect(status.voiceState).toBe('approved');
+    expect(status.audioAssets).toBe(1);
+    expect(status.placedAudioAssets).toBe(0);
+    expect(JSON.stringify(ready)).toBe(before);
+    const { writerPipeline: _pipeline, ...withoutPlan } = ready;
+    expect(productionCompanions(withoutPlan, []).voiceState).toBe('outdated');
+    expect(productionCompanions(createEmptyAiProjectDocument(), []).voiceState).toBe('empty');
+  });
   it('text batches exclude unapproved plans, unsupported models and already queued shots', () => {
     const proposal = proposeProductionPlan(request, draft, 'test');
     const empty = createEmptyAiProjectDocument();
