@@ -236,6 +236,7 @@ export type TimelineDocument = {
 };
 
 export type LocalProjectSnapshot = {
+  readonly projectType?: import('./projectTypes').ProjectType;
   readonly schemaVersion: typeof PROJECT_SCHEMA_VERSION;
   readonly id: string;
   readonly name: string;
@@ -257,6 +258,7 @@ export type OpenProjectFolderResult =
   | { readonly cancelled: false; readonly created: boolean; readonly project: LocalProjectSnapshot };
 
 export type LocalProjectSummary = {
+  readonly projectType?: import('./projectTypes').ProjectType;
   readonly id: string;
   readonly name: string;
   readonly createdAt: string;
@@ -331,6 +333,7 @@ export type AddTrackInput = {
 };
 
 export type CreateProjectInput = {
+  readonly projectType?: import('./projectTypes').ProjectType;
   readonly name: string;
 };
 

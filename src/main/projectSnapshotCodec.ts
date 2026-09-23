@@ -1,4 +1,5 @@
 import { PROJECT_SCHEMA_VERSION } from '../shared/timelineTypes';
+import { parseProjectType } from '../shared/projectTypes';
 import { RESULT_ASSET_ORIGIN_KINDS, resultAssetOriginKey, type BrowserAssetMetadata, type LocalProjectSnapshot, type MediaAsset, type MediaKind, type ResultAssetOrigin, type TimelineDocument } from '../shared/timelineTypes';
 import { createEmptyAiProjectDocument, parseAiProjectDocument } from '../shared/aiProjectDomain';
 import { migrateTimelineDocumentV1, migrateTimelineDocumentV2, parseTimelineDocument } from '../shared/timelineValidators';
@@ -142,6 +143,8 @@ function parseProjectRecord(
   aiValue: unknown,
   expectedProjectId?: string
 ): LocalProjectSnapshot | null {
+  const projectType = parseProjectType(value.projectType);
+  if (projectType === null) return null;
   const id = getOpaqueId(value, 'id');
   const name = getTrimmedString(value, 'name', TIMELINE_VALIDATION_LIMITS.nameLength);
   const createdAt = getIsoTimestamp(value, 'createdAt');
@@ -172,14 +175,14 @@ function parseProjectRecord(
     return null;
   }
   return findInvalidAssetRelation(timeline, assets) === null
-    ? { schemaVersion: PROJECT_SCHEMA_VERSION, id, name, createdAt, updatedAt, assets, timeline, ai }
+    ? { schemaVersion: PROJECT_SCHEMA_VERSION, id, name, createdAt, updatedAt, assets, timeline, ai, ...(projectType === undefined ? {} : { projectType }) }
     : null;
 }
 
 export function parsePersistedProject(value: unknown, expectedProjectId?: string): LocalProjectSnapshot | null {
   if (
     !isPlainRecord(value) ||
-    !hasAllowedKeys(value, ['schemaVersion', 'id', 'name', 'createdAt', 'updatedAt', 'assets', 'timeline', 'ai']) ||
+    !hasAllowedKeys(value, ['schemaVersion', 'id', 'name', 'createdAt', 'updatedAt', 'assets', 'timeline', 'ai', 'projectType']) ||
     value.schemaVersion !== PROJECT_SCHEMA_VERSION ||
     value.ai === undefined
   ) {

@@ -1,4 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import { parseProjectType } from '@openvideo/shared/projectTypes';
 import { recordVideoRecipe } from '@openvideo/shared/videoRecipeHistory';
 
 import { parseTimelineDocument } from '@openvideo/shared/timelineDocumentValidators';
@@ -74,6 +75,7 @@ export function isStillAsset(asset: MobileAsset): boolean {
 }
 
 export type MobileProject = {
+  readonly projectType?: import('@openvideo/shared/projectTypes').ProjectType;
   readonly schemaVersion: typeof PROJECT_SCHEMA_VERSION;
   readonly id: string;
   readonly name: string;
@@ -95,7 +97,7 @@ export type MobileProject = {
   readonly subtitleDelivery?: SubtitleDelivery;
 };
 
-export type ProjectSummary = { readonly id: string; readonly name: string; readonly updatedAt: string };
+export type ProjectSummary = { readonly id: string; readonly name: string; readonly updatedAt: string; readonly projectType?: import('@openvideo/shared/projectTypes').ProjectType };
 
 function isFramePreference(value: unknown): value is FramePreference {
   return value === 'source' || value === 'landscape' || value === 'portrait' || value === 'square';
@@ -129,7 +131,7 @@ export function listProjects(): readonly ProjectSummary[] {
   for (const entry of ROOT.list()) {
     if (!(entry instanceof Directory)) continue;
     const project = readProject(entry.name);
-    if (project !== null) summaries.push({ id: project.id, name: project.name, updatedAt: project.updatedAt });
+    if (project !== null) summaries.push({ id: project.id, name: project.name, updatedAt: project.updatedAt, ...(project.projectType === undefined ? {} : { projectType: project.projectType }) });
   }
   // Most recently touched first: the project a user wants is almost always the
   // one they were last in.
@@ -152,6 +154,7 @@ export function readProject(id: string): MobileProject | null {
   try {
     const parsed: unknown = JSON.parse(file.textSync());
     const candidate = parsed as Partial<MobileProject>;
+    if (parseProjectType(candidate.projectType) === null) return null;
     const storedSchemaVersion = (parsed as { readonly schemaVersion?: unknown }).schemaVersion;
     const isLegacyV3 = storedSchemaVersion === 3;
     if (!isLegacyV3 && storedSchemaVersion !== PROJECT_SCHEMA_VERSION) return null;
@@ -166,10 +169,11 @@ export function readProject(id: string): MobileProject | null {
       : parseAiProjectDocument(candidate.ai, new Set(assets.map((asset) => asset.id)));
     if (ai === null) return null;
     const subtitleDelivery = candidate.subtitleDelivery === undefined ? undefined : parseSubtitleDelivery(candidate.subtitleDelivery);
-    if (subtitleDelivery === null || subtitleDelivery?.sidecarFormat !== 'none') return null;
+    if (subtitleDelivery === null || (subtitleDelivery !== undefined && subtitleDelivery.sidecarFormat !== 'none')) return null;
     return {
       schemaVersion: PROJECT_SCHEMA_VERSION,
       id: candidate.id,
+      ...(candidate.projectType === undefined ? {} : { projectType: candidate.projectType }),
       name: candidate.name,
       createdAt: candidate.createdAt ?? new Date().toISOString(),
       updatedAt: candidate.updatedAt ?? new Date().toISOString(),
@@ -191,9 +195,10 @@ export function readProject(id: string): MobileProject | null {
   }
 }
 
-export function createProject(name: string): MobileProject {
+export function createProject(name: string, projectType: import('@openvideo/shared/projectTypes').ProjectType = 'editing'): MobileProject {
+  if (parseProjectType(projectType) === null) throw new Error('Invalid project type.');
   ensureRoot();
-  const id = `project-${Date.now().toString(36)}`;
+  const id = `project-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   const dir = projectDir(id);
   dir.create({ intermediates: true });
   new Directory(dir, 'media').create({ intermediates: true });
@@ -202,6 +207,7 @@ export function createProject(name: string): MobileProject {
     schemaVersion: PROJECT_SCHEMA_VERSION,
     id,
     name: name.trim().length > 0 ? name.trim() : 'Untitled',
+    projectType,
     createdAt: now,
     updatedAt: now,
     assets: [],
@@ -213,6 +219,7 @@ export function createProject(name: string): MobileProject {
 }
 
 export function writeProject(project: MobileProject): void {
+  if (parseProjectType(project.projectType) === null) throw new Error('Invalid project type.');
   ensureRoot();
   const dir = projectDir(project.id);
   if (!dir.exists) dir.create({ intermediates: true });
@@ -223,6 +230,27 @@ export function writeProject(project: MobileProject): void {
   }
   projectFile(project.id).write(JSON.stringify({ ...project, schemaVersion: PROJECT_SCHEMA_VERSION, ai, updatedAt: new Date().toISOString() }));
   announce();
+}
+
+/** Copies media bytes, not the generation board or timeline, into a new edit. */
+export function createEditingCopy(sourceId: string): MobileProject {
+  const source = readProject(sourceId);
+  if (source === null || source.projectType === 'editing' || source.assets.length === 0) throw new Error('Open a generation project with saved media first.');
+  const destination = createProject(source.name + ' - Edit', 'editing');
+  try {
+    const assets = source.assets.map((asset, index) => {
+      if (!/^media\/[a-zA-Z0-9._-]+$/.test(asset.relativePath)) throw new Error('Invalid source media path.');
+      const relativePath = `media/${index}-${asset.relativePath.slice(6)}`;
+      new File(assetUri(source.id, asset)).copy(new File(projectDir(destination.id), relativePath));
+      return { ...asset, relativePath };
+    });
+    const result = { ...destination, assets };
+    writeProject(result);
+    return result;
+  } catch (error) {
+    deleteProject(destination.id);
+    throw error;
+  }
 }
 
 /**

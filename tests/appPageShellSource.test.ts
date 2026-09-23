@@ -43,7 +43,7 @@ describe('app page shell source contract', () => {
     expect(app).toContain('if (isProjectRequiredPageId(pageId) && !hasActiveProject) {');
     expect(app).toContain("navigateToPage('projects');");
     expect(app).toContain('if (hasActiveProject || !isProjectRequiredPageId(activePageId)) return;');
-    expect(app).toContain('const opened = await editor.openProjectFolder();');
+    expect(app).toContain('const opened = await editor.openProjectFolder(projectTypeForMode(mode));');
     expect(app).toContain('const opened = await editor.openProject(projectId);');
     expect(app).toContain("if (opened) navigateToPage('edit');");
     expect(app).toContain('hasActiveProject={hasActiveProject}');

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 
 import type { AgentChatHistoryEntry } from '../../shared/agentChat';
-import { CREATION_TOOLS, WORKSPACE_MODES, WORKSPACE_MODE_LABELS, isCreationTool, workspaceModeForTab, workspaceTabForMode, type CreationTool } from '../../shared/workspaceModes';
+import { modeForProjectType, projectTypeForMode } from '../../shared/projectTypes';
+import { CREATION_TOOLS, WORKSPACE_MODES, WORKSPACE_MODE_LABELS, WORKSPACE_EXPERIENCES, isCreationTool, workspaceModeForTab, workspaceTabForMode, type CreationTool } from '../../shared/workspaceModes';
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import { AppShell } from './AppShell';
 import type { AgentChatRestoreRequest } from './AgentChatContext';
@@ -274,14 +275,30 @@ export function App(): ReactElement {
   }, [editor, navigateToPage, projectTabs]);
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   // Which workspace surface is showing; remembered across launches.
-  const [workspaceTabId, setWorkspaceTabId] = useState<WorkspaceTabId>(() =>
+  const [preferredWorkspaceTab, setWorkspaceTabId] = useState<WorkspaceTabId>(() =>
     readWorkspaceTab()
   );
   const [lastCreationTool, setLastCreationTool] = useState<CreationTool>(() => {
     const tab = readWorkspaceTab();
     return isCreationTool(tab) ? tab : 'video';
   });
-  const workspaceMode = workspaceModeForTab(workspaceTabId);
+  const workspaceMode = modeForProjectType(editor.project?.projectType, workspaceModeForTab(preferredWorkspaceTab));
+  const workspaceTabId = workspaceMode === 'edit' ? 'edit' : isCreationTool(preferredWorkspaceTab) ? preferredWorkspaceTab : 'video';
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  const [handoffError, setHandoffError] = useState('');
+  const sendToEditing = async (): Promise<void> => {
+    if (!editor.project || handoffBusy) return;
+    if (editor.project.projectType === undefined) { selectWorkspaceTab('edit'); return; }
+    if (!window.confirm('Copy all saved project media into a new editing project? The original generation project and its prompts stay unchanged. The new timeline starts empty.')) return;
+    setHandoffBusy(true); setHandoffError('');
+    try {
+      const result = await window.videoTool.createEditingCopy({ projectId: editor.project.id });
+      if (!result.ok) { setHandoffError(result.error.message); return; }
+      await editor.refreshProjects();
+      await editor.openProject(result.value.id);
+    } catch { setHandoffError('Could not create the editing copy. Check your project library before retrying.'); }
+    finally { setHandoffBusy(false); }
+  };
 
   // Lives here because both studios touch it: the image studio produces a still
   // and the video studio consumes it as an image-to-video seed.
@@ -297,6 +314,7 @@ export function App(): ReactElement {
   }, [editor.project?.id]);
 
   const selectWorkspaceTab = (tabId: WorkspaceTabId): void => {
+    if (editor.project?.projectType !== undefined && workspaceModeForTab(tabId) !== modeForProjectType(editor.project.projectType)) return;
     setWorkspaceTabId(tabId);
     if (isCreationTool(tabId)) setLastCreationTool(tabId);
     try {
@@ -420,13 +438,13 @@ export function App(): ReactElement {
               project={editor.project}
               projects={editor.projects}
               chats={chatHistory}
-              onOpenProject={async (projectId) => {
+              onOpenProject={async (projectId, mode) => {
                 const opened = await editor.openProject(projectId);
-                if (opened) navigateToPage('edit');
+                if (opened) { setWorkspaceTabId(WORKSPACE_EXPERIENCES[mode].entryTab); navigateToPage('edit'); }
               }}
-              onOpenProjectFolder={async () => {
-                const opened = await editor.openProjectFolder();
-                if (opened) navigateToPage('edit');
+              onOpenProjectFolder={async (mode) => {
+                const opened = await editor.openProjectFolder(projectTypeForMode(mode));
+                if (opened) { setWorkspaceTabId(WORKSPACE_EXPERIENCES[mode].entryTab); navigateToPage('edit'); }
               }}
               onOpenChat={openChatFromHistory}
               onRemoveProject={removeProject}
@@ -436,10 +454,14 @@ export function App(): ReactElement {
             />
           </section>
           <div className={`app-stack local-edit-bay${workspaceMode === 'create' ? ' local-edit-bay--create' : ''}`} hidden={!workspaceIsVisible}>
-            {/* Workspace switcher: the editor, Writer, and generation studios
-                share the area, so a generated clip lands on the timeline
-                without leaving the workspace or the agent chat beside it. */}
+            <header className={`workspace-identity workspace-identity--${workspaceMode}`}>
+              <span className="workspace-entrance__eyebrow">OPENSCENE / {workspaceMode === 'edit' ? 'EDIT' : 'CREATE'}</span>
+              <h1 id="project-workspace-title">{WORKSPACE_EXPERIENCES[workspaceMode].title}</h1>
+              <p>{WORKSPACE_EXPERIENCES[workspaceMode].description}</p>
+            </header>
+            {/* Only legacy mixed projects retain an in-project type switcher. */}
             <div className="workspace-tab-line">
+              {editor.project?.projectType === undefined ? <>
               <Tabs
                 activeTabId={workspaceMode}
                 idBase="workspace-mode"
@@ -448,6 +470,8 @@ export function App(): ReactElement {
                 className="workspace-tabs"
                 aria-label="Project workspace"
               />
+              <span className="workspace-mode-hint">Legacy mixed project · both workspaces preserved</span>
+              </> : <span className="workspace-project-type">{workspaceMode === 'edit' ? 'EDITING PROJECT · Timeline / Media / Export' : 'GENERATION PROJECT · Story / Frames / Shots / Voice'}</span>}
               <button
                 type="button"
                 className="workspace-settings-button"
@@ -464,12 +488,12 @@ export function App(): ReactElement {
                 <Tabs
                   activeTabId={workspaceTabId}
                   idBase="workspace"
-                  tabs={CREATION_TOOLS.map((id) => ({ id, label: WORKSPACE_TAB_LABELS[id] }))}
+                  tabs={(['writer', 'image', 'video', 'voice'] as const).map((id, index) => ({ id, label: `${index + 1}. ${WORKSPACE_TAB_LABELS[id]}` }))}
                   onActiveTabChange={selectWorkspaceTab}
                   className="workspace-tabs"
                   aria-label="AI creation tools"
                 />
-                <span className="workspace-mode-hint">Generate a clip directly, or start with Writer. Results belong to this project.</span>
+                <span className="workspace-mode-hint">Build your story, prepare frames, generate shots, then add a voice. You can start at any step.</span>
                 <details className="workspace-media-library">
                   <summary>Project media ({editor.project?.assets.length ?? 0})</summary>
                   <div className="workspace-media-library__list">
@@ -477,18 +501,19 @@ export function App(): ReactElement {
                     {editor.project?.assets.map((asset) => (
                       <div className="workspace-media-library__row" key={asset.id}>
                         <span>{asset.displayName}</span>
-                        <button type="button" className="button" disabled={editor.isBusy}
+                        {editor.project?.projectType === undefined && <button type="button" className="button" disabled={editor.isBusy}
                           onClick={() => {
                             if (editor.placeAssetOnTimeline(asset.id)) selectWorkspaceTab('edit');
-                          }}>Add & open editor</button>
+                          }}>Add & open editor</button>}
                       </div>
                     ))}
                   </div>
                 </details>
-                <button type="button" className="button" onClick={() => selectWorkspaceTab('edit')}>Open in editor</button>
+                <button type="button" className="button" disabled={handoffBusy || editor.isBusy || (editor.project?.assets.length ?? 0) === 0} onClick={() => void sendToEditing()}>{handoffBusy ? 'Copying media…' : editor.project?.projectType === undefined ? 'Open in editor' : 'Create editing project →'}</button>
+                {handoffError && <p role="alert">{handoffError}</p>}
               </div>
             )}
-            <div className="app-workspace-panel-stack" id={`workspace-mode-${workspaceMode}-panel`} role="tabpanel" aria-labelledby={`workspace-mode-${workspaceMode}-tab`}>
+            <div className="app-workspace-panel-stack" id={`workspace-mode-${workspaceMode}-panel`} role={editor.project?.projectType === undefined ? 'tabpanel' : 'region'} aria-labelledby={editor.project?.projectType === undefined ? `workspace-mode-${workspaceMode}-tab` : 'project-workspace-title'}>
               <section
                 aria-labelledby={EDIT_WORKSPACE.navId}
                 hidden={workspaceTabId !== 'edit' || activeWorkspaceId !== EDIT_WORKSPACE.id || !workspaceIsVisible}
@@ -557,7 +582,7 @@ export function App(): ReactElement {
                   onGenerateProductionImage={openProductionImageBrief}
                   onGenerateProductionImages={generateProductionImages}
                   onOpenImageResults={() => selectWorkspaceTab('image')}
-                  onOpenEditor={() => selectWorkspaceTab('edit')}
+                  onOpenEditor={() => void sendToEditing()}
                 />
               </section>
               <section
