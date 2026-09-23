@@ -572,6 +572,7 @@ export function App(): ReactElement {
                 tabIndex={-1}
               >
                 <VideoGenerationWorkspace
+                  active={workspaceTabId === 'video' && workspaceIsVisible}
                   writerDocument={editor.project?.ai ?? null}
                   onSaveAi={editor.saveAiProjectDocument}
                   projectId={editor.project?.id ?? null}

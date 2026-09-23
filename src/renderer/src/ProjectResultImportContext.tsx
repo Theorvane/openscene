@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactElement, type ReactNode } from 'react';
 
-import type { MediaAsset } from '../../shared/timelineTypes';
+import type { MediaAsset, TimelineDocument } from '../../shared/timelineTypes';
 import type { StatusMessage } from './appTypes';
 import type { TimelineEditorController } from './editor/useTimelineEditor';
 import type { AiResultImportStatus } from './editor/useProjectAssetImports';
@@ -14,6 +14,9 @@ type ProjectResultImportContextValue = {
   readonly activeProject: ActiveProjectSummary | null;
   /** Media in the open project, for surfaces that let the user point at a clip. */
   readonly assets: readonly MediaAsset[];
+  readonly timeline: TimelineDocument | null;
+  readonly hasUnsavedTimeline: boolean;
+  readonly saveTimeline: () => Promise<boolean>;
   readonly isImporting: boolean;
   readonly importRecordingResult: (sessionId: string) => Promise<StatusMessage>;
   readonly importAiResult: (jobId: string) => Promise<AiResultImportStatus>;
@@ -32,6 +35,9 @@ export function ProjectResultImportProvider({ children, editor }: ProjectResultI
   const value: ProjectResultImportContextValue = {
     activeProject: editor.project === null ? null : { id: editor.project.id, name: editor.project.name },
     assets: editor.project?.assets ?? [],
+    timeline: editor.project?.timeline ?? null,
+    hasUnsavedTimeline: editor.hasUnsavedTimeline,
+    saveTimeline: editor.saveTimeline,
     importRecordingResult: editor.importRecordingResult,
     importAiResult: editor.importAiResult,
     placeAiAssetOnTimeline: editor.placeAssetOnTimeline,

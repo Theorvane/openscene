@@ -703,6 +703,44 @@ button {
 
 /* Generation studios read like the chat panel: a compact header, a quiet body,
    and a composer pinned to the bottom where the action lives. */
+.prompt-production-editor { display: grid; grid-template-columns: minmax(330px, .85fr) minmax(300px, 1.15fr); grid-template-rows: minmax(0, 1fr) 230px; height: 100%; min-height: 0; gap: 12px; }
+.production-prompt-pane { min-height: 0; min-width: 0; overflow: hidden; }
+.production-prompt-pane > .studio-surface { grid-template-rows: auto auto minmax(0, 1fr); }
+.production-prompt-pane .studio-surface__header { grid-row: 1; flex-wrap: wrap; }
+.production-prompt-pane .studio-composer { grid-row: 2; max-height: 42vh; overflow: auto; }
+.production-prompt-pane .studio-surface__body { grid-row: 3; }
+.production-preview { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.production-preview header { padding: 16px; }
+.production-preview header span { font-size: 10px; letter-spacing: .12em; color: var(--text-weak); }
+.production-preview h2 { font-size: 16px; margin: 8px 0 0; overflow-wrap: anywhere; }
+.production-preview video { width: 100%; max-height: 45vh; min-height: 180px; background: #101216; }
+.production-preview audio { width: 100%; }
+.production-preview-empty { min-height: 180px; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--text-weak); background: var(--muted); }
+.production-selection-details { padding: 16px; }
+.production-selection-details p { white-space: pre-wrap; max-height: 110px; overflow: auto; font-size: 12px; color: var(--text-weak); }
+.production-preview-note { padding: 0 16px 12px; font-size: 11px; color: var(--text-weak); }
+.production-track-deck { grid-column: 1 / -1; min-width: 0; overflow: auto; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.production-track-deck > header { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 8px; }
+.production-track-deck > header span, .production-track-deck > small { color: var(--text-weak); font-size: 10px; }
+.production-track-row { display: grid; grid-template-columns: 65px minmax(0, 1fr); gap: 8px; margin-bottom: 6px; }
+.production-track-label { font-size: 11px; text-transform: capitalize; padding-top: 12px; }
+.production-track-items { display: flex; flex-wrap: wrap; gap: 6px; overflow: auto; padding: 2px; }
+.production-unplaced-label { flex-basis: 100%; color: var(--text-weak); font-size: 10px; }
+.production-track-item { flex: 0 0 155px; text-align: left; border: 1px solid var(--border); border-left: 3px solid #8e73c6; border-radius: 6px; background: var(--muted); color: var(--text); cursor: pointer; padding: 5px 8px; display: grid; gap: 3px; }
+.production-track-item--voice { border-left-color: #3b9f95; }.production-track-item--subtitles { border-left-color: #c18d43; }
+.production-track-item[aria-pressed="true"] { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.production-track-item span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+.production-track-item small { font-size: 9px; color: var(--text-weak); }
+.production-track-empty { color: var(--text-weak); font-size: 11px; margin: 10px 0; }
+.production-timed-lane { position: relative; flex: 0 0 100%; height: 52px; min-width: 400px; background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), var(--border) 10%); }
+.production-timed-lane > .production-track-item { position: absolute; top: 2px; bottom: 2px; min-width: 0; overflow: hidden; }
+.production-playhead { position: absolute; top: 0; bottom: 0; border-left: 2px solid var(--focus-ring); pointer-events: none; }
+.production-time-control { display: flex; align-items: center; gap: 12px; font-size: 11px; margin-bottom: 8px; }
+.production-time-control input { flex: 1; min-width: 40px; }
+.production-readiness { color: var(--text-weak); font-size: 11px; margin: 4px 0 8px; }
+.production-caption-inspection { padding: 10px 16px; font-size: 13px; background: var(--muted); }
+@media (max-width: 1000px) { .prompt-production-editor { grid-template-columns: 1fr; grid-template-rows: 560px auto auto; overflow: auto; }.production-track-deck { grid-column: 1; }.production-preview { min-height: 240px; } }
+
 .studio-surface {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
