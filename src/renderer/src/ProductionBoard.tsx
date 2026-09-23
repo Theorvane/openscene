@@ -219,6 +219,7 @@ export function ProductionBoard({
       </ol>
 
       {!assembly.ok && <StatusCard tone="neutral">Assembly blocked: {assembly.reason}</StatusCard>}
+      {assembly.ok && <StatusCard tone="neutral">Film sequence: {assembly.shots.length} shots · {(assembly.totalDurationMs / 1000).toFixed(1)}s in script order. Extra generated footage is trimmed without changing the original files; short takes must be replaced or the plan revised.</StatusCard>}
       <div className="production-board__actions">
         <Button variant="default" disabled={busy || saving || batchBusy || missingCharacterTargets.length === 0}
           onClick={() => void runImages(missingCharacterTargets)}>
