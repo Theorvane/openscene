@@ -1,6 +1,8 @@
 # Prompt-led production editor
 
-Desktop generation now uses a left prompt/settings pane, a right selected-source preview, and a lower Video / Voice / Subtitles plan navigator. Mobile uses the same selection model in a vertically stacked preview/navigator above the composer. Selection alone does not overwrite a prompt or spend money. Edit selected prompt is explicit, confirms replacement of non-empty text, and retains the existing generation and approval flow.
+Desktop creation uses one Production studio: Story, Scenes, and Voice & captions are internal stages, with Video takes and Reference frames nested inside Scenes. The left pane changes tools while the right selected-source preview and lower Video / Voice / Subtitles navigator remain mounted. Drafts and jobs remain in their existing controllers. Loading a selected shot or saved prompt explicitly opens Video takes and confirms replacement of non-empty text.
+
+Mobile has one Studio entrance alongside AI and Library. It uses the same stage grouping and evidence-based status labels, retaining visited tool screens and drafts. To fit the phone screen, source preview and the sequence navigator remain in Video takes rather than occupying every stage. Existing editing-project navigation is unchanged. Persisted tool ids, generation consent and review gates are unchanged; entering a stage never marks it complete or starts generation.
 
 Approved Writer shots supply planned start times. Completed approved candidates are preferred, then unreviewed completed candidates; rejected takes are not selected for a shot. Stored recipe history provides unplaced takes and their original prompts. Audio without placement is labelled unplaced. Narration cue times appear as planned captions, not burned-in subtitles. Missing media retains prompt inspection.
 

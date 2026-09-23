@@ -13,6 +13,7 @@ import { ImageScreen } from './src/screens/ImageScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
 import { AdBanner } from './src/components/AdBanner';
 import { PlanScreen } from './src/screens/PlanScreen';
+import { CreationStageNav } from './src/components/CreationStageNav';
 import { ProjectsScreen } from './src/screens/ProjectsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { VoiceScreen } from './src/screens/VoiceScreen';
@@ -386,6 +387,7 @@ function Shell() {
           <Text style={styles.tabOn}>{project?.projectType === undefined ? 'Open in editor →' : 'Create editing project →'}</Text>
         </Pressable>
       )}
+      {workspaceMode === 'create' && isCreationTool(tab) && <CreationStageNav tool={tab} onSelect={selectTab} document={project?.ai} assets={project?.assets ?? []} />}
       <View key={route.projectId} style={styles.body} onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}>
         <RetainedScreen active={tab === 'edit'}><EditScreen active={tab === 'edit'} topInset={0} projectId={route.projectId} /></RetainedScreen>
         <RetainedScreen active={tab === 'writer'}>
@@ -414,21 +416,23 @@ function Shell() {
       <AdBanner />
 
       <View accessibilityRole="tablist" style={[styles.tabBar, { paddingBottom: insets.bottom, height: 60 + insets.bottom }]}>
-        {PROJECT_TABS.filter(({ id }) => isTabInWorkspace(id, workspaceMode)).map(({ id, label, Icon }) => {
-          const selected = id === tab;
+        {PROJECT_TABS.filter(({ id }) => isTabInWorkspace(id, workspaceMode) && (workspaceMode !== 'create' || !isCreationTool(id) || id === 'video')).map(({ id, label, Icon }) => {
+          const studio = workspaceMode === 'create' && id === 'video';
+          const selected = studio ? isCreationTool(tab) : id === tab;
+          const title = studio ? 'Studio' : label;
           return (
             <Pressable
               key={id}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
-              accessibilityLabel={label}
-              onPress={() => selectTab(id)}
+              accessibilityLabel={title}
+              onPress={() => selectTab(studio ? lastCreationTool : id)}
               style={press(styles.tab)}
             >
               <View style={[styles.tabIcon, selected && styles.tabIconOn]}>
                 <Icon size={19} color={selected ? theme.accent : theme.textWeaker} />
               </View>
-              <Text style={[styles.tabLabel, selected && styles.tabOn]}>{label}</Text>
+              <Text style={[styles.tabLabel, selected && styles.tabOn]}>{title}</Text>
             </Pressable>
           );
         })}

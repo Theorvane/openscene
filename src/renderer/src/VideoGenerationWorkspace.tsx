@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
   CONTINUITY_REVIEW_FIELDS,
   type AiProjectDocument,
@@ -109,6 +109,9 @@ type VideoInputSnapshot = {
   readonly motionMode?: MotionControlMode;
 };
 type VideoGenerationWorkspaceProps = {
+  readonly tools?: ReactNode;
+  readonly toolActive?: boolean;
+  readonly onActivateVideo?: () => void;
   readonly active?: boolean;
   readonly writerDocument?: AiProjectDocument | null;
   readonly projectId?: string | null;
@@ -142,6 +145,9 @@ function showGoogleFlowWindow(): boolean {
 }
 
 export function VideoGenerationWorkspace({
+  tools,
+  toolActive = true,
+  onActivateVideo,
   active = true,
   writerDocument,
   onSaveAi,
@@ -1066,6 +1072,7 @@ export function VideoGenerationWorkspace({
       active={active} busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
       onLoad={item => {
         if (prompt.trim() && !window.confirm('Replace the current prompt with this selection? Generated media stays unchanged.')) return;
+        onActivateVideo?.();
         if (item.shotId) { void openProductionShot(item.shotId); return; }
         const recipe = writerDocument?.videoHistory?.find(entry => entry.id === item.recipeId);
         if (!recipe) return;
@@ -1074,7 +1081,8 @@ export function VideoGenerationWorkspace({
         onReferenceImageChange(null); setLastFrame(null); setReferenceImages([]); setDrivingVideoAssetId('');
         setStatusMsg({ tone: 'neutral', text: 'Saved prompt loaded. Reselect model, duration and reference inputs before generating a new take.' });
       }}>
-    <section className="studio-surface" aria-labelledby="video-generation-title">
+    {tools}
+    <section hidden={!toolActive} className="studio-surface" aria-labelledby="video-generation-title">
       <header className="studio-surface__header">
         <div className="studio-surface__title">
           <h2 className="studio-surface__title-label" id="video-generation-title">Video Generation</h2>
