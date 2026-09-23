@@ -770,6 +770,100 @@ button {
 .production-caption-inspection { padding: 10px 16px; font-size: 13px; background: var(--muted); }
 @media (max-width: 1000px) { .prompt-production-editor { grid-template-columns: 1fr; grid-template-rows: 560px auto auto; overflow: auto; }.production-track-deck { grid-column: 1; }.production-preview { min-height: 240px; } }
 
+/* One app-wide professional palette. Stored alternate presets remain available. */
+:root[data-preset="obsidian-pro"][data-theme="dark"] {
+  color-scheme: dark;
+  --background: #191c22; --foreground: #e7ebf2;
+  --card: #22262e; --card-foreground: #e7ebf2;
+  --popover: #2b303a; --popover-foreground: #e7ebf2;
+  --primary: #78a9ff; --primary-foreground: #101b30;
+  --secondary: #303641; --secondary-foreground: #e7ebf2;
+  --muted: #292e38; --muted-foreground: #abb4c3;
+  --accent: #78a9ff; --accent-foreground: #101b30;
+  --destructive: #ff858d; --success: #69d5b0; --warning: #e8bb73; --info: #8cbcff;
+  --border: #363d49; --border-strong: #515d70; --input: #1b1f26; --ring: #9cbfff;
+  --text: #e7ebf2; --text-strong: #e7ebf2; --text-weak: #abb4c3; --text-weaker: #929eb0;
+  --color-obsidian: #191c22; --color-obsidian-2: #292e38;
+  --color-panel: #22262e; --color-panel-soft: #22262e; --color-panel-strong: #2b303a;
+  --color-line: #363d49; --color-line-strong: #515d70;
+  --color-text: #e7ebf2; --color-muted: #abb4c3; --color-faint: #929eb0;
+  --color-primary: #78a9ff; --color-danger: #ff858d; --color-success: #69d5b0; --color-warning: #e8bb73;
+  --surface-control: #292e38; --surface-control-hover: #363e4c; --surface-control-selected: #2c4164;
+  --surface-hover: #2c3340; --surface-active: #354054;
+  --surface-inset: #1b1f26; --surface-inset-strong: #171a20;
+  --surface-raised: #2b303a; --surface-raised-soft: #272c35;
+  --surface-rule: #363d49; --surface-rule-strong: #515d70;
+  --line-subtle: #363d49; --line-control: #515d70; --line-selected: #9cbfff;
+  --focus-ring: #9cbfff; --focus-shadow: #304870;
+  --shadow-inset-rule: inset 0 1px 0 #ffffff08;
+}
+.local-edit-bay--create { color: var(--foreground); background: var(--background); padding: 6px; }
+:root { --radius-xs: 3px; --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; }
+.button { border-radius: var(--radius-sm); box-shadow: none; }
+.local-edit-bay--create input, .local-edit-bay--create textarea, .local-edit-bay--create select { background-color: var(--input); color: var(--foreground); border-color: var(--border-strong); }
+.local-edit-bay--create input::placeholder, .local-edit-bay--create textarea::placeholder { color: var(--text-weaker); }
+.local-edit-bay--create .button { border-radius: 4px; box-shadow: none; }
+.local-edit-bay--create .production-plan-composer > .button:not(:disabled) { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); font-weight: 600; }
+.local-edit-bay--create .production-plan-review { padding: 12px; border: 1px solid var(--border); background: var(--surface-inset); border-radius: 4px; }
+.local-edit-bay--create .production-plan-review details { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.local-edit-bay--create .production-companions { margin: 0 12px 12px; padding: 12px; background: var(--muted); border-radius: 4px; font-size: 12px; }
+.local-edit-bay--create .production-board { padding: 12px; }
+.local-edit-bay--create .production-board__shot { border-radius: 4px; }
+.local-edit-bay--create .workspace-identity { padding: 8px 12px; display: flex; align-items: center; gap: 16px; border-left: 0; border-bottom: 1px solid var(--border); }
+.local-edit-bay--create .workspace-identity h1 { font-size: 14px; margin: 0; }
+.local-edit-bay--create .workspace-identity p { display: none; }
+.local-edit-bay--create .workspace-identity .workspace-entrance__eyebrow { font-size: 9px; }
+.local-edit-bay--create .workspace-creation-tools { gap: 8px; padding: 4px 0; }
+.local-edit-bay--create .production-advanced-tools { flex-basis: auto; }
+.local-edit-bay--create .workspace-tab-line { min-height: 28px; }
+.pro-production-editor { grid-template-columns: minmax(300px, .65fr) minmax(320px, 1.35fr); grid-template-rows: 36px minmax(0, 1fr) minmax(210px, 28%); gap: 4px; background: var(--border); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.production-workbench-bar { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--card); padding: 0 10px; font-size: 11px; }
+.production-workbench-bar > div { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.production-workbench-bar strong { font-size: 10px; letter-spacing: .12em; }
+.production-workbench-bar span { color: var(--text-weak); font-variant-numeric: tabular-nums; }
+.production-workbench-divider { height: 16px; border-left: 1px solid var(--border); }
+.production-workbench-bar button { background: transparent; color: var(--text); border: 1px solid transparent; border-radius: 3px; padding: 5px 8px; cursor: pointer; white-space: nowrap; }
+.production-workbench-bar button[aria-pressed="true"] { background: var(--muted); border-color: var(--border-strong); }
+.production-workbench-bar button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.pro-production-editor .production-prompt-pane { background: var(--card); gap: 0; }
+.production-panel-caption { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 10px; font-weight: 600; letter-spacing: .08em; }
+.production-panel-caption span { color: var(--text-weak); font-weight: 400; letter-spacing: 0; }
+.pro-production-editor .production-director-toolbar { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 11px; flex-wrap: wrap; }
+.pro-production-editor .production-plan-composer { gap: 10px; }
+.pro-production-editor .production-plan-composer h2 { font-size: 18px; letter-spacing: -.02em; }
+.pro-production-editor .production-plan-composer header p { font-size: 11px; line-height: 1.6; color: var(--text-weak); }
+.pro-production-editor .production-plan-composer .section-kicker { font-size: 9px; }
+.pro-production-editor .production-preview { border: 0; border-radius: 0; background: var(--card); }
+.pro-production-editor .production-preview header { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.pro-production-editor .production-preview h2 { font-size: 13px; margin-top: 6px; }
+.production-monitor-badge { font-size: 9px; font-weight: 400; letter-spacing: 0; padding: 2px 6px; border: 1px solid var(--border); border-radius: 3px; margin-left: 8px; color: var(--text-weak); }
+.production-monitor-stage { flex: 1; min-height: 180px; background: #17191c; display: grid; place-items: center; overflow: hidden; }
+.production-monitor-stage .production-preview-empty { background: transparent; color: #aab1bd; font-size: 12px; min-height: 180px; max-width: 440px; }
+.production-monitor-stage video { height: 100%; max-height: 45vh; object-fit: contain; background: transparent; }
+.production-monitor-status { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding: 8px 12px; font-size: 10px; border-bottom: 1px solid var(--border); }
+.production-monitor-status output { font-variant-numeric: tabular-nums; font-family: monospace; }
+.pro-production-editor .production-selection-details { padding: 10px 14px; }
+.pro-production-editor .production-selection-details > strong { font-size: 9px; color: var(--text-weak); letter-spacing: .1em; }
+.pro-production-editor .production-selection-details p { max-height: 64px; line-height: 1.6; }
+.pro-production-editor .production-preview-note { font-size: 10px; margin: 0; padding: 8px 14px; border-top: 1px solid var(--border); }
+.pro-production-editor .production-track-deck { border: 0; border-radius: 0; padding: 10px 12px; }
+.pro-production-editor .production-track-deck > header { align-items: center; }
+.pro-production-editor .production-track-deck > .button { float: right; font-size: 10px; padding: 4px 8px; min-height: 26px; }
+.pro-production-editor .production-track-row { grid-template-columns: 86px minmax(0, 1fr); gap: 4px; }
+.production-track-code { display: inline-block; padding: 3px; margin-right: 5px; font-size: 9px; border: 1px solid var(--border); border-radius: 2px; color: var(--text-weak); }
+.pro-production-editor .production-track-label { font-size: 10px; }
+.pro-production-editor .production-track-item { border-radius: 3px; border-left-color: #837be0; background: color-mix(in srgb, #837be0 12%, var(--card)); }
+.pro-production-editor .production-track-item--voice { border-left-color: #32a89b; background: color-mix(in srgb, #32a89b 12%, var(--card)); }
+.pro-production-editor .production-track-item--subtitles { border-left-color: #bd934e; background: color-mix(in srgb, #bd934e 12%, var(--card)); }
+.production-ruler { margin-left: 92px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 0 0 5px; color: var(--text-weak); font: 9px monospace; }
+.pro-production-editor--focus { grid-template-columns: minmax(0, 1fr); }
+.pro-production-editor [hidden] { display: none !important; }
+@media (max-width: 1000px) {
+  .pro-production-editor { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(480px, auto) minmax(360px, auto) auto; overflow: auto; }
+  .production-workbench-bar { min-height: 40px; flex-wrap: wrap; padding: 8px; }
+  .pro-production-editor--focus { grid-template-rows: auto minmax(400px, auto) auto; }
+}
+
 .studio-surface {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;

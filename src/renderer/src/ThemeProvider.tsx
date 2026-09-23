@@ -52,12 +52,12 @@ function getStoredThemePreference(): ThemePreference {
 }
 
 function getStoredThemePreset(defaultMode: ThemeMode): ThemePresetId {
-  if (typeof window === 'undefined') return defaultMode === 'light' ? 'daylight-glass' : 'dark-zinc';
+  if (typeof window === 'undefined') return 'obsidian-pro';
 
   try {
     return parseThemePreset(window.localStorage.getItem(THEME_PRESET_STORAGE_KEY), defaultMode);
   } catch (error) {
-    if (isDomStorageError(error)) return defaultMode === 'light' ? 'daylight-glass' : 'dark-zinc';
+    if (isDomStorageError(error)) return 'obsidian-pro';
     throw error;
   }
 }

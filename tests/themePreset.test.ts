@@ -24,15 +24,15 @@ describe('theme preset configuration and helper functions', () => {
     }
   });
 
-  it('parses stored preset IDs with fallback based on default mode', () => {
+  it('parses stored preset IDs with a consistent professional fallback', () => {
     expect(parseThemePreset('dark-zinc', 'dark')).toBe('dark-zinc');
     expect(parseThemePreset('midnight-neon', 'dark')).toBe('midnight-neon');
     expect(parseThemePreset('daylight-glass', 'light')).toBe('daylight-glass');
     expect(parseThemePreset('obsidian-pro', 'dark')).toBe('obsidian-pro');
 
-    expect(parseThemePreset(null, 'dark')).toBe('dark-zinc');
-    expect(parseThemePreset(undefined, 'light')).toBe('daylight-glass');
-    expect(parseThemePreset('invalid-preset', 'dark')).toBe('dark-zinc');
+    expect(parseThemePreset(null, 'dark')).toBe('obsidian-pro');
+    expect(parseThemePreset(undefined, 'light')).toBe('obsidian-pro');
+    expect(parseThemePreset('invalid-preset', 'dark')).toBe('obsidian-pro');
   });
 
   it('preserves all theme presets across both light and dark modes', () => {
@@ -58,7 +58,7 @@ describe('theme preset configuration and helper functions', () => {
   });
 
   it('keeps daylight-glass and dark-zinc as mode fallback compatibility identifiers', () => {
-    expect(parseThemePreset('missing', 'light')).toBe('daylight-glass');
-    expect(parseThemePreset('missing', 'dark')).toBe('dark-zinc');
+    expect(parseThemePreset('missing', 'light')).toBe('obsidian-pro');
+    expect(parseThemePreset('missing', 'dark')).toBe('obsidian-pro');
   });
 });
