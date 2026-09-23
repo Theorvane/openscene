@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { nextVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
 import { clipDurationMs, clipTimelineEndMs } from '@openvideo/shared/timelineClipGeometry';
+import { snapTimelinePosition } from '@openvideo/shared/timelineSnapping';
 import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
 import { DEFAULT_SUBTITLE_DELIVERY } from '@openvideo/shared/subtitleDelivery';
 import { metadataPrivacyPlan } from '@openvideo/shared/metadataPrivacy';
@@ -155,6 +156,7 @@ export function EditScreen({
   });
 
   const [pxPerSecond, setPxPerSecond] = useState(28);
+  const [snappingEnabled, setSnappingEnabled] = useState(true);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [storedAssets, setStoredAssets] = useState<readonly MobileAsset[]>([]);
   const [playing, setPlaying] = useState(false);
@@ -550,6 +552,7 @@ export function EditScreen({
         contentContainerStyle={styles.toolbar}
       >
         <Tool label="Import" onPress={() => void importMedia()} disabled={projectId === null} />
+        <Tool label={snappingEnabled ? 'Snap: On' : 'Snap: Off'} onPress={() => setSnappingEnabled((value) => !value)} hint="Align clip edges with other clips and the playhead" />
         <Tool label="Split" onPress={editor.splitAtPlayhead} disabled={selected === null} />
         <Tool label="Adjust" onPress={() => setInspecting((open) => !open)} disabled={selected === null} />
         {selectedAsset?.kind === 'video' && (
@@ -709,8 +712,15 @@ export function EditScreen({
                     assetUri={editor.assetFor(clip.assetId)?.uri ?? null}
                     still={editor.assetFor(clip.assetId)?.kind === 'image'}
                     onSelect={() => editor.setSelectedClipId(clip.id)}
-                    onMove={(startMs) => editor.moveClipTo(clip.id, track.id, startMs)}
-                    onTrim={(edge, atMs) => editor.trimClipTo(clip.id, edge, atMs)}
+                    onMove={(startMs) => editor.moveClipTo(clip.id, track.id, snapTimelinePosition({
+                      timeline: editor.timeline, positionMs: startMs, pixelsPerMs: pxPerMs,
+                      playheadMs: editor.playheadMs, enabled: snappingEnabled,
+                      excludeClipId: clip.id, movingDurationMs: clipDurationMs(clip)
+                    }))}
+                    onTrim={(edge, atMs) => editor.trimClipTo(clip.id, edge, snapTimelinePosition({
+                      timeline: editor.timeline, positionMs: atMs, pixelsPerMs: pxPerMs,
+                      playheadMs: editor.playheadMs, enabled: snappingEnabled, excludeClipId: clip.id
+                    }))}
                     scrollGesture={laneScroll}
                     onDragStateChange={setDragging}
                   />
