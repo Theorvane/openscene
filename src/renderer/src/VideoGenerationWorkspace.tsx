@@ -44,6 +44,7 @@ import { ProductionMemoryPanel } from './ProductionMemoryPanel';
 import { recordVideoRecipe } from '../../shared/videoRecipeHistory';
 import { VideoRecipeHistory } from './VideoRecipeHistory';
 import { PromptProductionLayout } from './PromptProductionLayout';
+import { ProductionPlanComposer } from './ProductionPlanComposer';
 import type { ComfyUiMotionWorkerStatus, MotionControlMode } from '../../shared/comfyUiMotion';
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
@@ -174,6 +175,7 @@ export function VideoGenerationWorkspace({
   const [flowSession, setFlowSession] = useState<BrowserSessionStatus | null>(null);
   const { importAiResult, placeAiAssetOnTimeline, assembleApprovedWriterShots } = useProjectResultImport();
   const [prompt, setPrompt] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [recipeParentId, setRecipeParentId] = useState<string | undefined>();
   const recipeParents = useRef(new Map<string, string>());
   const importingRecipes = useRef(new Set<string>());
@@ -714,24 +716,24 @@ export function VideoGenerationWorkspace({
     }
   };
 
-  const handleImportToProject = async (job: VideoGenerationJob, openEditor = false): Promise<void> => {
-    if (job.status !== 'completed') return;
-    if (!projectId || activeProjectIdRef.current !== projectId || importingRecipes.current.has(job.id)) return;
+  const handleImportToProject = async (job: VideoGenerationJob, openEditor = false): Promise<boolean> => {
+    if (job.status !== 'completed') return false;
+    if (!projectId || activeProjectIdRef.current !== projectId || importingRecipes.current.has(job.id)) return false;
     if (documentRef.current?.videoHistory?.some(recipe => recipe.id === job.id)) {
       if (openEditor) onOpenEditor?.();
-      return;
+      return true;
     }
     importingRecipes.current.add(job.id);
     try {
       const status = await importAiResult(job.id);
-      if (activeProjectIdRef.current !== projectId) return;
+      if (activeProjectIdRef.current !== projectId) return false;
       setStatusMsg(status);
       if (status.importedAssetId !== undefined) {
         const parentId = recipeParents.current.get(job.id);
         const saved = await persistCandidateChange(document => {
           if (activeProjectIdRef.current !== projectId) return { ok: false, reason: 'Project changed before history could be saved.' };
           const candidate = document.generations.some(entry => entry.id === job.id)
-            ? updateGenerationCandidate(document, job.id, { outputAssetIds: [status.importedAssetId!], updatedAt: new Date().toISOString() })
+            ? updateGenerationCandidate(document, job.id, { status: 'completed', outputAssetIds: [status.importedAssetId!], updatedAt: new Date().toISOString() })
             : { ok: true as const, document };
           if (!candidate.ok) return candidate;
           return { ok: true, document: recordVideoRecipe(candidate.document, {
@@ -742,12 +744,14 @@ export function VideoGenerationWorkspace({
             ...(parentId === undefined ? {} : { parentId })
           }) };
         });
-        if (!saved) { setStatusMsg({ tone: 'warning', text: 'Video imported, but prompt history was not saved. Retry Import to project before closing.' }); return; }
+        if (!saved) { setStatusMsg({ tone: 'warning', text: 'Video imported, but prompt history was not saved. Retry Import to project before closing.' }); return false; }
         setStatusMsg({ tone: 'success', text: 'Video and exact prompt saved to this project. Original timeline unchanged.' });
       }
       if (openEditor && status.importedAssetId !== undefined && activeProjectIdRef.current === projectId) onOpenEditor?.();
+      return status.importedAssetId !== undefined;
     } catch (err) {
       setStatusMsg({ text: `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`, tone: 'danger' });
+      return false;
     } finally {
       importingRecipes.current.delete(job.id);
     }
@@ -957,6 +961,7 @@ export function VideoGenerationWorkspace({
 
   const generateProductionVideoBatch = async (): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
     if (isBatchGenerating || isGenerating) return { tone: 'warning', text: 'Another video generation job is already running.' };
+    const approvedPlan = JSON.stringify(documentRef.current?.writerPipeline);
     const plan = await prepareProductionVideoBatch();
     if (plan.items.length === 0) {
       return { tone: 'neutral', text: plan.skipped[0] ?? 'No not-started or failed production shots need a new candidate.' };
@@ -981,6 +986,10 @@ export function VideoGenerationWorkspace({
     let attempted = 0;
     try {
       for (const [index, item] of plan.items.entries()) {
+        if (activeProjectIdRef.current !== projectId || JSON.stringify(documentRef.current?.writerPipeline) !== approvedPlan) {
+          failed += 1;
+          break;
+        }
         setStatusMsg({ tone: 'neutral', text: `Production video ${index + 1}/${plan.items.length}: ${item.label}.` });
         const job = await handleGenerate({
           prompt: item.prompt,
@@ -997,14 +1006,25 @@ export function VideoGenerationWorkspace({
         if (job === null) {
           attempted += 1;
           failed += 1;
-          continue;
+          break;
         }
         attempted += 1;
+        if (!documentRef.current?.generations.some(candidate => candidate.id === job.id)) {
+          failed += 1;
+          break;
+        }
         const terminal = await waitForVideoTerminal(job.id);
-        if (terminal === 'completed') completed += 1;
+        if (terminal === 'completed') {
+          const result = await window.videoTool.aiGetVideoJob(job.id);
+          if (!result.ok || !result.value || !await handleImportToProject(result.value)) {
+            failed += 1;
+            break;
+          }
+          completed += 1;
+        }
         else {
           failed += 1;
-          if (terminal === 'needs_user_action' || terminal === 'timeout') break;
+          break;
         }
       }
     } finally {
@@ -1073,6 +1093,7 @@ export function VideoGenerationWorkspace({
       onLoad={item => {
         if (prompt.trim() && !window.confirm('Replace the current prompt with this selection? Generated media stays unchanged.')) return;
         onActivateVideo?.();
+        setShowAdvanced(true);
         if (item.shotId) { void openProductionShot(item.shotId); return; }
         const recipe = writerDocument?.videoHistory?.find(entry => entry.id === item.recipeId);
         if (!recipe) return;
@@ -1082,7 +1103,25 @@ export function VideoGenerationWorkspace({
         setStatusMsg({ tone: 'neutral', text: 'Saved prompt loaded. Reselect model, duration and reference inputs before generating a new take.' });
       }}>
     {tools}
-    <section hidden={!toolActive} className="studio-surface" aria-labelledby="video-generation-title">
+    {toolActive && <div className="production-director-toolbar"><strong>Production</strong><button className="button" onClick={() => setShowAdvanced(value => !value)}>{showAdvanced ? 'Back to production plan' : 'Advanced generation settings'}</button></div>}
+    <div className="production-director" hidden={!toolActive || showAdvanced}>
+      {writerDocument && onSaveAi && <ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} />}
+        {writerDocument !== null && writerDocument !== undefined && onSaveAi !== undefined && projectId !== null && projectId !== undefined &&
+          <ProductionBoard
+            document={writerDocument}
+            assets={projectAssets}
+            busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
+            onSave={onSaveAi}
+            onOpenShot={async id => { setShowAdvanced(true); await openProductionShot(id); }}
+            onGenerateCharacterImage={(characterId) => onGenerateProductionImage({ kind: 'character_reference', characterId })}
+            onGenerateStoryboardImage={(shotId) => onGenerateProductionImage({ kind: 'storyboard', shotId }, effectiveAspectRatio)}
+            onGenerateImages={(targets) => onGenerateProductionImages(targets, effectiveAspectRatio)}
+            onOpenImageResults={onOpenImageResults}
+            onGenerateVideoBatch={generateProductionVideoBatch}
+            onAssemble={assembleApprovedWriterShots}
+          />}
+    </div>
+    <section hidden={!toolActive || !showAdvanced} className="studio-surface" aria-labelledby="video-generation-title">
       <header className="studio-surface__header">
         <div className="studio-surface__title">
           <h2 className="studio-surface__title-label" id="video-generation-title">Video Generation</h2>
@@ -1103,20 +1142,6 @@ export function VideoGenerationWorkspace({
       </header>
 
       <div className="studio-surface__body">
-        {writerDocument !== null && writerDocument !== undefined && onSaveAi !== undefined && projectId !== null && projectId !== undefined &&
-          <ProductionBoard
-            document={writerDocument}
-            assets={projectAssets}
-            busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
-            onSave={onSaveAi}
-            onOpenShot={openProductionShot}
-            onGenerateCharacterImage={(characterId) => onGenerateProductionImage({ kind: 'character_reference', characterId })}
-            onGenerateStoryboardImage={(shotId) => onGenerateProductionImage({ kind: 'storyboard', shotId }, effectiveAspectRatio)}
-            onGenerateImages={(targets) => onGenerateProductionImages(targets, effectiveAspectRatio)}
-            onOpenImageResults={onOpenImageResults}
-            onGenerateVideoBatch={generateProductionVideoBatch}
-            onAssemble={assembleApprovedWriterShots}
-          />}
         {browserSessionSupported && (
           <div className="studio-field">
             <span className="studio-field__label">Connection</span>

@@ -1,5 +1,15 @@
 # Prompt-led production editor
 
+## Guided production
+
+The default desktop video entry starts with one production brief, target duration and dialogue language. One writing-model request proposes a complete screenplay, scene breakdown and shot-prompt package. The package is saved unapproved in the existing Writer contract. Users inspect the displayed documents, then explicitly approve the entire package to prepare production shots. A changed brief, incomplete package or duration mismatch blocks approval. Planning confirmation warns about writing-model charges; plan approval never authorizes media spend.
+
+The production board then prices a sequential video batch. Completed videos are imported automatically with their exact prompts and remain unapproved. Import failure or a changed plan stops further submissions. Continuity review and assembly remain explicit; desktop arrangement saving and final export are separate actions. Individual settings, Writer stages, frame tools and voice tools remain available as advanced controls.
+
+Mobile uses the same plan proposal/approval rules and adds a priced text-to-video batch over eligible approved shots, persisted candidate review and approved-cut assembly. It refuses incompatible durations or required image references instead of dropping constraints. Reference-driven batches remain on desktop; mobile displays the reason. Both surfaces retain existing images and videos when a planning draft is revised.
+
+This is a guided shot-production workflow, not an unattended all-media renderer. Image generation/reference assignment, voice synthesis and final export are still separate explicit operations. Queues do not silently resume paid submissions after restart; existing queued/completed candidates prevent duplicate submissions. Actual provider output and native mobile execution require device/provider validation.
+
 Desktop creation uses one Production studio: Story, Scenes, and Voice & captions are internal stages, with Video takes and Reference frames nested inside Scenes. The left pane changes tools while the right selected-source preview and lower Video / Voice / Subtitles navigator remain mounted. Drafts and jobs remain in their existing controllers. Loading a selected shot or saved prompt explicitly opens Video takes and confirms replacement of non-empty text.
 
 Mobile has one Studio entrance alongside AI and Library. It uses the same stage grouping and evidence-based status labels, retaining visited tool screens and drafts. To fit the phone screen, source preview and the sequence navigator remain in Video takes rather than occupying every stage. Existing editing-project navigation is unchanged. Persisted tool ids, generation consent and review gates are unchanged; entering a stage never marks it complete or starts generation.

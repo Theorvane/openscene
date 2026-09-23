@@ -107,7 +107,7 @@ export function ProductionBoard({
       <header className="production-board__header">
         <div>
           <h3 id="production-board-title">Storyboard production board</h3>
-          <p>Map existing images, edit a brief, or start a provider job here. Batch queues run one target at a time and never approve or attach a result automatically. Current video modes send either the storyboard first frame or the character-reference set, not both.</p>
+          <p>Approve a plan, review generation cost, then run shots sequentially. Completed batch videos are saved with their exact prompts and wait for your continuity review before assembly. Image references are assigned explicitly. Current video modes send either the storyboard first frame or the character-reference set, not both.</p>
         </div>
         <StatusCard tone={assembly.ok ? 'success' : 'neutral'}>{rows.filter((row) => row.state === 'approved').length}/{rows.length} shots approved</StatusCard>
       </header>
@@ -238,7 +238,7 @@ export function ProductionBoard({
             ? `Placed ${rows.length} approved shots on the timeline in Writer order. Save and review the cut before export.`
             : 'The cut was not assembled. Check the Editing status for the exact conflict.' });
         }}>Assemble approved shots on timeline</Button>
-        <span>Generation requires confirmation; approval, attachment, replacement and export stay manual.</span>
+        <span>Video results are saved automatically. Continuity approval, image-reference assignment, assembly and export remain explicit.</span>
       </div>
     </section>
   );
