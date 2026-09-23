@@ -8,6 +8,28 @@ export type ProductionEditorItem = {
   readonly assetId?: string; readonly shotId?: string; readonly recipeId?: string; readonly status: string;
 };
 export const PRODUCTION_LANES = ['video', 'voice', 'subtitles'] as const;
+export function isTimedProductionItem(item: ProductionEditorItem): boolean {
+  return item.startMs !== undefined && Number.isFinite(item.startMs) && item.startMs >= 0 &&
+    item.durationMs !== undefined && Number.isFinite(item.durationMs) && item.durationMs > 0;
+}
+export function productionPlanDuration(items: readonly ProductionEditorItem[]): number {
+  return items.reduce((end, item) => isTimedProductionItem(item) ? Math.max(end, item.startMs! + item.durationMs!) : end, 0);
+}
+/** Half-open intervals avoid selecting both neighboring shots at a cut. */
+export function inspectProductionTime(items: readonly ProductionEditorItem[], requestedMs: number) {
+  const durationMs = productionPlanDuration(items);
+  const timeMs = Math.max(0, Math.min(durationMs, Number.isFinite(requestedMs) ? requestedMs : 0));
+  const matches = items.filter(item => isTimedProductionItem(item) && item.startMs! <= timeMs && timeMs < item.startMs! + item.durationMs!);
+  const video = matches.find(item => item.lane === 'video');
+  return { timeMs, durationMs, video, sourceOffsetMs: video ? timeMs - video.startMs! : 0,
+    captions: matches.filter(item => item.lane === 'subtitles') };
+}
+export function productionReadiness(items: readonly ProductionEditorItem[]) {
+  const shots = items.filter(item => item.shotId !== undefined);
+  return { total: shots.length, missing: shots.filter(item => !item.assetId).length,
+    review: shots.filter(item => item.assetId && item.status !== 'Approved take').length,
+    approved: shots.filter(item => item.assetId && item.status === 'Approved take').length };
+}
 /** A read-only plan navigator, never a claim that unplaced assets are synchronized. */
 export function productionEditorItems(document: AiProjectDocument, assets: readonly ProductionEditorAsset[]): readonly ProductionEditorItem[] {
   const items: ProductionEditorItem[] = [];

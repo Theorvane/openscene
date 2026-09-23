@@ -1,9 +1,15 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AiProjectDocument } from '../../shared/aiProjectDomain';
-import { PRODUCTION_LANES, productionEditorItems, type ProductionEditorAsset, type ProductionEditorItem } from '../../shared/productionEditor';
+import { PRODUCTION_LANES, inspectProductionTime, isTimedProductionItem, productionPlanDuration, productionReadiness, productionEditorItems, type ProductionEditorAsset, type ProductionEditorItem } from '../../shared/productionEditor';
 
-function MediaPreview({ projectId, item, kind }: { projectId: string; item: ProductionEditorItem; kind: string | undefined }) {
+function MediaPreview({ projectId, item, kind, offsetMs }: { projectId: string; item: ProductionEditorItem; kind: string | undefined; offsetMs: number }) {
   const [url, setUrl] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const seek = () => {
+    const video = videoRef.current;
+    if (video && video.readyState >= 1 && Number.isFinite(video.duration)) { video.pause(); video.currentTime = Math.min(offsetMs / 1000, Math.max(0, video.duration - .001)); }
+  };
+  useEffect(seek, [offsetMs]);
   useEffect(() => {
     let current = true;
     if (item.assetId) void window.videoTool.getAssetPlaybackUrl({ projectId, assetId: item.assetId }).then(result => {
@@ -12,20 +18,26 @@ function MediaPreview({ projectId, item, kind }: { projectId: string; item: Prod
     return () => { current = false; };
   }, [projectId, item.assetId]);
   if (!url) return <div className="production-preview-empty">{item.assetId || item.recipeId ? 'Preview unavailable. Your saved prompt is still here.' : item.lane === 'subtitles' ? item.prompt : 'This shot is waiting for a generated video.'}</div>;
-  return kind === 'audio' ? <audio controls src={url} /> : <video controls preload="metadata" src={url} />;
+  return kind === 'audio' ? <audio controls src={url} /> : <video ref={videoRef} onLoadedMetadata={seek} controls preload="metadata" src={url} />;
 }
 export function PromptProductionLayout({ children, document, assets, projectId, busy, active, onLoad }: {
   children: ReactNode; document: AiProjectDocument | null | undefined; assets: readonly ProductionEditorAsset[];
   projectId: string | null | undefined; busy: boolean; active: boolean; onLoad: (item: ProductionEditorItem) => void;
 }) {
   const [selectedId, setSelectedId] = useState('');
+  const [inspectionMs, setInspectionMs] = useState<number | null>(null);
   const items = document ? productionEditorItems(document, assets) : [];
-  const selected = items.find(item => item.id === selectedId) ?? items[0];
+  const inspection = inspectProductionTime(items, inspectionMs ?? 0);
+  const selected = inspectionMs === null ? items.find(item => item.id === selectedId) ?? items[0] : inspection.video;
+  const durationMs = productionPlanDuration(items);
+  const readiness = productionReadiness(items);
+  const select = (item: ProductionEditorItem) => { setInspectionMs(null); setSelectedId(item.id); };
   return <div className="prompt-production-editor">
     <div className="production-prompt-pane">{children}</div>
     <aside className="production-preview" aria-label="Production preview">
       <header><span>PROGRAM / SELECTED SHOT</span><h2>{selected?.label ?? 'Your story starts here'}</h2></header>
-      {active && selected && projectId ? <MediaPreview key={projectId + selected.id + selected.assetId} projectId={projectId} item={selected} kind={assets.find(asset => asset.id === selected.assetId)?.kind} /> : <div className="production-preview-empty">Write a prompt on the left or plan scenes in Writer. Saved results appear here.</div>}
+      {active && selected && projectId ? <MediaPreview key={projectId + selected.id + selected.assetId} projectId={projectId} item={selected} offsetMs={inspectionMs === null ? 0 : inspection.sourceOffsetMs} kind={assets.find(asset => asset.id === selected.assetId)?.kind} /> : <div className="production-preview-empty">{inspectionMs === null ? 'Write a prompt on the left or plan scenes in Writer. Saved results appear here.' : 'No planned video at this time.'}</div>}
+      {inspectionMs !== null && <p className="production-caption-inspection" aria-live="polite">Caption at inspected time: {inspection.captions.map(item => item.prompt).join(' ') || 'None'}</p>}
       {selected && <div className="production-selection-details"><strong>{selected.status}</strong><p>{selected.prompt || 'No saved prompt for this media.'}</p>
         {(selected.shotId || selected.recipeId) && <button className="button" disabled={busy} onClick={() => onLoad(selected)}>Edit selected prompt</button>}
       </div>}
@@ -33,11 +45,23 @@ export function PromptProductionLayout({ children, document, assets, projectId, 
     </aside>
     <section className="production-track-deck" aria-label="Production tracks">
       <header><strong>Sequence plan</strong><span>Video · Voice · Subtitles — select to inspect</span></header>
+      <p className="production-readiness">{readiness.total === 0 ? 'Start with Writer to create a timed shot plan.' : `${readiness.approved}/${readiness.total} shots approved · ${readiness.missing} missing media · ${readiness.review} need review`}</p>
+      {durationMs > 0 && <label className="production-time-control">Inspect plan · {(inspection.timeMs / 1000).toFixed(1)} / {(durationMs / 1000).toFixed(1)}s
+        <input aria-label="Inspect production time" type="range" min={0} max={durationMs} step={100} value={inspection.timeMs} onChange={event => setInspectionMs(Number(event.target.value))} />
+      </label>}
       {PRODUCTION_LANES.map(lane => <div className="production-track-row" key={lane}>
         <strong className="production-track-label">{lane}</strong>
         <div className="production-track-items" role="group" aria-label={lane + ' track'}>
-          {items.filter(item => item.lane === lane).map(item => <button type="button" key={item.id} aria-pressed={selected?.id === item.id}
-            className={'production-track-item production-track-item--' + lane} onClick={() => setSelectedId(item.id)}>
+          {durationMs > 0 && <div className="production-timed-lane">
+            {items.filter(item => item.lane === lane && isTimedProductionItem(item)).map(item => <button type="button" key={item.id}
+              title={item.label} aria-label={`${item.label}, ${item.startMs! / 1000}s, ${item.durationMs! / 1000}s long`} aria-pressed={selected?.id === item.id}
+              className={'production-track-item production-track-item--' + lane} style={{ left: `${item.startMs! / durationMs * 100}%`, width: `${item.durationMs! / durationMs * 100}%` }}
+              onClick={() => setInspectionMs(item.startMs!)}><span>{item.label}</span><small>{item.startMs! / 1000}s · {item.durationMs! / 1000}s</small></button>)}
+            {inspectionMs !== null && <span className="production-playhead" style={{ left: `${inspection.timeMs / durationMs * 100}%` }} />}
+          </div>}
+          {items.some(item => item.lane === lane && !isTimedProductionItem(item)) && <small className="production-unplaced-label">Unplaced media — outside the plan</small>}
+          {items.filter(item => item.lane === lane && !isTimedProductionItem(item)).map(item => <button type="button" key={item.id} aria-pressed={selected?.id === item.id}
+            className={'production-track-item production-track-item--' + lane} onClick={() => select(item)}>
             <small>{item.startMs === undefined ? 'Unplaced' : (item.startMs / 1000).toFixed(1) + 's'}{item.durationMs === undefined ? '' : ' · ' + (item.durationMs / 1000).toFixed(1) + 's'}</small>
             <span>{item.label}</span><small>{item.status}</small>
           </button>)}
