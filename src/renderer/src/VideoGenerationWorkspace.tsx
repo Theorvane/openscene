@@ -40,6 +40,7 @@ import {
   type BrowserSessionStatus
 } from '../../shared/browserSession';
 import type { MediaAsset } from '../../shared/timelineTypes';
+import { ProductionMemoryPanel } from './ProductionMemoryPanel';
 import { recordVideoRecipe } from '../../shared/videoRecipeHistory';
 import { VideoRecipeHistory } from './VideoRecipeHistory';
 import type { ComfyUiMotionWorkerStatus, MotionControlMode } from '../../shared/comfyUiMotion';
@@ -1475,6 +1476,8 @@ export function VideoGenerationWorkspace({
 
       {/* Composer mirrors the chat prompt card: write, then act. */}
       <div className="studio-composer">
+        {projectId && writerDocument && <ProductionMemoryPanel key={projectId} projectId={projectId}
+          document={writerDocument} prompt={prompt} onChange={setPrompt} disabled={isGenerating || isBatchGenerating} />}
         {projectId && <VideoRecipeHistory key={projectId} projectId={projectId}
           records={writerDocument?.videoHistory ?? []} assetIds={projectAssets.map(asset => asset.id)}
           disabled={isGenerating || isBatchGenerating || isSavingCandidate}
