@@ -28,4 +28,14 @@ describe('workspace integration contracts', () => {
     expect(source('mobile/src/screens/LibraryScreen.tsx')).toContain('if (placed) onOpenEditor?.()');
     expect(source('src/renderer/src/VideoGenerationWorkspace.tsx')).toContain('if (placed) onOpenEditor?.()');
   });
+
+  it('observes background generation completion without reloading its own edits', () => {
+    const editor = source('mobile/src/screens/EditScreen.tsx');
+    expect(editor).toContain('const observedProject = useProject(projectId)');
+    expect(editor).toContain('[projectId, loadProject, reloadToken, active, observedProject]');
+    const markOwnEdit = editor.indexOf('loadedSnapshot.current = JSON.stringify([timeline, project.assets])');
+    const publishEdit = editor.indexOf('writeProject({ ...project, timeline })');
+    expect(markOwnEdit).toBeGreaterThan(-1);
+    expect(markOwnEdit).toBeLessThan(publishEdit);
+  });
 });

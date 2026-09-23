@@ -22,6 +22,8 @@ mount lazily and remain mounted while the project is open, preserving drafts
 and pending generation across mode changes. Hidden editing pauses playback.
 Returning to editing reloads externally changed assets/timelines; an unchanged
 document retains its editing state. External changes invalidate local undo.
+The editor also observes background job completion while it is already visible;
+its own saved edits do not trigger a reload or reset undo.
 Leaving the project still ends this screen session; this is not cross-project
 or process-restart draft persistence.
 
