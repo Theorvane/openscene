@@ -121,6 +121,7 @@ type VideoGenerationWorkspaceProps = {
   /** Starts one or more Writer-derived stills without leaving Video Generation. */
   readonly onGenerateProductionImages: (targets: readonly ProductionImageTarget[], aspectRatio?: ImageAspectRatio) => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
   readonly onOpenImageResults: () => void;
+  readonly onOpenEditor?: () => void;
   /** Local project folder/name mirrored to the signed-in Flow workspace. */
   readonly projectName?: string | undefined;
 };
@@ -145,9 +146,12 @@ export function VideoGenerationWorkspace({
   onGenerateProductionImage,
   onGenerateProductionImages,
   onOpenImageResults,
+  onOpenEditor,
   projectName
 }: VideoGenerationWorkspaceProps): ReactElement {
   const { selectedModel } = useAiDomainModel();
+  const activeProjectIdRef = useRef(projectId);
+  activeProjectIdRef.current = projectId;
   const videoModel = selectedModel('video-generation');
   const flowVideoModel = googleFlowVideoModelFor(videoModel.id);
   const grokImagineBrowser = videoModel.id === 'grok-imagine-video-1.5';
@@ -692,11 +696,12 @@ export function VideoGenerationWorkspace({
     }
   };
 
-  const handleImportToProject = async (job: VideoGenerationJob): Promise<void> => {
+  const handleImportToProject = async (job: VideoGenerationJob, openEditor = false): Promise<void> => {
     if (job.status !== 'completed') return;
     try {
       const status = await importAiResult(job.id);
       setStatusMsg(status);
+      if (openEditor && status.importedAssetId !== undefined && activeProjectIdRef.current === projectId) onOpenEditor?.();
       if (status.importedAssetId !== undefined && documentRef.current?.generations.some((entry) => entry.id === job.id)) {
         const saved = await persistCandidateChange((document) => updateGenerationCandidate(document, job.id, {
           outputAssetIds: [status.importedAssetId!], updatedAt: new Date().toISOString()
@@ -1321,6 +1326,11 @@ export function VideoGenerationWorkspace({
                       {(writerDocument?.generations.find((entry) => entry.id === job.id)?.outputAssetIds.length ?? 0) > 0 ? 'Imported' : 'Import to project'}
                     </Button>
                   )}
+                  {job.status === 'completed' && onOpenEditor !== undefined && (
+                    <Button variant="ghost" onClick={() => void handleImportToProject(job, true)}>
+                      Import & open editor
+                    </Button>
+                  )}
                   {(job.status === 'failed' || job.status === 'needs_user_action') && job.error !== undefined && (
                     <p className="studio-job__error">{job.error}</p>
                   )}
@@ -1415,10 +1425,11 @@ export function VideoGenerationWorkspace({
                       <Button variant="ghost" disabled={isSavingCandidate || review.decision === 'rejected'} onClick={() => void decideCandidate(candidate.id, 'rejected')}>Reject</Button>
                       {review.decision === 'approved' && candidate.outputAssetIds[0] !== undefined && <Button variant="ghost" disabled={isSavingCandidate} onClick={() => {
                         const placed = placeAiAssetOnTimeline(candidate.outputAssetIds[0]!);
+                        if (placed) onOpenEditor?.();
                         setStatusMsg({ tone: placed ? 'success' : 'warning', text: placed
                           ? 'Approved candidate added to the timeline. Review the cut, then save the timeline.'
                           : 'The approved asset could not be placed. Wait for metadata probing or add a compatible video track.' });
-                      }}>Add approved to timeline</Button>}
+                      }}>Add approved & open editor</Button>}
                       {review.decision === 'approved' && candidate.outputAssetIds[0] !== undefined && nextApprovedWriterShotId(writerDocument!, candidate.shotId) !== null &&
                         <Button variant="ghost" disabled={isSavingCandidate || isChainingFrame} onClick={() => void chainCandidateToNextShot(candidate.id)}>
                           {isChainingFrame ? 'Extracting frame…' : 'Chain final frame to next shot'}

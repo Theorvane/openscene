@@ -12,6 +12,7 @@ import { applyCaptionPreset, CAPTION_PLACEMENTS, CAPTION_STYLE_PRESETS, isAutoma
 import { track } from '../lib/analyticsClient';
 import { theme } from '../lib/theme';
 import { useMobileEditor, type EditorAsset } from '../lib/editorState';
+import { useProject } from '../lib/useProject';
 import {
   assetUri,
   deleteAsset,
@@ -143,21 +144,30 @@ function formatMs(ms: number): string {
 
 export function EditScreen({
   topInset,
-  projectId
+  projectId,
+  active = true
 }: {
   readonly topInset: number;
   readonly projectId: string | null;
+  readonly active?: boolean;
 }) {
+  const loadedSnapshot = useRef('');
+  // Retained generation screens can finish while the editor is visible.
+  const observedProject = useProject(projectId);
   const editor = useMobileEditor((timeline) => {
     if (projectId === null) return;
     const project = readProject(projectId);
-    if (project !== null) writeProject({ ...project, timeline });
+    if (project !== null) {
+      loadedSnapshot.current = JSON.stringify([timeline, project.assets]);
+      writeProject({ ...project, timeline });
+    }
   });
 
   const [pxPerSecond, setPxPerSecond] = useState(28);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [storedAssets, setStoredAssets] = useState<readonly MobileAsset[]>([]);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => { if (!active) setPlaying(false); }, [active]);
   const [reloadToken, setReloadToken] = useState(0);
   const [inspecting, setInspecting] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
@@ -170,7 +180,7 @@ export function EditScreen({
     if (projectId === null) return;
     setFramePreference(readProject(projectId)?.frame ?? 'source');
     setBurnAutomaticCaptions(readProject(projectId)?.subtitleDelivery?.burnAutomaticCaptions ?? DEFAULT_SUBTITLE_DELIVERY.burnAutomaticCaptions);
-  }, [projectId, reloadToken]);
+  }, [projectId, reloadToken, observedProject]);
 
   /*
     What this cut would export as, so the row shows a size rather than a word.
@@ -235,9 +245,13 @@ export function EditScreen({
   // Opening a project replaces the editor's document and its undo history.
   const { loadProject } = editor;
   useEffect(() => {
+    if (!active) return;
     if (projectId === null) return;
     const project = readProject(projectId);
     if (project === null) return;
+    const snapshot = JSON.stringify([project.timeline, project.assets]);
+    if (loadedSnapshot.current === snapshot) return;
+    loadedSnapshot.current = snapshot;
     setStoredAssets(project.assets);
     loadProject(
       project.timeline,
@@ -254,7 +268,7 @@ export function EditScreen({
         metadata: { durationMs: asset.durationMs, width: asset.width, height: asset.height }
       }))
     );
-  }, [projectId, loadProject, reloadToken]);
+  }, [projectId, loadProject, reloadToken, active, observedProject]);
 
   const timelineWidth = useMemo(
     () => Math.max(240, editor.durationMs * pxPerMs + 80),

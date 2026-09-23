@@ -78,11 +78,13 @@ const INPUT_MODES: readonly { readonly id: VideoOperation; readonly label: strin
 type PickedReference = { readonly displayName: string; readonly base64: string; readonly mimeType: string };
 
 export function PlanScreen({
+  active = true,
   topInset,
   keyboardOffset,
   projectId,
   connectionsVersion
 }: {
+  readonly active?: boolean;
   readonly topInset: number;
   /** Height of the chrome above this screen; see FormScreen. */
   readonly keyboardOffset: number;
@@ -618,7 +620,7 @@ export function PlanScreen({
             {take !== undefined && (
               <View style={styles.reviewCard}>
                 <Text style={styles.label}>Continuity review</Text>
-                {candidateAsset !== undefined && projectId !== null && <CandidateVideo key={candidateAsset.id} projectId={projectId} asset={candidateAsset} />}
+                {candidateAsset !== undefined && projectId !== null && <CandidateVideo active={active} key={candidateAsset.id} projectId={projectId} asset={candidateAsset} />}
                 {CONTINUITY_REVIEW_FIELDS.map((field) => (
                   <View key={field}>
                     <Text style={styles.body}>{REVIEW_LABELS[field]}</Text>
@@ -773,8 +775,9 @@ function ReferenceRow({ value, empty, onPick, onRemove }: {
   </View>;
 }
 
-function CandidateVideo({ projectId, asset }: { readonly projectId: string; readonly asset: MobileAsset }) {
+function CandidateVideo({ projectId, asset, active }: { readonly projectId: string; readonly asset: MobileAsset; readonly active: boolean }) {
   const player = useVideoPlayer(assetUri(projectId, asset));
+  useEffect(() => { if (!active) player.pause(); }, [active, player]);
   return <VideoView player={player} style={styles.candidateVideo} contentFit="contain" nativeControls />;
 }
 
