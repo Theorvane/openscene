@@ -16,6 +16,6 @@ Saved audio can be explicitly appended to the first audio track using existing t
 
 ## Reference and reuse decision
 
-Reviewed https://github.com/calesthio/OpenMontage and its README on 2026-09-23. Its staged script/scene/media/composition workflow informed the interaction discussion. Its repository declares AGPL-3.0 while OpenScene declares MIT. No source, assets, skills, dependencies or scripts were copied or installed; no license conversion was attempted. Direct code integration requires a separate licensing/distribution decision. This implementation is original code over OpenScene contracts.
+OpenMontage's staged script/scene/media/composition workflow informed the interaction design.
 
 Follow-up code reading covered `pipeline_defs/cinematic.yaml`, the manifest loading/order portions of `lib/pipeline_loader.py`, the opening scene-time contract in `schemas/artifacts/scene_plan.schema.json`, and the routing/input surface of `tools/video/video_compose.py`. Observed main revision: `08e2151fa02de28a5d6a312b3d575692bf147ad7`. This was a focused architecture review, not a full repository audit. The distinction between scene intent, materialized assets, edit decisions and runtime validation informs our separation between a plan preview and an exported cut.
