@@ -40,6 +40,7 @@ import {
   type BrowserSessionStatus
 } from '../../shared/browserSession';
 import type { MediaAsset } from '../../shared/timelineTypes';
+import { ProductionMemoryPanel } from './ProductionMemoryPanel';
 import type { ComfyUiMotionWorkerStatus, MotionControlMode } from '../../shared/comfyUiMotion';
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
@@ -1445,6 +1446,8 @@ export function VideoGenerationWorkspace({
 
       {/* Composer mirrors the chat prompt card: write, then act. */}
       <div className="studio-composer">
+        {projectId && writerDocument && <ProductionMemoryPanel key={projectId} projectId={projectId}
+          document={writerDocument} prompt={prompt} onChange={setPrompt} disabled={isGenerating || isBatchGenerating} />}
         {writerShots.length > 0 && <div className="studio-field">
           <label className="studio-field__label" htmlFor="writer-video-shot">Approved Writer shot</label>
           <select id="writer-video-shot" disabled={isGenerating} value={writerShotId} onChange={(e) => {

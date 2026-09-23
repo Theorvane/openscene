@@ -24,6 +24,7 @@ import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { generateShot } from '../lib/videoGeneration';
 import { appendAssetToTimeline, assembleApprovedWriterShots, assetUri, clipIdForAsset, readProject, replaceTakeInTimeline, saveGeneratedVideoCandidate, type MobileAsset } from '../lib/projectStore';
 import { SpendPrompt } from '../components/SpendPrompt';
+import { ProductionMemoryPanel } from '../components/ProductionMemoryPanel';
 import { FormScreen } from '../components/FormScreen';
 import { useRevealOnFocus } from '../components/KeyboardAwareScroll';
 import { theme } from '../lib/theme';
@@ -554,6 +555,9 @@ export function PlanScreen({
       )}
 
       <Text style={styles.label}>Scenario · carried by every shot</Text>
+      {projectId !== null && activeProject !== null && <ProductionMemoryPanel key={projectId}
+        projectId={projectId} document={activeProject.ai} prompt={prompt}
+        onChange={value => setPlan(() => setPrompt(value))} disabled={running || asking || redoing !== null} />}
       <TextInput
         ref={promptInput}
         onFocus={() => reveal(promptInput.current)}
