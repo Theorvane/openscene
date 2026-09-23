@@ -43,6 +43,7 @@ import type { MediaAsset } from '../../shared/timelineTypes';
 import { ProductionMemoryPanel } from './ProductionMemoryPanel';
 import { recordVideoRecipe } from '../../shared/videoRecipeHistory';
 import { VideoRecipeHistory } from './VideoRecipeHistory';
+import { PromptProductionLayout } from './PromptProductionLayout';
 import type { ComfyUiMotionWorkerStatus, MotionControlMode } from '../../shared/comfyUiMotion';
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
@@ -108,6 +109,7 @@ type VideoInputSnapshot = {
   readonly motionMode?: MotionControlMode;
 };
 type VideoGenerationWorkspaceProps = {
+  readonly active?: boolean;
   readonly writerDocument?: AiProjectDocument | null;
   readonly projectId?: string | null;
   readonly projectAssets?: readonly MediaAsset[];
@@ -140,6 +142,7 @@ function showGoogleFlowWindow(): boolean {
 }
 
 export function VideoGenerationWorkspace({
+  active = true,
   writerDocument,
   onSaveAi,
   projectId,
@@ -1059,6 +1062,18 @@ export function VideoGenerationWorkspace({
   };
 
   return (
+    <PromptProductionLayout key={projectId ?? 'none'} projectId={projectId} document={writerDocument} assets={projectAssets}
+      active={active} busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
+      onLoad={item => {
+        if (prompt.trim() && !window.confirm('Replace the current prompt with this selection? Generated media stays unchanged.')) return;
+        if (item.shotId) { void openProductionShot(item.shotId); return; }
+        const recipe = writerDocument?.videoHistory?.find(entry => entry.id === item.recipeId);
+        if (!recipe) return;
+        setPrompt(recipe.prompt); setRecipeParentId(recipe.id);
+        setWriterShotId(''); setLoadedWriterShotId(''); setLoadedReferenceAssetIds([]); setAutoLoadedCharacterReferenceIds([]);
+        onReferenceImageChange(null); setLastFrame(null); setReferenceImages([]); setDrivingVideoAssetId('');
+        setStatusMsg({ tone: 'neutral', text: 'Saved prompt loaded. Reselect model, duration and reference inputs before generating a new take.' });
+      }}>
     <section className="studio-surface" aria-labelledby="video-generation-title">
       <header className="studio-surface__header">
         <div className="studio-surface__title">
@@ -1533,5 +1548,6 @@ export function VideoGenerationWorkspace({
         </div>
       </div>
     </section>
+    </PromptProductionLayout>
   );
 }

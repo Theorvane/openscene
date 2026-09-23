@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ProductionNavigator } from '../components/ProductionNavigator';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
@@ -449,6 +450,16 @@ export function PlanScreen({
 
   return (
     <FormScreen topInset={topInset} keyboardOffset={keyboardOffset}>
+      {projectId !== null && activeProject !== null && <ProductionNavigator key={projectId} projectId={projectId} document={activeProject.ai} assets={activeProject.assets}
+        active={active} busy={running || asking || redoing !== null} onLoad={item => {
+          const load = () => {
+            setPlan(() => { setPrompt(item.prompt); setRecipeParentId(item.recipeId); setDescriptions({}); });
+            setFirstFrame(null); setLastFrame(null); setAssetReferences([]);
+            setWriterMessage('Prompt loaded only. Review model, shot lengths and reference media before generating.');
+          };
+          if (prompt.trim()) Alert.alert('Replace prompt?', 'Your saved media stays unchanged.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Load prompt', onPress: load }]);
+          else load();
+        }} />}
       {productionRows.length > 0 && <View style={styles.reviewCard}>
         <Text style={styles.label}>Storyboard production board</Text>
         <Text style={styles.body}>{productionRows.filter((row) => row.state === 'approved').length}/{productionRows.length} Writer shots approved. Opening and generation remain manual.</Text>

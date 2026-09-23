@@ -6,6 +6,7 @@ import { applyWriterDraft, compileWriterPrompt, parseWriterRequest, validateWrit
 import { requestGeminiWriter } from '../src/shared/writerGeneration';
 import { chainContinuationFrame, nextApprovedWriterShotId } from '../src/shared/generationReview';
 import { buildProductionMemory, searchProductionMemory } from '../src/shared/productionMemory';
+import { productionEditorItems } from '../src/shared/productionEditor';
 
 const brief: WriterRequest = { mode: 'idea_to_script', sourceText: 'The first social network was yelling.', language: 'English', audience: 'Adults', tone: 'Deadpan satire', targetDurationSeconds: 16, videoStyle: 'cinematic-narrative', emotionalGoal: 'entertain' };
 const artifact = (stage: WriterStageArtifact['stage'], content = `Complete ${stage} document`): WriterStageArtifact => ({ stage, title: 'The Stone Age Scroll', content, modelId: 'gemini-3.1-flash-lite', approved: false });
@@ -38,6 +39,9 @@ describe('manual Writer pipeline', () => {
       review: { decision: 'approved' as const, notes: '', continuity: { identity: 'pass' as const, wardrobeProps: 'pass' as const, settingPalette: 'pass' as const, motionDirection: 'pass' as const, boundaryMatch: 'pass' as const } }
     }] };
     const index = buildProductionMemory('p', doc);
+    const planned = productionEditorItems(doc, []);
+    expect(planned.filter(item => item.shotId).map(item => item.startMs)).toEqual([0, 8000]);
+    expect(planned.filter(item => item.shotId).every(item => item.durationMs === 8000 && item.assetId === undefined)).toBe(true);
     for (const prefix of ['script/', 'scene/', 'shot/', 'generation/']) {
       expect(index.entries.some(entry => entry.sourceId.startsWith(prefix))).toBe(true);
     }
