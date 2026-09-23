@@ -97,6 +97,10 @@ export function PlanScreen({
   const [modelId, setModelId] = useState<string>(() => catalog.find((entry) => isDomainModelAvailableOnRuntime(entry, 'mobile'))?.id ?? '');
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
   const [prompt, setPrompt] = useState('');
+  const [recipeParentId, setRecipeParentId] = useState<string | undefined>();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyCount, setHistoryCount] = useState(20);
+  useEffect(() => { setRecipeParentId(undefined); setHistoryCount(20); }, [projectId]);
   const [writerMessage, setWriterMessage] = useState('');
   const activeProject = projectId === null ? null : readProject(projectId);
   const writerShots = approvedWriterShots(activeProject?.ai);
@@ -244,7 +248,17 @@ export function PlanScreen({
         mark({ kind: 'failed', message: 'The project could not be read to save this shot.' });
         break;
       }
-      saveGeneratedVideoCandidate(project, result.asset);
+      try {
+        saveGeneratedVideoCandidate(project, result.asset, {
+          id: result.asset.id, assetId: result.asset.id, prompt: shotPrompt,
+          modelId: model.id, providerId: model.providerId, operation: shotOperation,
+          durationSeconds: shot.durationSeconds, aspectRatio: effectiveAspectRatio, createdAt: new Date().toISOString(),
+          ...(recipeParentId === undefined ? {} : { parentId: recipeParentId })
+        });
+      } catch (error) {
+        mark({ kind: 'failed', message: 'Video history save failed: ' + String(error) });
+        break;
+      }
       // Kept so this shot can be asked for again with a change: the prompt to
       // build on, the clip the next take stands in for, and the frame this one
       // started from.
@@ -323,7 +337,17 @@ export function PlanScreen({
 
     // Keep the new take in the library. The existing approved clip stays on the
     // timeline until this candidate passes review and the user approves it.
-    saveGeneratedVideoCandidate(project, result.asset);
+    try {
+      saveGeneratedVideoCandidate(project, result.asset, {
+        id: result.asset.id, assetId: result.asset.id, prompt: refined.prompt,
+        modelId: model.id, providerId: model.providerId,
+        operation: take.operation ?? (take.startFrame === undefined ? 'text_to_video' : 'image_to_video'),
+        durationSeconds: shot.durationSeconds, aspectRatio: effectiveAspectRatio, createdAt: new Date().toISOString(), parentId: take.assetId
+      });
+    } catch (error) {
+      mark({ kind: 'failed', message: 'Video history save failed: ' + String(error) });
+      return;
+    }
 
     setTakes((current) => ({
       ...current,
@@ -554,6 +578,30 @@ export function PlanScreen({
       )}
 
       <Text style={styles.label}>Scenario · carried by every shot</Text>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: historyOpen }}
+        style={press(styles.redo)} onPress={() => setHistoryOpen(value => !value)}>
+        <Text style={styles.redoText}>Saved videos & prompts ({activeProject?.ai.videoHistory?.length ?? 0})</Text>
+      </Pressable>
+      {historyOpen && <>
+        <Text style={styles.body}>Prepare regeneration loads the saved prompt only, without spending. Reselect model, duration, operation and reference media before generating a new candidate. Original videos are kept.</Text>
+        {activeProject?.ai.videoHistory?.slice(-historyCount).reverse().map(recipe => {
+          const asset = activeProject.assets.find(item => item.id === recipe.assetId);
+          return <View key={recipe.id}>
+            <Text style={styles.label}>{recipe.modelId} · {recipe.durationSeconds}s · {recipe.aspectRatio} · {recipe.operation}</Text>
+            {asset !== undefined && projectId !== null ? <CandidateVideo active={active} projectId={projectId} asset={asset} /> : <Text style={styles.body}>Media removed. Prompt retained.</Text>}
+            <Text selectable style={styles.body}>{recipe.prompt}</Text>
+            <Pressable accessibilityRole="button" disabled={running || redoing !== null || asking} style={press(styles.redo)}
+              onPress={() => {
+                setPlan(() => { setPrompt(recipe.prompt); setRecipeParentId(recipe.id); setDescriptions({}); });
+                setFirstFrame(null); setLastFrame(null); setAssetReferences([]);
+                setWriterMessage('Prompt loaded, not generated. Check model, length, operation and reference media before approving a new generation.');
+              }}><Text style={styles.redoText}>Prepare regeneration</Text></Pressable>
+          </View>;
+        })}
+        {historyCount < (activeProject?.ai.videoHistory?.length ?? 0) && <Pressable accessibilityRole="button" style={press(styles.redo)} onPress={() => setHistoryCount(value => value + 20)}>
+          <Text style={styles.redoText}>Show older videos</Text>
+        </Pressable>}
+      </>}
       <TextInput
         ref={promptInput}
         onFocus={() => reveal(promptInput.current)}

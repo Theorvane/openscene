@@ -24,7 +24,8 @@ describe('reviewed video candidate parity', () => {
       readRepo('mobile/src/lib/projectStore.ts'),
       readRepo('mobile/src/lib/agentTools.ts')
     ]);
-    expect(screen).toContain('saveGeneratedVideoCandidate(project, result.asset)');
+    expect(screen).toContain('saveGeneratedVideoCandidate(project, result.asset, {');
+    expect(screen).toContain('prompt: shotPrompt');
     expect(screen).toContain('appendAssetToTimeline(project, asset)');
     expect(store).toContain('export function saveGeneratedVideoCandidate');
     expect(agentTools).toContain('saveGeneratedVideoCandidate(project, result.asset)');
