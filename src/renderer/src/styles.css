@@ -3742,7 +3742,8 @@ button {
 }
 
 .program-monitor {
-  grid-template-rows: auto minmax(0, 1fr);
+  /* The picture owns the flexible row, not the transport controls. */
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--space-3);
   min-height: 0;
 }
