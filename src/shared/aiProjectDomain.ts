@@ -7,6 +7,7 @@ import {
   isPlainRecord,
   isUnknownArray
 } from './timelineValidationPrimitives';
+import { parseVideoRecipeHistory, type VideoRecipe } from './videoRecipeHistory';
 import { VIDEO_OPERATIONS } from './mediaCapabilityRegistry';
 import { parseWriterPipelineState, type WriterPipelineState } from './writerStages';
 import { parseNarrationPlan, type NarrationPlan } from './narrationPlan';
@@ -152,6 +153,7 @@ export type ProvenanceRecord = {
 };
 
 export type AiProjectDocument = {
+  readonly videoHistory?: readonly VideoRecipe[];
   readonly writerPipeline?: WriterPipelineState;
   readonly narrationPlan?: NarrationPlan;
   readonly transcriptionDraft?: TranscriptionDraft;
@@ -540,7 +542,9 @@ function relationsAreValid(document: AiProjectDocument, availableAssetIds?: Read
 }
 
 export function parseAiProjectDocument(value: unknown, availableAssetIds?: ReadonlySet<string>): AiProjectDocument | null {
-  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['schemaVersion', 'scripts', 'scenes', 'shots', 'characters', 'styleBible', 'referenceAssets', 'generations', 'provenance', 'writerPipeline', 'narrationPlan', 'transcriptionDraft']) || value.schemaVersion !== AI_PROJECT_SCHEMA_VERSION) return null;
+  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['schemaVersion', 'scripts', 'scenes', 'shots', 'characters', 'styleBible', 'referenceAssets', 'generations', 'provenance', 'writerPipeline', 'narrationPlan', 'transcriptionDraft', 'videoHistory']) || value.schemaVersion !== AI_PROJECT_SCHEMA_VERSION) return null;
+  const videoHistory = value.videoHistory === undefined ? undefined : parseVideoRecipeHistory(value.videoHistory);
+  if (videoHistory === null) return null;
   const writerPipeline = value.writerPipeline === undefined ? undefined : parseWriterPipelineState(value.writerPipeline);
   if (writerPipeline === null) return null;
   const narrationPlan = value.narrationPlan === undefined ? undefined : parseNarrationPlan(value.narrationPlan);
@@ -557,6 +561,7 @@ export function parseAiProjectDocument(value: unknown, availableAssetIds?: Reado
   const provenance = parseCollection(value.provenance, LIMITS.provenance, parseProvenance);
   if (scripts === null || scenes === null || shots === null || characters === null || styleBible === null || referenceAssets === null || generations === null || provenance === null) return null;
   const document: AiProjectDocument = {
+    ...(videoHistory === undefined ? {} : { videoHistory }),
     ...(writerPipeline === undefined ? {} : { writerPipeline }),
     ...(narrationPlan === undefined ? {} : { narrationPlan }),
     ...(transcriptionDraft === undefined ? {} : { transcriptionDraft }),

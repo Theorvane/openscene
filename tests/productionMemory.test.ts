@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyAiProjectDocument, type AiProjectDocument, type GenerationRecord } from '../src/shared/aiProjectDomain';
 import { appendProductionMemory, buildProductionMemory, MEMORY_LIMITS, searchProductionMemory } from '../src/shared/productionMemory';
+import { WRITER_STAGES } from '../src/shared/writerStages';
 
 function document(): AiProjectDocument {
   return { ...createEmptyAiProjectDocument(),
@@ -45,9 +46,27 @@ describe('project-local production memory', () => {
     expect(searchProductionMemory(index, 'p', 'rejected')).toEqual([]);
     expect(searchProductionMemory(index, 'p', 'failed')).toEqual([]);
   });
-  it('disables retrieval after Writer approval is revoked', () => {
-    const doc = { ...document(), writerPipeline: { requestJson: '{}', artifacts: [] } };
-    expect(buildProductionMemory('p', doc).entries).toEqual([]);
+  it.each(['empty', 'incomplete', ...WRITER_STAGES])('keeps definitions searchable but gates lineage for %s approval', state => {
+    const base = document();
+    const artifacts = WRITER_STAGES.map(stage => ({ stage, title: stage, content: 'content', modelId: 'model', approved: stage !== state }));
+    const doc: AiProjectDocument = { ...base,
+      styleBible: { ...base.styleBible, lighting: 'moonlit indigo' },
+      generations: [candidate('accepted', 'approved')],
+      writerPipeline: { requestJson: '{}', appliedScriptId: 'current',
+        artifacts: state === 'empty' ? [] : state === 'incomplete' ? artifacts.slice(0, 3) : artifacts }
+    };
+    const before = JSON.stringify(doc);
+    const index = buildProductionMemory('p', doc);
+    expect(index.entries.map(entry => entry.sourceId)).toEqual(['character/hero:0', 'style:0']);
+    expect(searchProductionMemory(index, 'p', '민지')[0]?.sourceId).toBe('character/hero:0');
+    expect(searchProductionMemory(index, 'p', 'indigo')[0]?.sourceId).toBe('style:0');
+    expect(searchProductionMemory(index, 'p', 'accepted')).toEqual([]);
+    expect(searchProductionMemory(index, 'p', '누구')).toEqual([]);
+    expect(JSON.stringify(doc)).toBe(before);
+    const restored = buildProductionMemory('p', { ...doc, writerPipeline: { ...doc.writerPipeline!, artifacts: artifacts.map(artifact => ({ ...artifact, approved: true })) } });
+    for (const prefix of ['script/', 'scene/', 'shot/', 'generation/']) {
+      expect(restored.entries.some(entry => entry.sourceId.startsWith(prefix))).toBe(true);
+    }
   });
   it('excludes orphaned candidates and earlier approved script versions', () => {
     const doc = document();

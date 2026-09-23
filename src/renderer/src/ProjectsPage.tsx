@@ -1,4 +1,6 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
+import { WORKSPACE_MODES, WORKSPACE_EXPERIENCES, type WorkspaceMode } from '../../shared/workspaceModes';
+import { modeForProjectType } from '../../shared/projectTypes';
 
 import type { AgentChatHistoryEntry } from '../../shared/agentChat';
 import type { LocalProjectSnapshot, LocalProjectSummary } from '../../shared/timelineTypes';
@@ -10,8 +12,8 @@ type ProjectsPageProps = {
   readonly project?: LocalProjectSnapshot | null;
   readonly projects?: readonly LocalProjectSummary[];
   readonly chats?: readonly AgentChatHistoryEntry[];
-  readonly onOpenProject?: (projectId: string) => Promise<void>;
-  readonly onOpenProjectFolder?: () => Promise<void>;
+  readonly onOpenProject?: (projectId: string, mode: WorkspaceMode) => Promise<void>;
+  readonly onOpenProjectFolder?: (mode: WorkspaceMode) => Promise<void>;
   readonly onOpenChat?: (entry: AgentChatHistoryEntry) => Promise<void>;
   readonly onRemoveProject?: (projectId: string) => Promise<void>;
   readonly onDeleteChat?: (entry: AgentChatHistoryEntry) => Promise<void>;
@@ -50,9 +52,29 @@ export function ProjectsPage({
   isBusy = false
 }: ProjectsPageProps): ReactElement {
   const chatGroups = groupAgentChatHistory(chats, new Date());
+  const [entrance, setEntrance] = useState<WorkspaceMode>('edit');
+  const visibleProjects = projects.filter(item => modeForProjectType(item.projectType, entrance) === entrance);
 
   return (
     <div className="projects-home">
+      <section className="workspace-entrances" aria-label="Choose your workspace">
+        <div className="workspace-entrances__intro">
+          <h2>What would you like to make?</h2>
+          <p>Two project types. Choose what you are making, then create or open a project below.</p>
+        </div>
+        <div className="workspace-entrances__cards">
+          {WORKSPACE_MODES.map(mode => <button key={mode} type="button"
+            className={`workspace-entrance workspace-entrance--${mode}`}
+            aria-pressed={entrance === mode} disabled={isBusy} onClick={() => setEntrance(mode)}>
+            <span className="workspace-entrance__eyebrow">{mode === 'edit' ? 'EDIT' : 'CREATE'}</span>
+            <strong>{WORKSPACE_EXPERIENCES[mode].title}</strong>
+            <span>{WORKSPACE_EXPERIENCES[mode].description}</span>
+            <small>{WORKSPACE_EXPERIENCES[mode].tools}</small>
+            <span className="workspace-entrance__selection">{entrance === mode ? 'Selected project type' : 'Browse projects →'}</span>
+          </button>)}
+        </div>
+        <p role="status">New projects are saved as {WORKSPACE_EXPERIENCES[entrance].title}. Existing mixed projects appear in both lists without changing their data.</p>
+      </section>
       <aside className="projects-home__sidebar" aria-label="Project folders">
         <div className="projects-home__heading-row">
           <h1 id="projects-page-title" className="projects-home__heading">Projects</h1>
@@ -61,7 +83,7 @@ export function ProjectsPage({
             className="projects-home__add-button"
             aria-label="Choose or create a project folder"
             title="Choose or create a project folder"
-            onClick={() => void onOpenProjectFolder?.()}
+            onClick={() => void onOpenProjectFolder?.(entrance)}
             disabled={isBusy}
           >
             <FolderPlusIcon />
@@ -70,16 +92,16 @@ export function ProjectsPage({
         {errorText !== undefined && errorText.length > 0 && (
           <p role="alert" className="projects-home__error">{errorText}</p>
         )}
-        {projects.length > 0 ? (
+        {visibleProjects.length > 0 ? (
           <ul className="projects-home__list">
-            {projects.map((item) => {
+            {visibleProjects.map((item) => {
               const isSelected = project?.id === item.id;
               return (
                 <li key={item.id} className="projects-home__row">
                   <button
                     type="button"
                     className={`projects-home__project${isSelected ? ' projects-home__project--active' : ''}`}
-                    onClick={() => void onOpenProject?.(item.id)}
+                    onClick={() => void onOpenProject?.(item.id, entrance)}
                     disabled={isBusy}
                     aria-current={isSelected ? 'true' : undefined}
                   >
@@ -88,6 +110,7 @@ export function ProjectsPage({
                     </span>
                     <span className="projects-home__project-body">
                       <span className="projects-home__project-name">{item.name}</span>
+                      <span className="projects-home__type-badge">{item.projectType === undefined ? 'Legacy · mixed' : item.projectType === 'editing' ? 'Editing' : 'AI Generation'}</span>
                       <span className="projects-home__project-meta">
                         {item.storage === 'external' && item.folderName ? item.folderName : formatTimestamp(item.updatedAt)}
                       </span>

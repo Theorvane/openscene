@@ -60,7 +60,7 @@ export function AgentChatPanel({ width, onCollapse }: AgentChatPanelProps): Reac
       <div className="agent-chat-panel">
         <div className="agent-chat-panel__header">
           <div className="agent-chat-panel__title">
-            <p className="agent-chat-panel__title-label">OpenScene Edit Agent</p>
+            <p className="agent-chat-panel__title-label">OpenScene Assistant</p>
             <span className="agent-chat-panel__title-meta">
               {selectedModel.label} · {selectedModel.providerLabel} · {isLocalModel ? 'Local' : modelReady ? 'Connected' : 'Not connected'}
             </span>

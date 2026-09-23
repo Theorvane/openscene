@@ -26,18 +26,19 @@ export function buildProductionMemory(projectId: string, document: AiProjectDocu
       entries.push({ projectId, sourceId: id + ':' + offset, title, text: bounded.slice(offset, offset + MEMORY_LIMITS.chunkChars) });
     }
   };
+  // Current definitions remain usable independently of Writer lineage approval.
+  for (const character of document.characters) add('character/' + character.id, character.name + ' · current definition', character.name + '\n' + character.invariantDescription);
+  const style = document.styleBible;
+  add('style', 'Current visual style', [style.palette.join(', '), style.lighting, style.cameraGrammar, style.texture, ...style.forbiddenChanges].join('\n'));
   const pipeline = document.writerPipeline;
   const pipelineApproved = pipeline === undefined || WRITER_STAGES.every(stage =>
     pipeline.artifacts.some(artifact => artifact.stage === stage && artifact.approved));
-  // Revoked upstream approval also makes imported production definitions stale.
+  // Gate only script-derived scenes, shots and reviewed generation candidates.
   if (!pipelineApproved) return { entries, truncated };
   const script = pipeline?.appliedScriptId !== undefined
     ? document.scripts.find(item => item.id === pipeline.appliedScriptId && item.status === 'approved')
     : document.scripts.filter(item => item.status === 'approved').slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))[0];
-  for (const character of document.characters) add('character/' + character.id, character.name + ' · current definition', character.name + '\n' + character.invariantDescription);
-  const style = document.styleBible;
-  add('style', 'Current visual style', [style.palette.join(', '), style.lighting, style.cameraGrammar, style.texture, ...style.forbiddenChanges].join('\n'));
   if (script !== undefined) {
     const scenes = document.scenes.filter(scene => scene.scriptVersionId === script.id).slice().sort((a,b) => a.order - b.order || a.id.localeCompare(b.id));
     const sceneIds = new Set(scenes.map(scene => scene.id));

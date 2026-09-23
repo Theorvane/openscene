@@ -41,6 +41,8 @@ import {
 } from '../../shared/browserSession';
 import type { MediaAsset } from '../../shared/timelineTypes';
 import { ProductionMemoryPanel } from './ProductionMemoryPanel';
+import { recordVideoRecipe } from '../../shared/videoRecipeHistory';
+import { VideoRecipeHistory } from './VideoRecipeHistory';
 import type { ComfyUiMotionWorkerStatus, MotionControlMode } from '../../shared/comfyUiMotion';
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
@@ -163,6 +165,10 @@ export function VideoGenerationWorkspace({
   const [flowSession, setFlowSession] = useState<BrowserSessionStatus | null>(null);
   const { importAiResult, placeAiAssetOnTimeline, assembleApprovedWriterShots } = useProjectResultImport();
   const [prompt, setPrompt] = useState('');
+  const [recipeParentId, setRecipeParentId] = useState<string | undefined>();
+  const recipeParents = useRef(new Map<string, string>());
+  const importingRecipes = useRef(new Set<string>());
+  useEffect(() => { setRecipeParentId(undefined); }, [projectId]);
   const [writerShotId, setWriterShotId] = useState('');
   const [loadedWriterShotId, setLoadedWriterShotId] = useState('');
   const writerShots = approvedWriterShots(writerDocument);
@@ -331,7 +337,7 @@ export function VideoGenerationWorkspace({
           if (targetWriterShotId !== '') await persistCandidateChange((document) => updateGenerationCandidate(document, job.id, {
             status: 'completed', updatedAt: updatedJob.updatedAt
           }));
-          setStatusMsg({ text: 'Video generation completed! Asset ready.', tone: 'success' });
+          await handleImportToProject(updatedJob);
         } else if (updatedJob.status === 'needs_user_action') {
           stopPolling(intervalId);
           setIsGenerating(activePollJobs.current.size > 0);
@@ -596,6 +602,8 @@ export function VideoGenerationWorkspace({
 
       if (response.ok && response.value) {
         const job = response.value as VideoGenerationJob;
+        const parentRecipe = overrides?.parentGenerationId ?? recipeParentId;
+        if (parentRecipe !== undefined) recipeParents.current.set(job.id, parentRecipe);
         setJobs((prev) => [job, ...prev]);
         setJobInputs((current) => ({ ...current, [job.id]: inputs }));
         setJobContinuityControls((current) => ({ ...current, [job.id]: effectiveContinuityControls }));
@@ -699,18 +707,40 @@ export function VideoGenerationWorkspace({
 
   const handleImportToProject = async (job: VideoGenerationJob, openEditor = false): Promise<void> => {
     if (job.status !== 'completed') return;
+    if (!projectId || activeProjectIdRef.current !== projectId || importingRecipes.current.has(job.id)) return;
+    if (documentRef.current?.videoHistory?.some(recipe => recipe.id === job.id)) {
+      if (openEditor) onOpenEditor?.();
+      return;
+    }
+    importingRecipes.current.add(job.id);
     try {
       const status = await importAiResult(job.id);
+      if (activeProjectIdRef.current !== projectId) return;
       setStatusMsg(status);
-      if (openEditor && status.importedAssetId !== undefined && activeProjectIdRef.current === projectId) onOpenEditor?.();
-      if (status.importedAssetId !== undefined && documentRef.current?.generations.some((entry) => entry.id === job.id)) {
-        const saved = await persistCandidateChange((document) => updateGenerationCandidate(document, job.id, {
-          outputAssetIds: [status.importedAssetId!], updatedAt: new Date().toISOString()
-        }));
-        if (saved) setStatusMsg({ tone: 'success', text: 'Candidate imported. Complete the continuity review before approval.' });
+      if (status.importedAssetId !== undefined) {
+        const parentId = recipeParents.current.get(job.id);
+        const saved = await persistCandidateChange(document => {
+          if (activeProjectIdRef.current !== projectId) return { ok: false, reason: 'Project changed before history could be saved.' };
+          const candidate = document.generations.some(entry => entry.id === job.id)
+            ? updateGenerationCandidate(document, job.id, { outputAssetIds: [status.importedAssetId!], updatedAt: new Date().toISOString() })
+            : { ok: true as const, document };
+          if (!candidate.ok) return candidate;
+          return { ok: true, document: recordVideoRecipe(candidate.document, {
+            id: job.id, assetId: status.importedAssetId!, prompt: job.prompt,
+            modelId: job.modelId ?? 'unknown', providerId: job.provider,
+            operation: job.operation ?? 'text_to_video', durationSeconds: job.durationSeconds,
+            aspectRatio: job.aspectRatio, createdAt: job.createdAt,
+            ...(parentId === undefined ? {} : { parentId })
+          }) };
+        });
+        if (!saved) { setStatusMsg({ tone: 'warning', text: 'Video imported, but prompt history was not saved. Retry Import to project before closing.' }); return; }
+        setStatusMsg({ tone: 'success', text: 'Video and exact prompt saved to this project. Original timeline unchanged.' });
       }
+      if (openEditor && status.importedAssetId !== undefined && activeProjectIdRef.current === projectId) onOpenEditor?.();
     } catch (err) {
       setStatusMsg({ text: `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`, tone: 'danger' });
+    } finally {
+      importingRecipes.current.delete(job.id);
     }
   };
 
@@ -1448,6 +1478,17 @@ export function VideoGenerationWorkspace({
       <div className="studio-composer">
         {projectId && writerDocument && <ProductionMemoryPanel key={projectId} projectId={projectId}
           document={writerDocument} prompt={prompt} onChange={setPrompt} disabled={isGenerating || isBatchGenerating} />}
+        {projectId && <VideoRecipeHistory key={projectId} projectId={projectId}
+          records={writerDocument?.videoHistory ?? []} assetIds={projectAssets.map(asset => asset.id)}
+          disabled={isGenerating || isBatchGenerating || isSavingCandidate}
+          onReuse={recipe => {
+            setPrompt(recipe.prompt); setRecipeParentId(recipe.id);
+            setWriterShotId(''); setLoadedWriterShotId('');
+            setLoadedReferenceAssetIds([]); setAutoLoadedCharacterReferenceIds([]);
+            onReferenceImageChange(null); setLastFrame(null); setReferenceImages([]);
+            setDrivingVideoAssetId('');
+            setStatusMsg({ tone: 'neutral', text: 'Saved prompt loaded, not generated. Reselect model, duration, operation and references; then Generate. The saved original is unchanged.' });
+          }} />}
         {writerShots.length > 0 && <div className="studio-field">
           <label className="studio-field__label" htmlFor="writer-video-shot">Approved Writer shot</label>
           <select id="writer-video-shot" disabled={isGenerating} value={writerShotId} onChange={(e) => {

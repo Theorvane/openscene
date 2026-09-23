@@ -14,6 +14,7 @@ export const IPC_CHANNELS = {
   projectsCreate: 'projects:create',
   projectsOpen: 'projects:open',
   projectsOpenFolder: 'projects:open-folder',
+  projectsCreateEditingCopy: 'projects:create-editing-copy',
   projectsDelete: 'projects:delete',
   projectsRename: 'projects:rename',
   projectAssetsImport: 'project-assets:import',

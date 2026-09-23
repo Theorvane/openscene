@@ -50,7 +50,7 @@ describe('timeline IPC service', () => {
       // Then
       expect(listed).toEqual({
         ok: true,
-        value: [{ id: project.id, name: 'Cutdown', createdAt: project.createdAt, updatedAt: project.updatedAt, storage: 'external', folderName: 'Cutdown' }]
+        value: [{ id: project.id, name: 'Cutdown', projectType: 'editing', createdAt: project.createdAt, updatedAt: project.updatedAt, storage: 'external', folderName: 'Cutdown' }]
       });
       expect(opened).toEqual({ ok: true, value: project });
       expect(invalid).toEqual({ ok: false, error: { code: 'INVALID_INPUT', message: 'The project lookup payload was not valid.' } });

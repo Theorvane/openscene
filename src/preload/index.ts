@@ -85,7 +85,8 @@ export interface VideoToolApi {
   listProjects(): Promise<ApiResponse<readonly LocalProjectSummary[]>>;
   createProject(input: CreateProjectInput): Promise<ApiResponse<CreateProjectResult>>;
   openProject(input: OpenProjectInput): Promise<ApiResponse<LocalProjectSnapshot>>;
-  openProjectFolder(): Promise<ApiResponse<OpenProjectFolderResult>>;
+  openProjectFolder(input?: { readonly projectType: import('../shared/projectTypes').ProjectType }): Promise<ApiResponse<OpenProjectFolderResult>>;
+  createEditingCopy(input: { readonly projectId: string }): Promise<ApiResponse<LocalProjectSnapshot>>;
   deleteProject(input: DeleteProjectInput): Promise<ApiResponse<{ readonly deleted: boolean }>>;
   renameProject(input: { readonly projectId: string; readonly name: string }): Promise<ApiResponse<LocalProjectSnapshot>>;
   importProjectAssets(input: ImportProjectAssetsInput): Promise<ApiResponse<ImportProjectAssetsResult>>;
@@ -205,7 +206,8 @@ const videoTool: VideoToolApi = {
   listProjects: () => ipcRenderer.invoke(IPC_CHANNELS.projectsList) as Promise<ApiResponse<readonly LocalProjectSummary[]>>,
   createProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsCreate, input) as Promise<ApiResponse<CreateProjectResult>>,
   openProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsOpen, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
-  openProjectFolder: () => ipcRenderer.invoke(IPC_CHANNELS.projectsOpenFolder) as Promise<ApiResponse<OpenProjectFolderResult>>,
+  openProjectFolder: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsOpenFolder, input) as Promise<ApiResponse<OpenProjectFolderResult>>,
+  createEditingCopy: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsCreateEditingCopy, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
   deleteProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsDelete, input) as Promise<ApiResponse<{ readonly deleted: boolean }>>,
   renameProject: (input) => ipcRenderer.invoke(IPC_CHANNELS.projectsRename, input) as Promise<ApiResponse<LocalProjectSnapshot>>,
   importProjectAssets: (input) =>
