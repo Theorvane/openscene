@@ -9,12 +9,12 @@ describe('product workspace entrances', () => {
     expect(experience.description.length).toBeGreaterThan(10);
     expect(experience.tools.length).toBeGreaterThan(10);
   });
-  it('both home screens pass the selected entrance when opening projects', () => {
+  it('uses the saved project type when opening a card and the selected type for new projects', () => {
     const desktop = readFileSync('src/renderer/src/ProjectsPage.tsx', 'utf8');
     const mobile = readFileSync('mobile/src/screens/ProjectsScreen.tsx', 'utf8');
-    expect(desktop).toContain('onOpenProject?.(item.id, entrance)');
+    expect(desktop).toContain('onOpenProject?.(item.id, modeForProjectType(item.projectType, entrance))');
     expect(desktop).toContain('onOpenProjectFolder?.(entrance)');
-    expect(mobile).toContain('onOpen(project.id, entrance)');
+    expect(mobile).toContain('onOpen(project.id, modeForProjectType(project.projectType, entrance))');
     for (const source of [desktop, mobile]) {
       expect(source).toContain('WORKSPACE_EXPERIENCES[mode].description');
       expect(source).not.toContain('aiGenerateVideo(');

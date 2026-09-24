@@ -57,8 +57,31 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const shotRows = productionShotRows(project?.ai);
   const selectedScene = scenes.find((scene) => scene.sceneId === selectedSceneId) ?? scenes.find((scene) => !scene.complete) ?? scenes[0];
   const visibleShotIds = new Set(project?.ai.shots.filter((shot) => shot.sceneId === selectedScene?.sceneId).map((shot) => shot.id) ?? []);
-  if (!project || !shots.length) return null;
+  if (!project) return null;
   const dashboard = productionDashboard(project.ai, project.assets.map(asset => ({ id: asset.id, kind: asset.kind, durationMs: asset.durationMs ?? null })));
+  if (shots.length === 0) return <View style={{ gap: 16, backgroundColor: '#0d0d10', padding: 14, borderRadius: 8 }}>
+    <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>OPENSCENE STUDIO · PRODUCTION</Text>
+    <Text style={{ color: '#f2efe9', fontSize: 24, fontWeight: '700' }}>{dashboard.title}</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="Production stages" contentContainerStyle={{ gap: 8, paddingVertical: 8 }}>
+      {dashboard.stages.map((stage, index) => <View key={stage.id} style={{ width: 132, minHeight: 94, borderTopWidth: 3, borderColor: stage.state === 'complete' ? theme.mint : stage.state === 'active' ? theme.warn : '#44444b', backgroundColor: '#1b1b20', padding: 10, gap: 5 }}>
+        <Text style={{ color: stage.state === 'waiting' ? theme.textWeak : theme.warn, fontSize: 11 }}>{stage.state === 'complete' ? '✓' : String(index + 1).padStart(2, '0')} · {stage.state.toUpperCase()}</Text>
+        <Text style={{ color: theme.text, fontWeight: '700' }}>{stage.label}</Text><Text numberOfLines={2} style={{ color: theme.textWeak, fontSize: 11 }}>{stage.detail}</Text>
+      </View>)}
+    </ScrollView>
+    <View style={{ padding: 12, backgroundColor: '#34291b', borderLeftWidth: 3, borderColor: theme.warn }}><Text style={{ color: '#f7d39d', fontWeight: '700' }}>{dashboard.status}</Text></View>
+    <View style={{ backgroundColor: '#ebe5d6', padding: 20, borderRadius: 4, gap: 10 }}>
+      <Text style={{ color: '#705f45', fontSize: 11, letterSpacing: 2, fontWeight: '700' }}>THE SCREENPLAY · WORKING SCRIPT</Text>
+      <Text style={{ color: '#242026', fontSize: 22, fontWeight: '700' }}>{dashboard.title}</Text>
+      <Text style={{ color: '#5c554e', lineHeight: 21 }}>{dashboard.screenplay || 'Every film begins with a brief. Use screenplay and plan controls below to start writing this one.'}</Text>
+    </View>
+    <View style={{ borderWidth: 1, borderColor: '#34343e', padding: 14, gap: 8 }}><Text style={{ color: '#f2efe9', fontSize: 17, fontWeight: '700' }}>Decisions</Text>
+      {dashboard.decisions.length === 0 ? <Text style={{ color: theme.textWeak }}>No style decisions recorded yet.</Text> : dashboard.decisions.map(item => <Text key={item.label} style={{ color: theme.text }}>{item.label}: {item.value}</Text>)}
+    </View>
+    <View style={{ borderWidth: 1, borderColor: '#34343e', padding: 14, gap: 8 }}><Text style={{ color: '#f2efe9', fontSize: 17, fontWeight: '700' }}>Activity</Text><Text style={{ color: theme.textWeak }}>Scene approvals and generation results will appear here.</Text></View>
+    <View style={{ padding: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: '#65523d', gap: 8 }}><Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700' }}>STORY REEL / 00 SCENES</Text>
+      <Text style={{ color: '#f2efe9', fontSize: 18, fontWeight: '700' }}>Scenes take shape here</Text><Text style={{ color: theme.textWeak }}>Review the brief, screenplay, scene plan and five-second shot prompts in the controls below.</Text>
+    </View>
+  </View>;
   const action = (label: string, run: () => void, blocked = false) => <Pressable accessibilityRole="button" disabled={disabled || lock.current || blocked} onPress={run} style={press({ minHeight: MIN_TAP, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{label}</Text></Pressable>;
   const save = (result: GenerationReviewResult) => {
     if (!result.ok) { setMessage(result.reason); return; }

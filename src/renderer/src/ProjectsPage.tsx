@@ -6,6 +6,7 @@ import type { AgentChatHistoryEntry } from '../../shared/agentChat';
 import type { LocalProjectSnapshot, LocalProjectSummary } from '../../shared/timelineTypes';
 import { formatAgentChatTime, groupAgentChatHistory } from './agentChatHistoryView';
 import { formatTimestamp } from './format';
+import { ProjectCover } from './ProjectCover';
 import { Button } from './ui';
 
 type ProjectsPageProps = {
@@ -31,13 +32,6 @@ function FolderPlusIcon(): ReactElement {
   );
 }
 
-function FolderGlyph(): ReactElement {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-      <path d="M3.5 6.25c0-.97.78-1.75 1.75-1.75h3.9c.47 0 .92.19 1.25.52l1.06 1.06c.33.33.78.52 1.25.52h6.04c.97 0 1.75.78 1.75 1.75v9.4c0 .97-.78 1.75-1.75 1.75H5.25c-.97 0-1.75-.78-1.75-1.75z" />
-    </svg>
-  );
-}
 
 export function ProjectsPage({
   project = null,
@@ -53,7 +47,7 @@ export function ProjectsPage({
 }: ProjectsPageProps): ReactElement {
   const chatGroups = groupAgentChatHistory(chats, new Date());
   const [entrance, setEntrance] = useState<WorkspaceMode>('edit');
-  const visibleProjects = projects.filter(item => modeForProjectType(item.projectType, entrance) === entrance);
+  const visibleProjects = projects;
 
   return (
     <div className="projects-home">
@@ -70,10 +64,10 @@ export function ProjectsPage({
             <strong>{WORKSPACE_EXPERIENCES[mode].title}</strong>
             <span>{WORKSPACE_EXPERIENCES[mode].description}</span>
             <small>{WORKSPACE_EXPERIENCES[mode].tools}</small>
-            <span className="workspace-entrance__selection">{entrance === mode ? 'Selected project type' : 'Browse projects →'}</span>
+            <span className="workspace-entrance__selection">{entrance === mode ? 'New project type selected' : 'Choose for new projects →'}</span>
           </button>)}
         </div>
-        <p role="status">New projects are saved as {WORKSPACE_EXPERIENCES[entrance].title}. Existing mixed projects appear in both lists without changing their data.</p>
+        <p role="status">New projects are saved as {WORKSPACE_EXPERIENCES[entrance].title}. All existing projects stay visible below. Opening one uses its saved workspace type.</p>
       </section>
       <aside className="projects-home__sidebar" aria-label="Project folders">
         <div className="projects-home__heading-row">
@@ -101,16 +95,14 @@ export function ProjectsPage({
                   <button
                     type="button"
                     className={`projects-home__project${isSelected ? ' projects-home__project--active' : ''}`}
-                    onClick={() => void onOpenProject?.(item.id, entrance)}
+                    onClick={() => void onOpenProject?.(item.id, modeForProjectType(item.projectType, entrance))}
                     disabled={isBusy}
                     aria-current={isSelected ? 'true' : undefined}
                   >
-                    <span className="projects-home__project-icon" aria-hidden="true">
-                      <FolderGlyph />
-                    </span>
+                    <ProjectCover projectId={item.id} updatedAt={item.updatedAt} />
                     <span className="projects-home__project-body">
                       <span className="projects-home__project-name">{item.name}</span>
-                      <span className="projects-home__type-badge">{item.projectType === undefined ? 'Legacy · mixed' : item.projectType === 'editing' ? 'Editing' : 'AI Generation'}</span>
+                      <span className="projects-home__type-badge">{item.projectType === undefined ? 'Legacy · mixed' : item.projectType === 'editing' ? 'Editing' : 'AI Creation'}</span>
                       <span className="projects-home__project-meta">
                         {item.storage === 'external' && item.folderName ? item.folderName : formatTimestamp(item.updatedAt)}
                       </span>
