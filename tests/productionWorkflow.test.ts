@@ -277,8 +277,8 @@ describe('production storyboard workflow', () => {
     ])).toMatchObject({ ok: false, reason: expect.stringContaining('does not have an approved candidate') });
 
     const plan = buildApprovedProductionAssemblyPlan(base, [
-      { id: 'video-0', kind: 'video', durationMs: 4_100 },
-      { id: 'video-1', kind: 'video', durationMs: 3_900 }
+      { id: 'video-0', kind: 'video', durationMs: 5_000 },
+      { id: 'video-1', kind: 'video', durationMs: 5_000 }
     ]);
     expect(plan).toMatchObject({ ok: true, totalDurationMs: 8_000 });
     if (!plan.ok) return;
@@ -288,8 +288,9 @@ describe('production storyboard workflow', () => {
     expect(assembled.ok).toBe(true);
     if (!assembled.ok) return;
     expect(assembled.timeline.tracks[0]?.clips.map((clip) => [clip.assetId, clip.timelineStartMs])).toEqual([
-      ['video-0', 0], ['video-1', 4_100]
+      ['video-0', 0], ['video-1', 4_000]
     ]);
+    expect(assembled.timeline.tracks[0]?.clips.map(clip => [clip.sourceEndMs, clip.sourceDurationMs])).toEqual([[4000, 5000], [4000, 5000]]);
     expect(assembleApprovedProductionCut({
       timeline: assembled.timeline, plan, targetTrackId: 'video-track-1', clipIdForShot: (id) => `again-${id}`
     })).toMatchObject({ ok: false, reason: expect.stringContaining('already on the timeline') });
@@ -317,6 +318,16 @@ describe('production storyboard workflow', () => {
     });
     expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('overlapping or duplicating') });
     expect(original.tracks[0]?.clips).toEqual([]);
+  });
+
+  it('blocks short or invalid takes instead of moving every later scene and caption', () => {
+    for (const durationMs of [3900, NaN, Infinity]) {
+      const result = buildApprovedProductionAssemblyPlan(approvedProject(), [
+        { id: 'video-0', kind: 'video', durationMs },
+        { id: 'video-1', kind: 'video', durationMs: 5000 }
+      ]);
+      expect(result.ok).toBe(false);
+    }
   });
 
   it('does not present a rejected completed take as still awaiting review', () => {

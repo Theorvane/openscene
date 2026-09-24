@@ -90,6 +90,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   };
   return <View style={{ gap: 10 }}>
     <Text style={{ color: theme.text, fontWeight: '600' }}>Approved plan · {shots.length} shots · {model.label}</Text>
+    <Text style={{ color: theme.textWeak }}>One film sequence · {shots.reduce((total, shot) => total + shot.durationSeconds, 0)}s planned. Approved takes join in script order, trimmed to planned lengths. Original videos and prompts stay saved; short takes block assembly.</Text>
     {action('Price & generate pending shots', start)}
     {lock.current && <><Text style={{ color: theme.textWeak }}>{stopRequested ? 'Stopping after the submitted take is saved…' : 'Stopping does not cancel submitted provider jobs or charges.'}</Text><Pressable accessibilityRole="button" disabled={stopRequested} onPress={() => { queueControl.current.requestStop(); setStopRequested(true); }} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>Stop after current shot</Text></Pressable></>}
     {project.ai.generations.filter(candidate => shots.some(shot => shot.id === candidate.shotId) && candidate.status === 'completed').map(candidate => {

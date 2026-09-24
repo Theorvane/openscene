@@ -38,6 +38,7 @@ export type ProductionAssemblyShot = {
   readonly shotId: string;
   readonly assetId: string;
   readonly durationMs: number;
+  readonly sourceDurationMs: number;
 };
 
 export type ProductionAssemblyPlan =
@@ -508,10 +509,11 @@ export function buildApprovedProductionAssemblyPlan(
     const asset = assetId === undefined ? undefined : byId.get(assetId);
     if (asset === undefined) return { ok: false, reason: `${row.label} has no available approved output asset.` };
     if (asset.kind !== 'video') return { ok: false, reason: `${row.label} approved output is not a video.` };
-    if (asset.durationMs === null || asset.durationMs <= 0) return { ok: false, reason: `Analyze ${row.label} video metadata before assembling the cut.` };
+    if (asset.durationMs === null || !Number.isFinite(asset.durationMs) || asset.durationMs <= 0) return { ok: false, reason: `Analyze ${row.label} video metadata before assembling the cut.` };
+    if (asset.durationMs < row.durationMs) return { ok: false, reason: `${row.label} needs ${row.durationMs / 1000}s but its take is only ${asset.durationMs / 1000}s. Generate a longer take or revise the plan before assembling; dialogue timing was not changed.` };
     if (usedAssetIds.has(asset.id)) return { ok: false, reason: `${row.label} reuses an approved video from another shot. Review the candidate mapping before assembling.` };
     usedAssetIds.add(asset.id);
-    shots.push({ shotId: row.shotId, assetId: asset.id, durationMs: asset.durationMs });
+    shots.push({ shotId: row.shotId, assetId: asset.id, durationMs: row.durationMs, sourceDurationMs: asset.durationMs });
   }
   return { ok: true, shots, totalDurationMs: shots.reduce((total, shot) => total + shot.durationMs, 0) };
 }
@@ -539,7 +541,7 @@ export function assembleApprovedProductionCut(input: {
         timelineStartMs: cursor,
         sourceStartMs: 0,
         sourceEndMs: shot.durationMs,
-        sourceDurationMs: shot.durationMs,
+        sourceDurationMs: shot.sourceDurationMs,
         effects: { ...DEFAULT_CLIP_EFFECTS },
         keyframes: []
       }
