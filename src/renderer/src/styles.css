@@ -6941,6 +6941,17 @@ button {
   gap: var(--space-2);
 }
 
+.production-board__prompt {
+  padding: var(--space-2);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  overflow-wrap: anywhere;
+}
+
+.production-board__prompt p,
+.production-board__take-summary { margin: var(--space-1) 0 0; white-space: pre-wrap; }
+
 .production-board__shot-actions {
   display: flex;
   flex-wrap: wrap;

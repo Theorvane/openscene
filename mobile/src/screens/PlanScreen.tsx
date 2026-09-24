@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { planVideoStoryboard, supportedShotSeconds, CONTINUITY_KEYS } from '@openvideo/shared/videoStoryboardPlan';
+import { productionSourceDurationSeconds } from '@openvideo/shared/productionWorkflow';
 import { composeShotPrompt, refineShotPrompt, revisionsOf, takeLabel } from '@openvideo/shared/shotPrompt';
 import { getDomainModels, isDomainModelAvailableOnRuntime } from '@openvideo/shared/aiDomainModels';
 import { approvedWriterShots } from '@openvideo/shared/writerPipeline';
@@ -506,12 +507,13 @@ export function PlanScreen({
         <Text style={styles.label}>Approved Writer shots — choose one to load, not generate</Text>
         {writerShots.map((shot) => <Pressable key={shot.id} accessibilityRole="button" disabled={running || redoing !== null || asking}
           style={press({ minHeight: MIN_TAP, padding: 10 })} onPress={() => {
-            if (!supportedShotSeconds(model.id).includes(shot.durationSeconds)) {
-              setWriterMessage(`This shot needs ${shot.durationSeconds}s; the model accepts ${supportedShotSeconds(model.id).join('/')}s. Choose a compatible model or revise the Writer shot.`);
+            const sourceSeconds = productionSourceDurationSeconds(model.id, 'text_to_video', shot.durationSeconds);
+            if (sourceSeconds === null) {
+              setWriterMessage(`This shot needs at least ${shot.durationSeconds}s; the model accepts ${supportedShotSeconds(model.id).join('/')}s. Choose a compatible model or revise the Writer shot.`);
               return;
             }
-            setPlan(() => { setPrompt(shot.prompt); setTotalSeconds(shot.durationSeconds); setDescriptions({}); });
-            setWriterMessage('Shot loaded, not generated. Review the prompt, references and spend confirmation before rendering.');
+            setPlan(() => { setPrompt(shot.prompt); setTotalSeconds(sourceSeconds); setDescriptions({}); });
+            setWriterMessage(`Shot loaded, not generated. The model source is ${sourceSeconds}s; the approved film cut uses ${shot.durationSeconds}s. Review the prompt, references and spend confirmation before rendering.`);
           }}><Text style={{ color: theme.text }}>{shot.label}</Text></Pressable>)}
         {!!writerMessage && <Text style={{ color: theme.textWeak }}>{writerMessage}</Text>}
       </View>}

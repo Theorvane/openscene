@@ -3,8 +3,8 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CONTINUITY_REVIEW_FIELDS } from '@openvideo/shared/aiProjectDomain';
 import { approvedWriterShots } from '@openvideo/shared/writerPipeline';
-import { productionTextBatch } from '@openvideo/shared/productionPlan';
-import { approveProductionScene, productionSceneRows } from '@openvideo/shared/productionWorkflow';
+import { productionTextBatch, productionTextShot } from '@openvideo/shared/productionPlan';
+import { approveProductionScene, productionSceneRows, productionShotRows } from '@openvideo/shared/productionWorkflow';
 import { createProductionQueueControl } from '@openvideo/shared/productionQueueControl';
 import { addGenerationCandidate, updateGenerationCandidate, setCandidateContinuity, decideGenerationCandidate, type GenerationReviewResult } from '@openvideo/shared/generationReview';
 import { estimateVideoPlanCost, PRICING_AS_OF } from '@openvideo/shared/mediaGenerationPricing';
@@ -35,6 +35,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const project = readProject(projectId);
   const shots = approvedWriterShots(project?.ai);
   const scenes = productionSceneRows(project?.ai);
+  const shotRows = productionShotRows(project?.ai);
   const selectedScene = scenes.find((scene) => scene.sceneId === selectedSceneId) ?? scenes.find((scene) => !scene.complete) ?? scenes[0];
   const visibleShotIds = new Set(project?.ai.shots.filter((shot) => shot.sceneId === selectedScene?.sceneId).map((shot) => shot.id) ?? []);
   if (!project || !shots.length) return null;
@@ -47,19 +48,19 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
       writeProject({ ...current, ai: result.document }); setMessage('Review saved.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Review could not be saved. Retry before assembling.'); }
   };
-  const start = () => {
+  const start = (shotId?: string) => {
     if (lock.current || disabled) return;
     if (!connected || permissions.standingFor('video-generation') === 'reject') { setMessage('Connect the provider and allow video generation in Settings.'); return; }
     const current = readProject(projectId);
     if (!current) return;
-    const batch = productionTextBatch(current.ai, model.id);
+    const batch = shotId === undefined ? productionTextBatch(current.ai, model.id) : productionTextShot(current.ai, model.id, shotId);
     if (!batch.ok) { setMessage(batch.reason); return; }
-    const queue = batch.shots;
+    const queue = 'shots' in batch ? batch.shots : [batch.shot];
     const fingerprint = JSON.stringify(current.ai.writerPipeline);
     const estimate = estimateVideoPlanCost(queue.map(shot => ({ modelId: model.id, durationSeconds: shot.sourceDurationSeconds })));
     const longer = queue.filter(shot => shot.sourceDurationSeconds > shot.durationSeconds).length;
     const cost = estimate.fullyPriced ? `Estimated $${estimate.totalUsd?.toFixed(2)} (rates as of ${PRICING_AS_OF}; actual charges may differ).` : 'The provider cost is unknown. Continue only if you accept unknown charges.';
-    Alert.alert('Approve generation cost', `${queue.length} planned five-second shots · ${model.label}\n${longer} source clips exceed five seconds and will be trimmed to five seconds in the assembled cut. Cost uses full source lengths.\n${cost}\nResults will be saved with prompts, then wait for your review.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Generate shots', onPress: () => { void (async () => {
+    Alert.alert('Approve generation cost', `${shotId === undefined ? `${queue.length} planned five-second shots` : `${queue[0]!.label} · ${current.ai.generations.some(item => item.shotId === shotId) ? 'regenerate one shot' : 'generate one shot'}`} · ${model.label}\n${shotId === undefined ? '' : `Planned prompt: ${queue[0]!.prompt}\n`}${longer} source clips exceed five seconds and will be trimmed to five seconds in the assembled cut. Cost uses full source lengths.\n${cost}\nThe existing approved take stays selected until you approve its replacement. An assembled cut is not changed automatically.\nResults will be saved with prompts, then wait for your review.`, [{ text: 'Cancel', style: 'cancel' }, { text: shotId === undefined ? 'Generate shots' : 'Generate shot', onPress: () => { void (async () => {
       if (lock.current || !mounted.current) return;
       if (!queueControl.current.begin()) return;
       setStopRequested(false);
@@ -69,8 +70,8 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
           if (!queueControl.current.canSubmit()) break;
           const latest = readProject(projectId);
           if (!mounted.current || !latest || JSON.stringify(latest.ai.writerPipeline) !== fingerprint) throw new Error('Plan changed or screen closed. Remaining shots were not submitted.');
-          const rechecked = productionTextBatch(latest.ai, model.id);
-          if (!rechecked.ok || !rechecked.shots.some(item => item.id === shot.id)) throw new Error('A queued shot is no longer eligible. Review current results before starting another batch.');
+          const rechecked = shotId === undefined ? productionTextBatch(latest.ai, model.id) : productionTextShot(latest.ai, model.id, shotId);
+          if (!rechecked.ok || !('shots' in rechecked ? rechecked.shots.some(item => item.id === shot.id) : rechecked.shot.id === shot.id)) throw new Error('A queued shot is no longer eligible. Review current results before starting another batch.');
           const id = `production-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
           const added = addGenerationCandidate(latest.ai, { id, shotId: shot.id, providerId: model.providerId, modelId: model.id, capability: 'text_to_video', prompt: shot.prompt, createdAt: new Date().toISOString() });
           if (!added.ok) throw new Error(added.reason);
@@ -109,12 +110,25 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
         ]);
       }, !scene.canApprove)}
     </View>)}
-    {action('Price & generate approved scene shots', start, !selectedScene?.canProduce || selectedScene.complete)}
+    {action('Price & generate approved scene shots', () => start(), !selectedScene?.canProduce || selectedScene.complete)}
+    <Text style={{ color: theme.text, fontWeight: '600' }}>{selectedScene ? `Scene ${selectedScene.order + 1} shot prompts` : 'Shot prompts'}</Text>
+    {shotRows.filter(row => row.sceneId === selectedScene?.sceneId).map(row => {
+      const eligibility = productionTextShot(project.ai, model.id, row.shotId);
+      const latest = project.ai.generations.filter(item => item.shotId === row.shotId).at(-1);
+      return <View key={row.shotId} style={{ gap: 6, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 }}>
+        <Text style={{ color: theme.text, fontWeight: '600' }}>{row.label} · {Math.round(row.durationMs / 1000)}s · {row.state}</Text>
+        <Text style={{ color: theme.textWeak }}>Planned video prompt</Text>
+        <Text selectable style={{ color: theme.text }}>{row.prompt}</Text>
+        <Text style={{ color: theme.textWeak }}>{row.candidateCount} take(s){latest ? ` · Latest: ${latest.status} / ${latest.review?.decision ?? 'pending'}` : ''}{row.approvedGeneration ? ' · Approved take retained until replacement approval' : ''}</Text>
+        {action(row.candidateCount > 0 ? 'Regenerate this shot · review cost' : 'Generate this shot · review cost', () => start(row.shotId), !eligibility.ok)}
+        {!eligibility.ok && <Text style={{ color: theme.textWeak }}>{eligibility.reason}</Text>}
+      </View>;
+    })}
     {lock.current && <><Text style={{ color: theme.textWeak }}>{stopRequested ? 'Stopping after the submitted take is saved…' : 'Stopping does not cancel submitted provider jobs or charges.'}</Text><Pressable accessibilityRole="button" disabled={stopRequested} onPress={() => { queueControl.current.requestStop(); setStopRequested(true); }} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>Stop after current shot</Text></Pressable></>}
     <Text style={{ color: theme.text, fontWeight: '600' }}>{selectedScene ? `Scene ${selectedScene.order + 1} takes` : 'Scene takes'}</Text>
     {project.ai.generations.filter(candidate => visibleShotIds.has(candidate.shotId) && candidate.status === 'completed').map(candidate => {
       const asset = project.assets.find(item => candidate.outputAssetIds.includes(item.id));
-      return <View key={candidate.id} style={{ gap: 6 }}><Text style={{ color: theme.text }}>{shots.find(shot => shot.id === candidate.shotId)?.label} · {candidate.review?.decision ?? 'pending'}</Text>
+      return <View key={candidate.id} style={{ gap: 6 }}><Text style={{ color: theme.text }}>{shots.find(shot => shot.id === candidate.shotId)?.label} · {candidate.review?.decision ?? 'pending'}</Text><Text selectable style={{ color: theme.textWeak }}>Take prompt: {candidate.prompt}</Text>
         {asset && action('View take', () => setPreview(preview === candidate.id ? null : candidate.id))}
         {active && asset && preview === candidate.id && <TakePreview key={asset.id} uri={assetUri(projectId, asset)} />}
         {CONTINUITY_REVIEW_FIELDS.map(field => action(`${candidate.review?.continuity[field] === 'pass' ? '✓' : 'Review'} ${field}`, () => { const latest = readProject(projectId); if (latest) save(setCandidateContinuity(latest.ai, candidate.id, field, candidate.review?.continuity[field] === 'pass' ? 'unchecked' : 'pass', candidate.review?.notes ?? '')); }))}

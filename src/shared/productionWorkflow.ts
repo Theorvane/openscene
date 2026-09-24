@@ -20,6 +20,7 @@ export type ProductionShotRow = {
   readonly shotId: string;
   readonly sceneId: string;
   readonly label: string;
+  readonly prompt: string;
   readonly durationMs: number;
   readonly sceneTitle: string;
   readonly characterIds: readonly string[];
@@ -389,6 +390,7 @@ export function productionShotRows(document: AiProjectDocument | null | undefine
       shotId: shot.id,
       sceneId: scene.id,
       label: writerShot.label,
+      prompt: writerShot.prompt,
       durationMs: shot.durationMs,
       sceneTitle: scene.title,
       characterIds: scene.characterIds,
@@ -455,6 +457,20 @@ export function productionSceneGenerationBlockReason(document: AiProjectDocument
   const state = productionSceneRows(document).find((entry) => entry.sceneId === scene.id);
   if (!state?.approved) return `Approve ${scene.title} for production before generating its shots.`;
   return state.canProduce ? null : 'Finish and approve every take in the preceding scenes before generating this scene.';
+}
+
+/** A deliberate new take may coexist with an approved one, but not with an unresolved provider job. */
+export function productionShotRegenerationBlockReason(document: AiProjectDocument, shotId: string): string | null {
+  const sceneBlock = productionSceneGenerationBlockReason(document, shotId);
+  if (sceneBlock !== null) return sceneBlock;
+  const attempts = document.generations.filter((entry) => entry.shotId === shotId && entry.review?.decision !== 'rejected');
+  if (attempts.some((entry) => ['queued', 'running', 'needs_user_action'].includes(entry.status))) {
+    return 'Wait for the current shot generation to finish before starting another take.';
+  }
+  if (attempts.some((entry) => entry.status === 'completed' && entry.outputAssetIds.length === 0)) {
+    return 'Import the completed take before starting another generation.';
+  }
+  return null;
 }
 
 export function approveProductionScene(document: AiProjectDocument, sceneId: string, approvedAt: string): ProductionMutationResult {
