@@ -9,10 +9,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { planVideoStoryboard, supportedShotSeconds, CONTINUITY_KEYS } from '@openvideo/shared/videoStoryboardPlan';
-import { productionSourceDurationSeconds } from '@openvideo/shared/productionWorkflow';
 import { composeShotPrompt, refineShotPrompt, revisionsOf, takeLabel } from '@openvideo/shared/shotPrompt';
 import { getDomainModels, isDomainModelAvailableOnRuntime } from '@openvideo/shared/aiDomainModels';
-import { approvedWriterShots } from '@openvideo/shared/writerPipeline';
 import {
   CONTINUITY_REVIEW_FIELDS,
   type ContinuityReview,
@@ -20,7 +18,7 @@ import {
   type ContinuityReviewValue
 } from '@openvideo/shared/aiProjectDomain';
 import { candidateApprovalBlockReason, emptyContinuityReview } from '@openvideo/shared/generationReview';
-import { activeStyleReference, productionShotRows } from '@openvideo/shared/productionWorkflow';
+import { activeStyleReference, productionShotRows, standaloneGenerationBlockReason } from '@openvideo/shared/productionWorkflow';
 import { getVideoOperationConstraints, isVideoOperationImplemented, type VideoOperation } from '@openvideo/shared/mediaCapabilityRegistry';
 import { ModelSelect } from '../components/ModelSelect';
 import { supportsReferenceImage, type VideoAspectRatio, type VideoProgressStage } from '@openvideo/shared/videoGeneration';
@@ -114,8 +112,8 @@ export function PlanScreen({
   const [showPlanControls, setShowPlanControls] = useState(false);
   useEffect(() => setShowPlanControls(false), [projectId]);
   const activeProject = projectId === null ? null : readProject(projectId);
-  const writerShots = approvedWriterShots(activeProject?.ai);
   const productionRows = productionShotRows(activeProject?.ai);
+  const standaloneBlock = standaloneGenerationBlockReason(activeProject?.ai);
   const styleReference = activeProject === null || activeProject === undefined ? undefined : activeStyleReference(activeProject.ai);
   const styleReferenceAsset = activeProject?.assets.find((asset) => asset.id === styleReference?.assetId);
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>('16:9');
@@ -205,6 +203,10 @@ export function PlanScreen({
    */
   const runGeneration = async (): Promise<void> => {
     if (projectId === null || model === undefined) return;
+    const current = readProject(projectId);
+    if (current === null) { setWriterMessage('Project is no longer available. Open it again before generating.'); return; }
+    const block = standaloneGenerationBlockReason(current.ai);
+    if (block !== null) { setWriterMessage(block); return; }
     setRunning(true);
     setShotStates(plan.shots.map(() => ({ kind: 'idle' })));
     let carriedFrame: { base64: string; mimeType: string } | undefined;
@@ -212,6 +214,9 @@ export function PlanScreen({
     for (const [index, shot] of plan.shots.entries()) {
       const mark = (state: ShotState): void =>
         setShotStates((current) => current.map((entry, position) => (position === index ? state : entry)));
+      const latest = readProject(projectId);
+      const latestBlock = latest === null ? 'Project is no longer available. Generation stopped before the next shot.' : standaloneGenerationBlockReason(latest.ai);
+      if (latestBlock !== null) { mark({ kind: 'failed', message: latestBlock }); break; }
       mark({ kind: 'running', stage: 'submitting' });
 
       // Composed by the shared rule rather than here, so the phone, the desktop
@@ -305,6 +310,9 @@ export function PlanScreen({
     const take = takes[index];
     const shot = plan.shots.find((candidate) => candidate.index === index);
     if (projectId === null || model === undefined || take === undefined || shot === undefined) return;
+    const current = readProject(projectId);
+    const block = current === null ? 'Project is no longer available. Open it again before generating.' : standaloneGenerationBlockReason(current.ai);
+    if (block !== null) { setWriterMessage(block); return; }
 
     const refined = refineShotPrompt(take.prompt, changeNote);
     if (!refined.ok) {
@@ -451,7 +459,7 @@ export function PlanScreen({
 
   const runLine = `${plan.shots.length} shot${plan.shots.length === 1 ? '' : 's'} · ${plan.totalSeconds}s`;
   const canGenerate =
-    projectId !== null && !running && prompt.trim().length > 0 && connected[model?.providerId ?? ''] === true
+    projectId !== null && standaloneBlock === null && !running && prompt.trim().length > 0 && connected[model?.providerId ?? ''] === true
     && isVideoOperationImplemented(model.id, operation)
     && (operation !== 'image_to_video' || firstFrame !== null)
     && (operation !== 'start_end' || (plan.shots.length === 1 && firstFrame !== null && lastFrame !== null))
@@ -506,20 +514,7 @@ export function PlanScreen({
         </Pressable>
         <Text style={styles.footnote}>Assigning the world/style image and imported storyboard or character images is currently done in the desktop production board; mobile reads the same saved mapping and assembly rules. Reference-driven image/video batches and signed-in browser automation remain desktop-only. Mobile can generate an approved scene with a compatible text-to-video model after a separate cost confirmation; every take still needs review.</Text>
       </View>}
-      {writerShots.length > 0 && <View>
-        <Text style={styles.label}>Approved Writer shots — choose one to load, not generate</Text>
-        {writerShots.map((shot) => <Pressable key={shot.id} accessibilityRole="button" disabled={running || redoing !== null || asking}
-          style={press({ minHeight: MIN_TAP, padding: 10 })} onPress={() => {
-            const sourceSeconds = productionSourceDurationSeconds(model.id, 'text_to_video', shot.durationSeconds);
-            if (sourceSeconds === null) {
-              setWriterMessage(`This shot needs at least ${shot.durationSeconds}s; the model accepts ${supportedShotSeconds(model.id).join('/')}s. Choose a compatible model or revise the Writer shot.`);
-              return;
-            }
-            setPlan(() => { setPrompt(shot.prompt); setTotalSeconds(sourceSeconds); setDescriptions({}); });
-            setWriterMessage(`Shot loaded, not generated. The model source is ${sourceSeconds}s; the approved film cut uses ${shot.durationSeconds}s. Review the prompt, references and spend confirmation before rendering.`);
-          }}><Text style={{ color: theme.text }}>{shot.label}</Text></Pressable>)}
-        {!!writerMessage && <Text style={{ color: theme.textWeak }}>{writerMessage}</Text>}
-      </View>}
+      {standaloneBlock !== null && <Text style={styles.footnote}>{standaloneBlock}</Text>}
       <Text style={styles.h1}>Plan a video</Text>
       <Text style={styles.sub}>Shot lengths and prices come from the same modules the desktop app uses.</Text>
       <Text style={styles.body}>Signed-in Google Flow video automation is desktop-only. Grok Imagine browser automation is desktop-only too. Login, CAPTCHA, verification, and account-limit states must be resolved on desktop; mobile continues to use supported official API-key routes.</Text>

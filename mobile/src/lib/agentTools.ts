@@ -1,6 +1,7 @@
 import { checkNarrationFit } from '@openvideo/shared/narrationTiming';
 import { estimateImageCost, estimateVideoPlanCost, PRICING_AS_OF } from '@openvideo/shared/mediaGenerationPricing';
 import { planVideoStoryboard } from '@openvideo/shared/videoStoryboardPlan';
+import { standaloneGenerationBlockReason } from '@openvideo/shared/productionWorkflow';
 import { timelineDurationMs } from '@openvideo/shared/timelineLogic';
 import {
   requestBytePlusImage,
@@ -92,6 +93,10 @@ export const GENERATE_VIDEO_TOOL: AgentTool = {
   },
   run: async (args, context) => {
     if (context.projectId === null) return { summary: 'No project is open, so there is nowhere to save the shot.' };
+    const current = readProject(context.projectId);
+    if (current === null) return { summary: 'The project is no longer available. Open it again before generating.' };
+    const block = standaloneGenerationBlockReason(current.ai);
+    if (block !== null) return { summary: block };
     const result = await generateShot({
       projectId: context.projectId,
       modelId: text(args, 'modelId', VIDEO_MODEL_IDS[0] ?? ''),
