@@ -6,8 +6,8 @@ import { approveProductionScene, batchableProductionVideoShotIds, buildApprovedP
 import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
 
 const at = '2026-09-24T00:00:00.000Z';
-const request: WriterRequest = { mode: 'idea_to_script', sourceText: 'A letter crosses two places.', targetDurationSeconds: 8, language: 'Korean', audience: 'General', tone: 'Dramatic' };
-const shot = (action: string) => ({ durationSeconds: 4, framing: 'Wide', cameraMotion: 'Static', action, dialogue: '', audioCues: [], negativePrompt: '' });
+const request: WriterRequest = { mode: 'idea_to_script', sourceText: 'A letter crosses two places.', targetDurationSeconds: 10, language: 'Korean', audience: 'General', tone: 'Dramatic' };
+const shot = (action: string) => ({ durationSeconds: 5, framing: 'Wide', cameraMotion: 'Static', action, dialogue: '', audioCues: [], negativePrompt: '' });
 const draft: WriterDraft = {
   title: 'Two scenes', screenplay: 'At the station, then at home.', characters: [],
   styleBible: { palette: [], lighting: 'Soft', cameraGrammar: 'Wide', texture: 'Film', forbiddenChanges: [] },
@@ -34,7 +34,7 @@ describe('scene-by-scene production', () => {
   it('keeps a multi-scene plan ordered and requires explicit approval before any provider candidate', () => {
     const document = plan();
     expect(productionSceneRows(document).map((scene) => [scene.title, scene.durationMs, scene.canApprove])).toEqual([
-      ['Station', 4000, true], ['Home', 4000, false]
+      ['Station', 5000, true], ['Home', 5000, false]
     ]);
     expect(batchableProductionVideoShotIds(document)).toEqual([]);
     expect(addGenerationCandidate(document, { id: 'blocked', shotId: document.shots[0]!.id, providerId: 'test', modelId: 'sora-2', capability: 'text_to_video', prompt: 'Test', createdAt: at })).toMatchObject({ ok: false, reason: expect.stringContaining('Approve Station') });
@@ -70,8 +70,8 @@ describe('scene-by-scene production', () => {
       }
     } : entry) };
     expect(buildApprovedProductionAssemblyPlan(finished, [
-      { id: 'video-1', kind: 'video', durationMs: 4000 }, { id: 'video-2', kind: 'video', durationMs: 4000 }
-    ])).toMatchObject({ ok: true, totalDurationMs: 8000, shots: [{ shotId: planned.shots[0]!.id }, { shotId: planned.shots[1]!.id }] });
+      { id: 'video-1', kind: 'video', durationMs: 8000 }, { id: 'video-2', kind: 'video', durationMs: 8000 }
+    ])).toMatchObject({ ok: true, totalDurationMs: 10000, shots: [{ durationMs: 5000, sourceDurationMs: 8000, shotId: planned.shots[0]!.id }, { durationMs: 5000, sourceDurationMs: 8000, shotId: planned.shots[1]!.id }] });
   });
 
   it('loads older scene documents without implicitly approving them', () => {

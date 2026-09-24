@@ -4,7 +4,7 @@ import { WRITER_STAGES } from '../src/shared/writerStages';
 import { addGenerationCandidate } from '../src/shared/generationReview';
 import { createEmptyAiProjectDocument, parseAiProjectDocument } from '../src/shared/aiProjectDomain';
 import { approvedWriterShots } from '../src/shared/writerPipeline';
-import { approveProductionScene } from '../src/shared/productionWorkflow';
+import { approveProductionScene, productionSourceDurationSeconds } from '../src/shared/productionWorkflow';
 import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
 import { productionCompanions } from '../src/shared/productionCompanions';
 import { createNarrationPlan } from '../src/shared/subtitleWorkflow';
@@ -76,6 +76,26 @@ describe('guided production plan', () => {
     const pending = addGenerationCandidate(document, { id: 'pending', shotId: document.shots[0]!.id, modelId: 'sora-2', providerId: 'openai', capability: 'text_to_video', prompt: 'test', createdAt: date });
     if (!pending.ok) throw new Error(pending.reason);
     expect(productionTextBatch(pending.document, 'sora-2').ok).toBe(false);
+  });
+  it('makes five-second finished shots from provider sources that are at least five seconds long', () => {
+    expect(productionSourceDurationSeconds('veo-2.0-generate-001', 'text_to_video', 5)).toBe(5);
+    expect(productionSourceDurationSeconds('sora-2', 'text_to_video', 5)).toBe(8);
+    expect(productionSourceDurationSeconds('sora-2', 'text_to_video', 13)).toBeNull();
+    expect(productionSourceDurationSeconds('sora-2', 'image_to_video', 5)).toBeNull();
+    expect(productionSourceDurationSeconds('sora-2', 'text_to_video', 5, [4, 6, 8])).toBe(6);
+    const fixed: WriterRequest = { ...request, targetDurationSeconds: 300, shotDurationSeconds: 5 };
+    const scenes = Array.from({ length: 6 }, (_, sceneIndex) => ({ ...draft.scenes[0]!, title: `Scene ${sceneIndex + 1}`, shots: Array.from({ length: 10 }, (_, shotIndex) => ({ ...draft.scenes[0]!.shots[0]!, durationSeconds: 5, action: `Scene ${sceneIndex + 1} action ${shotIndex + 1}` })) }));
+    const fiveMinute = { ...draft, scenes };
+    const approved = approveProductionPlan(createEmptyAiProjectDocument(), fixed, proposeProductionPlan(fixed, fiveMinute, 'test'), date, 'five-minute');
+    expect(approved.shots).toHaveLength(60);
+    const sceneApproval = approveProductionScene(approved, approved.scenes[0]!.id, date);
+    if (!sceneApproval.ok) throw new Error(sceneApproval.reason);
+    const batch = productionTextBatch(sceneApproval.document, 'sora-2');
+    expect(batch.ok).toBe(true);
+    if (batch.ok) expect(batch.shots).toMatchObject(Array.from({ length: 10 }, () => ({ durationSeconds: 5, sourceDurationSeconds: 8 })));
+    const fifteen: WriterRequest = { ...fixed, targetDurationSeconds: 900 };
+    expect(proposeProductionPlan(fifteen, { ...draft, scenes: [...scenes, ...scenes, ...scenes] }, 'test').artifacts).toHaveLength(4);
+    expect(() => proposeProductionPlan(fixed, { ...draft, scenes: [{ ...scenes[0]!, shots: [{ ...scenes[0]!.shots[0]!, durationSeconds: 4 }] }] }, 'test')).toThrow('exactly 5 seconds');
   });
   it('persists a whole unapproved proposal without enabling media generation', () => {
     const plan = proposeProductionPlan(request, draft, 'test');

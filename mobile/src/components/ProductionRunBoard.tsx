@@ -56,9 +56,10 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
     if (!batch.ok) { setMessage(batch.reason); return; }
     const queue = batch.shots;
     const fingerprint = JSON.stringify(current.ai.writerPipeline);
-    const estimate = estimateVideoPlanCost(queue.map(shot => ({ modelId: model.id, durationSeconds: shot.durationSeconds })));
+    const estimate = estimateVideoPlanCost(queue.map(shot => ({ modelId: model.id, durationSeconds: shot.sourceDurationSeconds })));
+    const longer = queue.filter(shot => shot.sourceDurationSeconds > shot.durationSeconds).length;
     const cost = estimate.fullyPriced ? `Estimated $${estimate.totalUsd?.toFixed(2)} (rates as of ${PRICING_AS_OF}; actual charges may differ).` : 'The provider cost is unknown. Continue only if you accept unknown charges.';
-    Alert.alert('Approve generation cost', `${queue.length} shots · ${model.label}\n${cost}\nResults will be saved with prompts, then wait for your review.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Generate shots', onPress: () => { void (async () => {
+    Alert.alert('Approve generation cost', `${queue.length} planned five-second shots · ${model.label}\n${longer} source clips exceed five seconds and will be trimmed to five seconds in the assembled cut. Cost uses full source lengths.\n${cost}\nResults will be saved with prompts, then wait for your review.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Generate shots', onPress: () => { void (async () => {
       if (lock.current || !mounted.current) return;
       if (!queueControl.current.begin()) return;
       setStopRequested(false);
@@ -75,7 +76,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
           if (!added.ok) throw new Error(added.reason);
           writeProject({ ...latest, ai: added.document });
           if (mounted.current) setMessage(`Generating ${shot.label}…`);
-          const result = await generateShot({ projectId, modelId: model.id, prompt: shot.prompt, durationSeconds: shot.durationSeconds, aspectRatio, operation: 'text_to_video', onProgress: () => {} });
+          const result = await generateShot({ projectId, modelId: model.id, prompt: shot.prompt, durationSeconds: shot.sourceDurationSeconds, aspectRatio, operation: 'text_to_video', onProgress: () => {} });
           let saved = readProject(projectId);
           if (!saved) throw new Error('Project could not be read after generation.');
           if (!result.ok) {
@@ -83,7 +84,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
             if (failed.ok) writeProject({ ...saved, ai: failed.document });
             throw new Error(result.message);
           }
-          saved = saveGeneratedVideoCandidate(saved, result.asset, { id, assetId: result.asset.id, prompt: shot.prompt, modelId: model.id, providerId: model.providerId, operation: 'text_to_video', durationSeconds: shot.durationSeconds, aspectRatio, createdAt: new Date().toISOString() });
+          saved = saveGeneratedVideoCandidate(saved, result.asset, { id, assetId: result.asset.id, prompt: shot.prompt, modelId: model.id, providerId: model.providerId, operation: 'text_to_video', durationSeconds: shot.sourceDurationSeconds, aspectRatio, createdAt: new Date().toISOString() });
           const completed = updateGenerationCandidate(saved.ai, id, { status: 'completed', outputAssetIds: [result.asset.id], updatedAt: new Date().toISOString() });
           if (!completed.ok) throw new Error(completed.reason);
           writeProject({ ...saved, ai: completed.document });

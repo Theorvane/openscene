@@ -59,6 +59,7 @@ import {
   planProductionVideoReferences,
   productionShotRows,
   productionSceneGenerationBlockReason,
+  productionSourceDurationSeconds,
   PRODUCTION_BATCH_LIMIT,
   type ProductionImageTarget
 } from '../../shared/productionWorkflow';
@@ -913,9 +914,6 @@ export function VideoGenerationWorkspace({
         skipped.push(`${row.label}: Writer data changed.`);
         continue;
       }
-      const nearestDurationFor = (operation: VideoOperation): number => durationOptionsForOperation(operation).reduce((best, candidate) =>
-        Math.abs(candidate - writerShot.durationSeconds) < Math.abs(best - writerShot.durationSeconds) ? candidate : best
-      );
       const referencePlan = planProductionVideoReferences(current, row.shotId, {
         controls: continuityControls,
         supportsImageToVideo: isVideoOperationImplemented(videoModel.id, 'image_to_video'),
@@ -924,6 +922,13 @@ export function VideoGenerationWorkspace({
       });
       if (referencePlan.kind === 'blocked') {
         skipped.push(`${row.label}: ${referencePlan.reason}`);
+        continue;
+      }
+      const operation: VideoOperation = referencePlan.kind === 'storyboard' ? 'image_to_video' : referencePlan.kind === 'characters' ? 'reference_to_video' : 'text_to_video';
+      const sourceSeconds = productionSourceDurationSeconds(videoModel.id, operation, writerShot.durationSeconds,
+        generationMode === 'browser_session' ? durationOptionsForOperation(operation) : undefined);
+      if (sourceSeconds === null) {
+        skipped.push(`${row.label}: this model cannot make a source clip long enough for the ${writerShot.durationSeconds}s finished shot.`);
         continue;
       }
       if (referencePlan.kind === 'storyboard') {
@@ -936,7 +941,7 @@ export function VideoGenerationWorkspace({
           shotId: row.shotId,
           label: row.label,
           prompt: writerShot.prompt,
-          durationSeconds: nearestDurationFor('image_to_video'),
+          durationSeconds: sourceSeconds,
           inputs: { operation: 'image_to_video', referenceImage: loaded.value },
           referenceAssetIds: [referencePlan.reference.id]
         });
@@ -955,7 +960,7 @@ export function VideoGenerationWorkspace({
           shotId: row.shotId,
           label: row.label,
           prompt: writerShot.prompt,
-          durationSeconds: nearestDurationFor('reference_to_video'),
+          durationSeconds: sourceSeconds,
           inputs: { operation: 'reference_to_video', referenceImages: loaded.flatMap((entry) => entry.response.ok ? [entry.response.value] : []) },
           referenceAssetIds: referencePlan.references.map((entry) => entry.id)
         });
@@ -965,7 +970,7 @@ export function VideoGenerationWorkspace({
         shotId: row.shotId,
         label: row.label,
         prompt: writerShot.prompt,
-        durationSeconds: nearestDurationFor('text_to_video'),
+        durationSeconds: sourceSeconds,
         inputs: { operation: 'text_to_video' },
         referenceAssetIds: []
       });
@@ -999,7 +1004,7 @@ export function VideoGenerationWorkspace({
         : `Estimated provider total: ~$${estimate.totalUsd?.toFixed(2)}.`
       : 'Provider total cannot be priced by OpenScene.';
     const confirmed = window.confirm(
-      `Generate ${plan.items.length} production video(s) sequentially with ${videoModel.label}?\n\n${price}\n${adjusted > 0 ? `${adjusted} shot duration(s) will use the nearest supported model duration.\n` : ''}${plan.skipped.length > 0 ? `${plan.skipped.length} target(s) will be skipped.\n` : ''}\nEach result still requires import and continuity review. Browser-session credits may be consumed.`
+      `Generate ${plan.items.length} production video(s) sequentially with ${videoModel.label}?\n\n${price}\n${adjusted > 0 ? `${adjusted} source clip(s) exceed the planned shot length and will be trimmed during assembly; cost uses full source lengths.\n` : ''}${plan.skipped.length > 0 ? `${plan.skipped.length} target(s) will be skipped.\n` : ''}\nEach result still requires import and continuity review. Browser-session credits may be consumed.`
     );
     if (!confirmed) return { tone: 'neutral', text: 'Production video batch cancelled before any provider job was submitted.' };
     let completed = 0;

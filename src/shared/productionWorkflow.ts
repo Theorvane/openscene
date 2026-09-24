@@ -1,5 +1,6 @@
 import type { AiProjectDocument, GenerationRecord, ReferenceAsset } from './aiProjectDomain';
 import type { ImageAspectRatio } from './providerSeams';
+import { getVideoOperationConstraints, isVideoOperationImplemented, type VideoOperation } from './mediaCapabilityRegistry';
 import type { VideoContinuityControls } from './videoContinuitySettings';
 import { approvedWriterShots, pipelineBaseRequest } from './writerPipeline';
 import { writerVideoStyleDirection } from './writerWorkflow';
@@ -53,6 +54,15 @@ export type ProductionMutationResult =
 export type ProductionImageTarget =
   | { readonly kind: 'character_reference'; readonly characterId: string }
   | { readonly kind: 'storyboard'; readonly shotId: string };
+
+/** Choose the shortest supported source that can fill the finished shot. Never stretch a short clip. */
+export function productionSourceDurationSeconds(modelId: string, operation: VideoOperation, finishedSeconds: number, browserDurations?: readonly number[]): number | null {
+  if (!Number.isFinite(finishedSeconds) || finishedSeconds <= 0) return null;
+  const options = browserDurations ?? (isVideoOperationImplemented(modelId, operation)
+    ? getVideoOperationConstraints(modelId, operation)?.durationSeconds
+    : undefined);
+  return options?.filter((seconds) => seconds >= finishedSeconds).sort((a, b) => a - b)[0] ?? null;
+}
 
 export const PRODUCTION_BATCH_LIMIT = 50;
 

@@ -24,18 +24,18 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
   const provider = getLlmProvider(model.providerId);
   const connected = provider?.credentialKey !== undefined && credentialStatus[provider.credentialKey] === true;
   const flow = useProductionPlan(document, onSave);
-  const request: WriterRequest = { ...(base ?? { mode: 'idea_to_script', audience: 'General audience', tone: 'Cinematic and engaging' }), sourceText: brief.trim(), targetDurationSeconds: Number(seconds), language: language.trim() };
+  const request: WriterRequest = { ...(base ?? { mode: 'idea_to_script', audience: 'General audience', tone: 'Cinematic and engaging', shotDurationSeconds: 5 as const }), sourceText: brief.trim(), targetDurationSeconds: Number(seconds), language: language.trim() };
   const busy = disabled || flow.busy;
-  const valid = !!request.sourceText && !!request.language && Number.isSafeInteger(request.targetDurationSeconds) && request.targetDurationSeconds >= 4 && request.targetDurationSeconds <= 7200;
+  const valid = !!request.sourceText && !!request.language && Number.isSafeInteger(request.targetDurationSeconds) && request.targetDurationSeconds >= (request.shotDurationSeconds === 5 ? 300 : 4) && request.targetDurationSeconds <= (request.shotDurationSeconds === 5 ? 900 : 7200) && (request.shotDurationSeconds !== 5 || request.targetDurationSeconds % 5 === 0);
   const matches = pipelineMatchesBrief(flow.proposal, request);
   const applied = !!document.writerPipeline?.appliedScriptId;
   const checkpoint = nextProductionCheckpoint(flow.proposal);
   return <section className="production-plan-composer" aria-label="Guided production">
     <header><p className="section-kicker">BRIEF → PLAN APPROVAL → GENERATE → REVIEW → ASSEMBLE</p><h2>What short film should we make?</h2>
-      <p>Plan a 5–15 minute story with multiple scenes. Review the complete script, scene order and shot prompts before producing each scene.</p></header>
+      <p>Plan a 5–15 minute story as 60–180 five-second shots across multiple scenes. Review the complete script, scene order and shot prompts before producing each scene.</p></header>
     <label className="studio-field"><span>Production brief</span><textarea rows={5} value={brief} disabled={busy} onChange={event => setBrief(event.target.value)} placeholder="A ten-minute mystery: two characters cross paths at a rainy station, uncover a secret, and face a final choice…" /></label>
     <div className="writer-workspace__row">
-      <label className="studio-field"><span>Target runtime (seconds)</span><input type="number" min={4} max={7200} value={seconds} disabled={busy} onChange={event => setSeconds(event.target.value)} /></label>
+      <label className="studio-field"><span>Target runtime (seconds; 300–900 in five-second steps)</span><input type="number" min={request.shotDurationSeconds === 5 ? 300 : 4} max={request.shotDurationSeconds === 5 ? 900 : 7200} step={request.shotDurationSeconds === 5 ? 5 : 1} value={seconds} disabled={busy} onChange={event => setSeconds(event.target.value)} /></label>
       <label className="studio-field"><span>Dialogue language</span><input value={language} disabled={busy} onChange={event => setLanguage(event.target.value)} /></label>
     </div>
     <DomainModelPicker domain="writer" ariaLabel="Production planner model" />

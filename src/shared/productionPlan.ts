@@ -1,15 +1,18 @@
 import type { AiProjectDocument } from './aiProjectDomain';
 import { applyWriterPipeline, approvedWriterShots, pipelineMatchesBrief, saveWriterArtifact, startWriterPipeline } from './writerPipeline';
-import { batchableProductionVideoShotIds, planProductionVideoReferences } from './productionWorkflow';
+import { batchableProductionVideoShotIds, planProductionVideoReferences, productionSourceDurationSeconds } from './productionWorkflow';
 import { DEFAULT_VIDEO_CONTINUITY_CONTROLS } from './videoContinuitySettings';
-import { getVideoOperationConstraints, isVideoOperationImplemented } from './mediaCapabilityRegistry';
+import { isVideoOperationImplemented } from './mediaCapabilityRegistry';
 import { parseWriterPipelineState, WRITER_STAGES, type WriterPipelineState, type WriterStage } from './writerStages';
-import { validateWriterDraft, type WriterDraft, type WriterRequest } from './writerWorkflow';
+import { validateWriterResponse, writerDraftDurationSeconds, type WriterDraft, type WriterRequest } from './writerWorkflow';
 
 /** One proposal, no implied approvals. The user reviews the whole package. */
 export function proposeProductionPlan(request: WriterRequest, draft: WriterDraft, modelId: string): WriterPipelineState {
-  const checked = validateWriterDraft(draft);
+  const checked = validateWriterResponse(draft, request);
   if (!checked.ok) throw new Error(`${checked.issue.path}: ${checked.issue.message}`);
+  if (request.shotDurationSeconds !== undefined && writerDraftDurationSeconds(checked.value) !== request.targetDurationSeconds) {
+    throw new Error(`A ${request.targetDurationSeconds}s film needs exactly ${request.targetDurationSeconds / request.shotDurationSeconds} five-second shots.`);
+  }
   const base = startWriterPipeline(request);
   const content = {
     concept: request.sourceText,
@@ -56,16 +59,16 @@ export function approveProductionCheckpoint(document: AiProjectDocument, request
   return result.document;
 }
 
-/** A constrained text-only batch never substitutes duration or drops references. */
+/** A constrained text-only batch prices provider source lengths and preserves five-second finished cuts. */
 export function productionTextBatch(document: AiProjectDocument, modelId: string) {
   const eligible = new Set(batchableProductionVideoShotIds(document));
   const shots = approvedWriterShots(document).filter(shot => eligible.has(shot.id));
-  const durations = getVideoOperationConstraints(modelId, 'text_to_video')?.durationSeconds ?? [];
+  const sources = shots.map((shot) => productionSourceDurationSeconds(modelId, 'text_to_video', shot.durationSeconds));
   if (!shots.length) return { ok: false as const, reason: 'No new or failed shots to generate. Review existing takes.' };
-  if (!isVideoOperationImplemented(modelId, 'text_to_video') || shots.some(shot => !durations.includes(shot.durationSeconds) || shot.referenceAssetIds.length > 0 || planProductionVideoReferences(document, shot.id, {
+  if (!isVideoOperationImplemented(modelId, 'text_to_video') || shots.some((shot, index) => sources[index] === null || shot.referenceAssetIds.length > 0 || planProductionVideoReferences(document, shot.id, {
     controls: DEFAULT_VIDEO_CONTINUITY_CONTROLS, supportsImageToVideo: false, supportsReferenceToVideo: false, supportsTextToVideo: true
   }).kind !== 'text')) {
-    return { ok: false as const, reason: 'This batch needs a text-to-video model supporting every planned duration and no required reference images. Use the desktop production board for reference-driven batches; no fallback or charge was made.' };
+    return { ok: false as const, reason: 'This batch needs a text-to-video model that can make source clips at least as long as every planned shot, with no required reference images. Use desktop for reference-driven batches; no charge was made.' };
   }
-  return { ok: true as const, shots };
+  return { ok: true as const, shots: shots.map((shot, index) => ({ ...shot, sourceDurationSeconds: sources[index]! })) };
 }
