@@ -15,6 +15,7 @@ import {
   productionShotRows,
   productionShotRegenerationBlockReason,
   productionSceneRows,
+  productionSceneSummary,
   removeCharacterReference,
   type ProductionImageTarget,
   type ProductionMutationResult
@@ -29,7 +30,7 @@ const STATE_LABELS = {
 
 export function ProductionBoard({
   document, assets, busy, onSave, onOpenShot, onGenerateCharacterImage, onGenerateStoryboardImage,
-  onGenerateImages, onOpenImageResults, onGenerateVideoBatch, onGenerateVideoShot, onAssemble
+  onGenerateImages, onOpenImageResults, onGenerateVideoScene, onGenerateVideoShot, onAssemble
 }: {
   readonly document: AiProjectDocument;
   readonly assets: readonly MediaAsset[];
@@ -42,7 +43,7 @@ export function ProductionBoard({
   readonly onGenerateImages: (targets: readonly ProductionImageTarget[]) => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
   readonly onOpenImageResults: () => void;
   readonly onGenerateVideoShot: (shotId: string) => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
-  readonly onGenerateVideoBatch: () => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
+  readonly onGenerateVideoScene: (sceneId: string) => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
   readonly onAssemble: () => boolean;
 }): ReactElement | null {
   const [saving, setSaving] = useState(false);
@@ -58,7 +59,7 @@ export function ProductionBoard({
   const missingCharacterTargets = missingProductionImageTargets(document, 'character_reference');
   const missingStoryboardTargets = missingProductionImageTargets(document, 'storyboard')
     .filter((target) => target.kind === 'storyboard' && rows.some((row) => row.shotId === target.shotId && row.sceneId === selectedScene?.sceneId));
-  const pendingVideoShotIds = batchableProductionVideoShotIds(document);
+  const pendingVideoShotIds = batchableProductionVideoShotIds(document, selectedScene?.sceneId);
   const images = assets.filter((asset) => asset.kind === 'image');
   const imageById = new Map(images.map((asset) => [asset.id, asset]));
   const referenceById = new Map(document.referenceAssets.map((entry) => [entry.id, entry]));
@@ -82,9 +83,9 @@ export function ProductionBoard({
 
   const runVideoBatch = async (shotId?: string): Promise<void> => {
     setBatchBusy(true);
-    setMessage({ tone: 'neutral', text: shotId === undefined ? 'Preparing eligible Writer shots, reference inputs and the batch cost confirmation.' : 'Preparing this shot, its reference inputs and cost confirmation.' });
+    setMessage({ tone: 'neutral', text: shotId === undefined ? 'Preparing this scene’s pending shots, reference inputs and cost confirmation.' : 'Preparing this shot, its reference inputs and cost confirmation.' });
     try {
-      setMessage(await (shotId === undefined ? onGenerateVideoBatch() : onGenerateVideoShot(shotId)));
+      setMessage(await (shotId === undefined ? onGenerateVideoScene(selectedScene!.sceneId) : onGenerateVideoShot(shotId)));
     } catch (error: unknown) {
       setMessage({ tone: 'danger', text: error instanceof Error ? error.message : 'The production video queue failed.' });
     } finally {
@@ -127,18 +128,48 @@ export function ProductionBoard({
 
       <section className="production-board__scenes" aria-label="Film scenes">
         <h4>Scene sequence · {scenes.length} scenes · {(scenes.reduce((total, scene) => total + scene.durationMs, 0) / 60_000).toFixed(1)} planned min</h4>
-        <ol>{scenes.map((scene) => <li key={scene.sceneId}>
-          <strong>{scene.order + 1}. {scene.title}</strong>
-          <span>{scene.setting} · {scene.timeOfDay} · {(scene.durationMs / 1_000).toFixed(0)}s · {scene.approvedShotCount}/{scene.shotCount} takes approved</span>
-          <p>{scene.objective} {scene.continuityNotes}</p>
-          <Button variant="ghost" onClick={() => setSelectedSceneId(scene.sceneId)}>{selectedScene?.sceneId === scene.sceneId ? 'Viewing scene shots' : 'View scene shots'}</Button>
-          <Button variant={scene.complete ? 'ghost' : 'primary'} disabled={busy || saving || batchBusy || !scene.canApprove} onClick={() => {
-            if (!window.confirm(`Approve scene ${scene.order + 1}: ${scene.title} for production? Media generation still has a separate cost confirmation.`)) return;
-            void persist(approveProductionScene(document, scene.sceneId, new Date().toISOString()), `${scene.title} is ready for production.`);
-          }}>{scene.complete ? 'Scene complete' : scene.approved ? 'Scene approved · review takes' : scene.canApprove ? 'Approve this scene' : 'Finish previous scene first'}</Button>
-        </li>)}</ol>
+        <ol>{scenes.map((scene) => {
+          const summary = productionSceneSummary(scene, rows);
+          return <li key={scene.sceneId} className={selectedScene?.sceneId === scene.sceneId ? 'production-board__scene--selected' : ''}>
+            <button type="button" aria-current={selectedScene?.sceneId === scene.sceneId ? 'step' : undefined} onClick={() => setSelectedSceneId(scene.sceneId)}>
+              <span className="production-board__scene-number">SC {String(scene.order + 1).padStart(2, '0')}</span>
+              <strong>{scene.title}</strong>
+              <span>{(scene.durationMs / 1000).toFixed(0)}s · {scene.approvedShotCount}/{scene.shotCount} shots approved</span>
+              <span className={`production-board__scene-stage production-board__scene-stage--${summary.stage}`}>{summary.stage === 'approval' ? 'Ready to approve' : summary.stage === 'generate' ? 'Ready to generate' : summary.stage === 'review' ? 'Review takes' : summary.stage === 'generating' ? 'Generating' : summary.stage === 'complete' ? 'Complete' : 'Locked'}</span>
+              <span className="production-board__scene-progress"><span style={{ width: `${scene.shotCount ? scene.approvedShotCount / scene.shotCount * 100 : 0}%` }} /></span>
+            </button>
+          </li>;
+        })}</ol>
       </section>
 
+      {selectedScene && <section className="production-board__scene-workspace" aria-label={`Scene ${selectedScene.order + 1} workspace`}>
+        <div className="production-board__scene-brief">
+          <span>SCENE {String(selectedScene.order + 1).padStart(2, '0')} / {String(scenes.length).padStart(2, '0')}</span>
+          <h4>{selectedScene.title}</h4>
+          <p>{selectedScene.objective}</p>
+          <small>{selectedScene.setting} · {selectedScene.timeOfDay} · {(selectedScene.durationMs / 1000).toFixed(0)}s · {selectedScene.shotCount} planned shots</small>
+          {selectedScene.continuityNotes && <small>Continuity: {selectedScene.continuityNotes}</small>}
+        </div>
+        <div className="production-board__scene-workspace-actions">
+          {(() => {
+            const summary = productionSceneSummary(selectedScene, rows);
+            return <>
+              <span>{selectedScene.approvedShotCount}/{selectedScene.shotCount} shots approved · {summary.pendingCount} pending · {summary.reviewCount} to review</span>
+              {!selectedScene.approved && <Button variant="primary" disabled={busy || saving || batchBusy || !selectedScene.canApprove} onClick={() => {
+                if (!window.confirm(`Approve scene ${selectedScene.order + 1}: ${selectedScene.title} for production? Media generation has a separate cost confirmation.`)) return;
+                void persist(approveProductionScene(document, selectedScene.sceneId, new Date().toISOString()), `${selectedScene.title} is ready for production.`);
+              }}>{selectedScene.canApprove ? 'Approve this scene' : 'Finish previous scene first'}</Button>}
+              {selectedScene.canProduce && summary.pendingCount > 0 && <Button variant="primary" disabled={busy || saving || batchBusy || pendingVideoShotIds.length === 0} onClick={() => void runVideoBatch()}>Generate {pendingVideoShotIds.length} pending shot(s) in this scene</Button>}
+              {selectedScene.canProduce && missingStoryboardTargets.length > 0 && <Button variant="default" disabled={busy || saving || batchBusy} onClick={() => void runImages(missingStoryboardTargets)}>Generate storyboards for approved scene</Button>}
+              {summary.reviewCount > 0 && <Button variant="ghost" onClick={() => { const shot = visibleRows.find((row) => row.state === 'needs_review' || row.state === 'needs_import'); if (shot) void onOpenShot(shot.shotId); }}>Review pending take</Button>}
+              {selectedScene.complete && scenes[scenes.findIndex((scene) => scene.sceneId === selectedScene.sceneId) + 1] && <Button variant="primary" onClick={() => setSelectedSceneId(scenes[scenes.findIndex((scene) => scene.sceneId === selectedScene.sceneId) + 1]!.sceneId)}>Continue to next scene</Button>}
+              {selectedScene.complete && !scenes[scenes.findIndex((scene) => scene.sceneId === selectedScene.sceneId) + 1] && <span>All scenes complete. Assemble and review the final cut below.</span>}
+            </>;
+          })()}
+        </div>
+      </section>}
+
+      <details className="production-board__references"><summary>Project references · world style and characters</summary>
       <div className="production-board__characters">
         <h4>World/style reference</h4>
         <p>Choose one approved image as the visual source of truth for every character sheet and storyboard frame in this project. It is attached first; up to two character images fill the remaining provider reference slots.</p>
@@ -209,6 +240,8 @@ export function ProductionBoard({
         })}
       </div>
 
+      </details>
+
       <h4>{selectedScene ? `Scene ${selectedScene.order + 1}: ${selectedScene.title} · planned shots` : 'Planned shots'}</h4>
       <ol className="production-board__shots">
         {visibleRows.map((row, index) => {
@@ -258,13 +291,6 @@ export function ProductionBoard({
         <Button variant="default" disabled={busy || saving || batchBusy || missingCharacterTargets.length === 0}
           onClick={() => void runImages(missingCharacterTargets)}>
           Generate missing character images
-        </Button>
-        <Button variant="default" disabled={busy || saving || batchBusy || !selectedScene?.canProduce || missingStoryboardTargets.length === 0}
-          onClick={() => void runImages(missingStoryboardTargets)}>
-          Generate storyboards for approved scene
-        </Button>
-        <Button variant="default" disabled={busy || saving || batchBusy || !selectedScene?.canProduce || !pendingVideoShotIds.some((shotId) => visibleRows.some((row) => row.shotId === shotId))} onClick={() => void runVideoBatch()}>
-          Generate pending shots in approved scene
         </Button>
         <Button variant="ghost" onClick={onOpenImageResults}>Review image results</Button>
         <Button variant="primary" disabled={busy || saving || !assembly.ok} onClick={() => {

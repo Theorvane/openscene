@@ -448,6 +448,28 @@ export function productionSceneRows(document: AiProjectDocument | null | undefin
   return result;
 }
 
+export type ProductionSceneStage = 'locked' | 'approval' | 'generate' | 'generating' | 'review' | 'complete';
+
+/** The next visible action for a scene, derived from the same take states on both surfaces. */
+export function productionSceneSummary(scene: ProductionSceneRow, shots: readonly ProductionShotRow[]): {
+  readonly stage: ProductionSceneStage;
+  readonly pendingCount: number;
+  readonly generatingCount: number;
+  readonly reviewCount: number;
+} {
+  const own = shots.filter((shot) => shot.sceneId === scene.sceneId);
+  const pendingCount = own.filter((shot) => shot.state === 'not_started' || shot.state === 'failed').length;
+  const generatingCount = own.filter((shot) => shot.state === 'generating').length;
+  const reviewCount = own.filter((shot) => shot.state === 'needs_import' || shot.state === 'needs_review').length;
+  const stage: ProductionSceneStage = scene.complete ? 'complete'
+    : !scene.approved ? scene.canApprove ? 'approval' : 'locked'
+    : !scene.canProduce ? 'locked'
+    : generatingCount > 0 ? 'generating'
+    : reviewCount > 0 ? 'review'
+    : 'generate';
+  return { stage, pendingCount, generatingCount, reviewCount };
+}
+
 /** Checked again at submission, so a stale screen cannot spend on an unapproved scene. */
 export function productionSceneGenerationBlockReason(document: AiProjectDocument, shotId: string): string | null {
   const shot = document.shots.find((entry) => entry.id === shotId);
@@ -507,10 +529,10 @@ export function missingProductionImageTargets(
 }
 
 /** Shots safe to enqueue without duplicating an active, reviewable, or approved take. */
-export function batchableProductionVideoShotIds(document: AiProjectDocument): readonly string[] {
+export function batchableProductionVideoShotIds(document: AiProjectDocument, sceneId?: string): readonly string[] {
   const approvedScenes = new Set(productionSceneRows(document).filter((scene) => scene.canProduce).map((scene) => scene.sceneId));
   return productionShotRows(document)
-    .filter((row) => approvedScenes.has(row.sceneId) && (row.state === 'not_started' || row.state === 'failed'))
+    .filter((row) => approvedScenes.has(row.sceneId) && (sceneId === undefined || row.sceneId === sceneId) && (row.state === 'not_started' || row.state === 'failed'))
     .slice(0, PRODUCTION_BATCH_LIMIT)
     .map((row) => row.shotId);
 }
