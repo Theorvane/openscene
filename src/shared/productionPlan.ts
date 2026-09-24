@@ -1,6 +1,6 @@
 import type { AiProjectDocument } from './aiProjectDomain';
 import { applyWriterPipeline, approvedWriterShots, pipelineMatchesBrief, saveWriterArtifact, startWriterPipeline } from './writerPipeline';
-import { batchableProductionVideoShotIds, planProductionVideoReferences, productionSourceDurationSeconds } from './productionWorkflow';
+import { batchableProductionVideoShotIds, planProductionVideoReferences, productionShotRegenerationBlockReason, productionSourceDurationSeconds } from './productionWorkflow';
 import { DEFAULT_VIDEO_CONTINUITY_CONTROLS } from './videoContinuitySettings';
 import { isVideoOperationImplemented } from './mediaCapabilityRegistry';
 import { parseWriterPipelineState, WRITER_STAGES, type WriterPipelineState, type WriterStage } from './writerStages';
@@ -71,4 +71,19 @@ export function productionTextBatch(document: AiProjectDocument, modelId: string
     return { ok: false as const, reason: 'This batch needs a text-to-video model that can make source clips at least as long as every planned shot, with no required reference images. Use desktop for reference-driven batches; no charge was made.' };
   }
   return { ok: true as const, shots: shots.map((shot, index) => ({ ...shot, sourceDurationSeconds: sources[index]! })) };
+}
+
+/** Explicit one-shot text generation; unlike the batch, an approved shot can receive a new take. */
+export function productionTextShot(document: AiProjectDocument, modelId: string, shotId: string) {
+  const shot = approvedWriterShots(document).find((entry) => entry.id === shotId);
+  if (shot === undefined) return { ok: false as const, reason: 'This shot is not in the active approved Writer plan.' };
+  const block = productionShotRegenerationBlockReason(document, shotId);
+  if (block !== null) return { ok: false as const, reason: block };
+  const sourceDurationSeconds = productionSourceDurationSeconds(modelId, 'text_to_video', shot.durationSeconds);
+  if (sourceDurationSeconds === null || shot.referenceAssetIds.length > 0 || planProductionVideoReferences(document, shotId, {
+    controls: DEFAULT_VIDEO_CONTINUITY_CONTROLS, supportsImageToVideo: false, supportsReferenceToVideo: false, supportsTextToVideo: true
+  }).kind !== 'text') {
+    return { ok: false as const, reason: 'This shot needs a compatible text-to-video model and no required reference images. Use desktop for reference-driven generation.' };
+  }
+  return { ok: true as const, shot: { ...shot, sourceDurationSeconds } };
 }

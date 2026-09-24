@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyAiProjectDocument, parseAiProjectDocument, type AiProjectDocument } from '../src/shared/aiProjectDomain';
-import { addGenerationCandidate } from '../src/shared/generationReview';
-import { approveProductionPlan, proposeProductionPlan } from '../src/shared/productionPlan';
-import { approveProductionScene, batchableProductionVideoShotIds, buildApprovedProductionAssemblyPlan, productionSceneRows } from '../src/shared/productionWorkflow';
+import { addGenerationCandidate, decideGenerationCandidate } from '../src/shared/generationReview';
+import { approveProductionPlan, proposeProductionPlan, productionTextShot } from '../src/shared/productionPlan';
+import { approveProductionScene, batchableProductionVideoShotIds, buildApprovedProductionAssemblyPlan, productionSceneRows, productionShotRegenerationBlockReason, productionShotRows } from '../src/shared/productionWorkflow';
 import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
 
 const at = '2026-09-24T00:00:00.000Z';
@@ -72,6 +72,37 @@ describe('scene-by-scene production', () => {
     expect(buildApprovedProductionAssemblyPlan(finished, [
       { id: 'video-1', kind: 'video', durationMs: 8000 }, { id: 'video-2', kind: 'video', durationMs: 8000 }
     ])).toMatchObject({ ok: true, totalDurationMs: 10000, shots: [{ durationMs: 5000, sourceDurationMs: 8000, shotId: planned.shots[0]!.id }, { durationMs: 5000, sourceDurationMs: 8000, shotId: planned.shots[1]!.id }] });
+  });
+
+  it('shows the exact planned prompt and generates one selected shot without discarding its approved take', () => {
+    const original = plan();
+    const shotId = original.shots[0]!.id;
+    expect(productionShotRows(original)[0]?.prompt).toContain('Find a letter');
+    expect(productionTextShot(original, 'sora-2', shotId)).toMatchObject({ ok: false, reason: expect.stringContaining('Approve Station') });
+    const approval = approveProductionScene(original, original.scenes[0]!.id, at);
+    if (!approval.ok) throw new Error(approval.reason);
+    const single = productionTextShot(approval.document, 'sora-2', shotId);
+    expect(single).toMatchObject({ ok: true, shot: { id: shotId, durationSeconds: 5, sourceDurationSeconds: 8 } });
+    const queued = addGenerationCandidate(approval.document, { id: 'queued', shotId, providerId: 'openai', modelId: 'sora-2', capability: 'text_to_video', prompt: 'First try', createdAt: at });
+    if (!queued.ok) throw new Error(queued.reason);
+    expect(productionShotRegenerationBlockReason(queued.document, shotId)).toContain('current shot generation');
+    expect(productionTextShot(queued.document, 'sora-2', shotId).ok).toBe(false);
+    expect(addGenerationCandidate(queued.document, { id: 'duplicate', shotId, providerId: 'openai', modelId: 'sora-2', capability: 'text_to_video', prompt: 'Duplicate', createdAt: at }).ok).toBe(false);
+    const approved = completeFirstTake(approval.document);
+    const replacement = addGenerationCandidate(approved, { id: 'replacement', shotId, providerId: 'openai', modelId: 'sora-2', capability: 'text_to_video', prompt: 'Refined shot', createdAt: at });
+    if (!replacement.ok) throw new Error(replacement.reason);
+    expect(productionShotRows(replacement.document)[0]).toMatchObject({ candidateCount: 2, state: 'approved', approvedGeneration: { id: 'take-1' } });
+    const completed = { ...replacement.document, generations: replacement.document.generations.map(item => item.id === 'replacement' ? {
+      ...item, status: 'completed' as const, outputAssetIds: ['video-new'], review: {
+        decision: 'pending' as const, notes: '',
+        continuity: { identity: 'pass' as const, wardrobeProps: 'pass' as const, settingPalette: 'pass' as const, motionDirection: 'pass' as const, boundaryMatch: 'pass' as const }
+      }
+    } : item) };
+    const decided = decideGenerationCandidate(completed, 'replacement', 'approved', '', at);
+    if (!decided.ok) throw new Error(decided.reason);
+    expect(productionShotRows(decided.document)[0]?.approvedGeneration?.id).toBe('replacement');
+    expect(decided.document.generations.find(item => item.id === 'take-1')?.review?.decision).toBe('rejected');
+    expect(productionTextShot(decided.document, 'sora-2', shotId).ok).toBe(true);
   });
 
   it('loads older scene documents without implicitly approving them', () => {

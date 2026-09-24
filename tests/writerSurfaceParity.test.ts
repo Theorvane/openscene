@@ -61,8 +61,8 @@ describe('Writer surface parity', () => {
     ]);
     expect(desktop).toContain('approvedWriterShots(writerDocument)');
     expect(mobile).toContain('approvedWriterShots(activeProject?.ai)');
-    expect(desktop).toContain('durationOptions.includes(shot.durationSeconds)');
-    expect(mobile).toContain('supportedShotSeconds(model.id).includes(shot.durationSeconds)');
+    expect(desktop).toContain('durationOptions.filter((seconds) => seconds >= shot.durationSeconds)');
+    expect(mobile).toContain("productionSourceDurationSeconds(model.id, 'text_to_video', shot.durationSeconds)");
     expect(desktop).toContain('setPrompt(shot.prompt)');
     expect(mobile).toContain('setPrompt(shot.prompt)');
     expect(mobile).toContain('<SpendPrompt');

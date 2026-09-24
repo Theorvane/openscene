@@ -13,6 +13,7 @@ import {
   clearStyleReference,
   missingProductionImageTargets,
   productionShotRows,
+  productionShotRegenerationBlockReason,
   productionSceneRows,
   removeCharacterReference,
   type ProductionImageTarget,
@@ -28,7 +29,7 @@ const STATE_LABELS = {
 
 export function ProductionBoard({
   document, assets, busy, onSave, onOpenShot, onGenerateCharacterImage, onGenerateStoryboardImage,
-  onGenerateImages, onOpenImageResults, onGenerateVideoBatch, onAssemble
+  onGenerateImages, onOpenImageResults, onGenerateVideoBatch, onGenerateVideoShot, onAssemble
 }: {
   readonly document: AiProjectDocument;
   readonly assets: readonly MediaAsset[];
@@ -40,6 +41,7 @@ export function ProductionBoard({
   readonly onGenerateStoryboardImage: (shotId: string) => string | null;
   readonly onGenerateImages: (targets: readonly ProductionImageTarget[]) => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
   readonly onOpenImageResults: () => void;
+  readonly onGenerateVideoShot: (shotId: string) => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
   readonly onGenerateVideoBatch: () => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
   readonly onAssemble: () => boolean;
 }): ReactElement | null {
@@ -78,11 +80,11 @@ export function ProductionBoard({
     }
   };
 
-  const runVideoBatch = async (): Promise<void> => {
+  const runVideoBatch = async (shotId?: string): Promise<void> => {
     setBatchBusy(true);
-    setMessage({ tone: 'neutral', text: 'Preparing eligible Writer shots, reference inputs and the batch cost confirmation.' });
+    setMessage({ tone: 'neutral', text: shotId === undefined ? 'Preparing eligible Writer shots, reference inputs and the batch cost confirmation.' : 'Preparing this shot, its reference inputs and cost confirmation.' });
     try {
-      setMessage(await onGenerateVideoBatch());
+      setMessage(await (shotId === undefined ? onGenerateVideoBatch() : onGenerateVideoShot(shotId)));
     } catch (error: unknown) {
       setMessage({ tone: 'danger', text: error instanceof Error ? error.message : 'The production video queue failed.' });
     } finally {
@@ -209,12 +211,18 @@ export function ProductionBoard({
 
       <h4>{selectedScene ? `Scene ${selectedScene.order + 1}: ${selectedScene.title} · planned shots` : 'Planned shots'}</h4>
       <ol className="production-board__shots">
-        {visibleRows.map((row, index) => <li className="production-board__shot" key={row.shotId}>
+        {visibleRows.map((row, index) => {
+          const latestTake = document.generations.filter((candidate) => candidate.shotId === row.shotId).at(-1);
+          const generationBlock = productionShotRegenerationBlockReason(document, row.shotId);
+          return <li className="production-board__shot" key={row.shotId}>
           <div className="production-board__shot-heading">
             <span className="production-board__number">{String(index + 1).padStart(2, '0')}</span>
             <div><strong>{row.label}</strong><span>{row.sceneTitle} · {(row.durationMs / 1_000).toFixed(1)}s · {row.candidateCount} candidate(s) · {row.characterReferenceIds.length} character reference(s)</span></div>
             <span className={`production-board__state production-board__state--${row.state}`}>{STATE_LABELS[row.state]}</span>
           </div>
+          <div className="production-board__prompt"><strong>Planned video prompt</strong><p>{row.prompt}</p></div>
+          {latestTake && <p className="production-board__take-summary">Latest take: {latestTake.status} · {latestTake.review?.decision ?? 'pending'}{latestTake.prompt !== row.prompt ? <> · Used prompt: {latestTake.prompt}</> : null}</p>}
+          {row.candidateCount > 0 && <p className="production-board__take-summary">{row.candidateCount} take(s) saved. A new take keeps the current approved version until you approve its replacement. An already assembled timeline cut needs manual review after replacement.</p>}
           <label className="studio-field">
             <span className="studio-field__label">Storyboard / first frame</span>
             <select disabled={busy || saving || images.length === 0} value={row.storyboardReference?.assetId ?? ''} onChange={(event) => {
@@ -237,9 +245,11 @@ export function ProductionBoard({
               if (reason !== null) setMessage({ tone: 'warning', text: reason });
             }}>Edit storyboard brief</Button>
             <Button variant="primary" disabled={busy || saving || batchBusy || !scenes.some((scene) => scene.sceneId === row.sceneId && scene.canProduce)} onClick={() => void runImages([{ kind: 'storyboard', shotId: row.shotId }])}>Generate image now</Button>
-            <Button variant="ghost" disabled={busy || saving || batchBusy || !scenes.some((scene) => scene.sceneId === row.sceneId && scene.canProduce)} onClick={() => void onOpenShot(row.shotId)}>Open shot for video</Button>
+            <Button variant="primary" disabled={busy || saving || batchBusy || generationBlock !== null} onClick={() => void runVideoBatch(row.shotId)}>{row.candidateCount > 0 ? 'Regenerate this shot' : 'Generate this shot'}</Button>
+            <Button variant="ghost" disabled={busy || saving || batchBusy} onClick={() => void onOpenShot(row.shotId)}>Edit prompt & inputs</Button>
           </div>
-        </li>)}
+          {generationBlock !== null && <p className="production-board__take-summary">{generationBlock}</p>}
+        </li>; })}
       </ol>
 
       {!assembly.ok && <StatusCard tone="neutral">Assembly blocked: {assembly.reason}</StatusCard>}
