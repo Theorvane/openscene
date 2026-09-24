@@ -23,12 +23,11 @@ describe('production board surface parity', () => {
     expect(desktop).toContain('World/style reference');
     expect(desktop).toContain('assignStyleReference');
     expect(desktop).toContain('Generate image now');
-    expect(desktop).toContain('Generate storyboards for approved scene');
+    expect(desktop).toContain('Optional · create storyboard frames');
     expect(desktop).toContain('approveProductionScene');
     expect(desktop).toContain('productionSceneRows(document)');
     expect(desktop).toContain('StoryboardSlate projectId={projectId}');
     expect(desktop).toContain('productionShotVisual(row)');
-    expect(desktop).toContain('pending shot(s) in this scene');
     expect(desktop).toContain('onGenerateVideoScene(selectedScene!.sceneId)');
     expect(desktop).toContain('Planned video prompt');
     expect(desktop).toContain('Regenerate this shot');
@@ -53,8 +52,7 @@ describe('production board surface parity', () => {
     expect(mobileRunBoard).toContain('approveProductionScene');
     expect(mobileRunBoard).toContain('productionSceneRows(project?.ai)');
     expect(mobileRunBoard).toContain('productionShotRows(project?.ai)');
-    expect(mobileRunBoard).toContain('if (shots.length === 0) return <View');
-    expect(mobileRunBoard).toContain('STORY REEL / 00 SCENES');
+    expect(mobileRunBoard).toContain('if (shots.length === 0) return null');
     expect(mobileRunBoard).toContain('StoryboardSlate projectId={projectId}');
     expect(mobileRunBoard).toContain('productionShotVisual(row)');
     expect(mobileRunBoard).toContain('visual.takeAssetId ?? visual.storyboardAssetId');
@@ -70,6 +68,21 @@ describe('production board surface parity', () => {
     expect(mobileStore).toContain('buildApprovedProductionAssemblyPlan(project.ai');
     expect(mobileStore).toContain('assembleApprovedProductionCut({');
     expect(desktop).not.toContain('aiGenerateVideo');
+  });
+
+  it('uses one planning entry and keeps film progress behind a disclosure on both surfaces', async () => {
+    const [desktop, board, mobile, mobileBoard] = await Promise.all([
+      source('src/renderer/src/VideoGenerationWorkspace.tsx'),
+      source('src/renderer/src/ProductionBoard.tsx'),
+      source('mobile/src/screens/PlanScreen.tsx'),
+      source('mobile/src/components/ProductionRunBoard.tsx')
+    ]);
+    expect(desktop).toContain('productionShotRows(writerDocument).length > 0 &&');
+    expect(board).toContain('<details className="production-board__production-notes">');
+    expect(board).toContain("summary.stage === 'review'");
+    expect(mobile).toContain('productionRows.length === 0 && <ProductionPlanComposer');
+    expect(mobileBoard).toContain('if (shots.length === 0) return null');
+    expect(mobileBoard).toContain('{showProductionNotes && <>');
   });
 
   it('exposes image import in Editing for the production board reference library', async () => {

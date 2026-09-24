@@ -46,6 +46,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [showScreenplay, setShowScreenplay] = useState(false);
   const [showProductionNotes, setShowProductionNotes] = useState(false);
+  const [showFinalCut, setShowFinalCut] = useState(false);
   const lock = useRef(false);
   const queueControl = useRef(createProductionQueueControl());
   const [stopRequested, setStopRequested] = useState(false);
@@ -60,29 +61,8 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const visibleShotIds = new Set(project?.ai.shots.filter((shot) => shot.sceneId === selectedScene?.sceneId).map((shot) => shot.id) ?? []);
   if (!project) return null;
   const dashboard = productionDashboard(project.ai, project.assets.map(asset => ({ id: asset.id, kind: asset.kind, durationMs: asset.durationMs ?? null })), project.name);
-  if (shots.length === 0) return <View style={{ gap: 16, backgroundColor: theme.bg, padding: 14, borderRadius: 8 }}>
-    <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>OPENSCENE STUDIO · PRODUCTION</Text>
-    <Text style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>{dashboard.title}</Text>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="Production stages" contentContainerStyle={{ gap: 8, paddingVertical: 8 }}>
-      {dashboard.stages.map((stage, index) => <View key={stage.id} style={{ width: 132, minHeight: 94, borderTopWidth: 3, borderColor: stage.state === 'complete' ? theme.mint : stage.state === 'active' ? theme.warn : theme.line, backgroundColor: theme.surface, padding: 10, gap: 5 }}>
-        <Text style={{ color: stage.state === 'waiting' ? theme.textWeak : theme.warn, fontSize: 11 }}>{stage.state === 'complete' ? '✓' : String(index + 1).padStart(2, '0')} · {stage.state.toUpperCase()}</Text>
-        <Text style={{ color: theme.text, fontWeight: '700' }}>{stage.label}</Text><Text numberOfLines={2} style={{ color: theme.textWeak, fontSize: 11 }}>{stage.detail}</Text>
-      </View>)}
-    </ScrollView>
-    <View style={{ padding: 12, backgroundColor: theme.surface, borderLeftWidth: 3, borderColor: theme.warn }}><Text style={{ color: theme.warn, fontWeight: '700' }}>{dashboard.status}</Text></View>
-    <View style={{ backgroundColor: theme.surface, padding: 20, borderRadius: 4, gap: 10 }}>
-      <Text style={{ color: theme.warn, fontSize: 11, letterSpacing: 2, fontWeight: '700' }}>THE SCREENPLAY · WORKING SCRIPT</Text>
-      <Text style={{ color: theme.text, fontSize: 22, fontWeight: '700' }}>{dashboard.title}</Text>
-      <Text style={{ color: theme.textWeak, lineHeight: 21 }}>{dashboard.screenplay || 'Every film begins with a story brief. Write it in the form above to create a screenplay and scene plan.'}</Text>
-    </View>
-    <View style={{ borderWidth: 1, borderColor: theme.line, padding: 14, gap: 8 }}><Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>Decisions</Text>
-      {dashboard.decisions.length === 0 ? <Text style={{ color: theme.textWeak }}>No style decisions recorded yet.</Text> : dashboard.decisions.map(item => <Text key={item.label} style={{ color: theme.text }}>{item.label}: {item.value}</Text>)}
-    </View>
-    <View style={{ borderWidth: 1, borderColor: theme.line, padding: 14, gap: 8 }}><Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>Activity</Text><Text style={{ color: theme.textWeak }}>Scene approvals and generation results will appear here.</Text></View>
-    <View style={{ padding: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.line, gap: 8 }}><Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700' }}>STORY REEL / 00 SCENES</Text>
-      <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>Scenes take shape here</Text><Text style={{ color: theme.textWeak }}>Approve the screenplay, scene plan and five-second shot prompts above. Scene 1 appears here after final approval.</Text>
-    </View>
-  </View>;
+  // The planning screen above is the single entry point until the shot plan is approved.
+  if (shots.length === 0) return null;
   const action = (label: string, run: () => void, blocked = false) => <Pressable accessibilityRole="button" disabled={disabled || lock.current || blocked} onPress={run} style={press({ minHeight: MIN_TAP, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{label}</Text></Pressable>;
   const save = (result: GenerationReviewResult) => {
     if (!result.ok) { setMessage(result.reason); return; }
@@ -144,6 +124,8 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
     <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>OPENSCENE STUDIO · PRODUCTION</Text>
     <Text style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>{dashboard.title}</Text>
     <Text style={{ color: theme.textWeak }}>{scenes.length} scenes · {shots.length} shots · {Math.round(shots.reduce((total, shot) => total + shot.durationSeconds, 0) / 60)} planned min</Text>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: showProductionNotes }} onPress={() => setShowProductionNotes(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text, fontWeight: '700' }}>{showProductionNotes ? 'Hide' : 'Show'} film progress and notes</Text></Pressable>
+    {showProductionNotes && <>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="Production stages" contentContainerStyle={{ gap: 8, paddingVertical: 8 }}>
       {dashboard.stages.map((stage, index) => <View key={stage.id} style={{ width: 132, minHeight: 94, borderTopWidth: 3, borderColor: stage.state === 'complete' ? theme.mint : stage.state === 'active' ? theme.warn : theme.line, backgroundColor: theme.surface, padding: 10, gap: 5 }}>
         <Text style={{ color: stage.state === 'waiting' ? theme.textWeak : theme.warn, fontSize: 11 }}>{stage.state === 'complete' ? '✓' : String(index + 1).padStart(2, '0')} · {stage.state.toUpperCase()}</Text>
@@ -151,8 +133,6 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
       </View>)}
     </ScrollView>
     <View style={{ padding: 12, backgroundColor: theme.surface, borderLeftWidth: 3, borderColor: theme.warn }}><Text style={{ color: theme.warn, fontWeight: '700' }}>{dashboard.status}</Text></View>
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded: showProductionNotes }} onPress={() => setShowProductionNotes(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text, fontWeight: '700' }}>{showProductionNotes ? 'Hide screenplay and production notes' : 'Screenplay and production notes'}</Text></Pressable>
-    {showProductionNotes && <>
     <View style={{ backgroundColor: theme.surface, padding: 20, borderRadius: 4, gap: 10 }}>
       <Text style={{ color: theme.warn, fontSize: 11, letterSpacing: 2, fontWeight: '700' }}>THE SCREENPLAY · {dashboard.screenplayApproved ? 'APPROVED' : 'WORKING SCRIPT'}</Text>
       <Text style={{ color: theme.text, fontSize: 22, fontWeight: '700' }}>{dashboard.title}</Text>
@@ -193,16 +173,23 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
       {(() => { const summary = productionSceneSummary(selectedScene, shotRows); const guide = productionSceneGuide(selectedScene, shotRows, scenes.some(scene => scene.order > selectedScene.order)); return <>
         <View style={{ padding: 12, borderLeftWidth: 3, borderColor: theme.warn, backgroundColor: theme.surface, gap: 5 }}><Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700' }}>{guide.step}</Text><Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>{guide.title}</Text><Text style={{ color: theme.textWeak, lineHeight: 19 }}>{guide.detail}</Text></View>
         <Text style={{ color: theme.textWeak }}>{summary.pendingCount} pending · {summary.reviewCount} to review · {selectedScene.approvedShotCount} approved</Text>
-        {!selectedScene.approved && action(selectedScene.canApprove ? 'Approve this scene' : 'Finish previous scene first', () => {
+        {summary.stage === 'approval' && action('Approve scene', () => {
           Alert.alert(`Approve scene ${selectedScene.order + 1}?`, `${selectedScene.title} will be available for media generation. Provider cost is confirmed separately.`, [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Approve scene', onPress: () => { const latest = readProject(projectId); if (latest) save(approveProductionScene(latest.ai, selectedScene.sceneId, new Date().toISOString())); } }
           ]);
-        }, !selectedScene.canApprove)}
-        {selectedScene.canProduce && summary.pendingCount > 0 && action(`Price & generate ${summary.pendingCount} shot(s) in this scene`, () => start({ sceneId: selectedScene.sceneId }))}
-        {summary.reviewCount > 0 && <Text style={{ color: theme.textWeak }}>Review the pending take and continuity checks below.</Text>}
-        {selectedScene.complete && scenes[scenes.findIndex(scene => scene.sceneId === selectedScene.sceneId) + 1] && action('Continue to next scene', () => setSelectedSceneId(scenes[scenes.findIndex(scene => scene.sceneId === selectedScene.sceneId) + 1]!.sceneId))}
-        {selectedScene.complete && !scenes[scenes.findIndex(scene => scene.sceneId === selectedScene.sceneId) + 1] && <Text style={{ color: theme.textWeak }}>All scenes complete. Assemble and review the final cut below.</Text>}
+        })}
+        {summary.stage === 'generate' && action(`Generate ${summary.pendingCount} shot(s) · review cost`, () => start({ sceneId: selectedScene.sceneId }))}
+        {summary.stage === 'review' && <Text style={{ color: theme.textWeak }}>Review the next take below, then approve it.</Text>}
+        {summary.stage === 'complete' && scenes.some(scene => scene.order > selectedScene.order) && action('Continue to next scene', () => setSelectedSceneId(scenes[scenes.findIndex(scene => scene.sceneId === selectedScene.sceneId) + 1]!.sceneId))}
+        {summary.stage === 'complete' && !scenes.some(scene => scene.order > selectedScene.order) && action('Assemble final cut', () => {
+          try {
+            const latest = readProject(projectId);
+            if (!latest) throw new Error('Project is no longer available.');
+            const result = assembleApprovedWriterShots(latest);
+            setMessage(result.ok ? 'Approved cut assembled and saved.' : result.reason);
+          } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save the assembled cut.'); }
+        }, !dashboard.assemblyReady)}
       </>; })()}
     </View>}
     <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>SHOT BOARD</Text><Text style={{ color: theme.text, fontWeight: '700', fontSize: 18 }}>{selectedScene ? `Scene ${selectedScene.order + 1} · ${selectedScene.title}` : 'Shot prompts'}</Text>
@@ -237,6 +224,8 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
         {action('Approve reviewed take', () => { const latest = readProject(projectId); if (latest) save(decideGenerationCandidate(latest.ai, candidate.id, 'approved', candidate.review?.notes ?? '', new Date().toISOString())); })}
       </View>;
     })}
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: showFinalCut }} onPress={() => setShowFinalCut(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text, fontWeight: '700' }}>{showFinalCut ? 'Hide' : 'Show'} final-cut details</Text></Pressable>
+    {showFinalCut && <>
     <Text style={{ color: theme.text, fontWeight: '700', fontSize: 18 }}>Final cut</Text>
     <Text style={{ color: theme.textWeak }}>{dashboard.assemblyReady ? 'Approved takes are ready to assemble.' : 'Awaiting approved takes for every planned shot.'}</Text>
     {action('Assemble approved cut', () => {
@@ -247,6 +236,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
         setMessage(result.ok ? 'Approved cut assembled and saved.' : result.reason);
       } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save the assembled cut.'); }
     })}
+    </>}
     {!!message && <Text accessibilityRole="alert" style={{ color: theme.textWeak }}>{message}</Text>}
   </View>;
 }
