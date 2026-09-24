@@ -136,7 +136,7 @@ describe('video continuity controls', () => {
 
   it('queues production videos sequentially with cost confirmation and per-shot snapshots', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/renderer/src/VideoGenerationWorkspace.tsx'), 'utf8');
-    expect(source).toContain('batchableProductionVideoShotIds(current)');
+    expect(source).toContain('batchableProductionVideoShotIds(current, selection.sceneId)');
     expect(source).toContain('estimateVideoPlanCost(');
     expect(source).toContain('const confirmed = window.confirm(');
     expect(source).toContain('await waitForVideoTerminal(job.id)');

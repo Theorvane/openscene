@@ -898,16 +898,16 @@ export function VideoGenerationWorkspace({
     return 'timeout';
   };
 
-  const prepareProductionVideoBatch = async (targetShotId?: string): Promise<{
+  const prepareProductionVideoBatch = async (selection: { readonly shotId?: string; readonly sceneId?: string }): Promise<{
     readonly items: readonly ProductionVideoBatchItem[];
     readonly skipped: readonly string[];
   }> => {
     const current = documentRef.current;
     if (current === null || projectId === null || projectId === undefined) return { items: [], skipped: ['Open a project first.'] };
-    const batchableShotIds = new Set(batchableProductionVideoShotIds(current));
-    const eligibleRows = productionShotRows(current).filter((row) => targetShotId === undefined ? batchableShotIds.has(row.shotId) : row.shotId === targetShotId);
-    if (targetShotId !== undefined) {
-      const block = productionShotRegenerationBlockReason(current, targetShotId);
+    const batchableShotIds = new Set(batchableProductionVideoShotIds(current, selection.sceneId));
+    const eligibleRows = productionShotRows(current).filter((row) => selection.shotId === undefined ? batchableShotIds.has(row.shotId) : row.shotId === selection.shotId);
+    if (selection.shotId !== undefined) {
+      const block = productionShotRegenerationBlockReason(current, selection.shotId);
       if (block !== null) return { items: [], skipped: [block] };
     }
     const items: ProductionVideoBatchItem[] = [];
@@ -983,17 +983,17 @@ export function VideoGenerationWorkspace({
     return { items, skipped };
   };
 
-  const generateProductionVideoBatch = async (targetShotId?: string): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
+  const generateProductionVideoBatch = async (selection: { readonly shotId?: string; readonly sceneId?: string }): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
     if (isGenerating || !productionQueue.current.begin()) return { tone: 'warning', text: 'Another video generation job is already running.' };
     setBatchStopRequested(false);
     setIsBatchGenerating(true);
-    try { return await runProductionVideoBatch(targetShotId); }
+    try { return await runProductionVideoBatch(selection); }
     finally { productionQueue.current.finish(); setIsBatchGenerating(false); }
   };
 
-  const runProductionVideoBatch = async (targetShotId?: string): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
+  const runProductionVideoBatch = async (selection: { readonly shotId?: string; readonly sceneId?: string }): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
     const approvedPlan = JSON.stringify(documentRef.current?.writerPipeline);
-    const plan = await prepareProductionVideoBatch(targetShotId);
+    const plan = await prepareProductionVideoBatch(selection);
     if (!productionQueue.current.canSubmit()) return { tone: 'neutral', text: 'Production stopped before any provider job was submitted.' };
     if (plan.items.length === 0) {
       return { tone: 'neutral', text: plan.skipped[0] ?? 'No not-started or failed production shots need a new candidate.' };
@@ -1009,7 +1009,7 @@ export function VideoGenerationWorkspace({
         : `Estimated provider total: ~$${estimate.totalUsd?.toFixed(2)}.`
       : 'Provider total cannot be priced by OpenScene.';
     const confirmed = window.confirm(
-      `${targetShotId === undefined ? `Generate ${plan.items.length} production videos sequentially` : `${plan.items[0]!.label}: ${documentRef.current?.generations.some((candidate) => candidate.shotId === targetShotId) ? 'Regenerate this shot' : 'Generate this shot'}`} with ${videoModel.label}?\n\n${targetShotId === undefined ? '' : `Planned prompt: ${plan.items[0]!.prompt}\n\n`}${price}\n${adjusted > 0 ? `${adjusted} source clip(s) exceed the planned shot length and will be trimmed during assembly; cost uses full source lengths.\n` : ''}${plan.skipped.length > 0 ? `${plan.skipped.length} target(s) will be skipped.\n` : ''}\nThe existing approved take stays selected until a replacement is reviewed and approved. An assembled timeline cut is not changed automatically.\nEach result still requires import and continuity review. Browser-session credits may be consumed.`
+      `${selection.shotId === undefined ? `Generate ${plan.items.length} shots for ${documentRef.current?.scenes.find((scene) => scene.id === selection.sceneId)?.title ?? 'this scene'}` : `${plan.items[0]!.label}: ${documentRef.current?.generations.some((candidate) => candidate.shotId === selection.shotId) ? 'Regenerate this shot' : 'Generate this shot'}`} with ${videoModel.label}?\n\n${selection.shotId === undefined ? '' : `Planned prompt: ${plan.items[0]!.prompt}\n\n`}${price}\n${adjusted > 0 ? `${adjusted} source clip(s) exceed the planned shot length and will be trimmed during assembly; cost uses full source lengths.\n` : ''}${plan.skipped.length > 0 ? `${plan.skipped.length} target(s) will be skipped.\n` : ''}\nThe existing approved take stays selected until a replacement is reviewed and approved. An assembled timeline cut is not changed automatically.\nEach result still requires import and continuity review. Browser-session credits may be consumed.`
     );
     if (!confirmed) return { tone: 'neutral', text: 'Production video generation cancelled before any provider job was submitted.' };
     let completed = 0;
@@ -1018,7 +1018,8 @@ export function VideoGenerationWorkspace({
     for (const [index, item] of plan.items.entries()) {
         if (!productionQueue.current.canSubmit()) break;
         if (activeProjectIdRef.current !== projectId || JSON.stringify(documentRef.current?.writerPipeline) !== approvedPlan ||
-          (targetShotId !== undefined && (!documentRef.current || productionShotRegenerationBlockReason(documentRef.current, targetShotId) !== null))) {
+          (selection.shotId !== undefined && (!documentRef.current || productionShotRegenerationBlockReason(documentRef.current, selection.shotId) !== null)) ||
+          (selection.sceneId !== undefined && (!documentRef.current || !batchableProductionVideoShotIds(documentRef.current, selection.sceneId).includes(item.shotId)))) {
           failed += 1;
           break;
         }
@@ -1148,8 +1149,8 @@ export function VideoGenerationWorkspace({
             onGenerateStoryboardImage={(shotId) => onGenerateProductionImage({ kind: 'storyboard', shotId }, effectiveAspectRatio)}
             onGenerateImages={(targets) => onGenerateProductionImages(targets, effectiveAspectRatio)}
             onOpenImageResults={onOpenImageResults}
-            onGenerateVideoBatch={() => generateProductionVideoBatch()}
-            onGenerateVideoShot={(id) => generateProductionVideoBatch(id)}
+            onGenerateVideoScene={(sceneId) => generateProductionVideoBatch({ sceneId })}
+            onGenerateVideoShot={(id) => generateProductionVideoBatch({ shotId: id })}
             onAssemble={assembleApprovedWriterShots}
           />}
     </div>

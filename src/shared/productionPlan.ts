@@ -60,8 +60,8 @@ export function approveProductionCheckpoint(document: AiProjectDocument, request
 }
 
 /** A constrained text-only batch prices provider source lengths and preserves five-second finished cuts. */
-export function productionTextBatch(document: AiProjectDocument, modelId: string) {
-  const eligible = new Set(batchableProductionVideoShotIds(document));
+export function productionTextBatch(document: AiProjectDocument, modelId: string, sceneId?: string) {
+  const eligible = new Set(batchableProductionVideoShotIds(document, sceneId));
   const shots = approvedWriterShots(document).filter(shot => eligible.has(shot.id));
   const sources = shots.map((shot) => productionSourceDurationSeconds(modelId, 'text_to_video', shot.durationSeconds));
   if (!shots.length) return { ok: false as const, reason: 'No new or failed shots to generate. Review existing takes.' };

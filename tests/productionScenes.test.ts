@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyAiProjectDocument, parseAiProjectDocument, type AiProjectDocument } from '../src/shared/aiProjectDomain';
 import { addGenerationCandidate, decideGenerationCandidate } from '../src/shared/generationReview';
-import { approveProductionPlan, proposeProductionPlan, productionTextShot } from '../src/shared/productionPlan';
-import { approveProductionScene, batchableProductionVideoShotIds, buildApprovedProductionAssemblyPlan, productionSceneRows, productionShotRegenerationBlockReason, productionShotRows } from '../src/shared/productionWorkflow';
+import { approveProductionPlan, proposeProductionPlan, productionTextBatch, productionTextShot } from '../src/shared/productionPlan';
+import { approveProductionScene, batchableProductionVideoShotIds, buildApprovedProductionAssemblyPlan, productionSceneRows, productionSceneSummary, productionShotRegenerationBlockReason, productionShotRows } from '../src/shared/productionWorkflow';
 import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
 
 const at = '2026-09-24T00:00:00.000Z';
@@ -43,6 +43,11 @@ describe('scene-by-scene production', () => {
     if (!first.ok) throw new Error(first.reason);
     expect(parseAiProjectDocument(first.document)).not.toBeNull();
     expect(batchableProductionVideoShotIds(first.document)).toEqual([document.shots[0]!.id]);
+    expect(batchableProductionVideoShotIds(first.document, document.scenes[1]!.id)).toEqual([]);
+    expect(batchableProductionVideoShotIds(first.document, document.scenes[0]!.id)).toEqual([document.shots[0]!.id]);
+    expect(productionTextBatch(first.document, 'sora-2', document.scenes[1]!.id).ok).toBe(false);
+    expect(productionTextBatch(first.document, 'sora-2', document.scenes[0]!.id)).toMatchObject({ ok: true, shots: [{ id: document.shots[0]!.id }] });
+    expect(productionSceneSummary(productionSceneRows(first.document)[0]!, productionShotRows(first.document))).toMatchObject({ stage: 'generate', pendingCount: 1, reviewCount: 0 });
     expect(addGenerationCandidate(first.document, { id: 'blocked-2', shotId: document.shots[1]!.id, providerId: 'test', modelId: 'sora-2', capability: 'text_to_video', prompt: 'Test', createdAt: at }).ok).toBe(false);
     expect(buildApprovedProductionAssemblyPlan(first.document, [])).toMatchObject({ ok: false, reason: expect.stringContaining('every planned scene') });
   });
@@ -53,6 +58,7 @@ describe('scene-by-scene production', () => {
     if (!firstApproval.ok) throw new Error(firstApproval.reason);
     const completed = completeFirstTake(firstApproval.document);
     expect(productionSceneRows(completed).map((scene) => scene.complete)).toEqual([true, false]);
+    expect(productionSceneSummary(productionSceneRows(completed)[0]!, productionShotRows(completed)).stage).toBe('complete');
     const secondApproval = approveProductionScene(completed, completed.scenes[1]!.id, at);
     if (!secondApproval.ok) throw new Error(secondApproval.reason);
     expect(batchableProductionVideoShotIds(secondApproval.document)).toEqual([planned.shots[1]!.id]);
