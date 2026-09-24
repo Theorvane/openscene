@@ -6883,6 +6883,39 @@ button {
   font-size: var(--text-caption);
 }
 
+.production-board__scenes {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.production-board__scenes h4,
+.production-board__scenes p { margin: 0; }
+
+.production-board__scenes ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.production-board__scenes li {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.production-board__scenes li > span,
+.production-board__scenes li > p {
+  color: var(--text-weak);
+  font-size: var(--text-caption);
+}
+
 .production-board__characters,
 .production-board__shots {
   display: grid;

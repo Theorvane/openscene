@@ -16,7 +16,7 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
 }) {
   const base = pipelineBaseRequest(document.writerPipeline);
   const [brief, setBrief] = useState(base?.sourceText ?? '');
-  const [seconds, setSeconds] = useState(String(base?.targetDurationSeconds ?? 60));
+  const [seconds, setSeconds] = useState(String(base?.targetDurationSeconds ?? 600));
   const [language, setLanguage] = useState(base?.language ?? 'Korean');
   const { selectedModel } = useAiDomainModel();
   const { credentialStatus } = useLlmModel();
@@ -31,11 +31,11 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
   const applied = !!document.writerPipeline?.appliedScriptId;
   const checkpoint = nextProductionCheckpoint(flow.proposal);
   return <section className="production-plan-composer" aria-label="Guided production">
-    <header><p className="section-kicker">BRIEF → PLAN APPROVAL → GENERATE → REVIEW → ASSEMBLE</p><h2>What video should we make?</h2>
-      <p>Describe the story once. Review the complete script, scenes and shot prompts before generating media.</p></header>
-    <label className="studio-field"><span>Production brief</span><textarea rows={5} value={brief} disabled={busy} onChange={event => setBrief(event.target.value)} placeholder="A 60-second mystery with two characters, a rainy station and a surprising ending…" /></label>
+    <header><p className="section-kicker">BRIEF → PLAN APPROVAL → GENERATE → REVIEW → ASSEMBLE</p><h2>What short film should we make?</h2>
+      <p>Plan a 5–15 minute story with multiple scenes. Review the complete script, scene order and shot prompts before producing each scene.</p></header>
+    <label className="studio-field"><span>Production brief</span><textarea rows={5} value={brief} disabled={busy} onChange={event => setBrief(event.target.value)} placeholder="A ten-minute mystery: two characters cross paths at a rainy station, uncover a secret, and face a final choice…" /></label>
     <div className="writer-workspace__row">
-      <label className="studio-field"><span>Target seconds</span><input type="number" min={4} max={7200} value={seconds} disabled={busy} onChange={event => setSeconds(event.target.value)} /></label>
+      <label className="studio-field"><span>Target runtime (seconds)</span><input type="number" min={4} max={7200} value={seconds} disabled={busy} onChange={event => setSeconds(event.target.value)} /></label>
       <label className="studio-field"><span>Dialogue language</span><input value={language} disabled={busy} onChange={event => setLanguage(event.target.value)} /></label>
     </div>
     <DomainModelPicker domain="writer" ariaLabel="Production planner model" />

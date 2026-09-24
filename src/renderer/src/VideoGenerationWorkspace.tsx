@@ -58,6 +58,7 @@ import {
   batchableProductionVideoShotIds,
   planProductionVideoReferences,
   productionShotRows,
+  productionSceneGenerationBlockReason,
   PRODUCTION_BATCH_LIMIT,
   type ProductionImageTarget
 } from '../../shared/productionWorkflow';
@@ -534,6 +535,13 @@ export function VideoGenerationWorkspace({
     }
     const candidateOperation = overrides?.inputs?.operation ?? selectedOperation;
     const targetWriterShotId = overrides?.writerShotId ?? loadedWriterShotId;
+    if (targetWriterShotId !== '' && documentRef.current !== null) {
+      const sceneBlock = productionSceneGenerationBlockReason(documentRef.current, targetWriterShotId);
+      if (sceneBlock !== null) {
+        setStatusMsg({ text: sceneBlock, tone: 'warning' });
+        return null;
+      }
+    }
     const editablePrompt = overrides?.prompt ?? prompt;
     const targetContinuityControls = overrides?.continuityControls ?? continuityControls;
     const compiledContinuity = targetWriterShotId !== '' && documentRef.current !== null

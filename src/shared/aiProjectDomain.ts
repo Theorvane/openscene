@@ -87,6 +87,8 @@ export type AiScene = {
   readonly characterIds: readonly string[];
   readonly shotIds: readonly string[];
   readonly continuityNotes: string;
+  /** Explicit approval to produce this scene after reviewing the saved Writer plan. */
+  readonly productionApprovedAt?: string;
 };
 
 export type AiShot = {
@@ -357,7 +359,7 @@ function parseStyleBible(value: unknown): StyleBible | null {
 }
 
 function parseScene(value: unknown): AiScene | null {
-  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['id', 'scriptVersionId', 'order', 'title', 'objective', 'setting', 'timeOfDay', 'characterIds', 'shotIds', 'continuityNotes'])) return null;
+  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['id', 'scriptVersionId', 'order', 'title', 'objective', 'setting', 'timeOfDay', 'characterIds', 'shotIds', 'continuityNotes', 'productionApprovedAt'])) return null;
   const id = getOpaqueId(value, 'id');
   const scriptVersionId = getOpaqueId(value, 'scriptVersionId');
   const order = getBoundedInteger(value, 'order', LIMITS.scenes);
@@ -368,8 +370,9 @@ function parseScene(value: unknown): AiScene | null {
   const characterIds = getUniqueIdList(value.characterIds);
   const shotIds = getUniqueIdList(value.shotIds);
   const continuityNotes = getText(value, 'continuityNotes', LIMITS.mediumText);
-  if (id === null || scriptVersionId === null || order === null || title === null || objective === null || setting === null || timeOfDay === null || characterIds === null || shotIds === null || continuityNotes === null) return null;
-  return { id, scriptVersionId, order, title, objective, setting, timeOfDay, characterIds, shotIds, continuityNotes };
+  const productionApprovedAt = value.productionApprovedAt === undefined ? undefined : getIsoTimestamp(value, 'productionApprovedAt');
+  if (id === null || scriptVersionId === null || order === null || title === null || objective === null || setting === null || timeOfDay === null || characterIds === null || shotIds === null || continuityNotes === null || productionApprovedAt === null) return null;
+  return { id, scriptVersionId, order, title, objective, setting, timeOfDay, characterIds, shotIds, continuityNotes, ...(productionApprovedAt === undefined ? {} : { productionApprovedAt }) };
 }
 
 function parseShot(value: unknown): AiShot | null {

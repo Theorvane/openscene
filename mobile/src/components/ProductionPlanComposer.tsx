@@ -21,7 +21,7 @@ export function ProductionPlanComposer({ document, onSave, disabled, connections
 }) {
   const base = pipelineBaseRequest(document.writerPipeline);
   const [brief, setBrief] = useState(base?.sourceText ?? '');
-  const [seconds, setSeconds] = useState(String(base?.targetDurationSeconds ?? 60));
+  const [seconds, setSeconds] = useState(String(base?.targetDurationSeconds ?? 600));
   const [language, setLanguage] = useState(base?.language ?? 'Korean');
   const [modelId, setModelId] = useState(getDomainModels('writer')[0]?.id ?? '');
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
@@ -38,10 +38,10 @@ export function ProductionPlanComposer({ document, onSave, disabled, connections
   useEffect(() => { if (checkpoint) setExpanded(checkpoint); }, [checkpoint]);
   const action = (label: string, callback: () => void, off = false) => <Pressable accessibilityRole="button" disabled={off} onPress={callback} style={press([styles.button, off && { opacity: .5 }])}><Text style={styles.text}>{label}</Text></Pressable>;
   return <View style={styles.card}>
-    <Text style={styles.title}>What video should we make?</Text>
+    <Text style={styles.title}>What short film should we make?</Text>
     <Text style={styles.text}>Brief → plan approval → generate → review → assemble</Text>
-    <TextInput accessibilityLabel="Production brief" placeholder="Describe the story, characters and ending…" placeholderTextColor={theme.textWeak} multiline value={brief} onChangeText={setBrief} editable={!busy} style={[styles.input, { minHeight: 110 }]} />
-    <Text style={styles.text}>Target seconds</Text><TextInput accessibilityLabel="Target seconds" value={seconds} onChangeText={setSeconds} keyboardType="number-pad" editable={!busy} style={styles.input} />
+    <TextInput accessibilityLabel="Production brief" placeholder="Describe a 5–15 minute story, its characters, scene changes and ending…" placeholderTextColor={theme.textWeak} multiline value={brief} onChangeText={setBrief} editable={!busy} style={[styles.input, { minHeight: 110 }]} />
+    <Text style={styles.text}>Target runtime (seconds)</Text><TextInput accessibilityLabel="Target runtime (seconds)" value={seconds} onChangeText={setSeconds} keyboardType="number-pad" editable={!busy} style={styles.input} />
     <Text style={styles.text}>Dialogue language</Text><TextInput accessibilityLabel="Dialogue language" value={language} onChangeText={setLanguage} editable={!busy} style={styles.input} />
     <ModelSelect domain="writer" selectedId={modelId} connected={connected} onSelect={item => setModelId(item.id)} onConnectionChange={() => { void readProviderConnections().then(setConnected); }} />
     {action(flow.busy ? 'Working…' : flow.proposal ? 'Revise complete plan' : 'Propose complete plan', () => {

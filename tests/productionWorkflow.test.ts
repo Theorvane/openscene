@@ -6,6 +6,7 @@ import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
 import type { WriterStageArtifact } from '../src/shared/writerStages';
 import {
   activeStyleReference,
+  approveProductionScene,
   addCharacterReference,
   assembleApprovedProductionCut,
   attachGeneratedProductionImage,
@@ -42,7 +43,9 @@ function project(writerRequest: WriterRequest = request) {
   state = saveWriterArtifact(state, artifactFromWriterDraft('prompts', draft, 'test'), true);
   const applied = applyWriterPipeline(createEmptyAiProjectDocument(), state, '2026-09-07T00:00:00.000Z', 'production');
   if (!applied.ok) throw new Error(applied.message);
-  return applied.document;
+  const approvedScene = approveProductionScene(applied.document, applied.document.scenes[0]!.id, '2026-09-07T00:00:00.000Z');
+  if (!approvedScene.ok) throw new Error(approvedScene.reason);
+  return approvedScene.document;
 }
 
 function approvedProject() {
