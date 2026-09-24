@@ -46,7 +46,7 @@ export function ProjectsPage({
   isBusy = false
 }: ProjectsPageProps): ReactElement {
   const chatGroups = groupAgentChatHistory(chats, new Date());
-  const [entrance, setEntrance] = useState<WorkspaceMode>('edit');
+  const [entrance, setEntrance] = useState<WorkspaceMode>('create');
   const visibleProjects = projects;
 
   return (

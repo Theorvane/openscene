@@ -18,7 +18,7 @@ import {
   type ContinuityReviewValue
 } from '@openvideo/shared/aiProjectDomain';
 import { candidateApprovalBlockReason, emptyContinuityReview } from '@openvideo/shared/generationReview';
-import { activeStyleReference, productionShotRows, standaloneGenerationBlockReason } from '@openvideo/shared/productionWorkflow';
+import { productionShotRows, standaloneGenerationBlockReason } from '@openvideo/shared/productionWorkflow';
 import { getVideoOperationConstraints, isVideoOperationImplemented, type VideoOperation } from '@openvideo/shared/mediaCapabilityRegistry';
 import { ModelSelect } from '../components/ModelSelect';
 import { supportsReferenceImage, type VideoAspectRatio, type VideoProgressStage } from '@openvideo/shared/videoGeneration';
@@ -26,7 +26,7 @@ import { isFrameExtractionAvailable } from '../../modules/video-export';
 import { readProviderConnections } from '../lib/mediaProviders';
 import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { generateShot } from '../lib/videoGeneration';
-import { appendAssetToTimeline, assembleApprovedWriterShots, assetUri, clipIdForAsset, readProject, replaceTakeInTimeline, saveGeneratedVideoCandidate, type MobileAsset } from '../lib/projectStore';
+import { appendAssetToTimeline, assetUri, clipIdForAsset, readProject, replaceTakeInTimeline, saveGeneratedVideoCandidate, type MobileAsset } from '../lib/projectStore';
 import { SpendPrompt } from '../components/SpendPrompt';
 import { ProductionMemoryPanel } from '../components/ProductionMemoryPanel';
 import { FormScreen } from '../components/FormScreen';
@@ -110,12 +110,11 @@ export function PlanScreen({
   useEffect(() => { setRecipeParentId(undefined); setHistoryCount(20); }, [projectId]);
   const [writerMessage, setWriterMessage] = useState('');
   const [showPlanControls, setShowPlanControls] = useState(false);
-  useEffect(() => setShowPlanControls(false), [projectId]);
+  const [showQuickClip, setShowQuickClip] = useState(false);
+  useEffect(() => { setShowPlanControls(false); setShowQuickClip(false); }, [projectId]);
   const activeProject = projectId === null ? null : readProject(projectId);
   const productionRows = productionShotRows(activeProject?.ai);
   const standaloneBlock = standaloneGenerationBlockReason(activeProject?.ai);
-  const styleReference = activeProject === null || activeProject === undefined ? undefined : activeStyleReference(activeProject.ai);
-  const styleReferenceAsset = activeProject?.assets.find((asset) => asset.id === styleReference?.assetId);
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>('16:9');
   const [shotStates, setShotStates] = useState<readonly ShotState[]>([]);
   // Keyed by shot index, because the plan can change under them and an array
@@ -467,6 +466,14 @@ export function PlanScreen({
 
   return (
     <FormScreen topInset={topInset} keyboardOffset={keyboardOffset}>
+      {productionRows.length > 0 && <View style={styles.filmModelControls}>
+        <Text style={styles.quickClipTitle}>Film shot model</Text>
+        <Text style={styles.body}>This model and framing are used for scene and shot generation below. Each run still asks for cost approval.</Text>
+        <ModelSelect domain="video-generation" selectedId={modelId} connected={connected}
+          onSelect={next => setPlan(() => setModelId(next.id))} onConnectionChange={refreshConnections} />
+        <Text style={styles.label}>Frame ratio</Text>
+        <View style={styles.row}>{aspectRatioOptions.map(ratio => <Chip key={ratio} label={ratio} selected={ratio === effectiveAspectRatio} onPress={() => setPlan(() => setAspectRatio(ratio))} />)}</View>
+      </View>}
       {projectId && <ProductionRunBoard key={'run-' + projectId} projectId={projectId} model={model} aspectRatio={effectiveAspectRatio} disabled={running || asking || redoing !== null} connected={connected[model.providerId] === true} onBusy={setRunning} active={active} />}
       {projectId && activeProject && productionShotRows(activeProject.ai).length > 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlanControls }} onPress={() => setShowPlanControls(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{showPlanControls ? 'Hide screenplay and plan controls' : 'Screenplay and plan controls'}</Text></Pressable>}
       {projectId && activeProject && <View style={{ display: productionRows.length === 0 || showPlanControls ? 'flex' : 'none' }}><ProductionPlanComposer key={'plan-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
@@ -476,7 +483,7 @@ export function PlanScreen({
         return true;
       }} /></View>}
       {activeProject && onSelectProductionTool && <ProductionCompanions project={activeProject} disabled={running || asking || redoing !== null} onSelect={onSelectProductionTool} />}
-      {projectId !== null && activeProject !== null && <ProductionNavigator key={projectId} projectId={projectId} document={activeProject.ai} assets={activeProject.assets}
+      {productionRows.length === 0 && projectId !== null && activeProject !== null && <ProductionNavigator key={projectId} projectId={projectId} document={activeProject.ai} assets={activeProject.assets}
         timeline={activeProject.timeline} onPlaceVoice={assetId => {
           try {
             const latest = readProject(projectId);
@@ -493,29 +500,12 @@ export function PlanScreen({
           if (prompt.trim()) Alert.alert('Replace prompt?', 'Your saved media stays unchanged.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Load prompt', onPress: load }]);
           else load();
         }} />}
-      {productionRows.length > 0 && <View style={styles.reviewCard}>
-        <Text style={styles.label}>Storyboard production board</Text>
-        <Text style={styles.body}>{productionRows.filter((row) => row.state === 'approved').length}/{productionRows.length} Writer shots approved. Opening and generation remain manual.</Text>
-        <Text style={styles.body}>World/style reference: {styleReferenceAsset?.displayName ?? styleReference?.label ?? 'Not assigned'}</Text>
-        {productionRows.map((row, index) => <View style={styles.shot} key={row.shotId}>
-          <Text style={styles.shotIndex}>{String(index + 1).padStart(2, '0')}</Text>
-          <Text style={styles.shotBody}>{row.label}</Text>
-          <Text style={styles.shotLen}>{row.state.replace('_', ' ')}</Text>
-        </View>)}
-        <Pressable accessibilityRole="button" disabled={running || activeProject === null}
-          onPress={() => {
-            if (activeProject === null) return;
-            const result = assembleApprovedWriterShots(activeProject);
-            setWriterMessage(result.ok
-              ? `Placed ${productionRows.length} approved shots on the timeline in Writer order.`
-              : result.reason);
-          }} style={press([styles.approve, (running || activeProject === null) && styles.approveOff])}>
-          <Text style={styles.approveText}>Assemble approved Writer cut</Text>
-        </Pressable>
-        <Text style={styles.footnote}>Assigning the world/style image and imported storyboard or character images is currently done in the desktop production board; mobile reads the same saved mapping and assembly rules. Reference-driven image/video batches and signed-in browser automation remain desktop-only. Mobile can generate an approved scene with a compatible text-to-video model after a separate cost confirmation; every take still needs review.</Text>
-      </View>}
-      {standaloneBlock !== null && <Text style={styles.footnote}>{standaloneBlock}</Text>}
-      <Text style={styles.h1}>Plan a video</Text>
+      {productionRows.length === 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showQuickClip }} onPress={() => setShowQuickClip(value => !value)} style={press(styles.quickClipToggle)}>
+        <Text style={styles.quickClipTitle}>{showQuickClip ? 'Hide quick clip tools' : 'Quick clip · separate from this film'}</Text>
+        <Text style={styles.footnote}>For a one-off video. The screenplay and scene board above are the film production flow.</Text>
+      </Pressable>}
+      {productionRows.length === 0 && showQuickClip && <>
+      <Text style={styles.h1}>Quick clip</Text>
       <Text style={styles.sub}>Shot lengths and prices come from the same modules the desktop app uses.</Text>
       <Text style={styles.body}>Signed-in Google Flow video automation is desktop-only. Grok Imagine browser automation is desktop-only too. Login, CAPTCHA, verification, and account-limit states must be resolved on desktop; mobile continues to use supported official API-key routes.</Text>
 
@@ -814,6 +804,7 @@ export function PlanScreen({
         <Text style={styles.footnote}>If the phone closes during a provider request, it is never submitted again automatically. Only a returned result saved into the project is treated as completed.</Text>
       </View>
 
+      </>}
       <SpendPrompt
         feature="video-generation"
         headline={runLine}
@@ -881,6 +872,9 @@ function Chip({ label, selected, disabled = false, onPress }: { label: string; s
 
 const styles = StyleSheet.create({
   h1: { color: theme.text, fontSize: 26, fontWeight: '700' },
+  filmModelControls: { gap: 8, marginBottom: 16, padding: 14, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  quickClipToggle: { marginTop: 18, minHeight: MIN_TAP, padding: 14, gap: 4, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  quickClipTitle: { color: theme.text, fontSize: 15, fontWeight: '700' },
   sub: { color: theme.textWeak, fontSize: 13, lineHeight: 19, marginBottom: 8 },
   label: { color: theme.text, fontSize: 13, fontWeight: '600', marginTop: 20, marginBottom: 8 },
   body: { color: theme.textWeak, fontSize: 13, lineHeight: 19 },

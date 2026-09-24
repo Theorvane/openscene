@@ -20,6 +20,7 @@ describe('production dashboard', () => {
   it('makes an empty and partially planned film visible without inventing scenes', () => {
     const empty = productionDashboard(createEmptyAiProjectDocument(), []);
     expect(empty.status).toBe('Start with a production brief');
+    expect(productionDashboard(createEmptyAiProjectDocument(), [], 'Midnight Station').title).toBe('Midnight Station');
     expect(empty.stages[0]).toMatchObject({ id: 'concept', state: 'active' });
     expect(empty.scenes).toEqual([]);
     expect(empty.screenplayApproved).toBe(false);

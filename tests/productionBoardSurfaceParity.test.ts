@@ -64,10 +64,9 @@ describe('production board surface parity', () => {
     expect(mobileRunBoard).toContain('Regenerate this shot');
     expect(mobileRunBoard).toContain('productionTextShot');
     expect(mobileRunBoard).toContain('productionTextBatch(current.ai, model.id, selection.sceneId)');
-    expect(mobile).toContain('activeStyleReference(activeProject.ai)');
-    expect(mobile).toContain('World/style reference:');
-    expect(mobile).toContain('assembleApprovedWriterShots(activeProject)');
-    expect(mobile).toContain('Mobile can generate an approved scene with a compatible text-to-video model');
+    expect(mobileRunBoard).toContain('assembleApprovedWriterShots(latest)');
+    expect(mobile).toContain('productionRows.length === 0 && showQuickClip');
+    expect(mobile).not.toContain('Storyboard production board');
     expect(mobileStore).toContain('buildApprovedProductionAssemblyPlan(project.ai');
     expect(mobileStore).toContain('assembleApprovedProductionCut({');
     expect(desktop).not.toContain('aiGenerateVideo');

@@ -34,7 +34,7 @@ export function ProjectsScreen({
 }) {
   const [projects, setProjects] = useState<readonly ProjectSummary[]>([]);
   const [draftName, setDraftName] = useState('');
-  const [entrance, setEntrance] = useState<WorkspaceMode>('edit');
+  const [entrance, setEntrance] = useState<WorkspaceMode>('create');
   const visibleProjects = projects;
   /** The project being renamed, and the name being typed for it. */
   const [renaming, setRenaming] = useState<{ readonly project: ProjectSummary; readonly name: string } | null>(null);
@@ -230,11 +230,11 @@ const styles = StyleSheet.create({
   create: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 18, borderRadius: 10, backgroundColor: theme.accent },
   createText: { color: theme.bg, fontSize: 14, fontWeight: '700' },
   empty: { color: theme.textWeak, fontSize: 14, marginTop: 12 },
-  card: { flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: '#18181d' },
-  cover: { height: 126, backgroundColor: '#27272e', borderRadius: 7, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  card: { flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  cover: { height: 126, backgroundColor: theme.bg, borderRadius: 7, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   coverImage: { width: '100%', height: '100%' },
-  coverEmpty: { color: '#9999a2', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  coverType: { position: 'absolute', left: 8, top: 8, padding: 5, backgroundColor: '#09090cbb', color: '#e5d9c1', fontSize: 11, fontWeight: '700' },
+  coverEmpty: { color: theme.textWeak, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  coverType: { position: 'absolute', left: 8, top: 8, padding: 5, backgroundColor: '#09090cbb', color: '#ffffff', fontSize: 11, fontWeight: '700' },
   cardInfo: { paddingHorizontal: 8, paddingVertical: 10 },
   cardActive: { borderColor: theme.accent },
   entrance: { padding: 16, gap: 8, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },

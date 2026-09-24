@@ -50,7 +50,7 @@ const WRITER_STAGE_NAMES: Readonly<Record<WriterStage, string>> = {
 };
 
 /** A truthful display model for the director dashboard on desktop and mobile. */
-export function productionDashboard(document: AiProjectDocument, assets: readonly ProductionAssetSummary[]): ProductionDashboard {
+export function productionDashboard(document: AiProjectDocument, assets: readonly ProductionAssetSummary[], projectName = 'Your short film'): ProductionDashboard {
   const script = document.scripts.find((entry) => entry.id === document.writerPipeline?.appliedScriptId);
   const draftScript = document.writerPipeline?.artifacts.find((artifact) => artifact.stage === 'screenplay');
   const draftBrief = document.writerPipeline?.artifacts.find((artifact) => artifact.stage === 'concept');
@@ -104,6 +104,6 @@ export function productionDashboard(document: AiProjectDocument, assets: readonl
     : shotRows.some((shot) => shot.state === 'needs_review' || shot.state === 'needs_import') ? 'Awaiting take review'
     : currentScene?.canApprove ? `Awaiting ${currentScene.title} approval`
     : 'In production';
-  return { title: script?.title ?? draftScript?.title ?? draftBrief?.title ?? 'Your short film', screenplay: script?.screenplay ?? draftScript?.content ?? '', screenplayApproved: script?.status === 'approved' || (script !== undefined && document.writerPipeline?.appliedScriptId === script.id && WRITER_STAGES.every((stage) => document.writerPipeline?.artifacts.some((artifact) => artifact.stage === stage && artifact.approved))),
+  return { title: script?.title ?? draftScript?.title ?? draftBrief?.title ?? projectName, screenplay: script?.screenplay ?? draftScript?.content ?? '', screenplayApproved: script?.status === 'approved' || (script !== undefined && document.writerPipeline?.appliedScriptId === script.id && WRITER_STAGES.every((stage) => document.writerPipeline?.artifacts.some((artifact) => artifact.stage === stage && artifact.approved))),
     scenes, stages, decisions, activity, status, totalDurationMs: startMs, assemblyReady };
 }

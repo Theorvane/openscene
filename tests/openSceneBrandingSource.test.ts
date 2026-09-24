@@ -38,7 +38,8 @@ describe('OpenScene branding source contract', () => {
     expect(mainIndexSource).toContain('title: APP_NAME');
     expect(timelineEditorSource).toContain('<h1 id="timeline-editor-title">OpenScene</h1>');
     // The studio headings dropped the "AI" prefix with the chat-style redesign.
-    expect(videoGenWorkspaceSource).toContain('id="video-generation-title">Video Generation<');
+    expect(videoGenWorkspaceSource).toContain("id=\"video-generation-title\"");
+    expect(videoGenWorkspaceSource).toContain('Shot generation & review');
     expect(designSource).toContain('# OpenScene Design System');
     expect(designSource).toContain('The Edit workspace keeps `Local studio`, `OpenScene`, and the `Timeline editor` subtitle as visually hidden region labels for accessibility;');
   });
