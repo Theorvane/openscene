@@ -52,6 +52,8 @@ const WRITER_STAGE_NAMES: Readonly<Record<WriterStage, string>> = {
 /** A truthful display model for the director dashboard on desktop and mobile. */
 export function productionDashboard(document: AiProjectDocument, assets: readonly ProductionAssetSummary[]): ProductionDashboard {
   const script = document.scripts.find((entry) => entry.id === document.writerPipeline?.appliedScriptId);
+  const draftScript = document.writerPipeline?.artifacts.find((artifact) => artifact.stage === 'screenplay');
+  const draftBrief = document.writerPipeline?.artifacts.find((artifact) => artifact.stage === 'concept');
   const sceneRows = productionSceneRows(document);
   const shotRows = productionShotRows(document);
   const assemblyReady = buildApprovedProductionAssemblyPlan(document, assets).ok;
@@ -64,9 +66,9 @@ export function productionDashboard(document: AiProjectDocument, assets: readonl
   const scenesApproved = sceneRows.length > 0 && sceneRows.every((scene) => scene.approved);
   const takesApproved = shotRows.length > 0 && shotRows.every((shot) => shot.state === 'approved');
   stages.push({ id: 'scenes', label: 'Scene approval', state: scenesApproved ? 'complete' : script ? 'active' : 'waiting',
-    detail: `${sceneRows.filter((scene) => scene.approved).length}/${sceneRows.length} scenes approved` });
+    detail: sceneRows.length > 0 ? `${sceneRows.filter((scene) => scene.approved).length}/${sceneRows.length} scenes approved` : 'Awaiting scene plan' });
   stages.push({ id: 'takes', label: 'Takes', state: takesApproved ? 'complete' : sceneRows.some((scene) => scene.approved) ? 'active' : 'waiting',
-    detail: `${shotRows.filter((shot) => shot.state === 'approved').length}/${shotRows.length} shots approved` });
+    detail: shotRows.length > 0 ? `${shotRows.filter((shot) => shot.state === 'approved').length}/${shotRows.length} shots approved` : 'Awaiting planned shots' });
   stages.push({ id: 'assembly', label: 'Final cut', state: assemblyReady ? 'active' : 'waiting',
     detail: assemblyReady ? 'Ready to assemble' : 'Awaiting approved takes' });
 
@@ -96,11 +98,12 @@ export function productionDashboard(document: AiProjectDocument, assets: readonl
     }))
   ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6);
   const currentScene = sceneRows.find((scene) => !scene.complete);
-  const status = assemblyReady ? 'Ready for final cut'
+  const status = !script && shotRows.length === 0 ? firstUnapprovedWriterStage === 'concept' ? 'Start with a production brief' : `Review ${WRITER_STAGE_NAMES[firstUnapprovedWriterStage ?? 'prompts']} to continue production`
+    : assemblyReady ? 'Ready for final cut'
     : shotRows.some((shot) => shot.state === 'generating') ? 'Generating shots'
     : shotRows.some((shot) => shot.state === 'needs_review' || shot.state === 'needs_import') ? 'Awaiting take review'
     : currentScene?.canApprove ? `Awaiting ${currentScene.title} approval`
     : 'In production';
-  return { title: script?.title ?? 'Short-film production', screenplay: script?.screenplay ?? '', screenplayApproved: script?.status === 'approved' || (script !== undefined && document.writerPipeline?.appliedScriptId === script.id && WRITER_STAGES.every((stage) => document.writerPipeline?.artifacts.some((artifact) => artifact.stage === stage && artifact.approved))),
+  return { title: script?.title ?? draftScript?.title ?? draftBrief?.title ?? 'Your short film', screenplay: script?.screenplay ?? draftScript?.content ?? '', screenplayApproved: script?.status === 'approved' || (script !== undefined && document.writerPipeline?.appliedScriptId === script.id && WRITER_STAGES.every((stage) => document.writerPipeline?.artifacts.some((artifact) => artifact.stage === stage && artifact.approved))),
     scenes, stages, decisions, activity, status, totalDurationMs: startMs, assemblyReady };
 }

@@ -99,7 +99,6 @@ export function ProductionBoard({
     id: asset.id, kind: asset.kind, durationMs: asset.metadata?.durationMs ?? null
   })));
   const dashboard = productionDashboard(document, assets.map((asset) => ({ id: asset.id, kind: asset.kind, durationMs: asset.metadata?.durationMs ?? null })));
-  if (rows.length === 0) return null;
 
   const runImages = async (targets: readonly ProductionImageTarget[]): Promise<void> => {
     setBatchBusy(true);
@@ -151,9 +150,9 @@ export function ProductionBoard({
       <header className="production-board__header">
         <div>
           <span className="production-board__eyebrow">OPENSCENE STUDIO · PRODUCTION</span><h3 id="production-board-title">{dashboard.title}</h3>
-          <p>{scenes.length} scenes · {(scenes.reduce((total, scene) => total + scene.durationMs, 0) / 60_000).toFixed(1)} planned min · Five-second shots, made and reviewed scene by scene.</p>
+          <p>{scenes.length > 0 ? `${scenes.length} scenes · ${(scenes.reduce((total, scene) => total + scene.durationMs, 0) / 60_000).toFixed(1)} planned min · Five-second shots, made and reviewed scene by scene.` : 'Write the brief, review the screenplay, then direct each five-second shot scene by scene.'}</p>
         </div>
-        <StatusCard tone={assembly.ok ? 'success' : 'neutral'}>{rows.filter((row) => row.state === 'approved').length}/{rows.length} shots approved</StatusCard>
+        <StatusCard tone={assembly.ok ? 'success' : 'neutral'}>{rows.length > 0 ? `${rows.filter((row) => row.state === 'approved').length}/${rows.length} shots approved` : 'Planning'}</StatusCard>
       </header>
 
       <nav className="production-board__pipeline" aria-label="Production stages">{dashboard.stages.map((stage, index) => <div key={stage.id} className={`production-board__pipeline-step production-board__pipeline-step--${stage.state}`} title={stage.detail}>
@@ -164,7 +163,8 @@ export function ProductionBoard({
         <section className="production-board__script" aria-label="Screenplay">
           <div className="production-board__script-meta"><span>THE SCREENPLAY</span><span>{dashboard.screenplayApproved ? 'APPROVED SCRIPT' : 'WORKING SCRIPT'}</span></div>
           <h4>{dashboard.title}</h4>
-          <p className="production-board__script-subtitle">{dashboard.scenes.length} scenes · {(dashboard.totalDurationMs / 60_000).toFixed(1)} planned min</p>
+          <p className="production-board__script-subtitle">{dashboard.scenes.length > 0 ? `${dashboard.scenes.length} scenes · ${(dashboard.totalDurationMs / 60_000).toFixed(1)} planned min` : 'Scene pages will appear after the shot plan is approved.'}</p>
+          {dashboard.scenes.length === 0 && <p className="production-board__script-empty">{dashboard.screenplay ? 'The screenplay is ready to review in the planning controls below.' : 'Every film begins with a brief. Describe the story below to start writing this one.'}</p>}
           {dashboard.scenes.slice(0, 5).map((scene) => <div className="production-board__script-scene" key={scene.sceneId}>
             <span>{String(scene.number).padStart(2, '0')} / {Math.round(scene.startMs / 1000)}–{Math.round(scene.endMs / 1000)}s</span>
             <strong>{scene.title}</strong><p>{scene.objective}</p>
@@ -184,6 +184,10 @@ export function ProductionBoard({
 
       {message !== null && <StatusCard tone={message.tone}>{message.text}</StatusCard>}
 
+      {rows.length === 0 ? <section className="production-board__empty-reel" aria-label="Story reel awaiting plan">
+        <div><span>STORY REEL / 00 SCENES</span><h4>Scenes take shape here</h4><p>Approve the brief, screenplay, scene plan and five-second shot prompts below. Each approved scene will then have its own storyboard and take controls.</p></div>
+        <a className="button button--primary" href="#production-plan">Open screenplay and plan controls</a>
+      </section> : <>
       <section className="production-board__scenes" aria-label="Film scenes">
         <h4>Story reel <span>Choose a scene to direct</span></h4>
         <ol>{scenes.map((scene) => {
@@ -368,6 +372,7 @@ export function ProductionBoard({
         }}>Assemble approved shots on timeline</Button>
         <span>Video results are saved automatically. Continuity approval, image-reference assignment, assembly and export remain explicit.</span>
       </div>
+      </>}
     </section>
   );
 }

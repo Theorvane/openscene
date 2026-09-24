@@ -30,7 +30,7 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
   const matches = pipelineMatchesBrief(flow.proposal, request);
   const applied = !!document.writerPipeline?.appliedScriptId;
   const checkpoint = nextProductionCheckpoint(flow.proposal);
-  return <section className="production-plan-composer" aria-label="Guided production">
+  return <section id="production-plan" className="production-plan-composer" aria-label="Guided production">
     <header><p className="section-kicker">BRIEF → PLAN APPROVAL → GENERATE → REVIEW → ASSEMBLE</p><h2>What short film should we make?</h2>
       <p>Plan a 5–15 minute story as 60–180 five-second shots across multiple scenes. Review the complete script, scene order and shot prompts before producing each scene.</p></header>
     <label className="studio-field"><span>Production brief</span><textarea rows={5} value={brief} disabled={busy} onChange={event => setBrief(event.target.value)} placeholder="A ten-minute mystery: two characters cross paths at a rainy station, uncover a secret, and face a final choice…" /></label>

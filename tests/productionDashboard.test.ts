@@ -17,6 +17,20 @@ const draft: WriterDraft = {
 };
 
 describe('production dashboard', () => {
+  it('makes an empty and partially planned film visible without inventing scenes', () => {
+    const empty = productionDashboard(createEmptyAiProjectDocument(), []);
+    expect(empty.status).toBe('Start with a production brief');
+    expect(empty.stages[0]).toMatchObject({ id: 'concept', state: 'active' });
+    expect(empty.scenes).toEqual([]);
+    expect(empty.screenplayApproved).toBe(false);
+    const partial = { ...createEmptyAiProjectDocument(), writerPipeline: proposeProductionPlan(request, draft, 'test') };
+    const planned = productionDashboard(partial, []);
+    expect(planned.title).toBe('The letter');
+    expect(planned.screenplay).toBe('A letter travels.');
+    expect(planned.scenes).toEqual([]);
+    expect(planned.screenplayApproved).toBe(false);
+  });
+
   it('shows only stored approvals and keeps scene timing in screenplay order', () => {
     const document = approveProductionPlan(createEmptyAiProjectDocument(), request, proposeProductionPlan(request, draft, 'test'), at, 'film');
     const before = productionDashboard(document, []);
