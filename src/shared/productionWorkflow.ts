@@ -484,6 +484,38 @@ export function productionSceneSummary(scene: ProductionSceneRow, shots: readonl
   return { stage, pendingCount, generatingCount, reviewCount };
 }
 
+export type ProductionSceneGuide = {
+  readonly step: string;
+  readonly title: string;
+  readonly detail: string;
+};
+
+/** One next-action explanation for the scene, shared by desktop and mobile. */
+export function productionSceneGuide(
+  scene: ProductionSceneRow,
+  shots: readonly ProductionShotRow[],
+  hasNextScene: boolean
+): ProductionSceneGuide {
+  const summary = productionSceneSummary(scene, shots);
+  const progress = `${scene.approvedShotCount}/${scene.shotCount} five-second shots approved`;
+  switch (summary.stage) {
+    case 'locked':
+      return { step: 'WAITING', title: `Finish the previous scene first`, detail: `Scenes are produced in story order. ${progress}.` };
+    case 'approval':
+      return { step: '1 / 4 · APPROVE', title: `Review and approve scene ${scene.order + 1}`, detail: 'Read the scene brief and shot prompts below. Approval unlocks this scene for media generation.' };
+    case 'generate':
+      return { step: '2 / 4 · GENERATE', title: `Make scene ${scene.order + 1} shot by shot`, detail: `${progress}. Generate the pending five-second shots, or open one shot to edit its prompt and first frame. Each paid run asks for cost approval.` };
+    case 'generating':
+      return { step: '2 / 4 · GENERATING', title: `Scene ${scene.order + 1} is rendering`, detail: `${summary.generatingCount} shot(s) are running. Review each take when it is saved.` };
+    case 'review':
+      return { step: '3 / 4 · REVIEW', title: `Choose the takes for scene ${scene.order + 1}`, detail: `${progress}. Review the pending takes and approve one for every shot before continuing.` };
+    case 'complete':
+      return hasNextScene
+        ? { step: '4 / 4 · NEXT SCENE', title: `Scene ${scene.order + 1} is ready`, detail: `All ${scene.shotCount} shots have approved takes. Continue to scene ${scene.order + 2}; the final assembly will place scenes in story order.` }
+        : { step: '4 / 4 · CONNECT', title: 'Connect the finished scenes', detail: 'Every scene has approved takes. Assemble them on the timeline in story order, then review and export the cut.' };
+  }
+}
+
 /** Checked again at submission, so a stale screen cannot spend on an unapproved scene. */
 export function productionSceneGenerationBlockReason(document: AiProjectDocument, shotId: string): string | null {
   const shot = document.shots.find((entry) => entry.id === shotId);

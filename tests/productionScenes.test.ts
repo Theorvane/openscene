@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyAiProjectDocument, parseAiProjectDocument, type AiProjectDocument } from '../src/shared/aiProjectDomain';
 import { addGenerationCandidate, decideGenerationCandidate } from '../src/shared/generationReview';
 import { approveProductionPlan, proposeProductionPlan, productionTextBatch, productionTextShot } from '../src/shared/productionPlan';
-import { approveProductionScene, batchableProductionVideoShotIds, buildApprovedProductionAssemblyPlan, productionSceneRows, productionSceneSummary, productionShotRegenerationBlockReason, productionShotRows, productionShotVisual, assignStoryboardReference } from '../src/shared/productionWorkflow';
+import { approveProductionScene, batchableProductionVideoShotIds, buildApprovedProductionAssemblyPlan, productionSceneRows, productionSceneSummary, productionSceneGuide, productionShotRegenerationBlockReason, productionShotRows, productionShotVisual, assignStoryboardReference } from '../src/shared/productionWorkflow';
 import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
 
 const at = '2026-09-24T00:00:00.000Z';
@@ -31,6 +31,25 @@ function completeFirstTake(document: AiProjectDocument): AiProjectDocument {
 }
 
 describe('scene-by-scene production', () => {
+  it('guides each scene from approval through generation to the next scene and assembly', () => {
+    const planned = plan();
+    const initialScenes = productionSceneRows(planned);
+    expect(productionSceneGuide(initialScenes[0]!, productionShotRows(planned), true).step).toContain('APPROVE');
+    expect(productionSceneGuide(initialScenes[1]!, productionShotRows(planned), false).step).toBe('WAITING');
+    const first = approveProductionScene(planned, initialScenes[0]!.sceneId, at);
+    if (!first.ok) throw new Error(first.reason);
+    expect(productionSceneGuide(productionSceneRows(first.document)[0]!, productionShotRows(first.document), true).step).toContain('GENERATE');
+    const finishedFirst = completeFirstTake(first.document);
+    expect(productionSceneGuide(productionSceneRows(finishedFirst)[0]!, productionShotRows(finishedFirst), true).title).toContain('ready');
+    expect(productionSceneGuide(productionSceneRows(finishedFirst)[1]!, productionShotRows(finishedFirst), false).step).toContain('APPROVE');
+    const second = approveProductionScene(finishedFirst, finishedFirst.scenes[1]!.id, at);
+    if (!second.ok) throw new Error(second.reason);
+    const added = addGenerationCandidate(second.document, { id: 'take-2', shotId: second.document.shots[1]!.id, providerId: 'test', modelId: 'sora-2', capability: 'text_to_video', prompt: 'Read the letter', createdAt: at });
+    if (!added.ok) throw new Error(added.reason);
+    const finished = { ...added.document, generations: added.document.generations.map(entry => entry.id === 'take-2' ? { ...entry, status: 'completed' as const, outputAssetIds: ['video-2'], review: { decision: 'approved' as const, notes: '', reviewedAt: at, continuity: { identity: 'pass' as const, wardrobeProps: 'pass' as const, settingPalette: 'pass' as const, motionDirection: 'pass' as const, boundaryMatch: 'pass' as const } } } : entry) };
+    expect(productionSceneGuide(productionSceneRows(finished)[1]!, productionShotRows(finished), false).step).toContain('CONNECT');
+  });
+
   it('keeps a multi-scene plan ordered and requires explicit approval before any provider candidate', () => {
     const document = plan();
     expect(productionSceneRows(document).map((scene) => [scene.title, scene.durationMs, scene.canApprove])).toEqual([

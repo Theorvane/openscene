@@ -5,7 +5,7 @@ import { CONTINUITY_REVIEW_FIELDS } from '@openvideo/shared/aiProjectDomain';
 import { approvedWriterShots } from '@openvideo/shared/writerPipeline';
 import { productionDashboard } from '@openvideo/shared/productionDashboard';
 import { productionTextBatch, productionTextShot } from '@openvideo/shared/productionPlan';
-import { approveProductionScene, productionSceneRows, productionSceneSummary, productionShotRows, productionShotVisual } from '@openvideo/shared/productionWorkflow';
+import { approveProductionScene, productionSceneRows, productionSceneSummary, productionSceneGuide, productionShotRows, productionShotVisual } from '@openvideo/shared/productionWorkflow';
 import { createProductionQueueControl } from '@openvideo/shared/productionQueueControl';
 import { addGenerationCandidate, updateGenerationCandidate, setCandidateContinuity, decideGenerationCandidate, type GenerationReviewResult } from '@openvideo/shared/generationReview';
 import { estimateVideoPlanCost, PRICING_AS_OF } from '@openvideo/shared/mediaGenerationPricing';
@@ -45,6 +45,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const [storyboardPreviewId, setStoryboardPreviewId] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [showScreenplay, setShowScreenplay] = useState(false);
+  const [showProductionNotes, setShowProductionNotes] = useState(false);
   const lock = useRef(false);
   const queueControl = useRef(createProductionQueueControl());
   const [stopRequested, setStopRequested] = useState(false);
@@ -150,6 +151,8 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
       </View>)}
     </ScrollView>
     <View style={{ padding: 12, backgroundColor: theme.surface, borderLeftWidth: 3, borderColor: theme.warn }}><Text style={{ color: theme.warn, fontWeight: '700' }}>{dashboard.status}</Text></View>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: showProductionNotes }} onPress={() => setShowProductionNotes(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text, fontWeight: '700' }}>{showProductionNotes ? 'Hide screenplay and production notes' : 'Screenplay and production notes'}</Text></Pressable>
+    {showProductionNotes && <>
     <View style={{ backgroundColor: theme.surface, padding: 20, borderRadius: 4, gap: 10 }}>
       <Text style={{ color: theme.warn, fontSize: 11, letterSpacing: 2, fontWeight: '700' }}>THE SCREENPLAY · {dashboard.screenplayApproved ? 'APPROVED' : 'WORKING SCRIPT'}</Text>
       <Text style={{ color: theme.text, fontSize: 22, fontWeight: '700' }}>{dashboard.title}</Text>
@@ -168,7 +171,9 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
     <View style={{ borderWidth: 1, borderColor: theme.line, padding: 14, gap: 9 }}><Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>Activity</Text>
       {dashboard.activity.length === 0 ? <Text style={{ color: theme.textWeak }}>Scene approvals and generation results will appear here.</Text> : dashboard.activity.map(item => <View key={item.id}><Text style={{ color: theme.warn, fontSize: 11 }}>{item.at.slice(0, 16).replace('T', ' ')} · {item.label}</Text><Text style={{ color: theme.text }}>{item.detail}</Text></View>)}
     </View>
-    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 17 }}>Story reel</Text>
+    </>}
+    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 17 }}>Scenes in story order</Text>
+    <Text style={{ color: theme.textWeak, fontSize: 12 }}>Select the current scene, finish its five-second shots, then continue. Assembly joins approved scenes on the timeline.</Text>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 16 }} accessibilityLabel="Scene sequence">
       {scenes.map(scene => { const summary = productionSceneSummary(scene, shotRows); const selected = scene.sceneId === selectedScene?.sceneId; const sceneRows = shotRows.filter(row => row.sceneId === scene.sceneId); const visualRow = sceneRows.find(row => { const visual = productionShotVisual(row); return visual.takeAssetId || visual.storyboardAssetId; }) ?? sceneRows[0]; const visual = visualRow ? productionShotVisual(visualRow) : null; const asset = project.assets.find(item => item.id === (visual?.takeAssetId ?? visual?.storyboardAssetId)) ?? project.assets.find(item => item.id === visual?.storyboardAssetId); const fallbackImage = project.assets.find(item => item.id === visual?.storyboardAssetId); return <Pressable key={scene.sceneId} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setSelectedSceneId(scene.sceneId)} style={press({ width: Math.max(210, Math.min(300, 190 + scene.durationMs / 1000)), padding: 8, borderWidth: selected ? 2 : 1, borderColor: selected ? theme.warn : theme.line, borderRadius: 8, gap: 7, backgroundColor: theme.surface })}>
         <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>SC {String(scene.order + 1).padStart(2, '0')} · {Math.round(scene.durationMs / 1000)}s</Text>
@@ -185,7 +190,8 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
       <Text style={{ color: theme.text }}>{selectedScene.objective}</Text>
       <Text style={{ color: theme.textWeak }}>{selectedScene.setting} · {selectedScene.timeOfDay} · {Math.round(selectedScene.durationMs / 1000)}s · {selectedScene.shotCount} shots</Text>
       {!!selectedScene.continuityNotes && <Text style={{ color: theme.textWeak }}>Continuity: {selectedScene.continuityNotes}</Text>}
-      {(() => { const summary = productionSceneSummary(selectedScene, shotRows); return <>
+      {(() => { const summary = productionSceneSummary(selectedScene, shotRows); const guide = productionSceneGuide(selectedScene, shotRows, scenes.some(scene => scene.order > selectedScene.order)); return <>
+        <View style={{ padding: 12, borderLeftWidth: 3, borderColor: theme.warn, backgroundColor: theme.surface, gap: 5 }}><Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700' }}>{guide.step}</Text><Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>{guide.title}</Text><Text style={{ color: theme.textWeak, lineHeight: 19 }}>{guide.detail}</Text></View>
         <Text style={{ color: theme.textWeak }}>{summary.pendingCount} pending · {summary.reviewCount} to review · {selectedScene.approvedShotCount} approved</Text>
         {!selectedScene.approved && action(selectedScene.canApprove ? 'Approve this scene' : 'Finish previous scene first', () => {
           Alert.alert(`Approve scene ${selectedScene.order + 1}?`, `${selectedScene.title} will be available for media generation. Provider cost is confirmed separately.`, [
