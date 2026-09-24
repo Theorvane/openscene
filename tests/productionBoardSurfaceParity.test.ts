@@ -42,6 +42,9 @@ describe('production board surface parity', () => {
     expect(mobileRunBoard).toContain('productionShotRows(project?.ai)');
     expect(mobileRunBoard).toContain('StoryboardSlate projectId={projectId}');
     expect(mobileRunBoard).toContain('productionShotVisual(row)');
+    expect(mobileRunBoard).toContain('visual.takeAssetId ?? visual.storyboardAssetId');
+    expect(mobileRunBoard).toContain('showVideoPreview={active && storyboardPreviewId === row.shotId}');
+    expect(mobileRunBoard).toContain('Preview approved take');
     expect(mobileRunBoard).toContain('Planned video prompt');
     expect(mobileRunBoard).toContain('Regenerate this shot');
     expect(mobileRunBoard).toContain('productionTextShot');
