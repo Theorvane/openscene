@@ -18,6 +18,7 @@ import {
   productionShotRegenerationBlockReason,
   productionSceneRows,
   productionSceneSummary,
+  productionSceneGuide,
   removeCharacterReference,
   type ProductionImageTarget,
   type ProductionMutationResult
@@ -163,6 +164,8 @@ export function ProductionBoard({
         <span>{stage.state === 'complete' ? '✓' : String(index + 1).padStart(2, '0')}</span><strong>{stage.label}</strong><small>{stage.detail}</small>
       </div>)}</nav>
       <div className="production-board__status" role="status"><span className="production-board__status-light" />{dashboard.status}</div>
+      <details key={rows.length === 0 ? 'planning-notes' : 'scene-notes'} className="production-board__production-notes" open={rows.length === 0}>
+      <summary>Screenplay, style decisions and activity</summary>
       <div className="production-board__overview">
         <section className="production-board__script" aria-label="Screenplay">
           <div className="production-board__script-meta"><span>THE SCREENPLAY</span><span>{dashboard.screenplayApproved ? 'APPROVED SCRIPT' : 'WORKING SCRIPT'}</span></div>
@@ -185,6 +188,7 @@ export function ProductionBoard({
           </section>
         </aside>
       </div>
+      </details>
 
       {message !== null && <StatusCard tone={message.tone}>{message.text}</StatusCard>}
 
@@ -193,7 +197,7 @@ export function ProductionBoard({
         <button type="button" className="button button--primary" onClick={onOpenPlan}>{document.writerPipeline?.artifacts.length ? 'Review screenplay and scene plan' : 'Write the story brief'}</button>
       </section> : <>
       <section className="production-board__scenes" aria-label="Film scenes">
-        <h4>Story reel <span>Choose a scene to direct</span></h4>
+        <h4>Scenes in story order <span>Select the highlighted scene, finish its five-second shots, then continue right. Assembly connects approved scenes on the timeline.</span></h4>
         <ol>{scenes.map((scene) => {
           const summary = productionSceneSummary(scene, rows);
           const sceneRows = rows.filter((row) => row.sceneId === scene.sceneId);
@@ -224,7 +228,9 @@ export function ProductionBoard({
         <div className="production-board__scene-workspace-actions">
           {(() => {
             const summary = productionSceneSummary(selectedScene, rows);
+            const guide = productionSceneGuide(selectedScene, rows, scenes.some((scene) => scene.order > selectedScene.order));
             return <>
+              <div className="production-board__scene-guide"><small>{guide.step}</small><strong>{guide.title}</strong><p>{guide.detail}</p></div>
               <span>{selectedScene.approvedShotCount}/{selectedScene.shotCount} shots approved · {summary.pendingCount} pending · {summary.reviewCount} to review</span>
               {!selectedScene.approved && <Button variant="primary" disabled={busy || saving || batchBusy || !selectedScene.canApprove} onClick={() => {
                 if (!window.confirm(`Approve scene ${selectedScene.order + 1}: ${selectedScene.title} for production? Media generation has a separate cost confirmation.`)) return;
