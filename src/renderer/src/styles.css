@@ -732,6 +732,13 @@ button {
 .production-director-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .production-plan-composer { display: grid; gap: 12px; padding: 12px; }
 .production-plan-composer h2, .production-plan-composer p { margin: 0; }
+.production-plan-composer__steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; counter-reset: production-step; }
+.production-plan-composer__steps li { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-control); counter-increment: production-step; }
+.production-plan-composer__steps li::before { content: counter(production-step, decimal-leading-zero); color: var(--primary); font: 700 11px var(--font-mono); }
+.production-plan-composer__steps strong { font-size: 12px; }
+.production-plan-composer__steps span { color: var(--text-weak); font-size: 11px; line-height: 1.4; }
+@media (max-width: 760px) { .production-plan-composer__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 .production-plan-review { display: grid; gap: 10px; }
 .production-checkpoint-rail { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; list-style: none; padding: 0; margin: 0; font-size: 11px; }
 .production-checkpoint-rail li { border: 1px solid var(--border); padding: 8px; border-radius: 3px; color: var(--text-weak); }

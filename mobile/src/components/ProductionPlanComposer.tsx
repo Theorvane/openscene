@@ -38,13 +38,13 @@ export function ProductionPlanComposer({ document, onSave, disabled, connections
   useEffect(() => { if (checkpoint) setExpanded(checkpoint); }, [checkpoint]);
   const action = (label: string, callback: () => void, off = false) => <Pressable accessibilityRole="button" disabled={off} onPress={callback} style={press([styles.button, off && { opacity: .5 }])}><Text style={styles.text}>{label}</Text></Pressable>;
   return <View style={styles.card}>
-    <Text style={styles.title}>What short film should we make?</Text>
-    <Text style={styles.text}>Brief → 5-second shots → scene approval → generate → review → assemble</Text>
+    <Text style={styles.title}>{applied ? 'Screenplay and scene plan' : flow.proposal ? 'Review your film plan' : 'Start your film here'}</Text>
+    <Text style={styles.text}>1. Describe the characters, setting, conflict and ending below. 2. Create the screenplay and scene plan. 3. Approve the screenplay, scenes and five-second shot prompts one step at a time. 4. Open scene 1 in the story reel to generate and review its shots.</Text>
     <TextInput accessibilityLabel="Production brief" placeholder="Describe a 5–15 minute story, its characters, scene changes and ending…" placeholderTextColor={theme.textWeak} multiline value={brief} onChangeText={setBrief} editable={!busy} style={[styles.input, { minHeight: 110 }]} />
     <Text style={styles.text}>Target runtime (seconds; 300–900 in five-second steps)</Text><TextInput accessibilityLabel="Target runtime (seconds; 300–900 in five-second steps)" value={seconds} onChangeText={setSeconds} keyboardType="number-pad" editable={!busy} style={styles.input} />
     <Text style={styles.text}>Dialogue language</Text><TextInput accessibilityLabel="Dialogue language" value={language} onChangeText={setLanguage} editable={!busy} style={styles.input} />
     <ModelSelect domain="writer" selectedId={modelId} connected={connected} onSelect={item => setModelId(item.id)} onConnectionChange={() => { void readProviderConnections().then(setConnected); }} />
-    {action(flow.busy ? 'Working…' : flow.proposal ? 'Revise complete plan' : 'Propose complete plan', () => {
+    {action(flow.busy ? 'Working…' : flow.proposal ? 'Revise screenplay and scene plan' : 'Create screenplay and scene plan', () => {
       if (!model) return;
       Alert.alert('Generate production plan?', 'Text-model charges may apply. This replaces the planning draft, not existing media. No video generation starts.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Propose plan', onPress: () => {
         void flow.generate(request, model.id, async input => {
@@ -55,6 +55,8 @@ export function ProductionPlanComposer({ document, onSave, disabled, connections
         });
       } }]);
     }, busy || !valid || !model || !isDomainModelAvailableOnRuntime(model, 'mobile') || !connected[model.providerId])}
+    {!request.sourceText && <Text style={styles.text}>Start by writing a story brief. This step does not generate video.</Text>}
+    {!connected[model?.providerId ?? ''] && <Text style={styles.text}>Connect the selected writing provider in Settings to create a plan.</Text>}
     {flow.proposal && <>
       <Text style={styles.text}>{WRITER_STAGES.map(stage => `${flow.proposal!.artifacts.some(item => item.stage === stage && item.approved) ? '✓' : checkpoint === stage ? '→' : '○'} ${WRITER_STAGE_LABELS[stage]}`).join('\n')}</Text>
       {flow.proposal.artifacts.map(artifact => <View key={artifact.stage}>{action(`${WRITER_STAGE_LABELS[artifact.stage]} · ${artifact.approved ? 'Approved' : 'Review required'}`, () => setExpanded(expanded === artifact.stage ? null : artifact.stage))}{expanded === artifact.stage && <><Text selectable style={styles.text}>{artifact.content}</Text><Text style={styles.text}>{WRITER_STAGE_CHECKLISTS[artifact.stage].join('\n')}</Text></>}</View>)}

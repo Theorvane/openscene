@@ -59,7 +59,7 @@ function StoryboardSlate({ projectId, asset, state, description }: {
 
 export function ProductionBoard({
   projectId, projectName, modelLabel, document, assets, busy, onSave, onOpenShot, onGenerateCharacterImage, onGenerateStoryboardImage,
-  onGenerateImages, onOpenImageResults, onGenerateVideoScene, onGenerateVideoShot, onAssemble
+  onGenerateImages, onOpenImageResults, onGenerateVideoScene, onGenerateVideoShot, onAssemble, onOpenPlan
 }: {
   readonly projectId: string;
   readonly projectName?: string | undefined;
@@ -77,6 +77,7 @@ export function ProductionBoard({
   readonly onGenerateVideoShot: (shotId: string) => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
   readonly onGenerateVideoScene: (sceneId: string) => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
   readonly onAssemble: () => boolean;
+  readonly onOpenPlan: () => void;
 }): ReactElement | null {
   const [saving, setSaving] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
@@ -188,8 +189,8 @@ export function ProductionBoard({
       {message !== null && <StatusCard tone={message.tone}>{message.text}</StatusCard>}
 
       {rows.length === 0 ? <section className="production-board__empty-reel" aria-label="Story reel awaiting plan">
-        <div><span>STORY REEL / 00 SCENES</span><h4>Scenes take shape here</h4><p>Approve the brief, screenplay, scene plan and five-second shot prompts below. Each approved scene will then have its own storyboard and take controls.</p></div>
-        <a className="button button--primary" href="#production-plan">Open screenplay and plan controls</a>
+        <div><span>STORY REEL / 00 SCENES</span><h4>{document.writerPipeline?.artifacts.length ? 'Review the plan to unlock scene 1' : 'Your first scene starts with a story brief'}</h4><p>{document.writerPipeline?.artifacts.length ? 'Approve the story, screenplay, scene order and five-second shot prompts above. Scene 1 appears here after the final approval.' : 'Write the brief above, propose a plan, then approve its screenplay, scene order and five-second shot prompts. Scene 1 appears here after the final approval.'}</p></div>
+        <button type="button" className="button button--primary" onClick={onOpenPlan}>{document.writerPipeline?.artifacts.length ? 'Review screenplay and scene plan' : 'Write the story brief'}</button>
       </section> : <>
       <section className="production-board__scenes" aria-label="Film scenes">
         <h4>Story reel <span>Choose a scene to direct</span></h4>
