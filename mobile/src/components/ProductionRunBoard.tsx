@@ -4,6 +4,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { CONTINUITY_REVIEW_FIELDS } from '@openvideo/shared/aiProjectDomain';
 import { approvedWriterShots } from '@openvideo/shared/writerPipeline';
 import { productionTextBatch } from '@openvideo/shared/productionPlan';
+import { approveProductionScene, productionSceneRows } from '@openvideo/shared/productionWorkflow';
 import { createProductionQueueControl } from '@openvideo/shared/productionQueueControl';
 import { addGenerationCandidate, updateGenerationCandidate, setCandidateContinuity, decideGenerationCandidate, type GenerationReviewResult } from '@openvideo/shared/generationReview';
 import { estimateVideoPlanCost, PRICING_AS_OF } from '@openvideo/shared/mediaGenerationPricing';
@@ -24,6 +25,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
 }) {
   const [message, setMessage] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const lock = useRef(false);
   const queueControl = useRef(createProductionQueueControl());
   const [stopRequested, setStopRequested] = useState(false);
@@ -32,8 +34,11 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const permissions = useSpendPermissions();
   const project = readProject(projectId);
   const shots = approvedWriterShots(project?.ai);
+  const scenes = productionSceneRows(project?.ai);
+  const selectedScene = scenes.find((scene) => scene.sceneId === selectedSceneId) ?? scenes.find((scene) => !scene.complete) ?? scenes[0];
+  const visibleShotIds = new Set(project?.ai.shots.filter((shot) => shot.sceneId === selectedScene?.sceneId).map((shot) => shot.id) ?? []);
   if (!project || !shots.length) return null;
-  const action = (label: string, run: () => void) => <Pressable accessibilityRole="button" disabled={disabled || lock.current} onPress={run} style={press({ minHeight: MIN_TAP, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{label}</Text></Pressable>;
+  const action = (label: string, run: () => void, blocked = false) => <Pressable accessibilityRole="button" disabled={disabled || lock.current || blocked} onPress={run} style={press({ minHeight: MIN_TAP, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{label}</Text></Pressable>;
   const save = (result: GenerationReviewResult) => {
     if (!result.ok) { setMessage(result.reason); return; }
     try {
@@ -51,9 +56,10 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
     if (!batch.ok) { setMessage(batch.reason); return; }
     const queue = batch.shots;
     const fingerprint = JSON.stringify(current.ai.writerPipeline);
-    const estimate = estimateVideoPlanCost(queue.map(shot => ({ modelId: model.id, durationSeconds: shot.durationSeconds })));
+    const estimate = estimateVideoPlanCost(queue.map(shot => ({ modelId: model.id, durationSeconds: shot.sourceDurationSeconds })));
+    const longer = queue.filter(shot => shot.sourceDurationSeconds > shot.durationSeconds).length;
     const cost = estimate.fullyPriced ? `Estimated $${estimate.totalUsd?.toFixed(2)} (rates as of ${PRICING_AS_OF}; actual charges may differ).` : 'The provider cost is unknown. Continue only if you accept unknown charges.';
-    Alert.alert('Approve generation cost', `${queue.length} shots · ${model.label}\n${cost}\nResults will be saved with prompts, then wait for your review.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Generate shots', onPress: () => { void (async () => {
+    Alert.alert('Approve generation cost', `${queue.length} planned five-second shots · ${model.label}\n${longer} source clips exceed five seconds and will be trimmed to five seconds in the assembled cut. Cost uses full source lengths.\n${cost}\nResults will be saved with prompts, then wait for your review.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Generate shots', onPress: () => { void (async () => {
       if (lock.current || !mounted.current) return;
       if (!queueControl.current.begin()) return;
       setStopRequested(false);
@@ -70,7 +76,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
           if (!added.ok) throw new Error(added.reason);
           writeProject({ ...latest, ai: added.document });
           if (mounted.current) setMessage(`Generating ${shot.label}…`);
-          const result = await generateShot({ projectId, modelId: model.id, prompt: shot.prompt, durationSeconds: shot.durationSeconds, aspectRatio, operation: 'text_to_video', onProgress: () => {} });
+          const result = await generateShot({ projectId, modelId: model.id, prompt: shot.prompt, durationSeconds: shot.sourceDurationSeconds, aspectRatio, operation: 'text_to_video', onProgress: () => {} });
           let saved = readProject(projectId);
           if (!saved) throw new Error('Project could not be read after generation.');
           if (!result.ok) {
@@ -78,7 +84,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
             if (failed.ok) writeProject({ ...saved, ai: failed.document });
             throw new Error(result.message);
           }
-          saved = saveGeneratedVideoCandidate(saved, result.asset, { id, assetId: result.asset.id, prompt: shot.prompt, modelId: model.id, providerId: model.providerId, operation: 'text_to_video', durationSeconds: shot.durationSeconds, aspectRatio, createdAt: new Date().toISOString() });
+          saved = saveGeneratedVideoCandidate(saved, result.asset, { id, assetId: result.asset.id, prompt: shot.prompt, modelId: model.id, providerId: model.providerId, operation: 'text_to_video', durationSeconds: shot.sourceDurationSeconds, aspectRatio, createdAt: new Date().toISOString() });
           const completed = updateGenerationCandidate(saved.ai, id, { status: 'completed', outputAssetIds: [result.asset.id], updatedAt: new Date().toISOString() });
           if (!completed.ok) throw new Error(completed.reason);
           writeProject({ ...saved, ai: completed.document });
@@ -90,10 +96,23 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   };
   return <View style={{ gap: 10 }}>
     <Text style={{ color: theme.text, fontWeight: '600' }}>Approved plan · {shots.length} shots · {model.label}</Text>
-    <Text style={{ color: theme.textWeak }}>One film sequence · {shots.reduce((total, shot) => total + shot.durationSeconds, 0)}s planned. Approved takes join in script order, trimmed to planned lengths. Original videos and prompts stay saved; short takes block assembly.</Text>
-    {action('Price & generate pending shots', start)}
+    <Text style={{ color: theme.textWeak }}>One film sequence · {scenes.length} scenes · {Math.round(shots.reduce((total, shot) => total + shot.durationSeconds, 0) / 60)} planned min. Approve each scene, generate its shots after cost confirmation, then review every take before continuing. Approved takes join in story order; short takes block assembly.</Text>
+    {scenes.map(scene => <View key={scene.sceneId} style={{ gap: 5, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 }}>
+      <Text style={{ color: theme.text, fontWeight: '600' }}>Scene {scene.order + 1} · {scene.title}</Text>
+      <Text style={{ color: theme.textWeak }}>{scene.setting} · {scene.timeOfDay} · {Math.round(scene.durationMs / 1000)}s · {scene.approvedShotCount}/{scene.shotCount} takes approved</Text>
+      <Text style={{ color: theme.textWeak }}>{scene.objective} {scene.continuityNotes}</Text>
+      {action(selectedScene?.sceneId === scene.sceneId ? 'Viewing scene takes' : 'View scene takes', () => setSelectedSceneId(scene.sceneId))}
+      {action(scene.complete ? 'Scene complete' : scene.approved ? 'Scene approved · review takes' : scene.canApprove ? 'Approve this scene' : 'Finish previous scene first', () => {
+        Alert.alert(`Approve scene ${scene.order + 1}?`, `${scene.title} will be available for media generation. Provider cost is confirmed separately.`, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Approve scene', onPress: () => { const latest = readProject(projectId); if (latest) save(approveProductionScene(latest.ai, scene.sceneId, new Date().toISOString())); } }
+        ]);
+      }, !scene.canApprove)}
+    </View>)}
+    {action('Price & generate approved scene shots', start, !selectedScene?.canProduce || selectedScene.complete)}
     {lock.current && <><Text style={{ color: theme.textWeak }}>{stopRequested ? 'Stopping after the submitted take is saved…' : 'Stopping does not cancel submitted provider jobs or charges.'}</Text><Pressable accessibilityRole="button" disabled={stopRequested} onPress={() => { queueControl.current.requestStop(); setStopRequested(true); }} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>Stop after current shot</Text></Pressable></>}
-    {project.ai.generations.filter(candidate => shots.some(shot => shot.id === candidate.shotId) && candidate.status === 'completed').map(candidate => {
+    <Text style={{ color: theme.text, fontWeight: '600' }}>{selectedScene ? `Scene ${selectedScene.order + 1} takes` : 'Scene takes'}</Text>
+    {project.ai.generations.filter(candidate => visibleShotIds.has(candidate.shotId) && candidate.status === 'completed').map(candidate => {
       const asset = project.assets.find(item => candidate.outputAssetIds.includes(item.id));
       return <View key={candidate.id} style={{ gap: 6 }}><Text style={{ color: theme.text }}>{shots.find(shot => shot.id === candidate.shotId)?.label} · {candidate.review?.decision ?? 'pending'}</Text>
         {asset && action('View take', () => setPreview(preview === candidate.id ? null : candidate.id))}

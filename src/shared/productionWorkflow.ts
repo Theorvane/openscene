@@ -1,5 +1,6 @@
 import type { AiProjectDocument, GenerationRecord, ReferenceAsset } from './aiProjectDomain';
 import type { ImageAspectRatio } from './providerSeams';
+import { getVideoOperationConstraints, isVideoOperationImplemented, type VideoOperation } from './mediaCapabilityRegistry';
 import type { VideoContinuityControls } from './videoContinuitySettings';
 import { approvedWriterShots, pipelineBaseRequest } from './writerPipeline';
 import { writerVideoStyleDirection } from './writerWorkflow';
@@ -17,6 +18,7 @@ export type ProductionShotState =
 
 export type ProductionShotRow = {
   readonly shotId: string;
+  readonly sceneId: string;
   readonly label: string;
   readonly durationMs: number;
   readonly sceneTitle: string;
@@ -52,6 +54,15 @@ export type ProductionMutationResult =
 export type ProductionImageTarget =
   | { readonly kind: 'character_reference'; readonly characterId: string }
   | { readonly kind: 'storyboard'; readonly shotId: string };
+
+/** Choose the shortest supported source that can fill the finished shot. Never stretch a short clip. */
+export function productionSourceDurationSeconds(modelId: string, operation: VideoOperation, finishedSeconds: number, browserDurations?: readonly number[]): number | null {
+  if (!Number.isFinite(finishedSeconds) || finishedSeconds <= 0) return null;
+  const options = browserDurations ?? (isVideoOperationImplemented(modelId, operation)
+    ? getVideoOperationConstraints(modelId, operation)?.durationSeconds
+    : undefined);
+  return options?.filter((seconds) => seconds >= finishedSeconds).sort((a, b) => a - b)[0] ?? null;
+}
 
 export const PRODUCTION_BATCH_LIMIT = 50;
 
@@ -286,6 +297,8 @@ export function buildStoryboardImageBrief(
   if (scene === undefined) return { ok: false, reason: 'The Writer scene no longer exists.' };
   const writerShot = approvedWriterShots(document).find((entry) => entry.id === shot.id);
   if (writerShot === undefined) return { ok: false, reason: 'Approve and save the Writer prompt stage before generating storyboard images.' };
+  const sceneBlock = productionSceneGenerationBlockReason(document, shot.id);
+  if (sceneBlock !== null) return { ok: false, reason: sceneBlock };
   const characters = scene.characterIds.flatMap((characterId) => {
     const character = document.characters.find((entry) => entry.id === characterId);
     return character === undefined ? [] : [`${character.name}: ${character.invariantDescription}`];
@@ -374,6 +387,7 @@ export function productionShotRows(document: AiProjectDocument | null | undefine
     ).filter((id, index, values) => values.indexOf(id) === index);
     return [{
       shotId: shot.id,
+      sceneId: scene.id,
       label: writerShot.label,
       durationMs: shot.durationMs,
       sceneTitle: scene.title,
@@ -387,6 +401,76 @@ export function productionShotRows(document: AiProjectDocument | null | undefine
   });
 }
 
+export type ProductionSceneRow = {
+  readonly sceneId: string;
+  readonly order: number;
+  readonly title: string;
+  readonly objective: string;
+  readonly setting: string;
+  readonly timeOfDay: string;
+  readonly continuityNotes: string;
+  readonly durationMs: number;
+  readonly shotCount: number;
+  readonly approvedShotCount: number;
+  readonly approved: boolean;
+  readonly complete: boolean;
+  readonly canApprove: boolean;
+  readonly canProduce: boolean;
+};
+
+/** Ordered scenes in the active Writer plan, with approval and take progress. */
+export function productionSceneRows(document: AiProjectDocument | null | undefined): readonly ProductionSceneRow[] {
+  if (!document?.writerPipeline?.appliedScriptId) return [];
+  const shots = productionShotRows(document);
+  if (shots.length === 0) return [];
+  const scenes = document.scenes
+    .filter((scene) => scene.scriptVersionId === document.writerPipeline?.appliedScriptId)
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  const result: ProductionSceneRow[] = [];
+  for (const scene of scenes) {
+    const sceneShots = shots.filter((shot) => shot.sceneId === scene.id);
+    if (sceneShots.length !== scene.shotIds.length || sceneShots.length === 0) return [];
+    const approved = scene.productionApprovedAt !== undefined;
+    const approvedShotCount = sceneShots.filter((shot) => shot.approvedGeneration?.status === 'completed' && (shot.approvedGeneration.outputAssetIds.length > 0)).length;
+    const complete = approved && approvedShotCount === sceneShots.length;
+    const previousComplete = result.every((entry) => entry.complete);
+    result.push({
+      sceneId: scene.id, order: scene.order, title: scene.title, objective: scene.objective,
+      setting: scene.setting, timeOfDay: scene.timeOfDay, continuityNotes: scene.continuityNotes,
+      durationMs: sceneShots.reduce((total, shot) => total + shot.durationMs, 0),
+      shotCount: sceneShots.length, approvedShotCount, approved, complete,
+      canApprove: !approved && previousComplete,
+      canProduce: approved && previousComplete
+    });
+  }
+  return result;
+}
+
+/** Checked again at submission, so a stale screen cannot spend on an unapproved scene. */
+export function productionSceneGenerationBlockReason(document: AiProjectDocument, shotId: string): string | null {
+  const shot = document.shots.find((entry) => entry.id === shotId);
+  const scene = shot === undefined ? undefined : document.scenes.find((entry) => entry.id === shot.sceneId);
+  if (scene === undefined) return 'The planned shot or scene no longer exists.';
+  if (scene.scriptVersionId !== document.writerPipeline?.appliedScriptId) return null;
+  const state = productionSceneRows(document).find((entry) => entry.sceneId === scene.id);
+  if (!state?.approved) return `Approve ${scene.title} for production before generating its shots.`;
+  return state.canProduce ? null : 'Finish and approve every take in the preceding scenes before generating this scene.';
+}
+
+export function approveProductionScene(document: AiProjectDocument, sceneId: string, approvedAt: string): ProductionMutationResult {
+  const scene = productionSceneRows(document).find((entry) => entry.sceneId === sceneId);
+  if (scene === undefined) return { ok: false, reason: 'This scene is not in the active approved Writer plan.' };
+  if (scene.approved) return { ok: false, reason: 'This scene is already approved for production.' };
+  if (!scene.canApprove) return { ok: false, reason: 'Approve every take in the preceding scene before starting this one.' };
+  if (Number.isNaN(new Date(approvedAt).valueOf()) || new Date(approvedAt).toISOString() !== approvedAt) {
+    return { ok: false, reason: 'Scene approval needs a valid timestamp.' };
+  }
+  return { ok: true, document: {
+    ...document,
+    scenes: document.scenes.map((entry) => entry.id === sceneId ? { ...entry, productionApprovedAt: approvedAt } : entry)
+  } };
+}
+
 /** Targets that are actually missing; existing reviewed mappings are never overwritten by a batch. */
 export function missingProductionImageTargets(
   document: AiProjectDocument,
@@ -394,7 +478,8 @@ export function missingProductionImageTargets(
 ): readonly ProductionImageTarget[] {
   const rows = productionShotRows(document);
   if (kind === 'storyboard') {
-    return rows.filter((row) => row.storyboardReference === undefined)
+    const approvedScenes = new Set(productionSceneRows(document).filter((scene) => scene.canProduce).map((scene) => scene.sceneId));
+    return rows.filter((row) => approvedScenes.has(row.sceneId) && row.storyboardReference === undefined)
       .slice(0, PRODUCTION_BATCH_LIMIT)
       .map((row) => ({ kind: 'storyboard' as const, shotId: row.shotId }));
   }
@@ -407,8 +492,9 @@ export function missingProductionImageTargets(
 
 /** Shots safe to enqueue without duplicating an active, reviewable, or approved take. */
 export function batchableProductionVideoShotIds(document: AiProjectDocument): readonly string[] {
+  const approvedScenes = new Set(productionSceneRows(document).filter((scene) => scene.canProduce).map((scene) => scene.sceneId));
   return productionShotRows(document)
-    .filter((row) => row.state === 'not_started' || row.state === 'failed')
+    .filter((row) => approvedScenes.has(row.sceneId) && (row.state === 'not_started' || row.state === 'failed'))
     .slice(0, PRODUCTION_BATCH_LIMIT)
     .map((row) => row.shotId);
 }
@@ -498,6 +584,8 @@ export function buildApprovedProductionAssemblyPlan(
 ): ProductionAssemblyPlan {
   const rows = productionShotRows(document);
   if (rows.length === 0) return { ok: false, reason: 'Approve and save the Writer prompt stage before assembling a production cut.' };
+  const scenes = productionSceneRows(document);
+  if (scenes.length === 0 || scenes.some((scene) => !scene.approved)) return { ok: false, reason: 'Approve every planned scene before assembling the film.' };
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
   const usedAssetIds = new Set<string>();
   const shots: ProductionAssemblyShot[] = [];

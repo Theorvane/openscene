@@ -57,6 +57,15 @@ describe('Writer workflow', () => {
     expect(parseWriterGenerationInput({ modelId: 'grok-4', request })).toBeNull();
   });
 
+  it('validates the five-second short-film contract and exact shot count', () => {
+    const fixed = { ...request, targetDurationSeconds: 300, shotDurationSeconds: 5 as const };
+    expect(parseWriterRequest(fixed)).toEqual(fixed);
+    expect(parseWriterRequest({ ...fixed, targetDurationSeconds: 302 })).toBeNull();
+    expect(parseWriterRequest({ ...fixed, targetDurationSeconds: 295 })).toBeNull();
+    expect(parseWriterRequest({ ...fixed, targetDurationSeconds: 905 })).toBeNull();
+    expect(compileWriterPrompt(fixed)).toContain('Plan exactly 60 shots');
+    expect(compileWriterPrompt({ ...fixed, targetDurationSeconds: 900 })).toContain('Plan exactly 180 shots');
+  });
   it('compiles source as delimited material and publishes a strict JSON schema', () => {
     const prompt = compileWriterPrompt(request);
     expect(prompt).toContain('<SOURCE_MATERIAL>');

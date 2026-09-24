@@ -131,8 +131,10 @@ export function saveWriterArtifact(state: WriterPipelineState, artifact: WriterS
   }
   const draft = validateWriterArtifact(state, artifact);
   const base = pipelineBaseRequest(state)!;
-  if (approve && artifact.stage === 'prompts' && !writerDraftDurationMatchesTarget(draft, base.targetDurationSeconds)) {
-    throw new Error(`Shot total is ${writerDraftDurationSeconds(draft)}s; the brief requests ${base.targetDurationSeconds}s. Adjust the shots or revise the breakdown before approval (within ±${WRITER_DURATION_TOLERANCE_SECONDS}s is accepted).`);
+  if (approve && artifact.stage === 'prompts' && (base.shotDurationSeconds === undefined
+    ? !writerDraftDurationMatchesTarget(draft, base.targetDurationSeconds)
+    : writerDraftDurationSeconds(draft) !== base.targetDurationSeconds)) {
+    throw new Error(`Shot total is ${writerDraftDurationSeconds(draft)}s; the brief requests ${base.targetDurationSeconds}s. ${base.shotDurationSeconds === 5 ? 'Every shot and the total must match the five-second plan exactly.' : `Adjust the shots or revise the breakdown before approval (within ±${WRITER_DURATION_TOLERANCE_SECONDS}s is accepted).`}`);
   }
   const normalized = { ...artifactFromWriterDraft(artifact.stage, draft, artifact.modelId), approved: approve };
   const next = putWriterArtifact(state, normalized);
