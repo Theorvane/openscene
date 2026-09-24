@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { proposeProductionPlan, approveProductionPlan, productionTextBatch } from '../src/shared/productionPlan';
+import { proposeProductionPlan, approveProductionPlan, productionTextBatch, approveProductionCheckpoint, nextProductionCheckpoint } from '../src/shared/productionPlan';
+import { WRITER_STAGES } from '../src/shared/writerStages';
 import { addGenerationCandidate } from '../src/shared/generationReview';
 import { createEmptyAiProjectDocument, parseAiProjectDocument } from '../src/shared/aiProjectDomain';
 import { approvedWriterShots } from '../src/shared/writerPipeline';
@@ -10,6 +11,31 @@ const request: WriterRequest = { mode: 'idea_to_script', sourceText: 'A traveler
 const draft: WriterDraft = { title: 'Letter', screenplay: 'A traveler opens the letter at dawn.', characters: [], styleBible: { palette: ['blue'], lighting: 'Dawn', cameraGrammar: 'Wide', texture: 'Film', forbiddenChanges: [] }, scenes: [{ title: 'Station', objective: 'Find the letter', setting: 'Station', timeOfDay: 'Dawn', characterNames: [], continuityNotes: 'Same station', shots: [{ durationSeconds: 8, framing: 'Wide', cameraMotion: 'Static', action: 'A traveler opens the letter', dialogue: '', audioCues: [], negativePrompt: '' }] }] };
 const date = '2026-09-24T00:00:00.000Z';
 describe('guided production plan', () => {
+  it('requires ordered saved checkpoints and prepares shots only after final approval', () => {
+    let document = { ...createEmptyAiProjectDocument(), writerPipeline: proposeProductionPlan(request, draft, 'test') };
+    const before = JSON.stringify(document);
+    expect(() => approveProductionCheckpoint(document, request, document.writerPipeline, 'prompts', date, 'skip')).toThrow('current checkpoint');
+    expect(JSON.stringify(document)).toBe(before);
+    for (const stage of WRITER_STAGES) {
+      expect(nextProductionCheckpoint(document.writerPipeline)).toBe(stage);
+      const saved = approveProductionCheckpoint(document, request, document.writerPipeline, stage, date, 'checkpoint');
+      expect(parseAiProjectDocument(saved)).not.toBeNull();
+      document = { ...saved, writerPipeline: saved.writerPipeline! };
+      expect(document.writerPipeline.artifacts.find(item => item.stage === stage)?.approved).toBe(true);
+      expect(approvedWriterShots(document)).toHaveLength(stage === 'prompts' ? 1 : 0);
+      expect(document.generations).toHaveLength(0);
+    }
+    expect(nextProductionCheckpoint(document.writerPipeline)).toBeNull();
+    expect(() => approveProductionCheckpoint(document, request, document.writerPipeline, 'prompts', date, 'again')).toThrow('already applied');
+  });
+  it('rejects stale briefs and missing checkpoint artifacts without changing the project', () => {
+    const document = createEmptyAiProjectDocument();
+    const proposal = proposeProductionPlan(request, draft, 'test');
+    expect(nextProductionCheckpoint(undefined)).toBeNull();
+    expect(() => approveProductionCheckpoint(document, { ...request, sourceText: 'Changed' }, proposal, 'concept', date, 'stale')).toThrow('brief changed');
+    expect(() => approveProductionCheckpoint(document, request, { ...proposal, artifacts: [] }, 'concept', date, 'missing')).toThrow('missing');
+    expect(document.scripts).toEqual([]);
+  });
   it('derives frame availability from saved image evidence, not a dangling reference', () => {
     const approved = approveProductionPlan(createEmptyAiProjectDocument(), request, proposeProductionPlan(request, draft, 'test'), date, 'frames');
     const document = { ...approved, shots: approved.shots.map(shot => ({ ...shot, referenceAssetIds: ['frame'] })), referenceAssets: [{ id: 'frame', assetId: 'image', role: 'start_frame' as const, label: 'First frame' }] };
