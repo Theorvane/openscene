@@ -64,8 +64,8 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
     label: 'Graphite Pro',
     description: 'Unified graphite workbench with blue controls',
     light: {
-      accentColor: '#2563eb',
-      bgPreview: '#f8fafc'
+      accentColor: '#245bc5',
+      bgPreview: '#e9edf3'
     },
     dark: {
       accentColor: '#78a9ff',

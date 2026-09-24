@@ -275,21 +275,38 @@
 }
 
 :root[data-preset="obsidian-pro"][data-theme="light"] {
-  --background: #f8fafc;
-  --card: #fdfdfe;
+  color-scheme: light;
+  --background: #e9edf3;
+  --card: #f5f7fb;
+  --card-foreground: #202938;
   --popover: #ffffff;
-  --foreground: #0f172a;
-  --secondary: #eef2f6;
-  --muted: #f1f5f9;
-  --primary: #2563eb;
-  --accent: #0284c7;
-  --ring: #3b82f6;
-  --border: rgba(15, 23, 42, 0.12);
-  --border-strong: rgba(15, 23, 42, 0.2);
-  --surface-control: #fdfdfe;
-  --surface-control-hover: #eef2f6;
-  --surface-control-selected: rgba(37, 99, 235, 0.12);
-  --surface-inset: #f1f5f9;
+  --popover-foreground: #202938;
+  --foreground: #202938;
+  --secondary: #e0e6ef;
+  --secondary-foreground: #202938;
+  --muted: #e5eaf2;
+  --muted-foreground: #536177;
+  --primary: #245bc5;
+  --primary-foreground: #ffffff;
+  --accent: #245bc5;
+  --accent-foreground: #ffffff;
+  --ring: #245bc5;
+  --border: #c9d1dd;
+  --border-strong: #9caabe;
+  --input: #ffffff;
+  --text: #202938;
+  --text-weaker: #627087;
+  --color-faint: #627087;
+  --surface-control: #f5f7fb;
+  --surface-control-hover: #e0e6ef;
+  --surface-control-selected: #dbe7ff;
+  --surface-hover: #e0e6ef;
+  --surface-active: #d5dfee;
+  --surface-inset: #e5eaf2;
+  --surface-inset-strong: #dce3ee;
+  --surface-raised: #ffffff;
+  --surface-raised-soft: #f5f7fb;
+  --surface-rule: #c9d1dd;
 }
 
 /* 3. Daylight Glass (Command Desk) */

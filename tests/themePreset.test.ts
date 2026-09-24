@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   parseThemePreset,
   resolveThemePreset,
@@ -57,8 +58,19 @@ describe('theme preset configuration and helper functions', () => {
     expect(THEME_STORAGE_KEY).toBe('window-loom-theme');
   });
 
-  it('keeps daylight-glass and dark-zinc as mode fallback compatibility identifiers', () => {
+  it('uses the professional preset as fallback without changing saved preset identifiers', () => {
     expect(parseThemePreset('missing', 'light')).toBe('obsidian-pro');
     expect(parseThemePreset('missing', 'dark')).toBe('obsidian-pro');
+  });
+  it('provides matching professional palette previews for both system theme modes', () => {
+    const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8');
+    const preset = THEME_PRESETS.find(item => item.id === 'obsidian-pro')!;
+    for (const mode of ['light', 'dark'] as const) {
+      const blocks = [...css.matchAll(new RegExp(`:root\\[data-preset="obsidian-pro"\\]\\[data-theme="${mode}"\\]\\s*\\{([^}]+)\\}`, 'g'))];
+      const block = blocks.at(-1)?.[1];
+      expect(block).toContain(`--background: ${preset[mode].bgPreview};`);
+      expect(block).toContain(`--primary: ${preset[mode].accentColor};`);
+      expect(block).toContain(`color-scheme: ${mode};`);
+    }
   });
 });
