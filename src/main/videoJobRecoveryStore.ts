@@ -11,7 +11,7 @@ const MAXIMUM_RETAINED_VIDEO_JOBS = 200;
 const MAXIMUM_JOURNAL_BYTES = 4 * 1024 * 1024;
 const PROVIDERS: readonly VideoGenerationProviderId[] = [
   'gemini_veo', 'gemini_omni', 'grok_imagine', 'openai_sora', 'runway_gen4', 'kling_v3',
-  'luma_dream', 'minimax_hailuo', 'comfyui_wan'
+  'luma_dream', 'minimax_hailuo', 'alibaba_wan', 'comfyui_wan'
 ];
 const STATUSES = ['queued', 'running', 'needs_user_action', 'completed', 'failed'] as const;
 const MODES = ['api', 'browser_session', 'local'] as const;

@@ -25,6 +25,8 @@ import {
   generateLumaVideo,
   generateOpenAiSpeech,
   generateRunwayVideo,
+  generateGrokVideo,
+  generateAlibabaVideo,
   generateSoraVideo,
   generateVeoVideo,
   generateVieNeuSpeech,
@@ -281,7 +283,8 @@ const VIDEO_PROVIDER_LABELS: Record<VideoGenerationProviderId, string> = {
   kling_v3: 'Kling',
   luma_dream: 'Luma',
   minimax_hailuo: 'MiniMax Hailuo',
-  comfyui_wan: 'ComfyUI Wan'
+  comfyui_wan: 'ComfyUI Wan',
+  alibaba_wan: 'Alibaba Model Studio'
 };
 
 const IMAGE_PROVIDER_LABELS: Record<ImageGenerationProviderId, string> = {
@@ -352,7 +355,9 @@ async function invokeCloudVideoProvider(
       google_omni: generateGeminiOmniVideo,
       openai_sora: generateSoraVideo,
       runway: generateRunwayVideo,
-      luma: generateLumaVideo
+      luma: generateLumaVideo,
+      xai_grok_api: generateGrokVideo,
+      alibaba_video: generateAlibabaVideo
     };
     const adapter = adapters[binding.adapterId];
     if (adapter === undefined) {
@@ -466,8 +471,11 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       if (flowModel === null) {
         throw new Error(`${model.label} has no exact counterpart in the current Google Flow video menu. Use the API lane instead.`);
       }
-    } else if (!(model.providerId === 'xai' && providerMapping.adapterId === 'grok_imagine_browser')) {
+    } else if (!(model.providerId === 'xai' && modelId === 'grok-imagine-video-1.5')) {
       throw new Error('Browser-session video generation is available only for an explicitly supported Google Flow or Grok Imagine model.');
+    }
+    if (model.providerId === 'xai' && ![6, 10, 15].includes(durationSeconds)) {
+      throw new Error('The signed-in Grok Imagine session supports 6, 10, or 15 second clips. Use the xAI API key lane for five-second shots.');
     }
     if (model.providerId === 'google_gemini') {
       if (!['text_to_video', 'image_to_video', 'reference_to_video', 'start_end'].includes(operation)) {

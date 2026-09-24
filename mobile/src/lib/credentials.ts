@@ -14,6 +14,7 @@ export const PROVIDER_KEYS = [
   { slot: 'elevenlabsApiKey', label: 'ElevenLabs', hint: 'sk_…', providerId: 'elevenlabs' },
   { slot: 'stabilityApiKey', label: 'Stability AI', hint: 'sk-…', providerId: 'stability' },
   { slot: 'blackForestLabsApiKey', label: 'Black Forest Labs', hint: 'key', providerId: 'black_forest_labs' },
+  { slot: 'xai', label: 'xAI', hint: 'xAI API key', providerId: 'xai' },
   { slot: 'dashscopeApiKey', label: 'Alibaba DashScope', hint: 'sk-…', providerId: 'alibaba_dashscope' },
   { slot: 'runwayApiKey', label: 'Runway', hint: 'key_…', providerId: 'runway' },
   { slot: 'klingApiKey', label: 'Kling', hint: 'key', providerId: 'kling' },

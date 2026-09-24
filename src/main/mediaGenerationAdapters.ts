@@ -7,6 +7,8 @@
 
 import {
   requestGeminiOmniVideo,
+  requestGrokVideo,
+  requestAlibabaVideo,
   requestLumaVideo,
   requestRunwayVideo,
   requestSoraVideo,
@@ -311,4 +313,12 @@ export async function generateRunwayVideo(input: VideoSynthesisInput): Promise<G
 
 export async function generateLumaVideo(input: VideoSynthesisInput): Promise<GeneratedVideo> {
   return download(await requestLumaVideo(input), 'Luma', input.fetchImpl ?? fetch);
+}
+
+export async function generateGrokVideo(input: VideoSynthesisInput): Promise<GeneratedVideo> {
+  return download(await requestGrokVideo(input), 'xAI Grok Imagine', input.fetchImpl ?? fetch);
+}
+
+export async function generateAlibabaVideo(input: VideoSynthesisInput): Promise<GeneratedVideo> {
+  return download(await requestAlibabaVideo(input), 'Alibaba Model Studio', input.fetchImpl ?? fetch);
 }

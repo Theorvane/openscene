@@ -177,7 +177,7 @@ export function VideoGenerationWorkspace({
   const grokImagineBrowser = videoModel.id === 'grok-imagine-video-1.5';
   const browserSessionSupported = flowVideoModel !== null || grokImagineBrowser;
   const [generationMode, setGenerationMode] = useState<ProviderExecutionMode>(
-    browserSessionSupported ? 'browser_session' : videoModel.executionPath
+    flowVideoModel !== null ? 'browser_session' : videoModel.executionPath
   );
   const [flowSession, setFlowSession] = useState<BrowserSessionStatus | null>(null);
   const { importAiResult, placeAiAssetOnTimeline, assembleApprovedWriterShots } = useProjectResultImport();
@@ -287,7 +287,7 @@ export function VideoGenerationWorkspace({
   useEffect(() => {
     if (previousVideoModelId.current === videoModel.id) return;
     previousVideoModelId.current = videoModel.id;
-    setGenerationMode(videoModel.id === 'grok-imagine-video-1.5' || googleFlowVideoModelFor(videoModel.id) !== null ? 'browser_session' : videoModel.executionPath);
+    setGenerationMode(googleFlowVideoModelFor(videoModel.id) !== null ? 'browser_session' : videoModel.executionPath);
     setSelectedOperation('text_to_video');
   }, [videoModel.id, videoModel.executionPath]);
 
@@ -1218,7 +1218,6 @@ export function VideoGenerationWorkspace({
               <button
                 type="button"
                 aria-pressed={generationMode === 'api'}
-                disabled={grokImagineBrowser}
                 className={`studio-chip${generationMode === 'api' ? ' studio-chip--selected' : ''}`}
                 onClick={() => setGenerationMode('api')}
               >

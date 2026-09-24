@@ -23,6 +23,15 @@ describe('video cost estimates', () => {
     expect(estimate.asOf).toBe(PRICING_AS_OF);
   });
 
+  it('prices five-second Grok, Wan, and HappyHorse shots before submission', () => {
+    expect(estimateVideoCost({ modelId: 'grok-imagine-video-1.5', durationSeconds: 5 }))
+      .toMatchObject({ priced: true, amountUsd: 0.75, asOf: '2026-09-24' });
+    expect(estimateVideoCost({ modelId: 'wan2.7-t2v', durationSeconds: 5 }))
+      .toMatchObject({ priced: true, amountUsd: 0.5, asOf: '2026-09-24' });
+    expect(estimateVideoCost({ modelId: 'happyhorse-1.1-i2v', durationSeconds: 5 }))
+      .toMatchObject({ priced: true, amountUsd: 0.7, asOf: '2026-09-24' });
+  });
+
   it('never quotes zero for a job that would still be charged', () => {
     // Given / When / Then
     // A 0s or negative request is a bug upstream; quoting $0.00 would turn it
