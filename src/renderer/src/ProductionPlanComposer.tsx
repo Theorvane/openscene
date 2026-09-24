@@ -31,9 +31,10 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
   const applied = !!document.writerPipeline?.appliedScriptId;
   const checkpoint = nextProductionCheckpoint(flow.proposal);
   return <section id="production-plan" className="production-plan-composer" aria-label="Guided production">
-    <header><p className="section-kicker">BRIEF → PLAN APPROVAL → GENERATE → REVIEW → ASSEMBLE</p><h2>What short film should we make?</h2>
-      <p>Plan a 5–15 minute story as 60–180 five-second shots across multiple scenes. Review the complete script, scene order and shot prompts before producing each scene.</p></header>
-    <label className="studio-field"><span>Production brief</span><textarea rows={5} value={brief} disabled={busy} onChange={event => setBrief(event.target.value)} placeholder="A ten-minute mystery: two characters cross paths at a rainy station, uncover a secret, and face a final choice…" /></label>
+    <header><p className="section-kicker">{applied ? 'PRODUCTION PLAN APPROVED' : flow.proposal ? 'REVIEW THE PROPOSED PLAN' : 'STEP 1 · STORY BRIEF'}</p><h2>{applied ? 'Screenplay and scene plan' : flow.proposal ? 'Review your film plan' : 'Start your film here'}</h2>
+      <p>Describe the characters, setting, conflict and ending. The planner turns your brief into a screenplay, scenes and five-second shot prompts for a 5–15 minute film.</p>
+      <ol className="production-plan-composer__steps"><li><strong>Write the brief</strong><span>Describe the story below.</span></li><li><strong>Propose a plan</strong><span>Use the selected writing model.</span></li><li><strong>Approve each step</strong><span>Review the screenplay, scenes and shot prompts.</span></li><li><strong>Make scene 1</strong><span>Return to the story reel to generate and review shots.</span></li></ol></header>
+    <label className="studio-field"><span>Production brief</span><textarea id="production-brief" rows={5} value={brief} disabled={busy} onChange={event => setBrief(event.target.value)} placeholder="A ten-minute mystery: two characters cross paths at a rainy station, uncover a secret, and face a final choice…" /></label>
     <div className="writer-workspace__row">
       <label className="studio-field"><span>Target runtime (seconds; 300–900 in five-second steps)</span><input type="number" min={request.shotDurationSeconds === 5 ? 300 : 4} max={request.shotDurationSeconds === 5 ? 900 : 7200} step={request.shotDurationSeconds === 5 ? 5 : 1} value={seconds} disabled={busy} onChange={event => setSeconds(event.target.value)} /></label>
       <label className="studio-field"><span>Dialogue language</span><input value={language} disabled={busy} onChange={event => setLanguage(event.target.value)} /></label>
@@ -48,10 +49,11 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
         if (!result.ok) throw new Error(result.error.message);
         return result.value;
       });
-    }}>{flow.busy ? 'Working…' : flow.proposal ? 'Revise complete plan' : 'Propose complete plan'}</button>
-    {!connected && <p>Connect the selected writing provider in Settings to propose a plan.</p>}
+    }}>{flow.busy ? 'Working…' : flow.proposal ? 'Revise screenplay and scene plan' : 'Create screenplay and scene plan'}</button>
+    {!request.sourceText && <p>Start by writing a story brief above. No video is generated at this step.</p>}
+    {!connected && <p>Connect the selected writing provider in Settings to create a plan.</p>}
     {flow.proposal && <div className="production-plan-review">
-      <h3>{applied && matches ? 'Approved production plan' : 'Review proposed plan'}</h3>
+      <h3 id="production-plan-review" tabIndex={-1}>{applied && matches ? 'Approved production plan' : 'Review proposed plan'}</h3>
       <ol className="production-checkpoint-rail" aria-label="Plan checkpoints">{WRITER_STAGES.map(stage => <li key={stage} aria-current={checkpoint === stage ? 'step' : undefined}>{flow.proposal!.artifacts.some(item => item.stage === stage && item.approved) ? '✓ ' : ''}{WRITER_STAGE_LABELS[stage]}</li>)}</ol>
       {flow.proposal.artifacts.map(artifact => <details key={artifact.stage + ':' + checkpoint} open={artifact.stage === checkpoint}><summary>{WRITER_STAGE_LABELS[artifact.stage]} · {artifact.approved ? 'Approved' : 'Review required'}</summary><pre>{artifact.content}</pre><ul>{WRITER_STAGE_CHECKLISTS[artifact.stage].map(item => <li key={item}>{item}</li>)}</ul></details>)}
       {!matches && <p role="alert">The brief changed. Generate a revised plan before approval.</p>}

@@ -72,14 +72,14 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
     <View style={{ backgroundColor: theme.surface, padding: 20, borderRadius: 4, gap: 10 }}>
       <Text style={{ color: theme.warn, fontSize: 11, letterSpacing: 2, fontWeight: '700' }}>THE SCREENPLAY · WORKING SCRIPT</Text>
       <Text style={{ color: theme.text, fontSize: 22, fontWeight: '700' }}>{dashboard.title}</Text>
-      <Text style={{ color: theme.textWeak, lineHeight: 21 }}>{dashboard.screenplay || 'Every film begins with a brief. Use screenplay and plan controls below to start writing this one.'}</Text>
+      <Text style={{ color: theme.textWeak, lineHeight: 21 }}>{dashboard.screenplay || 'Every film begins with a story brief. Write it in the form above to create a screenplay and scene plan.'}</Text>
     </View>
     <View style={{ borderWidth: 1, borderColor: theme.line, padding: 14, gap: 8 }}><Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>Decisions</Text>
       {dashboard.decisions.length === 0 ? <Text style={{ color: theme.textWeak }}>No style decisions recorded yet.</Text> : dashboard.decisions.map(item => <Text key={item.label} style={{ color: theme.text }}>{item.label}: {item.value}</Text>)}
     </View>
     <View style={{ borderWidth: 1, borderColor: theme.line, padding: 14, gap: 8 }}><Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>Activity</Text><Text style={{ color: theme.textWeak }}>Scene approvals and generation results will appear here.</Text></View>
     <View style={{ padding: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.line, gap: 8 }}><Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700' }}>STORY REEL / 00 SCENES</Text>
-      <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>Scenes take shape here</Text><Text style={{ color: theme.textWeak }}>Review the brief, screenplay, scene plan and five-second shot prompts in the controls below.</Text>
+      <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>Scenes take shape here</Text><Text style={{ color: theme.textWeak }}>Approve the screenplay, scene plan and five-second shot prompts above. Scene 1 appears here after final approval.</Text>
     </View>
   </View>;
   const action = (label: string, run: () => void, blocked = false) => <Pressable accessibilityRole="button" disabled={disabled || lock.current || blocked} onPress={run} style={press({ minHeight: MIN_TAP, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{label}</Text></Pressable>;

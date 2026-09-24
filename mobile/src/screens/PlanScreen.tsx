@@ -474,14 +474,20 @@ export function PlanScreen({
         <Text style={styles.label}>Frame ratio</Text>
         <View style={styles.row}>{aspectRatioOptions.map(ratio => <Chip key={ratio} label={ratio} selected={ratio === effectiveAspectRatio} onPress={() => setPlan(() => setAspectRatio(ratio))} />)}</View>
       </View>}
-      {projectId && <ProductionRunBoard key={'run-' + projectId} projectId={projectId} model={model} aspectRatio={effectiveAspectRatio} disabled={running || asking || redoing !== null} connected={connected[model.providerId] === true} onBusy={setRunning} active={active} />}
-      {projectId && activeProject && productionShotRows(activeProject.ai).length > 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlanControls }} onPress={() => setShowPlanControls(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{showPlanControls ? 'Hide screenplay and plan controls' : 'Screenplay and plan controls'}</Text></Pressable>}
-      {projectId && activeProject && <View style={{ display: productionRows.length === 0 || showPlanControls ? 'flex' : 'none' }}><ProductionPlanComposer key={'plan-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
+      {projectId && activeProject && productionRows.length === 0 && <ProductionPlanComposer key={'plan-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
         const latest = readProject(projectId);
         if (!latest) return false;
         writeProject({ ...latest, ai });
         return true;
-      }} /></View>}
+      }} />}
+      {projectId && <ProductionRunBoard key={'run-' + projectId} projectId={projectId} model={model} aspectRatio={effectiveAspectRatio} disabled={running || asking || redoing !== null} connected={connected[model.providerId] === true} onBusy={setRunning} active={active} />}
+      {projectId && activeProject && productionRows.length > 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlanControls }} onPress={() => setShowPlanControls(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{showPlanControls ? 'Hide screenplay and plan controls' : 'Screenplay and plan controls'}</Text></Pressable>}
+      {projectId && activeProject && productionRows.length > 0 && showPlanControls && <ProductionPlanComposer key={'plan-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
+        const latest = readProject(projectId);
+        if (!latest) return false;
+        writeProject({ ...latest, ai });
+        return true;
+      }} />}
       {activeProject && onSelectProductionTool && <ProductionCompanions project={activeProject} disabled={running || asking || redoing !== null} onSelect={onSelectProductionTool} />}
       {productionRows.length === 0 && projectId !== null && activeProject !== null && <ProductionNavigator key={projectId} projectId={projectId} document={activeProject.ai} assets={activeProject.assets}
         timeline={activeProject.timeline} onPlaceVoice={assetId => {
