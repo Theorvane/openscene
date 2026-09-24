@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   parseThemePreset,
   resolveThemePreset,
@@ -24,15 +25,15 @@ describe('theme preset configuration and helper functions', () => {
     }
   });
 
-  it('parses stored preset IDs with fallback based on default mode', () => {
+  it('parses stored preset IDs with a consistent professional fallback', () => {
     expect(parseThemePreset('dark-zinc', 'dark')).toBe('dark-zinc');
     expect(parseThemePreset('midnight-neon', 'dark')).toBe('midnight-neon');
     expect(parseThemePreset('daylight-glass', 'light')).toBe('daylight-glass');
     expect(parseThemePreset('obsidian-pro', 'dark')).toBe('obsidian-pro');
 
-    expect(parseThemePreset(null, 'dark')).toBe('dark-zinc');
-    expect(parseThemePreset(undefined, 'light')).toBe('daylight-glass');
-    expect(parseThemePreset('invalid-preset', 'dark')).toBe('dark-zinc');
+    expect(parseThemePreset(null, 'dark')).toBe('obsidian-pro');
+    expect(parseThemePreset(undefined, 'light')).toBe('obsidian-pro');
+    expect(parseThemePreset('invalid-preset', 'dark')).toBe('obsidian-pro');
   });
 
   it('preserves all theme presets across both light and dark modes', () => {
@@ -57,8 +58,19 @@ describe('theme preset configuration and helper functions', () => {
     expect(THEME_STORAGE_KEY).toBe('window-loom-theme');
   });
 
-  it('keeps daylight-glass and dark-zinc as mode fallback compatibility identifiers', () => {
-    expect(parseThemePreset('missing', 'light')).toBe('daylight-glass');
-    expect(parseThemePreset('missing', 'dark')).toBe('dark-zinc');
+  it('uses the professional preset as fallback without changing saved preset identifiers', () => {
+    expect(parseThemePreset('missing', 'light')).toBe('obsidian-pro');
+    expect(parseThemePreset('missing', 'dark')).toBe('obsidian-pro');
+  });
+  it('provides matching professional palette previews for both system theme modes', () => {
+    const css = readFileSync(new URL('../src/renderer/src/styles.css', import.meta.url), 'utf8');
+    const preset = THEME_PRESETS.find(item => item.id === 'obsidian-pro')!;
+    for (const mode of ['light', 'dark'] as const) {
+      const blocks = [...css.matchAll(new RegExp(`:root\\[data-preset="obsidian-pro"\\]\\[data-theme="${mode}"\\]\\s*\\{([^}]+)\\}`, 'g'))];
+      const block = blocks.at(-1)?.[1];
+      expect(block).toContain(`--background: ${preset[mode].bgPreview};`);
+      expect(block).toContain(`--primary: ${preset[mode].accentColor};`);
+      expect(block).toContain(`color-scheme: ${mode};`);
+    }
   });
 });

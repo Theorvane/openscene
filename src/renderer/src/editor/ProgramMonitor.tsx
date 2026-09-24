@@ -307,7 +307,7 @@ export function ProgramMonitor({ editor, exportControl }: ProgramMonitorProps): 
     <section className="program-monitor clip-controls" aria-labelledby="program-monitor-title">
       <h2 id="program-monitor-title" className="visually-hidden">Program Monitor</h2>
 
-      <div className="monitor-container" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--space-3)', minHeight: 0 }}>
+      <div className="monitor-container" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 'var(--space-3)', minHeight: 0, minWidth: 0 }}>
         {/* Preview Frame */}
         <div 
           ref={frameRef}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AiProjectDocument } from '../../shared/aiProjectDomain';
 import { useProjectResultImport } from './ProjectResultImportContext';
+import { productionTimeLabel, productionRuler } from '../../shared/productionDisplay';
 import { PRODUCTION_LANES, inspectProductionTime, isTimedProductionItem, productionPlanDuration, productionReadiness, productionEditorItems, type ProductionEditorAsset, type ProductionEditorItem } from '../../shared/productionEditor';
 
 function MediaPreview({ projectId, item, kind, offsetMs }: { projectId: string; item: ProductionEditorItem; kind: string | undefined; offsetMs: number }) {
@@ -27,6 +28,8 @@ export function PromptProductionLayout({ children, document, assets, projectId, 
   projectId: string | null | undefined; busy: boolean; active: boolean; onLoad: (item: ProductionEditorItem) => void;
 }) {
   const [selectedId, setSelectedId] = useState('');
+  const [focusPreview, setFocusPreview] = useState(false);
+  const [showProperties, setShowProperties] = useState(true);
   const { timeline, hasUnsavedTimeline, saveTimeline, placeAiAssetOnTimeline, isImporting } = useProjectResultImport();
   const [placementMessage, setPlacementMessage] = useState('');
   const [inspectionMs, setInspectionMs] = useState<number | null>(null);
@@ -36,13 +39,20 @@ export function PromptProductionLayout({ children, document, assets, projectId, 
   const durationMs = productionPlanDuration(items);
   const readiness = productionReadiness(items);
   const select = (item: ProductionEditorItem) => { setInspectionMs(null); setSelectedId(item.id); };
-  return <div className="prompt-production-editor">
-    <div className="production-prompt-pane">{children}</div>
+  return <div className={'prompt-production-editor pro-production-editor' + (focusPreview ? ' pro-production-editor--focus' : '')}>
+    <div className="production-workbench-bar" role="toolbar" aria-label="Production workspace layout">
+      <div><strong>PRODUCTION</strong><span className="production-workbench-divider" /><span>{readiness.total} shots</span><span>{productionTimeLabel(durationMs)}</span></div>
+      <div><button type="button" aria-pressed={focusPreview} onClick={() => setFocusPreview(value => !value)}>{focusPreview ? 'Show workspace' : 'Focus preview'}</button><button type="button" aria-pressed={showProperties} onClick={() => setShowProperties(value => !value)}>Properties</button></div>
+    </div>
+    <div className="production-prompt-pane" hidden={focusPreview}><div className="production-panel-caption">DIRECTOR <span>Brief / plan / generate</span></div>{children}</div>
     <aside className="production-preview" aria-label="Production preview">
-      <header><span>PROGRAM / SELECTED SHOT</span><h2>{selected?.label ?? 'Your story starts here'}</h2></header>
+      <header><span>SOURCE MONITOR <span className="production-monitor-badge">Single source</span></span><h2>{selected?.label ?? 'No shot selected'}</h2></header>
+      <div className="production-monitor-stage">
       {active && selected && projectId ? <MediaPreview key={projectId + selected.id + selected.assetId} projectId={projectId} item={selected} offsetMs={inspectionMs === null ? selected.sourceStartMs ?? 0 : inspection.sourceOffsetMs} kind={assets.find(asset => asset.id === selected.assetId)?.kind} /> : <div className="production-preview-empty">{inspectionMs === null ? 'Write a prompt on the left or plan scenes in Writer. Saved results appear here.' : 'No planned video at this time.'}</div>}
+      </div>
+      <div className="production-monitor-status"><span>{selected?.status ?? 'Awaiting plan'}</span><output>{productionTimeLabel(inspection.timeMs)} / {productionTimeLabel(durationMs)}</output></div>
       {inspectionMs !== null && <p className="production-caption-inspection" aria-live="polite">Caption at inspected time: {inspection.captions.map(item => item.prompt).join(' ') || 'None'}</p>}
-      {selected && <div className="production-selection-details"><strong>{selected.status}</strong><p>{selected.prompt || 'No saved prompt for this media.'}</p>
+      {selected && <div className="production-selection-details" hidden={!showProperties}><strong>SHOT PROPERTIES</strong><p>{selected.prompt || 'No saved prompt for this media.'}</p>
         {(selected.shotId || selected.recipeId) && <button className="button" disabled={busy} onClick={() => onLoad(selected)}>Edit selected prompt</button>}
         {selected.lane === 'voice' && selected.assetId && selected.startMs === undefined && <button className="button" disabled={busy || isImporting} onClick={() => {
           setPlacementMessage(placeAiAssetOnTimeline(selected.assetId!) ? 'Voice appended to the audio track. Save arrangement to keep this placement.' : 'Could not place audio. Check media duration and available audio track.');
@@ -51,15 +61,16 @@ export function PromptProductionLayout({ children, document, assets, projectId, 
       <p className="production-preview-note">Selection previews one source, not the final composite. Loading a prompt never starts generation.</p>
     </aside>
     <section className="production-track-deck" aria-label="Production tracks">
-      <header><strong>Sequence plan</strong><span>Video · Voice · Subtitles — select to inspect</span></header>
+      <header><strong>SEQUENCE <span className="production-monitor-badge">Plan</span></strong><span>Video · Voice · Subtitles — select to inspect</span></header>
       <button className="button" disabled={busy || isImporting || !hasUnsavedTimeline} onClick={() => { void saveTimeline().then(ok => setPlacementMessage(ok ? 'Arrangement saved locally.' : 'Save failed. Your arrangement is still unsaved.')); }}>Save arrangement{hasUnsavedTimeline ? ' · Unsaved changes' : ''}</button>
       {placementMessage && <p role="status">{placementMessage}</p>}
       <p className="production-readiness">{readiness.total === 0 ? 'Start with Writer to create a timed shot plan.' : `${readiness.approved}/${readiness.total} shots approved · ${readiness.missing} missing media · ${readiness.review} need review`}</p>
       {durationMs > 0 && <label className="production-time-control">Inspect plan · {(inspection.timeMs / 1000).toFixed(1)} / {(durationMs / 1000).toFixed(1)}s
         <input aria-label="Inspect production time" type="range" min={0} max={durationMs} step={100} value={inspection.timeMs} onChange={event => setInspectionMs(Number(event.target.value))} />
       </label>}
-      {PRODUCTION_LANES.map(lane => <div className="production-track-row" key={lane}>
-        <strong className="production-track-label">{lane}</strong>
+      {durationMs > 0 && <div className="production-ruler" aria-label="Sequence time ruler">{productionRuler(durationMs).map(tick => <span key={tick.position}>{tick.label}</span>)}</div>}
+      {PRODUCTION_LANES.map((lane, index) => <div className="production-track-row" key={lane}>
+        <strong className="production-track-label"><span className="production-track-code">{['V1', 'A1', 'T1'][index]}</span>{lane}</strong>
         <div className="production-track-items" role="group" aria-label={lane + ' track'}>
           {durationMs > 0 && <div className="production-timed-lane">
             {items.filter(item => item.lane === lane && isTimedProductionItem(item)).map(item => <button type="button" key={item.id}
