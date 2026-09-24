@@ -39,6 +39,8 @@ describe('production board surface parity', () => {
     const mobileSubmission = mobile.slice(mobile.indexOf('const runGeneration ='), mobile.indexOf('const approveTake ='));
     expect(mobileSubmission.indexOf('standaloneGenerationBlockReason(current.ai)')).toBeLessThan(mobileSubmission.indexOf('generateShot({'));
     expect(mobileSubmission).toContain('standaloneGenerationBlockReason(latest.ai)');
+    const mobileRedo = mobile.slice(mobile.indexOf('const redoShot ='), mobile.indexOf('const reviewTake ='));
+    expect(mobileRedo.indexOf('standaloneGenerationBlockReason(current.ai)')).toBeLessThan(mobileRedo.indexOf('generateShot({'));
     expect(mobile).toContain('standaloneBlock === null');
     expect(mobile).not.toContain('setPrompt(shot.prompt)');
     const desktopWorkspace = await source('src/renderer/src/VideoGenerationWorkspace.tsx');

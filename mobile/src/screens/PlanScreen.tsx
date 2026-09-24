@@ -310,6 +310,9 @@ export function PlanScreen({
     const take = takes[index];
     const shot = plan.shots.find((candidate) => candidate.index === index);
     if (projectId === null || model === undefined || take === undefined || shot === undefined) return;
+    const current = readProject(projectId);
+    const block = current === null ? 'Project is no longer available. Open it again before generating.' : standaloneGenerationBlockReason(current.ai);
+    if (block !== null) { setWriterMessage(block); return; }
 
     const refined = refineShotPrompt(take.prompt, changeNote);
     if (!refined.ok) {
