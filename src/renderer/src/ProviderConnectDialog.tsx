@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 
 import type { LlmProviderInfo } from '../../shared/llmProviders';
+import { alibabaVideoBaseUrl } from '../../shared/videoGeneration';
 import { Button } from './ui';
 
 /**
@@ -20,7 +21,7 @@ export type ProviderOAuthMethod = {
 
 type ProviderConnectDialogProps = {
   readonly provider: LlmProviderInfo;
-  readonly onConnect: (apiKey: string) => Promise<boolean>;
+  readonly onConnect: (apiKey: string, workspaceId?: string) => Promise<boolean>;
   readonly onClose: () => void;
   readonly oauthMethod?: ProviderOAuthMethod | undefined;
 };
@@ -36,6 +37,7 @@ type DialogStep = 'method' | 'api-key' | 'oauth';
  */
 export function ProviderConnectDialog({ provider, onConnect, onClose, oauthMethod }: ProviderConnectDialogProps): ReactElement {
   const [apiKey, setApiKey] = useState('');
+  const [workspaceId, setWorkspaceId] = useState('');
   const [state, setState] = useState<ConnectState>('idle');
   const [step, setStep] = useState<DialogStep>(oauthMethod === undefined ? 'api-key' : 'method');
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -58,8 +60,16 @@ export function ProviderConnectDialog({ provider, onConnect, onClose, oauthMetho
       setState('required');
       return;
     }
+    if (provider.id === 'alibaba_dashscope') {
+      try {
+        alibabaVideoBaseUrl(workspaceId);
+      } catch {
+        setState('required');
+        return;
+      }
+    }
     setState('saving');
-    const saved = await onConnect(apiKey.trim());
+    const saved = await onConnect(apiKey.trim(), provider.id === 'alibaba_dashscope' ? workspaceId.trim() : undefined);
     if (saved) {
       onClose();
       return;
@@ -163,7 +173,16 @@ export function ProviderConnectDialog({ provider, onConnect, onClose, oauthMetho
                   spellCheck={false}
                 />
               </label>
-              {state === 'required' && <p role="alert" className="provider-connect-dialog__error">API key is required</p>}
+              {provider.id === 'alibaba_dashscope' && (
+                <label className="field-label" htmlFor="provider-connect-workspace-id">
+                  Singapore Workspace ID
+                  <input id="provider-connect-workspace-id" type="text" value={workspaceId}
+                    placeholder="llm-..." autoComplete="off" spellCheck={false}
+                    onChange={(event) => { setWorkspaceId(event.target.value); if (state === 'required') setState('idle'); }} />
+                  <small>Copy the ID from Alibaba Model Studio Workspace Details. Use a Singapore API key.</small>
+                </label>
+              )}
+              {state === 'required' && <p role="alert" className="provider-connect-dialog__error">{provider.id === 'alibaba_dashscope' ? 'API key and valid Singapore Workspace ID are required' : 'API key is required'}</p>}
               {state === 'error' && <p role="alert" className="provider-connect-dialog__error">The key could not be saved. Try again.</p>}
               <div className="provider-connect-dialog__actions">
                 {oauthMethod !== undefined && (

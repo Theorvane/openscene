@@ -426,16 +426,24 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     available: false,
     unavailableReason: 'MiniMax adapter is not implemented in this build.'
   },
+  ...([
+    ['wan2.7-t2v', 'Wan 2.7 · Text', 'Generate from a text prompt with Alibaba Wan 2.7.'],
+    ['wan2.7-i2v', 'Wan 2.7 · First frame', 'Animate a storyboard image with Alibaba Wan 2.7.'],
+    ['happyhorse-1.1-t2v', 'HappyHorse 1.1 · Text', 'Generate from a text prompt with Alibaba HappyHorse 1.1.'],
+    ['happyhorse-1.1-i2v', 'HappyHorse 1.1 · First frame', 'Animate a first frame with Alibaba HappyHorse 1.1.']
+  ] as const).map(([id, label, description]) => ({
+    id, providerId: 'alibaba_dashscope', label, providerLabel: 'Alibaba Model Studio',
+    description, executionPath: 'api' as const, domains: ['video-generation'] as const, available: true
+  })),
   {
     id: 'grok-imagine-video-1.5',
     providerId: 'xai',
     label: 'Grok Imagine Video 1.5',
     providerLabel: 'xAI Grok Imagine',
-    description: 'Desktop browser-session text/image-to-video using the signed-in Grok Imagine UI.',
+    description: 'Text or first-frame video through xAI API or the signed-in desktop Grok session.',
     executionPath: 'api',
     domains: ['video-generation'],
-    available: true,
-    availableOn: ['desktop']
+    available: true
   },
   {
     id: 'grok-imagine-video',

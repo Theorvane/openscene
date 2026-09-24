@@ -49,6 +49,8 @@ export type VideoProgressStage = 'submitting' | 'generating' | 'ready';
 
 export type VideoRequestInput = {
   readonly apiKey: string;
+  /** Alibaba Model Studio Singapore workspace ID, stored outside project files. */
+  readonly alibabaWorkspaceId?: string;
   readonly modelId: string;
   readonly prompt: string;
   readonly aspectRatio: VideoAspectRatio;
@@ -151,8 +153,8 @@ export function assertImplementedVideoRequest(input: Pick<VideoRequestInput, 'mo
 async function safeErrorDetail(response: Response): Promise<string> {
   const bodyText = await response.text().catch(() => '');
   try {
-    const parsed = JSON.parse(bodyText) as { error?: { message?: string } | string; detail?: { message?: string } | string };
-    const candidate = parsed.error ?? parsed.detail;
+    const parsed = JSON.parse(bodyText) as { error?: { message?: string } | string; detail?: { message?: string } | string; message?: string };
+    const candidate = parsed.error ?? parsed.detail ?? parsed.message;
     if (typeof candidate === 'string') return candidate.slice(0, 300);
     if (candidate && typeof candidate.message === 'string') return candidate.message.slice(0, 300);
   } catch {
@@ -453,6 +455,111 @@ export async function requestSoraVideo(input: VideoRequestInput): Promise<VideoD
   }
 }
 
+/** xAI Imagine: submit a text/first-frame request, then poll the request id. */
+export async function requestGrokVideo(input: VideoRequestInput): Promise<VideoDownload> {
+  assertImplementedVideoRequest(input);
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const pollIntervalMs = input.pollIntervalMs ?? VIDEO_POLL_INTERVAL_MS;
+  const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${input.apiKey}` };
+  const startedAt = Date.now();
+  input.onProgress?.('submitting', 0);
+  const response = await fetchWithTimeout(fetchImpl, 'https://api.x.ai/v1/videos/generations', {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      model: input.modelId, prompt: input.prompt, duration: input.durationSeconds,
+      aspect_ratio: input.aspectRatio, resolution: '720p',
+      ...(input.referenceImage === undefined ? {} : { image: { url: `data:${input.referenceImage.mimeType};base64,${input.referenceImage.base64}` } })
+    })
+  });
+  await expectOk(response, 'xAI Grok Imagine');
+  const created = (await response.json()) as { request_id?: string };
+  if (!created.request_id) throw new Error('xAI Grok Imagine did not return a video request id.');
+  const deadline = startedAt + pollTimeoutMs;
+  for (;;) {
+    if (Date.now() > deadline) throw new Error(`xAI Grok Imagine generation did not finish within ${Math.round(pollTimeoutMs / 60_000)} minutes.`);
+    input.onProgress?.('generating', Date.now() - startedAt);
+    await sleep(pollIntervalMs);
+    const poll = await fetchWithTimeout(fetchImpl, `https://api.x.ai/v1/videos/${encodeURIComponent(created.request_id)}`, {
+      method: 'GET', headers: { Authorization: `Bearer ${input.apiKey}` }
+    });
+    await expectOk(poll, 'xAI Grok Imagine');
+    const result = (await poll.json()) as { status?: string; video?: { url?: string }; error?: { message?: string } };
+    if (result.status === 'failed' || result.status === 'expired') {
+      throw new Error(`xAI Grok Imagine generation ${result.status}: ${result.error?.message ?? 'unknown error'}.`);
+    }
+    if (result.status !== 'done') continue;
+    if (!result.video?.url) throw new Error('xAI Grok Imagine finished without a downloadable video.');
+    input.onProgress?.('ready', Date.now() - startedAt);
+    return { url: result.video.url, headers: {}, providerJobId: created.request_id, mimeType: 'video/mp4' };
+  }
+}
+
+/** Stable catalog names resolve to the dated Wan model versions used by the HTTP API. */
+const ALIBABA_VIDEO_API_MODEL_IDS: Readonly<Record<string, string>> = {
+  'wan2.7-t2v': 'wan2.7-t2v-2026-06-12',
+  'wan2.7-i2v': 'wan2.7-i2v-2026-04-25'
+};
+
+/** Construct only the Singapore workspace host; never accept a user-supplied URL. */
+export function alibabaVideoBaseUrl(workspaceId: string | undefined): string {
+  const id = workspaceId?.trim();
+  if (!id || !/^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/.test(id)) {
+    throw new Error('Alibaba video needs a Singapore Workspace ID. Add it in Settings before generating.');
+  }
+  return `https://${id}.ap-southeast-1.maas.aliyuncs.com/api/v1`;
+}
+
+/** Alibaba Model Studio Singapore: submit Wan/HappyHorse, then poll DashScope. */
+export async function requestAlibabaVideo(input: VideoRequestInput): Promise<VideoDownload> {
+  assertImplementedVideoRequest(input);
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const pollIntervalMs = input.pollIntervalMs ?? 15_000;
+  const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
+  const base = alibabaVideoBaseUrl(input.alibabaWorkspaceId);
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${input.apiKey}`, 'X-DashScope-Async': 'enable' };
+  const startedAt = Date.now();
+  input.onProgress?.('submitting', 0);
+  const seeded = input.referenceImage !== undefined;
+  const response = await fetchWithTimeout(fetchImpl, `${base}/services/aigc/video-generation/video-synthesis`, {
+    method: 'POST', headers,
+    body: JSON.stringify({
+      model: ALIBABA_VIDEO_API_MODEL_IDS[input.modelId] ?? input.modelId,
+      input: {
+        prompt: input.prompt,
+        ...(seeded ? { media: [{ type: 'first_frame', url: `data:${input.referenceImage!.mimeType};base64,${input.referenceImage!.base64}` }] } : {})
+      },
+      parameters: {
+        resolution: '720P', duration: input.durationSeconds, watermark: false,
+        ...(seeded ? {} : { ratio: input.aspectRatio })
+      }
+    })
+  });
+  await expectOk(response, 'Alibaba Model Studio');
+  const created = (await response.json()) as { output?: { task_id?: string }; code?: string; message?: string };
+  const taskId = created.output?.task_id;
+  if (!taskId) throw new Error(`Alibaba Model Studio did not return a video task id${created.message ? `: ${created.message}` : ''}.`);
+  const deadline = startedAt + pollTimeoutMs;
+  for (;;) {
+    if (Date.now() > deadline) throw new Error(`Alibaba Model Studio generation did not finish within ${Math.round(pollTimeoutMs / 60_000)} minutes.`);
+    input.onProgress?.('generating', Date.now() - startedAt);
+    await sleep(pollIntervalMs);
+    const poll = await fetchWithTimeout(fetchImpl, `${base}/tasks/${encodeURIComponent(taskId)}`, {
+      method: 'GET', headers: { Authorization: `Bearer ${input.apiKey}` }
+    });
+    await expectOk(poll, 'Alibaba Model Studio');
+    const result = (await poll.json()) as { output?: { task_status?: string; video_url?: string }; code?: string; message?: string };
+    const status = result.output?.task_status;
+    if (status === 'FAILED' || status === 'CANCELED' || status === 'UNKNOWN') {
+      throw new Error(`Alibaba Model Studio generation ${status.toLowerCase()}: ${result.message ?? result.code ?? 'unknown error'}.`);
+    }
+    if (status !== 'SUCCEEDED') continue;
+    if (!result.output?.video_url) throw new Error('Alibaba Model Studio finished without a downloadable video.');
+    input.onProgress?.('ready', Date.now() - startedAt);
+    return { url: result.output.video_url, headers: {}, providerJobId: taskId, mimeType: 'video/mp4' };
+  }
+}
+
 /**
  * Runway over /v1/text_to_video: create → poll the task → hand back the output URL.
  *
@@ -603,7 +710,9 @@ const VIDEO_ADAPTERS: Readonly<Record<string, (input: VideoRequestInput) => Prom
   openai: requestSoraVideo,
   google_gemini: requestVeoVideo,
   runway: requestRunwayVideo,
-  luma: requestLumaVideo
+  luma: requestLumaVideo,
+  xai: requestGrokVideo,
+  alibaba_dashscope: requestAlibabaVideo
 };
 
 /**

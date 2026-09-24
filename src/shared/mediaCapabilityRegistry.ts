@@ -32,9 +32,9 @@ export type VideoOperationConstraints = {
 };
 
 export type VideoProviderBinding = {
-  readonly adapterId: 'google_veo' | 'google_omni' | 'grok_imagine_browser' | 'openai_sora' | 'runway' | 'luma' | 'comfyui_wan';
-  readonly credentialKey?: 'geminiApiKey' | 'openaiApiKey' | 'runwayApiKey' | 'lumaApiKey';
-  readonly seamProviderId: 'gemini_veo' | 'gemini_omni' | 'grok_imagine' | 'openai_sora' | 'runway_gen4' | 'luma_dream' | 'comfyui_wan';
+  readonly adapterId: 'google_veo' | 'google_omni' | 'grok_imagine_browser' | 'openai_sora' | 'runway' | 'luma' | 'xai_grok_api' | 'alibaba_video' | 'comfyui_wan';
+  readonly credentialKey?: 'geminiApiKey' | 'openaiApiKey' | 'runwayApiKey' | 'lumaApiKey' | 'xai' | 'dashscopeApiKey';
+  readonly seamProviderId: 'gemini_veo' | 'gemini_omni' | 'grok_imagine' | 'openai_sora' | 'runway_gen4' | 'luma_dream' | 'alibaba_wan' | 'comfyui_wan';
 };
 
 export type VideoModelCapabilities = {
@@ -72,8 +72,11 @@ const GOOGLE_BINDING: VideoProviderBinding = {
 const GOOGLE_OMNI_BINDING: VideoProviderBinding = {
   adapterId: 'google_omni', credentialKey: 'geminiApiKey', seamProviderId: 'gemini_omni'
 };
-const GROK_IMAGINE_BROWSER_BINDING: VideoProviderBinding = {
-  adapterId: 'grok_imagine_browser', seamProviderId: 'grok_imagine'
+const GROK_IMAGINE_API_BINDING: VideoProviderBinding = {
+  adapterId: 'xai_grok_api', credentialKey: 'xai', seamProviderId: 'grok_imagine'
+};
+const ALIBABA_VIDEO_BINDING: VideoProviderBinding = {
+  adapterId: 'alibaba_video', credentialKey: 'dashscopeApiKey', seamProviderId: 'alibaba_wan'
 };
 const OPENAI_BINDING: VideoProviderBinding = {
   adapterId: 'openai_sora', credentialKey: 'openaiApiKey', seamProviderId: 'openai_sora'
@@ -292,18 +295,30 @@ export const VIDEO_MODEL_CAPABILITIES: readonly VideoModelCapabilities[] = [
     operations: { text_to_video: operation([4, 8], LANDSCAPE_PORTRAIT, ['720p'], false) }, implemented: [],
     unavailableReason: `${providerLabel} adapter is not implemented in this build.`
   })),
+  ...([
+    ['wan2.7-t2v', 'Wan 2.7 · Text', 'text_to_video', range(2, 15), 'https://www.alibabacloud.com/help/en/model-studio/text-to-video-api-reference'],
+    ['wan2.7-i2v', 'Wan 2.7 · First frame', 'image_to_video', range(2, 15), 'https://www.alibabacloud.com/help/en/model-studio/image-to-video-general-api-reference'],
+    ['happyhorse-1.1-t2v', 'HappyHorse 1.1 · Text', 'text_to_video', range(3, 15), 'https://docs.modelstudio.console.alibabacloud.com/en/model-studio/happyhorse-text-to-video-api-reference'],
+    ['happyhorse-1.1-i2v', 'HappyHorse 1.1 · First frame', 'image_to_video', range(3, 15), 'https://docs.modelstudio.console.alibabacloud.com/en/model-studio/happyhorse-image-to-video-api-reference']
+  ] as const).map(([modelId, label, mode, durationSeconds, sourceUrl]) => model({
+    modelId, providerId: 'alibaba_dashscope', providerLabel: 'Alibaba Model Studio', label,
+    description: `${label} via the Singapore DashScope API, 720p.`, documentedAsOf: '2026-09-24',
+    sourceUrls: [sourceUrl], binding: ALIBABA_VIDEO_BINDING,
+    operations: { [mode]: operation(durationSeconds, ALL_APP_RATIOS, ['720p'], true) },
+    implemented: [mode]
+  })),
   model({
     modelId: 'grok-imagine-video-1.5', providerId: 'xai', providerLabel: 'xAI Grok Imagine',
-    label: 'Grok Imagine Video 1.5', description: 'xAI text, image, and multi-reference video generation.',
+    label: 'Grok Imagine Video 1.5', description: 'xAI text and first-frame video generation; multi-reference is not yet connected.',
     sourceUrls: [XAI_VIDEO_SOURCE],
     operations: {
-      text_to_video: operation([6, 10, 15], ALL_APP_RATIOS, ['480p'], true),
-      image_to_video: operation([6, 10, 15], ALL_APP_RATIOS, ['480p'], true, { minReferenceImages: 1, maxReferenceImages: 1 }),
+      text_to_video: operation(range(1, 15), ALL_APP_RATIOS, ['480p', '720p', '1080p'], true),
+      image_to_video: operation(range(1, 15), ALL_APP_RATIOS, ['480p', '720p', '1080p'], true, { minReferenceImages: 1, maxReferenceImages: 1 }),
       reference_to_video: operation(range(1, 15), ALL_APP_RATIOS, ['480p', '720p'], true, { minReferenceImages: 1 })
     },
-    binding: GROK_IMAGINE_BROWSER_BINDING,
+    binding: GROK_IMAGINE_API_BINDING,
     implemented: ['text_to_video', 'image_to_video'],
-    unavailableReason: 'Grok Imagine runs through the signed-in browser lane in this build; reference, edit, and extend remain unavailable until their public UI controls are verified.'
+    unavailableReason: 'Reference, edit, and extend inputs are not yet sent by this adapter.'
   }),
   model({
     modelId: 'grok-imagine-video', providerId: 'xai', providerLabel: 'xAI Grok Imagine',

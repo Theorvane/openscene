@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   requestGeminiOmniVideo,
+  requestGrokVideo,
+  requestAlibabaVideo,
+  alibabaVideoBaseUrl,
   requestLumaVideo,
   requestRunwayVideo,
   requestSoraVideo,
@@ -358,10 +361,130 @@ describe('shared video generation', () => {
     expect(videoAdapterFor('google_gemini', 'gemini-omni-1.1-flash')).toBe(requestGeminiOmniVideo);
     expect(videoAdapterFor('runway')).toBe(requestRunwayVideo);
     expect(videoAdapterFor('luma')).toBe(requestLumaVideo);
+    expect(videoAdapterFor('xai')).toBe(requestGrokVideo);
+    expect(videoAdapterFor('alibaba_dashscope')).toBe(requestAlibabaVideo);
     // Listed in the catalog but unported: callers must get undefined and say so
     // rather than picking a wrong adapter.
     expect(videoAdapterFor('kling')).toBeUndefined();
     expect(videoAdapterFor('byteplus')).toBeUndefined();
+  });
+
+  it('creates a five-second Grok shot and polls until the signed video is ready', async () => {
+    let polls = 0;
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(url).not.toContain('xai-secret');
+      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer xai-secret');
+      if (url.endsWith('/generations')) {
+        expect(JSON.parse(init.body as string)).toEqual({
+          model: 'grok-imagine-video-1.5', prompt: 'a kite', duration: 5,
+          aspect_ratio: '16:9', resolution: '720p'
+        });
+        return new Response(JSON.stringify({ request_id: 'grok-1' }), { status: 200 });
+      }
+      polls += 1;
+      return new Response(JSON.stringify(polls === 1
+        ? { status: 'pending' }
+        : { status: 'done', video: { url: 'https://cdn.example/grok.mp4' } }), { status: 200 });
+    });
+    const ready = await requestGrokVideo({
+      apiKey: 'xai-secret', modelId: 'grok-imagine-video-1.5', prompt: 'a kite',
+      durationSeconds: 5, aspectRatio: '16:9', pollIntervalMs: 0,
+      fetchImpl: fetchMock as unknown as typeof fetch
+    });
+    expect(ready).toEqual({ url: 'https://cdn.example/grok.mp4', headers: {}, providerJobId: 'grok-1', mimeType: 'video/mp4' });
+    expect(polls).toBe(2);
+  });
+
+  it('passes Grok a first frame and reports an expired request', async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/generations')) {
+        expect(JSON.parse(init.body as string).image).toEqual({ url: 'data:image/png;base64,QUJD' });
+        return new Response(JSON.stringify({ request_id: 'grok-2' }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ status: 'expired' }), { status: 200 });
+    });
+    await expect(requestGrokVideo({
+      apiKey: 'k', modelId: 'grok-imagine-video-1.5', prompt: 'continue',
+      durationSeconds: 5, aspectRatio: '9:16', referenceImage: { mimeType: 'image/png', base64: 'QUJD' },
+      pollIntervalMs: 0, fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/expired/);
+  });
+
+  it('rejects a missing or unsafe Alibaba workspace before any provider request', async () => {
+    expect(() => alibabaVideoBaseUrl('llm-studio123')).not.toThrow();
+    expect(() => alibabaVideoBaseUrl('bad.example.com')).toThrow(/Workspace ID/);
+    const fetchMock = vi.fn();
+    await expect(requestAlibabaVideo({
+      apiKey: 'k', modelId: 'wan2.7-t2v', prompt: 'a kite', durationSeconds: 5,
+      aspectRatio: '16:9', fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/Workspace ID/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('creates a five-second Alibaba Wan shot and polls DashScope', async () => {
+    let polls = 0;
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      expect(url).not.toContain('ali-secret');
+      expect(url).toContain('https://llm-studio123.ap-southeast-1.maas.aliyuncs.com/api/v1/');
+      expect((init.headers as Record<string, string>).Authorization).toBe('Bearer ali-secret');
+      if (url.endsWith('/video-synthesis')) {
+        expect((init.headers as Record<string, string>)['X-DashScope-Async']).toBe('enable');
+        expect(JSON.parse(init.body as string)).toEqual({
+          model: 'wan2.7-t2v-2026-06-12', input: { prompt: 'a kite' },
+          parameters: { resolution: '720P', duration: 5, watermark: false, ratio: '16:9' }
+        });
+        return new Response(JSON.stringify({ output: { task_id: 'ali-1' } }), { status: 200 });
+      }
+      polls += 1;
+      return new Response(JSON.stringify({ output: polls === 1
+        ? { task_status: 'RUNNING' }
+        : { task_status: 'SUCCEEDED', video_url: 'https://cdn.example/wan.mp4' } }), { status: 200 });
+    });
+    const ready = await requestAlibabaVideo({
+      apiKey: 'ali-secret', alibabaWorkspaceId: 'llm-studio123', modelId: 'wan2.7-t2v', prompt: 'a kite',
+      durationSeconds: 5, aspectRatio: '16:9', pollIntervalMs: 0,
+      fetchImpl: fetchMock as unknown as typeof fetch
+    });
+    expect(ready).toEqual({ url: 'https://cdn.example/wan.mp4', headers: {}, providerJobId: 'ali-1', mimeType: 'video/mp4' });
+    expect(polls).toBe(2);
+  });
+
+  it('pins Wan first-frame generation to the documented dated API model id', async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/video-synthesis')) {
+        expect(JSON.parse(init.body as string)).toMatchObject({
+          model: 'wan2.7-i2v-2026-04-25',
+          input: { media: [{ type: 'first_frame', url: 'data:image/png;base64,QUJD' }] }
+        });
+        return new Response(JSON.stringify({ output: { task_id: 'wan-i2v' } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ output: { task_status: 'SUCCEEDED', video_url: 'https://cdn.example/wan-i2v.mp4' } }), { status: 200 });
+    });
+    const ready = await requestAlibabaVideo({
+      apiKey: 'k', alibabaWorkspaceId: 'llm-studio123', modelId: 'wan2.7-i2v', prompt: 'continue',
+      durationSeconds: 5, aspectRatio: '16:9', referenceImage: { mimeType: 'image/png', base64: 'QUJD' },
+      pollIntervalMs: 0, fetchImpl: fetchMock as unknown as typeof fetch
+    });
+    expect(ready.url).toBe('https://cdn.example/wan-i2v.mp4');
+  });
+
+  it('sends HappyHorse its first frame and surfaces a failed task', async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/video-synthesis')) {
+        expect(JSON.parse(init.body as string)).toEqual({
+          model: 'happyhorse-1.1-i2v',
+          input: { prompt: 'continue', media: [{ type: 'first_frame', url: 'data:image/jpeg;base64,QUJD' }] },
+          parameters: { resolution: '720P', duration: 5, watermark: false }
+        });
+        return new Response(JSON.stringify({ output: { task_id: 'ali-2' } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ output: { task_status: 'FAILED' }, message: 'quota exceeded' }), { status: 200 });
+    });
+    await expect(requestAlibabaVideo({
+      apiKey: 'k', alibabaWorkspaceId: 'llm-studio123', modelId: 'happyhorse-1.1-i2v', prompt: 'continue',
+      durationSeconds: 5, aspectRatio: '16:9', referenceImage: { mimeType: 'image/jpeg', base64: 'QUJD' },
+      pollIntervalMs: 0, fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/quota exceeded/);
   });
 
   it('pins the Runway API version and polls the task until it succeeds', async () => {

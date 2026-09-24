@@ -15,7 +15,7 @@ import type {
 import { getDefaultDomainModelId, getDomainModel, type AiDomainModelConfig } from '../shared/aiDomainModels';
 import { estimateImageCost, estimateSpeechCost, estimateVideoCost, type CostEstimate } from '../shared/mediaGenerationPricing';
 import { getVideoOperationConstraints, getVideoProviderBinding, validateVideoRequest } from '../shared/mediaCapabilityRegistry';
-import { resolveVideoOperation, validateVideoInputSet } from '../shared/videoGeneration';
+import { alibabaVideoBaseUrl, resolveVideoOperation, validateVideoInputSet } from '../shared/videoGeneration';
 import { GenerationSpendStore } from './generationSpendStore';
 import { discoverFfmpeg } from './ffmpegDiscovery';
 import type { CredentialStore } from './credentialStore';
@@ -25,6 +25,8 @@ import {
   generateLumaVideo,
   generateOpenAiSpeech,
   generateRunwayVideo,
+  generateGrokVideo,
+  generateAlibabaVideo,
   generateSoraVideo,
   generateVeoVideo,
   generateVieNeuSpeech,
@@ -281,7 +283,8 @@ const VIDEO_PROVIDER_LABELS: Record<VideoGenerationProviderId, string> = {
   kling_v3: 'Kling',
   luma_dream: 'Luma',
   minimax_hailuo: 'MiniMax Hailuo',
-  comfyui_wan: 'ComfyUI Wan'
+  comfyui_wan: 'ComfyUI Wan',
+  alibaba_wan: 'Alibaba Model Studio'
 };
 
 const IMAGE_PROVIDER_LABELS: Record<ImageGenerationProviderId, string> = {
@@ -318,11 +321,13 @@ async function invokeCloudVideoProvider(
   model: AiDomainModelConfig,
   apiKey: string,
   request: VideoGenerationRequest & { readonly durationSeconds: number },
-  outputFilePath: string
+  outputFilePath: string,
+  alibabaWorkspaceId?: string
 ): Promise<CloudProviderResult> {
   let lastProgressLogMs = -10_000;
   const synthesisInput = {
     apiKey,
+    ...(alibabaWorkspaceId === undefined ? {} : { alibabaWorkspaceId }),
     modelId: model.id,
     prompt: request.prompt,
     aspectRatio: request.aspectRatio ?? ('16:9' as const),
@@ -352,7 +357,9 @@ async function invokeCloudVideoProvider(
       google_omni: generateGeminiOmniVideo,
       openai_sora: generateSoraVideo,
       runway: generateRunwayVideo,
-      luma: generateLumaVideo
+      luma: generateLumaVideo,
+      xai_grok_api: generateGrokVideo,
+      alibaba_video: generateAlibabaVideo
     };
     const adapter = adapters[binding.adapterId];
     if (adapter === undefined) {
@@ -466,8 +473,11 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       if (flowModel === null) {
         throw new Error(`${model.label} has no exact counterpart in the current Google Flow video menu. Use the API lane instead.`);
       }
-    } else if (!(model.providerId === 'xai' && providerMapping.adapterId === 'grok_imagine_browser')) {
+    } else if (!(model.providerId === 'xai' && modelId === 'grok-imagine-video-1.5')) {
       throw new Error('Browser-session video generation is available only for an explicitly supported Google Flow or Grok Imagine model.');
+    }
+    if (model.providerId === 'xai' && ![6, 10, 15].includes(durationSeconds)) {
+      throw new Error('The signed-in Grok Imagine session supports 6, 10, or 15 second clips. Use the xAI API key lane for five-second shots.');
     }
     if (model.providerId === 'google_gemini') {
       if (!['text_to_video', 'image_to_video', 'reference_to_video', 'start_end'].includes(operation)) {
@@ -554,6 +564,12 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
         throw new Error(`API key is required for ${VIDEO_PROVIDER_LABELS[provider]} cloud generation. Connect the provider in Settings first.`);
       }
 
+      const alibabaWorkspaceId = mode === 'api' && providerMapping.adapterId === 'alibaba_video'
+        ? await activeCredentialStore?.getCredentialValue('alibabaWorkspaceId')
+        : undefined;
+      if (mode === 'api' && providerMapping.adapterId === 'alibaba_video') {
+        alibabaVideoBaseUrl(alibabaWorkspaceId);
+      }
       if (mode === 'api') await settleSpend(reservationId, 'charged');
       logVideoJob(id, 'provider.request.started', { provider: VIDEO_PROVIDER_LABELS[provider] });
       let cloudResult: CloudProviderResult;
@@ -601,7 +617,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
           throw error;
         }
       } else {
-        cloudResult = await invokeCloudVideoProvider(id, model, apiKey!, normalizedRequest, join(videoDir, `${id}.mp4`));
+        cloudResult = await invokeCloudVideoProvider(id, model, apiKey!, normalizedRequest, join(videoDir, `${id}.mp4`), alibabaWorkspaceId);
       }
       if (!cloudResult.ok) {
         throw new Error(cloudResult.error);
