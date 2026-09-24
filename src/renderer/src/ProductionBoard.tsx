@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 
 import type { AiProjectDocument } from '../../shared/aiProjectDomain';
 import {
@@ -13,6 +13,7 @@ import {
   clearStyleReference,
   missingProductionImageTargets,
   productionShotRows,
+  productionShotVisual,
   productionShotRegenerationBlockReason,
   productionSceneRows,
   productionSceneSummary,
@@ -28,10 +29,38 @@ const STATE_LABELS = {
   needs_review: 'Needs review', approved: 'Approved', failed: 'Failed'
 } as const;
 
+function StoryboardSlate({ projectId, asset, state, description }: {
+  readonly projectId: string;
+  readonly asset: MediaAsset | undefined;
+  readonly state: string;
+  readonly description: string;
+}): ReactElement {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setUrl(null);
+    setFailed(false);
+    if (asset && (asset.kind === 'image' || asset.kind === 'video')) {
+      void window.videoTool.getAssetPlaybackUrl({ projectId, assetId: asset.id }).then((result) => {
+        if (live) { if (result.ok) setUrl(result.value.url); else setFailed(true); }
+      }).catch(() => { if (live) setFailed(true); });
+    }
+    return () => { live = false; };
+  }, [projectId, asset?.id]);
+  return <span className={`production-board__slate production-board__slate--${state}`}>
+    {url && !failed && asset?.kind === 'image' && <img src={url} alt="" onError={() => setFailed(true)} />}
+    {url && !failed && asset?.kind === 'video' && <video src={url} muted playsInline preload="metadata" onError={() => setFailed(true)} />}
+    {(!url || failed) && <span className="production-board__slate-copy">{state === 'generating' ? '◉ GENERATING' : description}</span>}
+    <span className="production-board__slate-tag">{failed ? 'MEDIA UNAVAILABLE' : state === 'approved' || state === 'complete' ? 'APPROVED TAKE' : state === 'needs_review' ? 'TAKE TO REVIEW' : state === 'generating' ? 'IN PRODUCTION' : asset?.kind === 'image' ? 'STORYBOARD FRAME' : 'SHOT PLAN'}</span>
+  </span>;
+}
+
 export function ProductionBoard({
-  document, assets, busy, onSave, onOpenShot, onGenerateCharacterImage, onGenerateStoryboardImage,
+  projectId, document, assets, busy, onSave, onOpenShot, onGenerateCharacterImage, onGenerateStoryboardImage,
   onGenerateImages, onOpenImageResults, onGenerateVideoScene, onGenerateVideoShot, onAssemble
 }: {
+  readonly projectId: string;
   readonly document: AiProjectDocument;
   readonly assets: readonly MediaAsset[];
   readonly busy: boolean;
@@ -62,6 +91,7 @@ export function ProductionBoard({
   const pendingVideoShotIds = batchableProductionVideoShotIds(document, selectedScene?.sceneId);
   const images = assets.filter((asset) => asset.kind === 'image');
   const imageById = new Map(images.map((asset) => [asset.id, asset]));
+  const assetById = new Map(assets.map((asset) => [asset.id, asset]));
   const referenceById = new Map(document.referenceAssets.map((entry) => [entry.id, entry]));
   const styleReference = activeStyleReference(document);
   const assembly = buildApprovedProductionAssemblyPlan(document, assets.map((asset) => ({
@@ -118,8 +148,8 @@ export function ProductionBoard({
     <section className="production-board" aria-labelledby="production-board-title">
       <header className="production-board__header">
         <div>
-          <h3 id="production-board-title">Short-film scene production</h3>
-          <p>Review and approve one scene at a time. Generate its shots after a separate cost confirmation, review every take, then continue to the next scene. Approved scenes join in story order for the final cut. Current video modes send either the storyboard first frame or the character-reference set, not both.</p>
+          <span className="production-board__eyebrow">LIVING STORYBOARD · DIRECTOR VIEW</span><h3 id="production-board-title">{document.scripts.find((script) => script.id === document.writerPipeline?.appliedScriptId)?.title ?? 'Short-film production'}</h3>
+          <p>{scenes.length} scenes · {(scenes.reduce((total, scene) => total + scene.durationMs, 0) / 60_000).toFixed(1)} planned min · Five-second shots, made and reviewed scene by scene.</p>
         </div>
         <StatusCard tone={assembly.ok ? 'success' : 'neutral'}>{rows.filter((row) => row.state === 'approved').length}/{rows.length} shots approved</StatusCard>
       </header>
@@ -127,12 +157,17 @@ export function ProductionBoard({
       {message !== null && <StatusCard tone={message.tone}>{message.text}</StatusCard>}
 
       <section className="production-board__scenes" aria-label="Film scenes">
-        <h4>Scene sequence · {scenes.length} scenes · {(scenes.reduce((total, scene) => total + scene.durationMs, 0) / 60_000).toFixed(1)} planned min</h4>
+        <h4>Story reel <span>Choose a scene to direct</span></h4>
         <ol>{scenes.map((scene) => {
           const summary = productionSceneSummary(scene, rows);
-          return <li key={scene.sceneId} className={selectedScene?.sceneId === scene.sceneId ? 'production-board__scene--selected' : ''}>
+          const sceneRows = rows.filter((row) => row.sceneId === scene.sceneId);
+          const visualRow = sceneRows.find((row) => { const visual = productionShotVisual(row); return visual.takeAssetId || visual.storyboardAssetId; }) ?? sceneRows[0];
+          const visual = visualRow ? productionShotVisual(visualRow) : null;
+          const asset = assetById.get(visual?.takeAssetId ?? visual?.storyboardAssetId ?? '');
+          return <li key={scene.sceneId} style={{ flexBasis: Math.max(220, Math.min(360, 190 + scene.durationMs / 1000 * 2)) }} className={selectedScene?.sceneId === scene.sceneId ? 'production-board__scene--selected' : ''}>
             <button type="button" aria-current={selectedScene?.sceneId === scene.sceneId ? 'step' : undefined} onClick={() => setSelectedSceneId(scene.sceneId)}>
               <span className="production-board__scene-number">SC {String(scene.order + 1).padStart(2, '0')}</span>
+              <StoryboardSlate projectId={projectId} asset={asset} state={summary.stage} description={scene.objective} />
               <strong>{scene.title}</strong>
               <span>{(scene.durationMs / 1000).toFixed(0)}s · {scene.approvedShotCount}/{scene.shotCount} shots approved</span>
               <span className={`production-board__scene-stage production-board__scene-stage--${summary.stage}`}>{summary.stage === 'approval' ? 'Ready to approve' : summary.stage === 'generate' ? 'Ready to generate' : summary.stage === 'review' ? 'Review takes' : summary.stage === 'generating' ? 'Generating' : summary.stage === 'complete' ? 'Complete' : 'Locked'}</span>
@@ -242,20 +277,21 @@ export function ProductionBoard({
 
       </details>
 
-      <h4>{selectedScene ? `Scene ${selectedScene.order + 1}: ${selectedScene.title} · planned shots` : 'Planned shots'}</h4>
+      <div className="production-board__shot-section-title"><span>SHOT BOARD</span><h4>{selectedScene ? `Scene ${selectedScene.order + 1} · ${selectedScene.title}` : 'Planned shots'}</h4><small>Each card is a five-second beat. Review its prompt and take before moving on.</small></div>
       <ol className="production-board__shots">
         {visibleRows.map((row, index) => {
           const latestTake = document.generations.filter((candidate) => candidate.shotId === row.shotId).at(-1);
           const generationBlock = productionShotRegenerationBlockReason(document, row.shotId);
+          const visual = productionShotVisual(row);
+          const visualAsset = assetById.get(visual.takeAssetId ?? visual.storyboardAssetId ?? '');
           return <li className="production-board__shot" key={row.shotId}>
-          <div className="production-board__shot-heading">
-            <span className="production-board__number">{String(index + 1).padStart(2, '0')}</span>
-            <div><strong>{row.label}</strong><span>{row.sceneTitle} · {(row.durationMs / 1_000).toFixed(1)}s · {row.candidateCount} candidate(s) · {row.characterReferenceIds.length} character reference(s)</span></div>
-            <span className={`production-board__state production-board__state--${row.state}`}>{STATE_LABELS[row.state]}</span>
-          </div>
+          <div className="production-board__shot-slate-heading"><span>SC {String((selectedScene?.order ?? 0) + 1).padStart(2, '0')} / SH {String(index + 1).padStart(2, '0')}</span><span>{(row.durationMs / 1000).toFixed(0)}s</span></div>
+          <StoryboardSlate projectId={projectId} asset={visualAsset} state={row.state} description={row.label} />
+          <div className="production-board__shot-heading"><strong>{row.label}</strong><span className={`production-board__state production-board__state--${row.state}`}>{STATE_LABELS[row.state]}</span></div>
           <div className="production-board__prompt"><strong>Planned video prompt</strong><p>{row.prompt}</p></div>
           {latestTake && <p className="production-board__take-summary">Latest take: {latestTake.status} · {latestTake.review?.decision ?? 'pending'}{latestTake.prompt !== row.prompt ? <> · Used prompt: {latestTake.prompt}</> : null}</p>}
-          {row.candidateCount > 0 && <p className="production-board__take-summary">{row.candidateCount} take(s) saved. A new take keeps the current approved version until you approve its replacement. An already assembled timeline cut needs manual review after replacement.</p>}
+          <div className="production-board__take-count">{row.candidateCount} take(s) · {row.characterReferenceIds.length} character reference(s)</div>
+          <details className="production-board__shot-settings"><summary>Frames and generation settings</summary>
           <label className="studio-field">
             <span className="studio-field__label">Storyboard / first frame</span>
             <select disabled={busy || saving || images.length === 0} value={row.storyboardReference?.assetId ?? ''} onChange={(event) => {
@@ -278,6 +314,8 @@ export function ProductionBoard({
               if (reason !== null) setMessage({ tone: 'warning', text: reason });
             }}>Edit storyboard brief</Button>
             <Button variant="primary" disabled={busy || saving || batchBusy || !scenes.some((scene) => scene.sceneId === row.sceneId && scene.canProduce)} onClick={() => void runImages([{ kind: 'storyboard', shotId: row.shotId }])}>Generate image now</Button>
+          </div></details>
+          <div className="production-board__shot-actions">
             <Button variant="primary" disabled={busy || saving || batchBusy || generationBlock !== null} onClick={() => void runVideoBatch(row.shotId)}>{row.candidateCount > 0 ? 'Regenerate this shot' : 'Generate this shot'}</Button>
             <Button variant="ghost" disabled={busy || saving || batchBusy} onClick={() => void onOpenShot(row.shotId)}>Edit prompt & inputs</Button>
           </div>

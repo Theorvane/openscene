@@ -31,6 +31,14 @@ export type ProductionShotRow = {
   readonly approvedGeneration?: GenerationRecord;
 };
 
+/** Media selected for a storyboard slate. The approved take leads; its first frame remains available as a fallback. */
+export function productionShotVisual(row: ProductionShotRow): { readonly takeAssetId: string | null; readonly storyboardAssetId: string | null } {
+  return {
+    takeAssetId: row.approvedGeneration?.status === 'completed' ? row.approvedGeneration.outputAssetIds[0] ?? null : null,
+    storyboardAssetId: row.storyboardReference?.assetId ?? null
+  };
+}
+
 export type ProductionAssetSummary = {
   readonly id: string;
   readonly kind: 'video' | 'audio' | 'image';

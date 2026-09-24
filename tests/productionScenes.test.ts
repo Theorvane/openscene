@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyAiProjectDocument, parseAiProjectDocument, type AiProjectDocument } from '../src/shared/aiProjectDomain';
 import { addGenerationCandidate, decideGenerationCandidate } from '../src/shared/generationReview';
 import { approveProductionPlan, proposeProductionPlan, productionTextBatch, productionTextShot } from '../src/shared/productionPlan';
-import { approveProductionScene, batchableProductionVideoShotIds, buildApprovedProductionAssemblyPlan, productionSceneRows, productionSceneSummary, productionShotRegenerationBlockReason, productionShotRows } from '../src/shared/productionWorkflow';
+import { approveProductionScene, batchableProductionVideoShotIds, buildApprovedProductionAssemblyPlan, productionSceneRows, productionSceneSummary, productionShotRegenerationBlockReason, productionShotRows, productionShotVisual, assignStoryboardReference } from '../src/shared/productionWorkflow';
 import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
 
 const at = '2026-09-24T00:00:00.000Z';
@@ -84,6 +84,7 @@ describe('scene-by-scene production', () => {
     const original = plan();
     const shotId = original.shots[0]!.id;
     expect(productionShotRows(original)[0]?.prompt).toContain('Find a letter');
+    expect(productionShotVisual(productionShotRows(original)[0]!)).toEqual({ takeAssetId: null, storyboardAssetId: null });
     expect(productionTextShot(original, 'sora-2', shotId)).toMatchObject({ ok: false, reason: expect.stringContaining('Approve Station') });
     const approval = approveProductionScene(original, original.scenes[0]!.id, at);
     if (!approval.ok) throw new Error(approval.reason);
@@ -95,6 +96,10 @@ describe('scene-by-scene production', () => {
     expect(productionTextShot(queued.document, 'sora-2', shotId).ok).toBe(false);
     expect(addGenerationCandidate(queued.document, { id: 'duplicate', shotId, providerId: 'openai', modelId: 'sora-2', capability: 'text_to_video', prompt: 'Duplicate', createdAt: at }).ok).toBe(false);
     const approved = completeFirstTake(approval.document);
+    expect(productionShotVisual(productionShotRows(approved)[0]!)).toEqual({ takeAssetId: 'video-1', storyboardAssetId: null });
+    const framed = assignStoryboardReference(approved, { shotId, assetId: 'frame-1', referenceId: 'frame-ref-1', label: 'First frame' });
+    if (!framed.ok) throw new Error(framed.reason);
+    expect(productionShotVisual(productionShotRows(framed.document)[0]!)).toEqual({ takeAssetId: 'video-1', storyboardAssetId: 'frame-1' });
     const replacement = addGenerationCandidate(approved, { id: 'replacement', shotId, providerId: 'openai', modelId: 'sora-2', capability: 'text_to_video', prompt: 'Refined shot', createdAt: at });
     if (!replacement.ok) throw new Error(replacement.reason);
     expect(productionShotRows(replacement.document)[0]).toMatchObject({ candidateCount: 2, state: 'approved', approvedGeneration: { id: 'take-1' } });

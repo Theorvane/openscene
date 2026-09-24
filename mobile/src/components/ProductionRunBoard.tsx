@@ -1,30 +1,47 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { CONTINUITY_REVIEW_FIELDS } from '@openvideo/shared/aiProjectDomain';
 import { approvedWriterShots } from '@openvideo/shared/writerPipeline';
 import { productionTextBatch, productionTextShot } from '@openvideo/shared/productionPlan';
-import { approveProductionScene, productionSceneRows, productionSceneSummary, productionShotRows } from '@openvideo/shared/productionWorkflow';
+import { approveProductionScene, productionSceneRows, productionSceneSummary, productionShotRows, productionShotVisual } from '@openvideo/shared/productionWorkflow';
 import { createProductionQueueControl } from '@openvideo/shared/productionQueueControl';
 import { addGenerationCandidate, updateGenerationCandidate, setCandidateContinuity, decideGenerationCandidate, type GenerationReviewResult } from '@openvideo/shared/generationReview';
 import { estimateVideoPlanCost, PRICING_AS_OF } from '@openvideo/shared/mediaGenerationPricing';
 import { generateShot } from '../lib/videoGeneration';
-import { readProject, writeProject, saveGeneratedVideoCandidate, assembleApprovedWriterShots, assetUri } from '../lib/projectStore';
+import { readProject, writeProject, saveGeneratedVideoCandidate, assembleApprovedWriterShots, assetUri, type MobileAsset } from '../lib/projectStore';
 import { useSpendPermissions } from '../lib/permissions';
 import type { VideoAspectRatio } from '@openvideo/shared/videoGeneration';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
 
-function TakePreview({ uri }: { uri: string }) {
+function TakePreview({ uri, height = 180 }: { uri: string; height?: number }) {
   const player = useVideoPlayer(uri);
-  return <VideoView player={player} nativeControls style={{ height: 180, width: '100%' }} />;
+  return <VideoView player={player} nativeControls style={{ height, width: '100%' }} />;
 }
+function StoryboardSlate({ projectId, asset, fallbackImage, state, description, height, showVideoPreview = false }: {
+  projectId: string; asset: MobileAsset | undefined; fallbackImage?: MobileAsset; state: string;
+  description: string; height: number; showVideoPreview?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [asset?.id, fallbackImage?.id]);
+  const still = asset?.kind === 'image' ? asset : fallbackImage?.kind === 'image' ? fallbackImage : undefined;
+  const videoVisible = asset?.kind === 'video' && showVideoPreview;
+  return <View style={{ height, overflow: 'hidden', borderWidth: 1, borderColor: state === 'generating' ? theme.warn : state === 'approved' || state === 'complete' ? theme.mint : '#42434b', borderRadius: 6, backgroundColor: '#202026', justifyContent: 'center' }}>
+    {videoVisible ? <TakePreview key={asset.id} uri={assetUri(projectId, asset)} height={height} />
+      : still && !failed ? <Image source={{ uri: assetUri(projectId, still) }} resizeMode="cover" onError={() => setFailed(true)} style={{ width: '100%', height: '100%' }} />
+      : <Text numberOfLines={4} style={{ color: state === 'generating' ? theme.warn : '#e6e0d3', fontSize: 13, textAlign: 'center', padding: 12 }}>{state === 'generating' ? '◉ GENERATING' : asset?.kind === 'video' ? `▶ ${description}` : description}</Text>}
+    {!videoVisible && <Text style={{ position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 6, paddingVertical: 3, backgroundColor: '#09090cdd', color: state === 'generating' || state === 'needs_review' ? theme.warn : '#e9e9ec', fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>{asset?.kind === 'video' ? '▶ APPROVED VIDEO' : failed ? 'FRAME UNAVAILABLE' : state === 'approved' || state === 'complete' ? 'APPROVED TAKE' : state === 'needs_review' || state === 'review' ? 'REVIEW TAKE' : state === 'generating' ? 'IN PRODUCTION' : still ? 'STORYBOARD FRAME' : 'SHOT PLAN'}</Text>}
+  </View>;
+}
+
 export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, connected, onBusy, active }: {
   projectId: string; model: { id: string; label: string; providerId: string }; aspectRatio: VideoAspectRatio;
   disabled: boolean; connected: boolean; onBusy: (busy: boolean) => void; active: boolean;
 }) {
   const [message, setMessage] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
+  const [storyboardPreviewId, setStoryboardPreviewId] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const lock = useRef(false);
   const queueControl = useRef(createProductionQueueControl());
@@ -96,13 +113,16 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
       finally { queueControl.current.finish(); lock.current = false; if (mounted.current) onBusy(false); }
     })(); } }]);
   };
-  return <View style={{ gap: 10 }}>
-    <Text style={{ color: theme.text, fontWeight: '600' }}>Approved plan · {shots.length} shots · {model.label}</Text>
-    <Text style={{ color: theme.textWeak }}>One film sequence · {scenes.length} scenes · {Math.round(shots.reduce((total, shot) => total + shot.durationSeconds, 0) / 60)} planned min. Approve each scene, generate its shots after cost confirmation, then review every take before continuing. Approved takes join in story order; short takes block assembly.</Text>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }} accessibilityLabel="Scene sequence">
-      {scenes.map(scene => { const summary = productionSceneSummary(scene, shotRows); const selected = scene.sceneId === selectedScene?.sceneId; return <Pressable key={scene.sceneId} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setSelectedSceneId(scene.sceneId)} style={press({ width: 176, minHeight: 118, padding: 12, borderWidth: selected ? 2 : 1, borderColor: selected ? theme.text : theme.line, borderRadius: 9, gap: 5 })}>
-        <Text style={{ color: theme.textWeak, fontSize: 11 }}>SC {String(scene.order + 1).padStart(2, '0')} · {Math.round(scene.durationMs / 1000)}s</Text>
-        <Text numberOfLines={2} style={{ color: theme.text, fontWeight: '700' }}>{scene.title}</Text>
+  return <View style={{ gap: 18, backgroundColor: '#0d0d10', padding: 14, borderRadius: 8 }}>
+    <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>LIVING STORYBOARD · DIRECTOR VIEW</Text>
+    <Text style={{ color: '#f2efe9', fontSize: 24, fontWeight: '700' }}>{project.ai.scripts.find(script => script.id === project.ai.writerPipeline?.appliedScriptId)?.title ?? 'Short-film production'}</Text>
+    <Text style={{ color: '#a8a8b1' }}>{scenes.length} scenes · {shots.length} shots · {Math.round(shots.reduce((total, shot) => total + shot.durationSeconds, 0) / 60)} planned min</Text>
+    <Text style={{ color: '#f2efe9', fontWeight: '700', fontSize: 17 }}>Story reel</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 16 }} accessibilityLabel="Scene sequence">
+      {scenes.map(scene => { const summary = productionSceneSummary(scene, shotRows); const selected = scene.sceneId === selectedScene?.sceneId; const sceneRows = shotRows.filter(row => row.sceneId === scene.sceneId); const visualRow = sceneRows.find(row => { const visual = productionShotVisual(row); return visual.takeAssetId || visual.storyboardAssetId; }) ?? sceneRows[0]; const visual = visualRow ? productionShotVisual(visualRow) : null; const asset = project.assets.find(item => item.id === (visual?.takeAssetId ?? visual?.storyboardAssetId)) ?? project.assets.find(item => item.id === visual?.storyboardAssetId); const fallbackImage = project.assets.find(item => item.id === visual?.storyboardAssetId); return <Pressable key={scene.sceneId} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setSelectedSceneId(scene.sceneId)} style={press({ width: Math.max(210, Math.min(300, 190 + scene.durationMs / 1000)), padding: 8, borderWidth: selected ? 2 : 1, borderColor: selected ? theme.warn : '#34343e', borderRadius: 8, gap: 7, backgroundColor: '#19191f' })}>
+        <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>SC {String(scene.order + 1).padStart(2, '0')} · {Math.round(scene.durationMs / 1000)}s</Text>
+        <StoryboardSlate projectId={projectId} asset={asset} fallbackImage={fallbackImage} state={summary.stage} description={scene.objective} height={116} />
+        <Text numberOfLines={2} style={{ color: '#f1eee7', fontWeight: '700' }}>{scene.title}</Text>
         <Text style={{ color: theme.textWeak }}>{scene.approvedShotCount}/{scene.shotCount} shots approved</Text>
         <Text style={{ color: theme.textWeak, fontSize: 11 }}>{summary.stage === 'approval' ? 'Ready to approve' : summary.stage === 'generate' ? 'Ready to generate' : summary.stage === 'review' ? 'Review takes' : summary.stage === 'generating' ? 'Generating' : summary.stage === 'complete' ? 'Complete' : 'Locked'}</Text>
         <View style={{ height: 3, backgroundColor: theme.line, borderRadius: 3 }}><View style={{ height: 3, width: `${scene.shotCount ? scene.approvedShotCount / scene.shotCount * 100 : 0}%`, backgroundColor: theme.text, borderRadius: 3 }} /></View>
@@ -128,19 +148,27 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
         {selectedScene.complete && !scenes[scenes.findIndex(scene => scene.sceneId === selectedScene.sceneId) + 1] && <Text style={{ color: theme.textWeak }}>All scenes complete. Assemble and review the final cut below.</Text>}
       </>; })()}
     </View>}
-    <Text style={{ color: theme.text, fontWeight: '600' }}>{selectedScene ? `Scene ${selectedScene.order + 1} shot prompts` : 'Shot prompts'}</Text>
-    {shotRows.filter(row => row.sceneId === selectedScene?.sceneId).map(row => {
+    <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>SHOT BOARD</Text><Text style={{ color: '#f1eee7', fontWeight: '700', fontSize: 18 }}>{selectedScene ? `Scene ${selectedScene.order + 1} · ${selectedScene.title}` : 'Shot prompts'}</Text>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 16 }} accessibilityLabel="Scene shot board">
+    {shotRows.filter(row => row.sceneId === selectedScene?.sceneId).map((row, index) => {
+      const visual = productionShotVisual(row);
+      const image = project.assets.find(item => item.id === visual.storyboardAssetId);
+      const asset = project.assets.find(item => item.id === (visual.takeAssetId ?? visual.storyboardAssetId)) ?? image;
       const eligibility = productionTextShot(project.ai, model.id, row.shotId);
       const latest = project.ai.generations.filter(item => item.shotId === row.shotId).at(-1);
-      return <View key={row.shotId} style={{ gap: 6, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 }}>
-        <Text style={{ color: theme.text, fontWeight: '600' }}>{row.label} · {Math.round(row.durationMs / 1000)}s · {row.state}</Text>
-        <Text style={{ color: theme.textWeak }}>Planned video prompt</Text>
-        <Text selectable style={{ color: theme.text }}>{row.prompt}</Text>
+      return <View key={row.shotId} style={{ width: 282, gap: 8, padding: 10, borderWidth: 1, borderColor: '#34343e', borderRadius: 8, backgroundColor: '#19191f' }}>
+        <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>SH {String(index + 1).padStart(2, '0')} · {Math.round(row.durationMs / 1000)}s</Text>
+        <StoryboardSlate projectId={projectId} asset={asset} fallbackImage={image} state={row.state} description={row.label} height={146} showVideoPreview={active && storyboardPreviewId === row.shotId} />
+        {asset?.kind === 'video' && action(storyboardPreviewId === row.shotId ? 'Close approved take preview' : 'Preview approved take', () => setStoryboardPreviewId(storyboardPreviewId === row.shotId ? null : row.shotId))}
+        <Text style={{ color: '#f1eee7', fontWeight: '700' }}>{row.label}</Text>
+        <Text style={{ color: theme.warn, fontSize: 11, letterSpacing: 1 }}>Planned video prompt</Text>
+        <Text selectable style={{ color: '#e4dfd4', fontSize: 12, lineHeight: 18 }}>{row.prompt}</Text>
         <Text style={{ color: theme.textWeak }}>{row.candidateCount} take(s){latest ? ` · Latest: ${latest.status} / ${latest.review?.decision ?? 'pending'}` : ''}{row.approvedGeneration ? ' · Approved take retained until replacement approval' : ''}</Text>
         {action(row.candidateCount > 0 ? 'Regenerate this shot · review cost' : 'Generate this shot · review cost', () => start({ shotId: row.shotId }), !eligibility.ok)}
         {!eligibility.ok && <Text style={{ color: theme.textWeak }}>{eligibility.reason}</Text>}
       </View>;
     })}
+    </ScrollView>
     {lock.current && <><Text style={{ color: theme.textWeak }}>{stopRequested ? 'Stopping after the submitted take is saved…' : 'Stopping does not cancel submitted provider jobs or charges.'}</Text><Pressable accessibilityRole="button" disabled={stopRequested} onPress={() => { queueControl.current.requestStop(); setStopRequested(true); }} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>Stop after current shot</Text></Pressable></>}
     <Text style={{ color: theme.text, fontWeight: '600' }}>{selectedScene ? `Scene ${selectedScene.order + 1} takes` : 'Scene takes'}</Text>
     {project.ai.generations.filter(candidate => visibleShotIds.has(candidate.shotId) && candidate.status === 'completed').map(candidate => {

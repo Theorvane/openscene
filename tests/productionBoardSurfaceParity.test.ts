@@ -26,6 +26,8 @@ describe('production board surface parity', () => {
     expect(desktop).toContain('Generate storyboards for approved scene');
     expect(desktop).toContain('approveProductionScene');
     expect(desktop).toContain('productionSceneRows(document)');
+    expect(desktop).toContain('StoryboardSlate projectId={projectId}');
+    expect(desktop).toContain('productionShotVisual(row)');
     expect(desktop).toContain('pending shot(s) in this scene');
     expect(desktop).toContain('onGenerateVideoScene(selectedScene!.sceneId)');
     expect(desktop).toContain('Planned video prompt');
@@ -38,6 +40,11 @@ describe('production board surface parity', () => {
     expect(mobileRunBoard).toContain('approveProductionScene');
     expect(mobileRunBoard).toContain('productionSceneRows(project?.ai)');
     expect(mobileRunBoard).toContain('productionShotRows(project?.ai)');
+    expect(mobileRunBoard).toContain('StoryboardSlate projectId={projectId}');
+    expect(mobileRunBoard).toContain('productionShotVisual(row)');
+    expect(mobileRunBoard).toContain('visual.takeAssetId ?? visual.storyboardAssetId');
+    expect(mobileRunBoard).toContain('showVideoPreview={active && storyboardPreviewId === row.shotId}');
+    expect(mobileRunBoard).toContain('Preview approved take');
     expect(mobileRunBoard).toContain('Planned video prompt');
     expect(mobileRunBoard).toContain('Regenerate this shot');
     expect(mobileRunBoard).toContain('productionTextShot');

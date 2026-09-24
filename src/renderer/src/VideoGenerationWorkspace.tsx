@@ -1119,7 +1119,7 @@ export function VideoGenerationWorkspace({
 
   return (
     <PromptProductionLayout key={projectId ?? 'none'} projectId={projectId} document={writerDocument} assets={projectAssets}
-      active={active} busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
+      active={active} directorMode={toolActive && !showAdvanced} busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
       onLoad={item => {
         if (prompt.trim() && !window.confirm('Replace the current prompt with this selection? Generated media stays unchanged.')) return;
         onActivateVideo?.();
@@ -1136,10 +1136,9 @@ export function VideoGenerationWorkspace({
     {isBatchGenerating && <div role="status" className="production-director-toolbar"><span>{batchStopRequested ? 'Stopping after the submitted job is saved…' : 'Production queue running. Submitted jobs may incur charges.'}</span><button className="button" disabled={batchStopRequested} onClick={() => { productionQueue.current.requestStop(); setBatchStopRequested(true); }}>Stop after current shot</button></div>}
     {toolActive && <div className="production-director-toolbar"><strong>Production</strong><button className="button" onClick={() => setShowAdvanced(value => !value)}>{showAdvanced ? 'Back to production plan' : 'Advanced generation settings'}</button></div>}
     <div className="production-director" hidden={!toolActive || showAdvanced}>
-      {writerDocument && onSaveAi && <ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} />}
-      {writerDocument && onSelectProductionTool && <ProductionCompanions document={writerDocument} assets={projectAssets} disabled={isGenerating || isBatchGenerating || isSavingCandidate} onSelect={onSelectProductionTool} />}
         {writerDocument !== null && writerDocument !== undefined && onSaveAi !== undefined && projectId !== null && projectId !== undefined &&
           <ProductionBoard
+            projectId={projectId}
             document={writerDocument}
             assets={projectAssets}
             busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
@@ -1153,6 +1152,10 @@ export function VideoGenerationWorkspace({
             onGenerateVideoShot={(id) => generateProductionVideoBatch({ shotId: id })}
             onAssemble={assembleApprovedWriterShots}
           />}
+      {writerDocument && onSaveAi && (productionShotRows(writerDocument).length > 0
+        ? <details className="production-director__secondary"><summary>Screenplay and plan controls</summary><ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} /></details>
+        : <ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} />)}
+      {writerDocument && onSelectProductionTool && <details className="production-director__secondary"><summary>Production tools and references</summary><ProductionCompanions document={writerDocument} assets={projectAssets} disabled={isGenerating || isBatchGenerating || isSavingCandidate} onSelect={onSelectProductionTool} /></details>}
     </div>
     <section hidden={!toolActive || !showAdvanced} className="studio-surface" aria-labelledby="video-generation-title">
       <header className="studio-surface__header">

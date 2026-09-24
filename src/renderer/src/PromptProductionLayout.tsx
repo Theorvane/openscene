@@ -23,12 +23,14 @@ function MediaPreview({ projectId, item, kind, offsetMs }: { projectId: string; 
   if (!url) return <div className="production-preview-empty">{item.assetId || item.recipeId ? item.prompt ? 'Preview unavailable. Your saved prompt is still here.' : 'Source preview unavailable.' : item.lane === 'subtitles' ? item.prompt : 'This shot is waiting for a generated video.'}</div>;
   return kind === 'audio' ? <audio ref={audioRef} onLoadedMetadata={seek} controls src={url} /> : <video ref={videoRef} onLoadedMetadata={seek} controls preload="metadata" src={url} />;
 }
-export function PromptProductionLayout({ children, document, assets, projectId, busy, active, onLoad }: {
+export function PromptProductionLayout({ children, document, assets, projectId, busy, active, directorMode = false, onLoad }: {
   children: ReactNode; document: AiProjectDocument | null | undefined; assets: readonly ProductionEditorAsset[];
-  projectId: string | null | undefined; busy: boolean; active: boolean; onLoad: (item: ProductionEditorItem) => void;
+  projectId: string | null | undefined; busy: boolean; active: boolean; directorMode?: boolean; onLoad: (item: ProductionEditorItem) => void;
 }) {
   const [selectedId, setSelectedId] = useState('');
   const [focusPreview, setFocusPreview] = useState(false);
+  const [showEditBay, setShowEditBay] = useState(false);
+  useEffect(() => { if (!directorMode) setShowEditBay(false); }, [directorMode]);
   const [showProperties, setShowProperties] = useState(true);
   const { timeline, hasUnsavedTimeline, saveTimeline, placeAiAssetOnTimeline, isImporting } = useProjectResultImport();
   const [placementMessage, setPlacementMessage] = useState('');
@@ -39,13 +41,13 @@ export function PromptProductionLayout({ children, document, assets, projectId, 
   const durationMs = productionPlanDuration(items);
   const readiness = productionReadiness(items);
   const select = (item: ProductionEditorItem) => { setInspectionMs(null); setSelectedId(item.id); };
-  return <div className={'prompt-production-editor pro-production-editor' + (focusPreview ? ' pro-production-editor--focus' : '')}>
+  return <div className={'prompt-production-editor pro-production-editor' + (focusPreview ? ' pro-production-editor--focus' : '') + (directorMode && !showEditBay ? ' pro-production-editor--storyboard' : '')}>
     <div className="production-workbench-bar" role="toolbar" aria-label="Production workspace layout">
-      <div><strong>PRODUCTION</strong><span className="production-workbench-divider" /><span>{readiness.total} shots</span><span>{productionTimeLabel(durationMs)}</span></div>
-      <div><button type="button" aria-pressed={focusPreview} onClick={() => setFocusPreview(value => !value)}>{focusPreview ? 'Show workspace' : 'Focus preview'}</button><button type="button" aria-pressed={showProperties} onClick={() => setShowProperties(value => !value)}>Properties</button></div>
+      <div><strong>{directorMode ? 'STORYBOARD' : 'PRODUCTION'}</strong><span className="production-workbench-divider" /><span>{readiness.total} shots</span><span>{productionTimeLabel(durationMs)}</span></div>
+      <div>{directorMode && <button type="button" aria-pressed={showEditBay} onClick={() => { setShowEditBay(value => !value); setFocusPreview(false); }}>{showEditBay ? 'Return to storyboard' : 'Open edit bay'}</button>}{(!directorMode || showEditBay) && <><button type="button" aria-pressed={focusPreview} onClick={() => setFocusPreview(value => !value)}>{focusPreview ? 'Show workspace' : 'Focus preview'}</button><button type="button" aria-pressed={showProperties} onClick={() => setShowProperties(value => !value)}>Properties</button></>}</div>
     </div>
     <div className="production-prompt-pane" hidden={focusPreview}><div className="production-panel-caption">DIRECTOR <span>Brief / plan / generate</span></div>{children}</div>
-    <aside className="production-preview" aria-label="Production preview">
+    <aside className="production-preview" aria-label="Production preview" hidden={directorMode && !showEditBay}>
       <header><span>SOURCE MONITOR <span className="production-monitor-badge">Single source</span></span><h2>{selected?.label ?? 'No shot selected'}</h2></header>
       <div className="production-monitor-stage">
       {active && selected && projectId ? <MediaPreview key={projectId + selected.id + selected.assetId} projectId={projectId} item={selected} offsetMs={inspectionMs === null ? selected.sourceStartMs ?? 0 : inspection.sourceOffsetMs} kind={assets.find(asset => asset.id === selected.assetId)?.kind} /> : <div className="production-preview-empty">{inspectionMs === null ? 'Write a prompt on the left or plan scenes in Writer. Saved results appear here.' : 'No planned video at this time.'}</div>}
@@ -60,7 +62,7 @@ export function PromptProductionLayout({ children, document, assets, projectId, 
       </div>}
       <p className="production-preview-note">Selection previews one source, not the final composite. Loading a prompt never starts generation.</p>
     </aside>
-    <section className="production-track-deck" aria-label="Production tracks">
+    <section className="production-track-deck" aria-label="Production tracks" hidden={directorMode && !showEditBay}>
       <header><strong>SEQUENCE <span className="production-monitor-badge">Plan</span></strong><span>Video · Voice · Subtitles — select to inspect</span></header>
       <button className="button" disabled={busy || isImporting || !hasUnsavedTimeline} onClick={() => { void saveTimeline().then(ok => setPlacementMessage(ok ? 'Arrangement saved locally.' : 'Save failed. Your arrangement is still unsaved.')); }}>Save arrangement{hasUnsavedTimeline ? ' · Unsaved changes' : ''}</button>
       {placementMessage && <p role="status">{placementMessage}</p>}
