@@ -134,7 +134,7 @@ export function ProjectsScreen({
           <View key={project.id} style={[styles.card, project.id === activeProjectId && styles.cardActive]}>
             <Pressable style={press(styles.cardMain)} accessibilityRole="button" onPress={() => onOpen(project.id, entrance)}>
               {(() => { const still = readProject(project.id)?.assets.find(asset => asset.kind === 'image'); return <View style={styles.cover}>
-                {still ? <Image source={{ uri: assetUri(project.id, still) }} resizeMode="cover" style={styles.coverImage} /> : <Text style={styles.coverEmpty}>OPEN PROJECT TO VIEW MEDIA</Text>}
+                {still ? <Image source={{ uri: assetUri(project.id, still) }} resizeMode="cover" style={styles.coverImage} /> : <Text style={styles.coverEmpty}>NO IMAGE COVER</Text>}
                 <Text style={styles.coverType}>{(project.projectType ?? 'legacy').toUpperCase()}</Text>
               </View>; })()}
               <View style={styles.cardInfo}><Text style={styles.cardTitle}>{project.name}</Text>

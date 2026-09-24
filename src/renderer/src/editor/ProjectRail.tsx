@@ -24,20 +24,24 @@ const COMPACT_PANEL_TITLE_STYLE = {
 } as const satisfies CSSProperties;
 
 
-function ProjectCover({ projectId, imageAssetId, mediaCount }: { readonly projectId: string; readonly imageAssetId: string | undefined; readonly mediaCount: number }): ReactElement {
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+function ProjectCover({ projectId, updatedAt }: { readonly projectId: string; readonly updatedAt: string }): ReactElement {
+  const [cover, setCover] = useState<{ readonly url: string | null; readonly label: string }>({ url: null, label: 'LOADING LOCAL COVER' });
   useEffect(() => {
     let live = true;
-    setUrl(null);
-    setFailed(false);
-    if (imageAssetId) void window.videoTool.getAssetPlaybackUrl({ projectId, assetId: imageAssetId }).then((result) => {
-      if (live) { if (result.ok) setUrl(result.value.url); else setFailed(true); }
-    }).catch(() => { if (live) setFailed(true); });
+    setCover({ url: null, label: 'LOADING LOCAL COVER' });
+    // Project lookup only reads the local snapshot. It does not switch the editor's open project.
+    void window.videoTool.openProject({ projectId }).then(async (result) => {
+      if (!live) return;
+      if (!result.ok) { setCover({ url: null, label: 'COVER UNAVAILABLE' }); return; }
+      const image = result.value.assets.find((asset) => asset.kind === 'image');
+      if (!image) { setCover({ url: null, label: 'NO IMAGE COVER' }); return; }
+      const playback = await window.videoTool.getAssetPlaybackUrl({ projectId, assetId: image.id });
+      if (live) setCover(playback.ok ? { url: playback.value.url, label: `${result.value.assets.length} LOCAL MEDIA ASSETS` } : { url: null, label: 'COVER UNAVAILABLE' });
+    }).catch(() => { if (live) setCover({ url: null, label: 'COVER UNAVAILABLE' }); });
     return () => { live = false; };
-  }, [projectId, imageAssetId]);
-  return <span className="project-card__cover">{url && !failed && <img src={url} alt="" onError={() => setFailed(true)} />}
-    <span>{mediaCount > 0 ? `${mediaCount} LOCAL MEDIA ASSETS` : 'OPEN PROJECT TO VIEW MEDIA'}</span>
+  }, [projectId, updatedAt]);
+  return <span className="project-card__cover">{cover.url && <img src={cover.url} alt="" onError={() => setCover({ url: null, label: 'COVER UNAVAILABLE' })} />}
+    <span>{cover.label}</span>
   </span>;
 }
 
@@ -71,7 +75,7 @@ export function ProjectRail({ editor }: ProjectRailProps): ReactElement {
             onClick={() => void editor.openProject(project.id)}
             disabled={editor.isBusy}
           >
-            <ProjectCover projectId={project.id} imageAssetId={editor.project?.id === project.id ? editor.project.assets.find((asset) => asset.kind === 'image')?.id : undefined} mediaCount={editor.project?.id === project.id ? editor.project.assets.length : 0} />
+            <ProjectCover projectId={project.id} updatedAt={project.updatedAt} />
             <span className="project-card__info"><strong>{project.name}</strong><small>{editor.project?.id === project.id ? 'OPEN · ' : ''}{formatTimestamp(project.updatedAt)}</small></span>
           </button>
         ))}
