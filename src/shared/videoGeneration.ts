@@ -493,6 +493,12 @@ export async function requestGrokVideo(input: VideoRequestInput): Promise<VideoD
   }
 }
 
+/** Stable catalog names resolve to the dated Wan model versions used by the HTTP API. */
+const ALIBABA_VIDEO_API_MODEL_IDS: Readonly<Record<string, string>> = {
+  'wan2.7-t2v': 'wan2.7-t2v-2026-06-12',
+  'wan2.7-i2v': 'wan2.7-i2v-2026-04-25'
+};
+
 /** Alibaba Model Studio Singapore: submit Wan/HappyHorse, then poll DashScope. */
 export async function requestAlibabaVideo(input: VideoRequestInput): Promise<VideoDownload> {
   assertImplementedVideoRequest(input);
@@ -507,7 +513,7 @@ export async function requestAlibabaVideo(input: VideoRequestInput): Promise<Vid
   const response = await fetchWithTimeout(fetchImpl, `${base}/services/aigc/video-generation/video-synthesis`, {
     method: 'POST', headers,
     body: JSON.stringify({
-      model: input.modelId,
+      model: ALIBABA_VIDEO_API_MODEL_IDS[input.modelId] ?? input.modelId,
       input: {
         prompt: input.prompt,
         ...(seeded ? { media: [{ type: 'first_frame', url: `data:${input.referenceImage!.mimeType};base64,${input.referenceImage!.base64}` }] } : {})

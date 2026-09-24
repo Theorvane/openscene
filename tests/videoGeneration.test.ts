@@ -417,7 +417,7 @@ describe('shared video generation', () => {
       if (url.endsWith('/video-synthesis')) {
         expect((init.headers as Record<string, string>)['X-DashScope-Async']).toBe('enable');
         expect(JSON.parse(init.body as string)).toEqual({
-          model: 'wan2.7-t2v', input: { prompt: 'a kite' },
+          model: 'wan2.7-t2v-2026-06-12', input: { prompt: 'a kite' },
           parameters: { resolution: '720P', duration: 5, watermark: false, ratio: '16:9' }
         });
         return new Response(JSON.stringify({ output: { task_id: 'ali-1' } }), { status: 200 });
@@ -434,6 +434,25 @@ describe('shared video generation', () => {
     });
     expect(ready).toEqual({ url: 'https://cdn.example/wan.mp4', headers: {}, providerJobId: 'ali-1', mimeType: 'video/mp4' });
     expect(polls).toBe(2);
+  });
+
+  it('pins Wan first-frame generation to the documented dated API model id', async () => {
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('/video-synthesis')) {
+        expect(JSON.parse(init.body as string)).toMatchObject({
+          model: 'wan2.7-i2v-2026-04-25',
+          input: { media: [{ type: 'first_frame', url: 'data:image/png;base64,QUJD' }] }
+        });
+        return new Response(JSON.stringify({ output: { task_id: 'wan-i2v' } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ output: { task_status: 'SUCCEEDED', video_url: 'https://cdn.example/wan-i2v.mp4' } }), { status: 200 });
+    });
+    const ready = await requestAlibabaVideo({
+      apiKey: 'k', modelId: 'wan2.7-i2v', prompt: 'continue',
+      durationSeconds: 5, aspectRatio: '16:9', referenceImage: { mimeType: 'image/png', base64: 'QUJD' },
+      pollIntervalMs: 0, fetchImpl: fetchMock as unknown as typeof fetch
+    });
+    expect(ready.url).toBe('https://cdn.example/wan-i2v.mp4');
   });
 
   it('sends HappyHorse its first frame and surfaces a failed task', async () => {
