@@ -28,11 +28,11 @@ function StoryboardSlate({ projectId, asset, fallbackImage, state, description, 
   useEffect(() => setFailed(false), [asset?.id, fallbackImage?.id]);
   const still = asset?.kind === 'image' ? asset : fallbackImage?.kind === 'image' ? fallbackImage : undefined;
   const videoVisible = asset?.kind === 'video' && showVideoPreview;
-  return <View style={{ height, overflow: 'hidden', borderWidth: 1, borderColor: state === 'generating' ? theme.warn : state === 'approved' || state === 'complete' ? theme.mint : '#42434b', borderRadius: 6, backgroundColor: '#202026', justifyContent: 'center' }}>
+  return <View style={{ height, overflow: 'hidden', borderWidth: 1, borderColor: state === 'generating' ? theme.warn : state === 'approved' || state === 'complete' ? theme.mint : theme.line, borderRadius: 6, backgroundColor: theme.surface, justifyContent: 'center' }}>
     {videoVisible ? <TakePreview key={asset.id} uri={assetUri(projectId, asset)} height={height} />
       : still && !failed ? <Image source={{ uri: assetUri(projectId, still) }} resizeMode="cover" onError={() => setFailed(true)} style={{ width: '100%', height: '100%' }} />
-      : <Text numberOfLines={4} style={{ color: state === 'generating' ? theme.warn : '#e6e0d3', fontSize: 13, textAlign: 'center', padding: 12 }}>{state === 'generating' ? '◉ GENERATING' : asset?.kind === 'video' ? `▶ ${description}` : description}</Text>}
-    {!videoVisible && <Text style={{ position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 6, paddingVertical: 3, backgroundColor: '#09090cdd', color: state === 'generating' || state === 'needs_review' ? theme.warn : '#e9e9ec', fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>{asset?.kind === 'video' ? '▶ APPROVED VIDEO' : failed ? 'FRAME UNAVAILABLE' : state === 'approved' || state === 'complete' ? 'APPROVED TAKE' : state === 'needs_review' || state === 'review' ? 'REVIEW TAKE' : state === 'generating' ? 'IN PRODUCTION' : still ? 'STORYBOARD FRAME' : 'SHOT PLAN'}</Text>}
+      : <Text numberOfLines={4} style={{ color: state === 'generating' ? theme.warn : theme.text, fontSize: 13, textAlign: 'center', padding: 12 }}>{state === 'generating' ? '◉ GENERATING' : asset?.kind === 'video' ? `▶ ${description}` : description}</Text>}
+    {!videoVisible && <Text style={{ position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 6, paddingVertical: 3, backgroundColor: '#09090cdd', color: state === 'generating' || state === 'needs_review' ? theme.warn : '#ffffff', fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>{asset?.kind === 'video' ? '▶ APPROVED VIDEO' : failed ? 'FRAME UNAVAILABLE' : state === 'approved' || state === 'complete' ? 'APPROVED TAKE' : state === 'needs_review' || state === 'review' ? 'REVIEW TAKE' : state === 'generating' ? 'IN PRODUCTION' : still ? 'STORYBOARD FRAME' : 'SHOT PLAN'}</Text>}
   </View>;
 }
 
@@ -58,28 +58,28 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const selectedScene = scenes.find((scene) => scene.sceneId === selectedSceneId) ?? scenes.find((scene) => !scene.complete) ?? scenes[0];
   const visibleShotIds = new Set(project?.ai.shots.filter((shot) => shot.sceneId === selectedScene?.sceneId).map((shot) => shot.id) ?? []);
   if (!project) return null;
-  const dashboard = productionDashboard(project.ai, project.assets.map(asset => ({ id: asset.id, kind: asset.kind, durationMs: asset.durationMs ?? null })));
-  if (shots.length === 0) return <View style={{ gap: 16, backgroundColor: '#0d0d10', padding: 14, borderRadius: 8 }}>
+  const dashboard = productionDashboard(project.ai, project.assets.map(asset => ({ id: asset.id, kind: asset.kind, durationMs: asset.durationMs ?? null })), project.name);
+  if (shots.length === 0) return <View style={{ gap: 16, backgroundColor: theme.bg, padding: 14, borderRadius: 8 }}>
     <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>OPENSCENE STUDIO · PRODUCTION</Text>
-    <Text style={{ color: '#f2efe9', fontSize: 24, fontWeight: '700' }}>{dashboard.title}</Text>
+    <Text style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>{dashboard.title}</Text>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="Production stages" contentContainerStyle={{ gap: 8, paddingVertical: 8 }}>
-      {dashboard.stages.map((stage, index) => <View key={stage.id} style={{ width: 132, minHeight: 94, borderTopWidth: 3, borderColor: stage.state === 'complete' ? theme.mint : stage.state === 'active' ? theme.warn : '#44444b', backgroundColor: '#1b1b20', padding: 10, gap: 5 }}>
+      {dashboard.stages.map((stage, index) => <View key={stage.id} style={{ width: 132, minHeight: 94, borderTopWidth: 3, borderColor: stage.state === 'complete' ? theme.mint : stage.state === 'active' ? theme.warn : theme.line, backgroundColor: theme.surface, padding: 10, gap: 5 }}>
         <Text style={{ color: stage.state === 'waiting' ? theme.textWeak : theme.warn, fontSize: 11 }}>{stage.state === 'complete' ? '✓' : String(index + 1).padStart(2, '0')} · {stage.state.toUpperCase()}</Text>
         <Text style={{ color: theme.text, fontWeight: '700' }}>{stage.label}</Text><Text numberOfLines={2} style={{ color: theme.textWeak, fontSize: 11 }}>{stage.detail}</Text>
       </View>)}
     </ScrollView>
-    <View style={{ padding: 12, backgroundColor: '#34291b', borderLeftWidth: 3, borderColor: theme.warn }}><Text style={{ color: '#f7d39d', fontWeight: '700' }}>{dashboard.status}</Text></View>
-    <View style={{ backgroundColor: '#ebe5d6', padding: 20, borderRadius: 4, gap: 10 }}>
-      <Text style={{ color: '#705f45', fontSize: 11, letterSpacing: 2, fontWeight: '700' }}>THE SCREENPLAY · WORKING SCRIPT</Text>
-      <Text style={{ color: '#242026', fontSize: 22, fontWeight: '700' }}>{dashboard.title}</Text>
-      <Text style={{ color: '#5c554e', lineHeight: 21 }}>{dashboard.screenplay || 'Every film begins with a brief. Use screenplay and plan controls below to start writing this one.'}</Text>
+    <View style={{ padding: 12, backgroundColor: theme.surface, borderLeftWidth: 3, borderColor: theme.warn }}><Text style={{ color: theme.warn, fontWeight: '700' }}>{dashboard.status}</Text></View>
+    <View style={{ backgroundColor: theme.surface, padding: 20, borderRadius: 4, gap: 10 }}>
+      <Text style={{ color: theme.warn, fontSize: 11, letterSpacing: 2, fontWeight: '700' }}>THE SCREENPLAY · WORKING SCRIPT</Text>
+      <Text style={{ color: theme.text, fontSize: 22, fontWeight: '700' }}>{dashboard.title}</Text>
+      <Text style={{ color: theme.textWeak, lineHeight: 21 }}>{dashboard.screenplay || 'Every film begins with a brief. Use screenplay and plan controls below to start writing this one.'}</Text>
     </View>
-    <View style={{ borderWidth: 1, borderColor: '#34343e', padding: 14, gap: 8 }}><Text style={{ color: '#f2efe9', fontSize: 17, fontWeight: '700' }}>Decisions</Text>
+    <View style={{ borderWidth: 1, borderColor: theme.line, padding: 14, gap: 8 }}><Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>Decisions</Text>
       {dashboard.decisions.length === 0 ? <Text style={{ color: theme.textWeak }}>No style decisions recorded yet.</Text> : dashboard.decisions.map(item => <Text key={item.label} style={{ color: theme.text }}>{item.label}: {item.value}</Text>)}
     </View>
-    <View style={{ borderWidth: 1, borderColor: '#34343e', padding: 14, gap: 8 }}><Text style={{ color: '#f2efe9', fontSize: 17, fontWeight: '700' }}>Activity</Text><Text style={{ color: theme.textWeak }}>Scene approvals and generation results will appear here.</Text></View>
-    <View style={{ padding: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: '#65523d', gap: 8 }}><Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700' }}>STORY REEL / 00 SCENES</Text>
-      <Text style={{ color: '#f2efe9', fontSize: 18, fontWeight: '700' }}>Scenes take shape here</Text><Text style={{ color: theme.textWeak }}>Review the brief, screenplay, scene plan and five-second shot prompts in the controls below.</Text>
+    <View style={{ borderWidth: 1, borderColor: theme.line, padding: 14, gap: 8 }}><Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>Activity</Text><Text style={{ color: theme.textWeak }}>Scene approvals and generation results will appear here.</Text></View>
+    <View style={{ padding: 18, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.line, gap: 8 }}><Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700' }}>STORY REEL / 00 SCENES</Text>
+      <Text style={{ color: theme.text, fontSize: 18, fontWeight: '700' }}>Scenes take shape here</Text><Text style={{ color: theme.textWeak }}>Review the brief, screenplay, scene plan and five-second shot prompts in the controls below.</Text>
     </View>
   </View>;
   const action = (label: string, run: () => void, blocked = false) => <Pressable accessibilityRole="button" disabled={disabled || lock.current || blocked} onPress={run} style={press({ minHeight: MIN_TAP, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{label}</Text></Pressable>;
@@ -139,41 +139,41 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
       finally { queueControl.current.finish(); lock.current = false; if (mounted.current) onBusy(false); }
     })(); } }]);
   };
-  return <View style={{ gap: 18, backgroundColor: '#0d0d10', padding: 14, borderRadius: 8 }}>
+  return <View style={{ gap: 18, backgroundColor: theme.bg, padding: 14, borderRadius: 8 }}>
     <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>OPENSCENE STUDIO · PRODUCTION</Text>
-    <Text style={{ color: '#f2efe9', fontSize: 24, fontWeight: '700' }}>{dashboard.title}</Text>
-    <Text style={{ color: '#a8a8b1' }}>{scenes.length} scenes · {shots.length} shots · {Math.round(shots.reduce((total, shot) => total + shot.durationSeconds, 0) / 60)} planned min</Text>
+    <Text style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>{dashboard.title}</Text>
+    <Text style={{ color: theme.textWeak }}>{scenes.length} scenes · {shots.length} shots · {Math.round(shots.reduce((total, shot) => total + shot.durationSeconds, 0) / 60)} planned min</Text>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="Production stages" contentContainerStyle={{ gap: 8, paddingVertical: 8 }}>
-      {dashboard.stages.map((stage, index) => <View key={stage.id} style={{ width: 132, minHeight: 94, borderTopWidth: 3, borderColor: stage.state === 'complete' ? theme.mint : stage.state === 'active' ? theme.warn : '#44444b', backgroundColor: '#1b1b20', padding: 10, gap: 5 }}>
+      {dashboard.stages.map((stage, index) => <View key={stage.id} style={{ width: 132, minHeight: 94, borderTopWidth: 3, borderColor: stage.state === 'complete' ? theme.mint : stage.state === 'active' ? theme.warn : theme.line, backgroundColor: theme.surface, padding: 10, gap: 5 }}>
         <Text style={{ color: stage.state === 'waiting' ? theme.textWeak : theme.warn, fontSize: 11 }}>{stage.state === 'complete' ? '✓' : String(index + 1).padStart(2, '0')} · {stage.state.toUpperCase()}</Text>
         <Text style={{ color: theme.text, fontWeight: '700' }}>{stage.label}</Text><Text numberOfLines={2} style={{ color: theme.textWeak, fontSize: 11 }}>{stage.detail}</Text>
       </View>)}
     </ScrollView>
-    <View style={{ padding: 12, backgroundColor: '#34291b', borderLeftWidth: 3, borderColor: theme.warn }}><Text style={{ color: '#f7d39d', fontWeight: '700' }}>{dashboard.status}</Text></View>
-    <View style={{ backgroundColor: '#ebe5d6', padding: 20, borderRadius: 4, gap: 10 }}>
-      <Text style={{ color: '#705f45', fontSize: 11, letterSpacing: 2, fontWeight: '700' }}>THE SCREENPLAY · {dashboard.screenplayApproved ? 'APPROVED' : 'WORKING SCRIPT'}</Text>
-      <Text style={{ color: '#242026', fontSize: 22, fontWeight: '700' }}>{dashboard.title}</Text>
-      <Text style={{ color: '#6a6258' }}>{dashboard.scenes.length} scenes · {(dashboard.totalDurationMs / 60_000).toFixed(1)} planned min</Text>
-      {dashboard.scenes.slice(0, 5).map(scene => <View key={scene.sceneId} style={{ borderTopWidth: 1, borderColor: '#c7bfaf', paddingTop: 10, gap: 3 }}>
-        <Text style={{ color: '#886b3c', fontSize: 11 }}>{String(scene.number).padStart(2, '0')} · {Math.round(scene.startMs / 1000)}–{Math.round(scene.endMs / 1000)}s</Text>
-        <Text style={{ color: '#252127', fontWeight: '700' }}>{scene.title}</Text><Text style={{ color: '#4a4541' }}>{scene.objective}</Text>
+    <View style={{ padding: 12, backgroundColor: theme.surface, borderLeftWidth: 3, borderColor: theme.warn }}><Text style={{ color: theme.warn, fontWeight: '700' }}>{dashboard.status}</Text></View>
+    <View style={{ backgroundColor: theme.surface, padding: 20, borderRadius: 4, gap: 10 }}>
+      <Text style={{ color: theme.warn, fontSize: 11, letterSpacing: 2, fontWeight: '700' }}>THE SCREENPLAY · {dashboard.screenplayApproved ? 'APPROVED' : 'WORKING SCRIPT'}</Text>
+      <Text style={{ color: theme.text, fontSize: 22, fontWeight: '700' }}>{dashboard.title}</Text>
+      <Text style={{ color: theme.textWeak }}>{dashboard.scenes.length} scenes · {(dashboard.totalDurationMs / 60_000).toFixed(1)} planned min</Text>
+      {dashboard.scenes.slice(0, 5).map(scene => <View key={scene.sceneId} style={{ borderTopWidth: 1, borderColor: theme.line, paddingTop: 10, gap: 3 }}>
+        <Text style={{ color: theme.warn, fontSize: 11 }}>{String(scene.number).padStart(2, '0')} · {Math.round(scene.startMs / 1000)}–{Math.round(scene.endMs / 1000)}s</Text>
+        <Text style={{ color: theme.text, fontWeight: '700' }}>{scene.title}</Text><Text style={{ color: theme.textWeak }}>{scene.objective}</Text>
       </View>)}
-      {dashboard.scenes.length > 5 && <Text style={{ color: '#6a6258' }}>+ {dashboard.scenes.length - 5} more scenes in the story reel</Text>}
-      {!!dashboard.screenplay && <Pressable accessibilityRole="button" onPress={() => setShowScreenplay(!showScreenplay)} style={press({ minHeight: MIN_TAP, justifyContent: 'center', borderTopWidth: 1, borderColor: '#c7bfaf' })}><Text style={{ color: '#553c20', fontWeight: '700' }}>{showScreenplay ? 'Hide full screenplay' : 'Read full screenplay'}</Text></Pressable>}
-      {showScreenplay && !!dashboard.screenplay && <Text selectable style={{ color: '#29252a', lineHeight: 22 }}>{dashboard.screenplay}</Text>}
+      {dashboard.scenes.length > 5 && <Text style={{ color: theme.textWeak }}>+ {dashboard.scenes.length - 5} more scenes in the story reel</Text>}
+      {!!dashboard.screenplay && <Pressable accessibilityRole="button" onPress={() => setShowScreenplay(!showScreenplay)} style={press({ minHeight: MIN_TAP, justifyContent: 'center', borderTopWidth: 1, borderColor: theme.line })}><Text style={{ color: theme.accent, fontWeight: '700' }}>{showScreenplay ? 'Hide full screenplay' : 'Read full screenplay'}</Text></Pressable>}
+      {showScreenplay && !!dashboard.screenplay && <Text selectable style={{ color: theme.text, lineHeight: 22 }}>{dashboard.screenplay}</Text>}
     </View>
-    <View style={{ borderWidth: 1, borderColor: '#34343e', padding: 14, gap: 9 }}><Text style={{ color: '#f2efe9', fontSize: 17, fontWeight: '700' }}>Decisions</Text>
+    <View style={{ borderWidth: 1, borderColor: theme.line, padding: 14, gap: 9 }}><Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>Decisions</Text>
       {dashboard.decisions.length === 0 ? <Text style={{ color: theme.textWeak }}>No style decisions recorded yet.</Text> : dashboard.decisions.map(item => <View key={item.label}><Text style={{ color: theme.warn, fontSize: 11 }}>{item.label} · {item.source}</Text><Text style={{ color: theme.text }}>{item.value}</Text></View>)}
     </View>
-    <View style={{ borderWidth: 1, borderColor: '#34343e', padding: 14, gap: 9 }}><Text style={{ color: '#f2efe9', fontSize: 17, fontWeight: '700' }}>Activity</Text>
+    <View style={{ borderWidth: 1, borderColor: theme.line, padding: 14, gap: 9 }}><Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>Activity</Text>
       {dashboard.activity.length === 0 ? <Text style={{ color: theme.textWeak }}>Scene approvals and generation results will appear here.</Text> : dashboard.activity.map(item => <View key={item.id}><Text style={{ color: theme.warn, fontSize: 11 }}>{item.at.slice(0, 16).replace('T', ' ')} · {item.label}</Text><Text style={{ color: theme.text }}>{item.detail}</Text></View>)}
     </View>
-    <Text style={{ color: '#f2efe9', fontWeight: '700', fontSize: 17 }}>Story reel</Text>
+    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 17 }}>Story reel</Text>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 16 }} accessibilityLabel="Scene sequence">
-      {scenes.map(scene => { const summary = productionSceneSummary(scene, shotRows); const selected = scene.sceneId === selectedScene?.sceneId; const sceneRows = shotRows.filter(row => row.sceneId === scene.sceneId); const visualRow = sceneRows.find(row => { const visual = productionShotVisual(row); return visual.takeAssetId || visual.storyboardAssetId; }) ?? sceneRows[0]; const visual = visualRow ? productionShotVisual(visualRow) : null; const asset = project.assets.find(item => item.id === (visual?.takeAssetId ?? visual?.storyboardAssetId)) ?? project.assets.find(item => item.id === visual?.storyboardAssetId); const fallbackImage = project.assets.find(item => item.id === visual?.storyboardAssetId); return <Pressable key={scene.sceneId} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setSelectedSceneId(scene.sceneId)} style={press({ width: Math.max(210, Math.min(300, 190 + scene.durationMs / 1000)), padding: 8, borderWidth: selected ? 2 : 1, borderColor: selected ? theme.warn : '#34343e', borderRadius: 8, gap: 7, backgroundColor: '#19191f' })}>
+      {scenes.map(scene => { const summary = productionSceneSummary(scene, shotRows); const selected = scene.sceneId === selectedScene?.sceneId; const sceneRows = shotRows.filter(row => row.sceneId === scene.sceneId); const visualRow = sceneRows.find(row => { const visual = productionShotVisual(row); return visual.takeAssetId || visual.storyboardAssetId; }) ?? sceneRows[0]; const visual = visualRow ? productionShotVisual(visualRow) : null; const asset = project.assets.find(item => item.id === (visual?.takeAssetId ?? visual?.storyboardAssetId)) ?? project.assets.find(item => item.id === visual?.storyboardAssetId); const fallbackImage = project.assets.find(item => item.id === visual?.storyboardAssetId); return <Pressable key={scene.sceneId} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => setSelectedSceneId(scene.sceneId)} style={press({ width: Math.max(210, Math.min(300, 190 + scene.durationMs / 1000)), padding: 8, borderWidth: selected ? 2 : 1, borderColor: selected ? theme.warn : theme.line, borderRadius: 8, gap: 7, backgroundColor: theme.surface })}>
         <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>SC {String(scene.order + 1).padStart(2, '0')} · {Math.round(scene.durationMs / 1000)}s</Text>
         <StoryboardSlate projectId={projectId} asset={asset} fallbackImage={fallbackImage} state={summary.stage} description={scene.objective} height={116} />
-        <Text numberOfLines={2} style={{ color: '#f1eee7', fontWeight: '700' }}>{scene.title}</Text>
+        <Text numberOfLines={2} style={{ color: theme.text, fontWeight: '700' }}>{scene.title}</Text>
         <Text style={{ color: theme.textWeak }}>{scene.approvedShotCount}/{scene.shotCount} shots approved</Text>
         <Text style={{ color: theme.textWeak, fontSize: 11 }}>{summary.stage === 'approval' ? 'Ready to approve' : summary.stage === 'generate' ? 'Ready to generate' : summary.stage === 'review' ? 'Review takes' : summary.stage === 'generating' ? 'Generating' : summary.stage === 'complete' ? 'Complete' : 'Locked'}</Text>
         <View style={{ height: 3, backgroundColor: theme.line, borderRadius: 3 }}><View style={{ height: 3, width: `${scene.shotCount ? scene.approvedShotCount / scene.shotCount * 100 : 0}%`, backgroundColor: theme.text, borderRadius: 3 }} /></View>
@@ -199,7 +199,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
         {selectedScene.complete && !scenes[scenes.findIndex(scene => scene.sceneId === selectedScene.sceneId) + 1] && <Text style={{ color: theme.textWeak }}>All scenes complete. Assemble and review the final cut below.</Text>}
       </>; })()}
     </View>}
-    <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>SHOT BOARD</Text><Text style={{ color: '#f1eee7', fontWeight: '700', fontSize: 18 }}>{selectedScene ? `Scene ${selectedScene.order + 1} · ${selectedScene.title}` : 'Shot prompts'}</Text>
+    <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 2 }}>SHOT BOARD</Text><Text style={{ color: theme.text, fontWeight: '700', fontSize: 18 }}>{selectedScene ? `Scene ${selectedScene.order + 1} · ${selectedScene.title}` : 'Shot prompts'}</Text>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 16 }} accessibilityLabel="Scene shot board">
     {shotRows.filter(row => row.sceneId === selectedScene?.sceneId).map((row, index) => {
       const visual = productionShotVisual(row);
@@ -207,13 +207,13 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
       const asset = project.assets.find(item => item.id === (visual.takeAssetId ?? visual.storyboardAssetId)) ?? image;
       const eligibility = productionTextShot(project.ai, model.id, row.shotId);
       const latest = project.ai.generations.filter(item => item.shotId === row.shotId).at(-1);
-      return <View key={row.shotId} style={{ width: 282, gap: 8, padding: 10, borderWidth: 1, borderColor: '#34343e', borderRadius: 8, backgroundColor: '#19191f' }}>
+      return <View key={row.shotId} style={{ width: 282, gap: 8, padding: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8, backgroundColor: theme.surface }}>
         <Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700', letterSpacing: 1 }}>SH {String(index + 1).padStart(2, '0')} · {Math.round(row.durationMs / 1000)}s</Text>
         <StoryboardSlate projectId={projectId} asset={asset} fallbackImage={image} state={row.state} description={row.label} height={146} showVideoPreview={active && storyboardPreviewId === row.shotId} />
         {asset?.kind === 'video' && action(storyboardPreviewId === row.shotId ? 'Close approved take preview' : 'Preview approved take', () => setStoryboardPreviewId(storyboardPreviewId === row.shotId ? null : row.shotId))}
-        <Text style={{ color: '#f1eee7', fontWeight: '700' }}>{row.label}</Text>
+        <Text style={{ color: theme.text, fontWeight: '700' }}>{row.label}</Text>
         <Text style={{ color: theme.warn, fontSize: 11, letterSpacing: 1 }}>Planned video prompt</Text>
-        <Text selectable style={{ color: '#e4dfd4', fontSize: 12, lineHeight: 18 }}>{row.prompt}</Text>
+        <Text selectable style={{ color: theme.text, fontSize: 12, lineHeight: 18 }}>{row.prompt}</Text>
         <Text style={{ color: theme.textWeak }}>{row.candidateCount} take(s){latest ? ` · Latest: ${latest.status} / ${latest.review?.decision ?? 'pending'}` : ''}{row.approvedGeneration ? ' · Approved take retained until replacement approval' : ''}</Text>
         {action(row.candidateCount > 0 ? 'Regenerate this shot · review cost' : 'Generate this shot · review cost', () => start({ shotId: row.shotId }), !eligibility.ok)}
         {!eligibility.ok && <Text style={{ color: theme.textWeak }}>{eligibility.reason}</Text>}
@@ -231,7 +231,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
         {action('Approve reviewed take', () => { const latest = readProject(projectId); if (latest) save(decideGenerationCandidate(latest.ai, candidate.id, 'approved', candidate.review?.notes ?? '', new Date().toISOString())); })}
       </View>;
     })}
-    <Text style={{ color: '#f2efe9', fontWeight: '700', fontSize: 18 }}>Final cut</Text>
+    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 18 }}>Final cut</Text>
     <Text style={{ color: theme.textWeak }}>{dashboard.assemblyReady ? 'Approved takes are ready to assemble.' : 'Awaiting approved takes for every planned shot.'}</Text>
     {action('Assemble approved cut', () => {
       try {

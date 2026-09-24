@@ -416,6 +416,7 @@ export function App(): ReactElement {
         hasActiveProject={hasActiveProject}
         onPageChange={setActivePage}
         activeProjectContext={activeProjectContext}
+        studioLayout={workspaceMode === 'create' && workspaceIsVisible}
         projectTabs={projectTabs}
         activeProjectId={editor.project?.id ?? null}
         onSelectProjectTab={(projectId) => void selectProjectTab(projectId)}

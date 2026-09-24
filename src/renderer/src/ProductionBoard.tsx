@@ -58,10 +58,12 @@ function StoryboardSlate({ projectId, asset, state, description }: {
 }
 
 export function ProductionBoard({
-  projectId, document, assets, busy, onSave, onOpenShot, onGenerateCharacterImage, onGenerateStoryboardImage,
+  projectId, projectName, modelLabel, document, assets, busy, onSave, onOpenShot, onGenerateCharacterImage, onGenerateStoryboardImage,
   onGenerateImages, onOpenImageResults, onGenerateVideoScene, onGenerateVideoShot, onAssemble
 }: {
   readonly projectId: string;
+  readonly projectName?: string | undefined;
+  readonly modelLabel: string;
   readonly document: AiProjectDocument;
   readonly assets: readonly MediaAsset[];
   readonly busy: boolean;
@@ -98,7 +100,7 @@ export function ProductionBoard({
   const assembly = buildApprovedProductionAssemblyPlan(document, assets.map((asset) => ({
     id: asset.id, kind: asset.kind, durationMs: asset.metadata?.durationMs ?? null
   })));
-  const dashboard = productionDashboard(document, assets.map((asset) => ({ id: asset.id, kind: asset.kind, durationMs: asset.metadata?.durationMs ?? null })));
+  const dashboard = productionDashboard(document, assets.map((asset) => ({ id: asset.id, kind: asset.kind, durationMs: asset.metadata?.durationMs ?? null })), projectName);
 
   const runImages = async (targets: readonly ProductionImageTarget[]): Promise<void> => {
     setBatchBusy(true);
@@ -151,6 +153,7 @@ export function ProductionBoard({
         <div>
           <span className="production-board__eyebrow">OPENSCENE STUDIO · PRODUCTION</span><h3 id="production-board-title">{dashboard.title}</h3>
           <p>{scenes.length > 0 ? `${scenes.length} scenes · ${(scenes.reduce((total, scene) => total + scene.durationMs, 0) / 60_000).toFixed(1)} planned min · Five-second shots, made and reviewed scene by scene.` : 'Write the brief, review the screenplay, then direct each five-second shot scene by scene.'}</p>
+          {rows.length > 0 && <small className="production-board__model">Shot model: {modelLabel} · Change it in a shot workbench before generating</small>}
         </div>
         <StatusCard tone={assembly.ok ? 'success' : 'neutral'}>{rows.length > 0 ? `${rows.filter((row) => row.state === 'approved').length}/${rows.length} shots approved` : 'Planning'}</StatusCard>
       </header>
@@ -349,7 +352,7 @@ export function ProductionBoard({
           </div></details>
           <div className="production-board__shot-actions">
             <Button variant="primary" disabled={busy || saving || batchBusy || generationBlock !== null} onClick={() => void runVideoBatch(row.shotId)}>{row.candidateCount > 0 ? 'Regenerate this shot' : 'Generate this shot'}</Button>
-            <Button variant="ghost" disabled={busy || saving || batchBusy} onClick={() => void onOpenShot(row.shotId)}>Edit prompt & inputs</Button>
+            <Button variant="ghost" disabled={busy || saving || batchBusy} onClick={() => void onOpenShot(row.shotId)}>{row.state === 'needs_review' || row.state === 'needs_import' ? 'Review take & prompt' : 'Edit prompt & inputs'}</Button>
           </div>
           {generationBlock !== null && <p className="production-board__take-summary">{generationBlock}</p>}
         </li>; })}

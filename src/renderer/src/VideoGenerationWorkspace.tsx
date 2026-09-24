@@ -186,7 +186,7 @@ export function VideoGenerationWorkspace({
   const [recipeParentId, setRecipeParentId] = useState<string | undefined>();
   const recipeParents = useRef(new Map<string, string>());
   const importingRecipes = useRef(new Set<string>());
-  useEffect(() => { setRecipeParentId(undefined); }, [projectId]);
+  useEffect(() => { setRecipeParentId(undefined); setShowAdvanced(false); setWriterShotId(''); setLoadedWriterShotId(''); }, [projectId]);
   const [writerShotId, setWriterShotId] = useState('');
   const [loadedWriterShotId, setLoadedWriterShotId] = useState('');
   const writerShots = approvedWriterShots(writerDocument);
@@ -262,6 +262,7 @@ export function VideoGenerationWorkspace({
   // Nothing to report until something happens; an idle card is just noise.
   const [statusMsg, setStatusMsg] = useState<{ text: string; tone: 'neutral' | 'success' | 'warning' | 'danger' } | null>(null);
   const selectedCandidates = writerShotId === '' ? [] : (writerDocument?.generations ?? []).filter((entry) => entry.shotId === writerShotId).slice().reverse();
+  const selectedProductionShot = productionShotRows(writerDocument).find((row) => row.shotId === writerShotId);
 
   useEffect(() => {
     documentRef.current = writerDocument ?? null;
@@ -824,19 +825,23 @@ export function VideoGenerationWorkspace({
       setStatusMsg({ tone: 'warning', text: 'The selected production shot is no longer available.' });
       return;
     }
-    const sourceDuration = durationOptions.filter((seconds) => seconds >= shot.durationSeconds).sort((a, b) => a - b)[0];
-    if (sourceDuration === undefined) {
-      setStatusMsg({ tone: 'warning', text: `This shot needs at least ${shot.durationSeconds}s; the selected model accepts ${durationOptions.join('/')}s. Choose a compatible model first.` });
-      return;
-    }
     setWriterShotId(shot.id);
-    setLoadedWriterShotId(shot.id);
     setPrompt(shot.prompt);
-    setDurationSeconds(sourceDuration);
+    setLoadedWriterShotId('');
     setLoadedReferenceAssetIds([]);
     setAutoLoadedCharacterReferenceIds([]);
     setReferenceImages([]);
+    setLastFrame(null);
+    setDrivingVideoAssetId('');
     onReferenceImageChange(null);
+    const sourceDuration = durationOptions.filter((seconds) => seconds >= shot.durationSeconds).sort((a, b) => a - b)[0];
+    if (sourceDuration === undefined) {
+      setLoadedWriterShotId('');
+      setStatusMsg({ tone: 'warning', text: `This shot needs at least ${shot.durationSeconds}s; the selected model accepts ${durationOptions.join('/')}s. Choose a compatible model, then load this shot again.` });
+      return;
+    }
+    setLoadedWriterShotId(shot.id);
+    setDurationSeconds(sourceDuration);
 
     const persistedShot = current.shots.find((entry) => entry.id === shot.id);
     const scene = persistedShot === undefined ? undefined : current.scenes.find((entry) => entry.id === persistedShot.sceneId);
@@ -1122,7 +1127,7 @@ export function VideoGenerationWorkspace({
 
   return (
     <PromptProductionLayout key={projectId ?? 'none'} projectId={projectId} document={writerDocument} assets={projectAssets}
-      active={active} directorMode={toolActive && !showAdvanced} busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
+      active={active} directorMode={toolActive} busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
       onLoad={item => {
         if (prompt.trim() && !window.confirm('Replace the current prompt with this selection? Generated media stays unchanged.')) return;
         onActivateVideo?.();
@@ -1137,11 +1142,13 @@ export function VideoGenerationWorkspace({
       }}>
     {tools}
     {isBatchGenerating && <div role="status" className="production-director-toolbar"><span>{batchStopRequested ? 'Stopping after the submitted job is saved…' : 'Production queue running. Submitted jobs may incur charges.'}</span><button className="button" disabled={batchStopRequested} onClick={() => { productionQueue.current.requestStop(); setBatchStopRequested(true); }}>Stop after current shot</button></div>}
-    {toolActive && <div className="production-director-toolbar"><strong>Production</strong><button className="button" onClick={() => setShowAdvanced(value => !value)}>{showAdvanced ? 'Back to production plan' : 'Advanced generation settings'}</button></div>}
+    {toolActive && <div className="production-director-toolbar"><strong>STUDIO / {showAdvanced ? 'SHOT WORKBENCH' : 'STORY REEL'}</strong>{!showAdvanced && productionShotRows(writerDocument).length === 0 && <button className="button" onClick={() => setShowAdvanced(true)}>Quick clip tools</button>}</div>}
     <div className="production-director" hidden={!toolActive || showAdvanced}>
         {writerDocument !== null && writerDocument !== undefined && onSaveAi !== undefined && projectId !== null && projectId !== undefined &&
           <ProductionBoard
             projectId={projectId}
+            projectName={projectName}
+            modelLabel={videoModel.label}
             document={writerDocument}
             assets={projectAssets}
             busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
@@ -1160,10 +1167,21 @@ export function VideoGenerationWorkspace({
         : <ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} />)}
       {writerDocument && onSelectProductionTool && <details className="production-director__secondary"><summary>Production tools and references</summary><ProductionCompanions document={writerDocument} assets={projectAssets} disabled={isGenerating || isBatchGenerating || isSavingCandidate} onSelect={onSelectProductionTool} /></details>}
     </div>
-    <section hidden={!toolActive || !showAdvanced} className="studio-surface" aria-labelledby="video-generation-title">
+    <div hidden={!toolActive || !showAdvanced} className="production-shot-workbench">
+      <header className="production-shot-workbench__context">
+        <div><span className="production-board__eyebrow">OPENSCENE STUDIO / {selectedProductionShot ? selectedProductionShot.sceneTitle : 'VIDEO'}</span>
+          <h2>{selectedProductionShot ? selectedProductionShot.label : 'Shot workbench'}</h2>
+          <p>{selectedProductionShot ? `Planned ${Math.round(selectedProductionShot.durationMs / 1000)}s shot · ${selectedProductionShot.candidateCount} saved take(s). Adjust inputs, generate, review, then return to the scene board.` : 'Choose a planned shot from the scene board to attach generation and review to this film.'}</p>
+        </div>
+        <div className="production-shot-workbench__actions">
+          {selectedCandidates.length > 0 && <a className="button" href="#shot-candidate-review">Review {selectedCandidates.length} take{selectedCandidates.length === 1 ? '' : 's'}</a>}
+          <button type="button" className="button" onClick={() => setShowAdvanced(false)}>← Scene board</button>
+        </div>
+      </header>
+    <section className="studio-surface" aria-labelledby="video-generation-title">
       <header className="studio-surface__header">
         <div className="studio-surface__title">
-          <h2 className="studio-surface__title-label" id="video-generation-title">Video Generation</h2>
+          <h2 className="studio-surface__title-label" id="video-generation-title">{selectedProductionShot ? 'Shot generation & review' : 'Quick clip generation'}</h2>
           {/* The picker beside it already names the model and provider. */}
           <span className="studio-surface__title-meta">
             {generationMode === 'browser_session' ? `Signed-in ${grokImagineBrowser ? 'Grok Imagine' : 'Google Flow'} worker` : 'Cloud + user-managed local generation'}
@@ -1485,7 +1503,7 @@ export function VideoGenerationWorkspace({
           )}
         </div>
 
-        <div className="studio-field">
+        <div className="studio-field" id="shot-candidate-review">
           <span className="studio-field__label">Shot candidates & continuity approval</span>
           {writerShotId === '' ? (
             <p className="studio-empty">Choose an approved Writer shot below. Generations without a Writer shot remain ad-hoc jobs and cannot be continuity-approved.</p>
@@ -1621,6 +1639,7 @@ export function VideoGenerationWorkspace({
         </div>
       </div>
     </section>
+    </div>
     </PromptProductionLayout>
   );
 }
