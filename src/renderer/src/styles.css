@@ -7133,3 +7133,50 @@ button {
   .pro-production-editor--storyboard { grid-template-rows: auto minmax(0, 1fr); }
   .pro-production-editor--storyboard .production-prompt-pane { overflow: visible; }
 }
+
+/* Studio dashboard: screenplay and production evidence above the filmstrip. */
+.production-board__pipeline { display: flex; overflow-x: auto; border: 1px solid var(--board-line); background: #131318; scrollbar-width: thin; }
+.production-board__pipeline-step { position: relative; display: grid; align-content: start; gap: 4px; flex: 1 0 128px; min-height: 92px; padding: 12px; border-right: 1px solid var(--board-line); border-top: 3px solid #45454d; }
+.production-board__pipeline-step:last-child { border-right: 0; }
+.production-board__pipeline-step--complete { border-top-color: #5a9b73; }
+.production-board__pipeline-step--active { border-top-color: var(--board-amber); background: #241e19; }
+.production-board__pipeline-step > span { color: var(--board-amber); font: 700 11px var(--font-mono); }
+.production-board__pipeline-step > strong { font-size: 12px; }
+.production-board__pipeline-step > small { color: var(--board-muted); font-size: 10px; line-height: 1.3; }
+.production-board__status { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-left: 3px solid var(--board-amber); background: #30261b; color: #f3d19b; font: 700 12px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; }
+.production-board__status-light { width: 7px; height: 7px; border-radius: 50%; background: var(--board-amber); box-shadow: 0 0 10px var(--board-amber); }
+.production-board__overview { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, 1fr); gap: 16px; align-items: stretch; }
+.production-board__script { max-height: 520px; overflow: auto; padding: clamp(22px, 3vw, 42px); background: #eae4d5; color: #29252a; box-shadow: 0 16px 35px #0005; }
+.production-board__script-meta { display: flex; justify-content: space-between; gap: 16px; color: #7a6241; font: 700 10px var(--font-mono); letter-spacing: .16em; }
+.production-board__script h4 { margin: 30px 0 4px; font: 700 clamp(25px, 3vw, 42px) Georgia, serif; letter-spacing: -.04em; }
+.production-board__script-subtitle { color: #746c62; font: 12px var(--font-mono); }
+.production-board__script-scene { display: grid; gap: 4px; padding: 16px 0; border-top: 1px solid #c5bdad; }
+.production-board__script-scene > span { color: #8d6936; font: 700 11px var(--font-mono); }
+.production-board__script-scene > strong { font: 700 18px Georgia, serif; }
+.production-board__script-scene p { margin: 0; color: #57514c; font: 14px/1.5 Georgia, serif; }
+.production-board__script-more { color: #6d6253; font-size: 12px; }
+.production-board__script details { border-top: 1px solid #c5bdad; padding-top: 14px; }
+.production-board__script summary { cursor: pointer; font-weight: 700; }
+.production-board__script pre { white-space: pre-wrap; font: 13px/1.55 var(--font-mono); }
+.production-board__overview-side { display: grid; grid-template-rows: 1fr 1fr; gap: 16px; min-height: 0; }
+.production-board__log { min-height: 0; max-height: 252px; overflow: auto; padding: 18px; border: 1px solid var(--board-line); background: #17171d; }
+.production-board__log h4 { display: flex; justify-content: space-between; margin: 0 0 10px; color: #f0eee8; font-size: 16px; }
+.production-board__log h4 span { color: var(--board-amber); font: 11px var(--font-mono); }
+.production-board__log div { padding: 10px 0; border-top: 1px solid var(--board-line); }
+.production-board__log small { color: var(--board-amber); font: 10px var(--font-mono); text-transform: uppercase; }
+.production-board__log p { margin: 5px 0 0; color: #d5d2cf; font-size: 12px; line-height: 1.5; }
+.production-board__final-heading { display: flex; justify-content: space-between; gap: 10px; margin: 0; font-size: 20px; }
+.production-board__final-heading span { color: var(--board-amber); font: 700 11px var(--font-mono); }
+@media (max-width: 850px) { .production-board__overview { grid-template-columns: 1fr; } .production-board__overview-side { grid-template-columns: 1fr 1fr; grid-template-rows: auto; } }
+@media (max-width: 580px) { .production-board__overview-side { grid-template-columns: 1fr; } }
+
+/* Compact local project library cards. A cover appears only when the project has media. */
+.project-list { gap: 10px; }
+.project-card { display: grid; gap: 0; overflow: hidden; padding: 0; text-align: left; border-radius: 8px; background: #18181d; }
+.project-card__cover { display: flex; align-items: center; justify-content: center; min-height: 104px; padding: 12px; background: linear-gradient(145deg, #313039, #17171c); color: #aaa7af; font: 700 10px var(--font-mono); letter-spacing: .1em; }
+.project-card__info { display: grid; gap: 4px; padding: 10px 12px 12px; }
+.project-card--selected .project-card__cover { background: linear-gradient(145deg, #4b3929, #252029); color: #f4cb8c; }
+
+.project-card__cover { position: relative; overflow: hidden; }
+.project-card__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.project-card__cover > span { position: relative; z-index: 1; padding: 4px 6px; background: #09090cb8; }

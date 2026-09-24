@@ -1,4 +1,4 @@
-import type { CSSProperties, ChangeEvent, ReactElement } from 'react';
+import { useEffect, useState, type CSSProperties, type ChangeEvent, type ReactElement } from 'react';
 
 import { formatTimestamp } from '../format';
 import type { TimelineEditorController } from './useTimelineEditor';
@@ -22,6 +22,24 @@ const COMPACT_PANEL_TITLE_STYLE = {
   lineHeight: 1.12,
   margin: 0
 } as const satisfies CSSProperties;
+
+
+function ProjectCover({ projectId, imageAssetId, mediaCount }: { readonly projectId: string; readonly imageAssetId: string | undefined; readonly mediaCount: number }): ReactElement {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setUrl(null);
+    setFailed(false);
+    if (imageAssetId) void window.videoTool.getAssetPlaybackUrl({ projectId, assetId: imageAssetId }).then((result) => {
+      if (live) { if (result.ok) setUrl(result.value.url); else setFailed(true); }
+    }).catch(() => { if (live) setFailed(true); });
+    return () => { live = false; };
+  }, [projectId, imageAssetId]);
+  return <span className="project-card__cover">{url && !failed && <img src={url} alt="" onError={() => setFailed(true)} />}
+    <span>{mediaCount > 0 ? `${mediaCount} LOCAL MEDIA ASSETS` : 'OPEN PROJECT TO VIEW MEDIA'}</span>
+  </span>;
+}
 
 export function ProjectRail({ editor }: ProjectRailProps): ReactElement {
   const onNameChange = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -53,8 +71,8 @@ export function ProjectRail({ editor }: ProjectRailProps): ReactElement {
             onClick={() => void editor.openProject(project.id)}
             disabled={editor.isBusy}
           >
-            <strong>{project.name}</strong>
-            <small>{formatTimestamp(project.updatedAt)}</small>
+            <ProjectCover projectId={project.id} imageAssetId={editor.project?.id === project.id ? editor.project.assets.find((asset) => asset.kind === 'image')?.id : undefined} mediaCount={editor.project?.id === project.id ? editor.project.assets.length : 0} />
+            <span className="project-card__info"><strong>{project.name}</strong><small>{editor.project?.id === project.id ? 'OPEN · ' : ''}{formatTimestamp(project.updatedAt)}</small></span>
           </button>
         ))}
       </div>

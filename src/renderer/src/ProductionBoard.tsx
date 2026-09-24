@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from 'react';
 
 import type { AiProjectDocument } from '../../shared/aiProjectDomain';
+import { productionDashboard } from '../../shared/productionDashboard';
 import {
   activeStyleReference,
   batchableProductionVideoShotIds,
@@ -97,6 +98,7 @@ export function ProductionBoard({
   const assembly = buildApprovedProductionAssemblyPlan(document, assets.map((asset) => ({
     id: asset.id, kind: asset.kind, durationMs: asset.metadata?.durationMs ?? null
   })));
+  const dashboard = productionDashboard(document, assets.map((asset) => ({ id: asset.id, kind: asset.kind, durationMs: asset.metadata?.durationMs ?? null })));
   if (rows.length === 0) return null;
 
   const runImages = async (targets: readonly ProductionImageTarget[]): Promise<void> => {
@@ -148,11 +150,37 @@ export function ProductionBoard({
     <section className="production-board" aria-labelledby="production-board-title">
       <header className="production-board__header">
         <div>
-          <span className="production-board__eyebrow">LIVING STORYBOARD · DIRECTOR VIEW</span><h3 id="production-board-title">{document.scripts.find((script) => script.id === document.writerPipeline?.appliedScriptId)?.title ?? 'Short-film production'}</h3>
+          <span className="production-board__eyebrow">OPENSCENE STUDIO · PRODUCTION</span><h3 id="production-board-title">{dashboard.title}</h3>
           <p>{scenes.length} scenes · {(scenes.reduce((total, scene) => total + scene.durationMs, 0) / 60_000).toFixed(1)} planned min · Five-second shots, made and reviewed scene by scene.</p>
         </div>
         <StatusCard tone={assembly.ok ? 'success' : 'neutral'}>{rows.filter((row) => row.state === 'approved').length}/{rows.length} shots approved</StatusCard>
       </header>
+
+      <nav className="production-board__pipeline" aria-label="Production stages">{dashboard.stages.map((stage, index) => <div key={stage.id} className={`production-board__pipeline-step production-board__pipeline-step--${stage.state}`} title={stage.detail}>
+        <span>{stage.state === 'complete' ? '✓' : String(index + 1).padStart(2, '0')}</span><strong>{stage.label}</strong><small>{stage.detail}</small>
+      </div>)}</nav>
+      <div className="production-board__status" role="status"><span className="production-board__status-light" />{dashboard.status}</div>
+      <div className="production-board__overview">
+        <section className="production-board__script" aria-label="Screenplay">
+          <div className="production-board__script-meta"><span>THE SCREENPLAY</span><span>{dashboard.screenplayApproved ? 'APPROVED SCRIPT' : 'WORKING SCRIPT'}</span></div>
+          <h4>{dashboard.title}</h4>
+          <p className="production-board__script-subtitle">{dashboard.scenes.length} scenes · {(dashboard.totalDurationMs / 60_000).toFixed(1)} planned min</p>
+          {dashboard.scenes.slice(0, 5).map((scene) => <div className="production-board__script-scene" key={scene.sceneId}>
+            <span>{String(scene.number).padStart(2, '0')} / {Math.round(scene.startMs / 1000)}–{Math.round(scene.endMs / 1000)}s</span>
+            <strong>{scene.title}</strong><p>{scene.objective}</p>
+          </div>)}
+          {dashboard.scenes.length > 5 && <p className="production-board__script-more">+ {dashboard.scenes.length - 5} more scenes in the story reel</p>}
+          {dashboard.screenplay && <details><summary>Read full screenplay</summary><pre>{dashboard.screenplay}</pre></details>}
+        </section>
+        <aside className="production-board__overview-side">
+          <section className="production-board__log" aria-label="Production decisions"><h4>Decisions <span>{dashboard.decisions.length}</span></h4>
+            {dashboard.decisions.length === 0 ? <p>No style decisions recorded yet.</p> : dashboard.decisions.map((item) => <div key={item.label}><small>{item.label} · {item.source}</small><p>{item.value}</p></div>)}
+          </section>
+          <section className="production-board__log" aria-label="Production activity"><h4>Activity <span>{dashboard.activity.length}</span></h4>
+            {dashboard.activity.length === 0 ? <p>Scene approvals and generation results will appear here.</p> : dashboard.activity.map((item) => <div key={item.id}><small>{item.at.slice(0, 16).replace('T', ' ')} · {item.label}</small><p>{item.detail}</p></div>)}
+          </section>
+        </aside>
+      </div>
 
       {message !== null && <StatusCard tone={message.tone}>{message.text}</StatusCard>}
 
@@ -323,6 +351,7 @@ export function ProductionBoard({
         </li>; })}
       </ol>
 
+      <h4 className="production-board__final-heading">Final cut <span>{dashboard.assemblyReady ? 'READY TO ASSEMBLE' : 'AWAITING APPROVED TAKES'}</span></h4>
       {!assembly.ok && <StatusCard tone="neutral">Assembly blocked: {assembly.reason}</StatusCard>}
       {assembly.ok && <StatusCard tone="neutral">Film sequence: {assembly.shots.length} shots · {(assembly.totalDurationMs / 1000).toFixed(1)}s in script order. Extra generated footage is trimmed without changing the original files; short takes must be replaced or the plan revised.</StatusCard>}
       <div className="production-board__actions">
