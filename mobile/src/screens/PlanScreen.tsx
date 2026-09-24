@@ -1,7 +1,10 @@
+import { pipelineBaseRequest } from '@openvideo/shared/writerPipeline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ProductionNavigator } from '../components/ProductionNavigator';
 import { ProductionPlanComposer } from '../components/ProductionPlanComposer';
+import { NextSceneComposer } from '../components/NextSceneComposer';
+import { canPlanNextSequentialScene } from '@openvideo/shared/sequentialProduction';
 import { ProductionRunBoard } from '../components/ProductionRunBoard';
 import { ProductionCompanions } from '../components/ProductionCompanions';
 import { writeProject } from '../lib/projectStore';
@@ -480,9 +483,15 @@ export function PlanScreen({
         writeProject({ ...latest, ai });
         return true;
       }} />}
+      {projectId && activeProject && canPlanNextSequentialScene(activeProject.ai) && <NextSceneComposer key={'next-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
+        const latest = readProject(projectId);
+        if (!latest) return false;
+        writeProject({ ...latest, ai });
+        return true;
+      }} />}
       {projectId && <ProductionRunBoard key={'run-' + projectId} projectId={projectId} model={model} aspectRatio={effectiveAspectRatio} disabled={running || asking || redoing !== null} connected={connected[model.providerId] === true} onBusy={setRunning} active={active} />}
-      {projectId && activeProject && productionRows.length > 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlanControls }} onPress={() => setShowPlanControls(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{showPlanControls ? 'Hide screenplay and plan controls' : 'Screenplay and plan controls'}</Text></Pressable>}
-      {projectId && activeProject && productionRows.length > 0 && showPlanControls && <ProductionPlanComposer key={'plan-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
+      {projectId && activeProject && productionRows.length > 0 && pipelineBaseRequest(activeProject.ai.writerPipeline)?.productionScope !== 'scene' && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlanControls }} onPress={() => setShowPlanControls(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{showPlanControls ? 'Hide screenplay and plan controls' : 'Screenplay and plan controls'}</Text></Pressable>}
+      {projectId && activeProject && productionRows.length > 0 && pipelineBaseRequest(activeProject.ai.writerPipeline)?.productionScope !== 'scene' && showPlanControls && <ProductionPlanComposer key={'plan-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
         const latest = readProject(projectId);
         if (!latest) return false;
         writeProject({ ...latest, ai });

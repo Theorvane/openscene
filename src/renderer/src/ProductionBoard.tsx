@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from 'react';
 
 import type { AiProjectDocument } from '../../shared/aiProjectDomain';
+import { pipelineBaseRequest } from '../../shared/writerPipeline';
 import { productionDashboard } from '../../shared/productionDashboard';
 import {
   activeStyleReference,
@@ -84,6 +85,7 @@ export function ProductionBoard({
   const [batchBusy, setBatchBusy] = useState(false);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string } | null>(null);
+  const sequential = pipelineBaseRequest(document.writerPipeline)?.productionScope === 'scene';
   const rows = productionShotRows(document);
   const scenes = productionSceneRows(document);
   const selectedScene = scenes.find((scene) => scene.sceneId === selectedSceneId) ?? scenes.find((scene) => !scene.complete) ?? scenes[0];
@@ -227,7 +229,7 @@ export function ProductionBoard({
         <div className="production-board__scene-workspace-actions">
           {(() => {
             const summary = productionSceneSummary(selectedScene, rows);
-            const guide = productionSceneGuide(selectedScene, rows, scenes.some((scene) => scene.order > selectedScene.order));
+            const guide = productionSceneGuide(selectedScene, rows, scenes.some((scene) => scene.order > selectedScene.order), sequential);
             return <>
               <div className="production-board__scene-guide"><small>{guide.step}</small><strong>{guide.title}</strong><p>{guide.detail}</p></div>
               <span>{selectedScene.approvedShotCount}/{selectedScene.shotCount} shots approved · {summary.pendingCount} pending · {summary.reviewCount} to review</span>
@@ -241,7 +243,7 @@ export function ProductionBoard({
               {summary.stage === 'complete' && !scenes.some((scene) => scene.order > selectedScene.order) && <Button variant="primary" disabled={busy || saving || !assembly.ok} onClick={() => {
                 const assembled = onAssemble();
                 setMessage({ tone: assembled ? 'success' : 'warning', text: assembled ? 'Approved shots are on the timeline. Review the cut before export.' : 'The cut could not be assembled. Check the final-cut requirements below.' });
-              }}>Assemble final cut</Button>}
+              }}>{sequential ? 'Assemble current cut' : 'Assemble final cut'}</Button>}
               {selectedScene.canProduce && missingStoryboardTargets.length > 0 && <details className="production-board__scene-options"><summary>Optional · create storyboard frames</summary><Button variant="default" disabled={busy || saving || batchBusy} onClick={() => void runImages(missingStoryboardTargets)}>Generate {missingStoryboardTargets.length} storyboard frame(s)</Button></details>}
             </>;
           })()}
@@ -367,7 +369,7 @@ export function ProductionBoard({
         </li>; })}
       </ol>
 
-      <details className="production-board__final-panel"><summary>Final cut <span>{dashboard.assemblyReady ? 'READY TO ASSEMBLE' : 'AWAITING APPROVED TAKES'}</span></summary>
+      <details className="production-board__final-panel"><summary>{sequential ? 'Current cut' : 'Final cut'} <span>{dashboard.assemblyReady ? 'READY TO ASSEMBLE' : 'AWAITING APPROVED TAKES'}</span></summary>
       {!assembly.ok && <StatusCard tone="neutral">Assembly blocked: {assembly.reason}</StatusCard>}
       {assembly.ok && <StatusCard tone="neutral">Film sequence: {assembly.shots.length} shots · {(assembly.totalDurationMs / 1000).toFixed(1)}s in script order. Extra generated footage is trimmed without changing the original files; short takes must be replaced or the plan revised.</StatusCard>}
       <div className="production-board__actions">

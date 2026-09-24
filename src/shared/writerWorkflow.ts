@@ -58,6 +58,8 @@ export type GeminiWriterModelId = (typeof GEMINI_WRITER_MODEL_IDS)[number];
 export type WriterModelId = GeminiWriterModelId | AgentRouterModelId;
 
 export type WriterRequest = {
+  /** Plan exactly one short scene in an unfinished film. */
+  readonly productionScope?: 'scene';
   readonly stage?: WriterStage;
   readonly approvedContext?: readonly { readonly stage: WriterStage; readonly content: string }[];
   readonly revisionInstructions?: string;
@@ -218,7 +220,7 @@ function stringList(value: unknown): readonly string[] | null {
 export function parseWriterRequest(value: unknown): WriterRequest | null {
   if (!isPlainRecord(value) || !hasAllowedKeys(value, [
     'mode', 'sourceText', 'language', 'audience', 'tone', 'targetDurationSeconds',
-    'parentScriptId', 'currentScreenplay', 'videoStyle', 'customVideoStyle', 'emotionalGoal', 'shotDurationSeconds', 'stage', 'approvedContext', 'revisionInstructions', 'currentStageText'
+    'parentScriptId', 'currentScreenplay', 'videoStyle', 'customVideoStyle', 'emotionalGoal', 'shotDurationSeconds', 'productionScope', 'stage', 'approvedContext', 'revisionInstructions', 'currentStageText'
   ])) return null;
   const mode = typeof value.mode === 'string' && (WRITER_MODES as readonly string[]).includes(value.mode)
     ? value.mode as WriterMode
@@ -229,6 +231,7 @@ export function parseWriterRequest(value: unknown): WriterRequest | null {
   const tone = exactText(value.tone, MAX_SHORT_TEXT_LENGTH);
   const targetDurationSeconds = value.targetDurationSeconds;
   const shotDurationSeconds = value.shotDurationSeconds === undefined ? undefined : value.shotDurationSeconds === 5 ? 5 as const : null;
+  const productionScope = value.productionScope === undefined ? undefined : value.productionScope === 'scene' ? 'scene' as const : null;
   const parentScriptId = value.parentScriptId === undefined ? undefined : exactText(value.parentScriptId, MAX_SHORT_TEXT_LENGTH);
   const currentScreenplay = value.currentScreenplay === undefined ? undefined : exactText(value.currentScreenplay, MAX_SOURCE_LENGTH);
   const videoStyle = value.videoStyle === undefined
@@ -247,8 +250,9 @@ export function parseWriterRequest(value: unknown): WriterRequest | null {
   if (
     mode === null || sourceText === null || language === null || audience === null || tone === null ||
     typeof targetDurationSeconds !== 'number' || !Number.isSafeInteger(targetDurationSeconds) ||
-    targetDurationSeconds < 4 || targetDurationSeconds > 7_200 || shotDurationSeconds === null ||
-    (shotDurationSeconds !== undefined && (targetDurationSeconds < 300 || targetDurationSeconds > 900 || targetDurationSeconds % shotDurationSeconds !== 0)) || parentScriptId === null ||
+    targetDurationSeconds < 4 || targetDurationSeconds > 7_200 || shotDurationSeconds === null || productionScope === null ||
+    (productionScope === 'scene' && shotDurationSeconds !== 5) ||
+    (shotDurationSeconds !== undefined && (targetDurationSeconds < (productionScope === 'scene' ? 5 : 300) || targetDurationSeconds > 900 || targetDurationSeconds % shotDurationSeconds !== 0)) || parentScriptId === null ||
     currentScreenplay === null || videoStyle === null || customVideoStyle === null || emotionalGoal === null
   ) return null;
   if (mode === 'rewrite' && (parentScriptId === undefined || currentScreenplay === undefined)) return null;
@@ -274,6 +278,7 @@ export function parseWriterRequest(value: unknown): WriterRequest | null {
   return {
     mode, sourceText, language, audience, tone, targetDurationSeconds,
     ...(shotDurationSeconds === undefined ? {} : { shotDurationSeconds }),
+    ...(productionScope === undefined ? {} : { productionScope }),
     ...(value.stage === undefined ? {} : { stage: value.stage as WriterStage, approvedContext }),
     ...(revisionInstructions === undefined ? {} : { revisionInstructions }),
     ...(currentStageText === undefined ? {} : { currentStageText }),
@@ -613,6 +618,7 @@ export function compileWriterPrompt(request: WriterRequest): string {
     `Tone: ${request.tone}`,
     `Target finished duration: ${request.targetDurationSeconds} seconds`,
     request.shotDurationSeconds === undefined ? '' : `Plan exactly ${request.targetDurationSeconds / request.shotDurationSeconds} shots. Every finished shot must be exactly ${request.shotDurationSeconds} seconds, including shots in every scene. Do not use shorter inserts or longer substitutes.`,
+    request.productionScope === 'scene' ? 'Create exactly ONE scene of an unfinished film. Do not plan later scenes or force an ending. Preserve established characters and visual style when continuing from supplied context.' : '',
     request.mode === 'rewrite' ? `<CURRENT_SCREENPLAY>\n${request.currentScreenplay}\n</CURRENT_SCREENPLAY>` : '',
     `<SOURCE_MATERIAL>\n${request.sourceText}\n</SOURCE_MATERIAL>`,
     'Every scene must contain at least one shot. Dialogue may be empty only when silence itself is the storytelling choice; action descriptions must always be specific and non-empty.'
@@ -729,6 +735,7 @@ export function validateWriterResponse(value: unknown, request: WriterRequest): 
   if (request.stage === undefined || request.stage === 'prompts') {
     const result = validateWriterDraft(value);
     if (!result.ok) return result;
+    if (request.productionScope === 'scene' && request.stage === undefined && result.value.scenes.length !== 1) return draftFailure('scenes', 'invalid_shape', 'Scene mode must return exactly one scene.');
     if (request.shotDurationSeconds !== undefined) {
       for (const [sceneIndex, scene] of result.value.scenes.entries()) {
         for (const [shotIndex, shot] of scene.shots.entries()) {

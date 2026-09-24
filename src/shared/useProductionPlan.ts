@@ -1,7 +1,7 @@
 import type { AiProjectDocument } from './aiProjectDomain';
 import type { WriterDraft, WriterRequest } from './writerWorkflow';
 import type { WriterPipelineState, WriterStage } from './writerStages';
-import { approveProductionCheckpoint, proposeProductionPlan } from './productionPlan';
+import { approveProductionCheckpoint, approveProductionPlan, proposeProductionPlan } from './productionPlan';
 
 type Hooks = {
   useState: <S>(initial: S | (() => S)) => [S, (next: S | ((previous: S) => S)) => void];
@@ -38,6 +38,14 @@ export function createUseProductionPlan({ useState, useRef, useEffect }: Hooks) 
         if (!unsaved) return;
         if (!await persist({ ...latest.current, writerPipeline: unsaved })) throw new Error('Could not save proposal.');
         if (mounted.current) { setUnsaved(null); setMessage('Proposal saved for review.'); }
+      }),
+      approveAll: (request: WriterRequest) => run(async () => {
+        if (request.productionScope !== 'scene') throw new Error('Whole-film plans require checkpoint approvals.');
+        if (!proposal || unsaved) throw new Error('Save the proposal before approving it.');
+        if (JSON.stringify(proposal) !== JSON.stringify(latest.current.writerPipeline)) throw new Error('The plan changed. Review the latest version.');
+        const next = approveProductionPlan(latest.current, request, proposal, new Date().toISOString(), 'production-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9));
+        if (!await persist(next)) throw new Error('Scene approval could not be saved. No generation started.');
+        if (mounted.current) setMessage('First scene saved. Review and approve its shot plan before video generation.');
       }),
       approve: (request: WriterRequest, stage: WriterStage) => run(async () => {
         if (!proposal || unsaved) throw new Error('Save the proposal before approving it.');

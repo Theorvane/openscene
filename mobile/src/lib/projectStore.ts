@@ -8,6 +8,7 @@ import { resolveTimelineTrackForAsset, trackAppendStartMs } from '@openvideo/sha
 import { placeClip, replaceClipSource } from '@openvideo/shared/timelineClipLogic';
 import { isStill, stillClipSource } from '@openvideo/shared/timelineStills';
 import { assembleApprovedProductionCut, buildApprovedProductionAssemblyPlan } from '@openvideo/shared/productionWorkflow';
+import { pipelineBaseRequest } from '@openvideo/shared/writerPipeline';
 import { parseSubtitleDelivery, type SubtitleDelivery } from '@openvideo/shared/subtitleDelivery';
 
 import { createInitialTimeline } from '@openvideo/shared/timelineLogic';
@@ -460,6 +461,7 @@ export function assembleApprovedWriterShots(project: MobileProject):
     timeline: project.timeline,
     plan,
     targetTrackId: track.id,
+    allowExistingPrefix: pipelineBaseRequest(project.ai.writerPipeline)?.productionScope === 'scene',
     clipIdForShot: () => `production-${assemblyId}-${++clipOrder}`
   });
   if (!assembled.ok) return assembled;
