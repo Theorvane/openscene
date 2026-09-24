@@ -17,6 +17,7 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
   const base = pipelineBaseRequest(document.writerPipeline);
   const [brief, setBrief] = useState(base?.sourceText ?? '');
   const [seconds, setSeconds] = useState(String(base?.targetDurationSeconds ?? 600));
+  const [customLength, setCustomLength] = useState(![300, 600, 900].includes(base?.targetDurationSeconds ?? 600));
   const [language, setLanguage] = useState(base?.language ?? 'Korean');
   const { selectedModel } = useAiDomainModel();
   const { credentialStatus } = useLlmModel();
@@ -32,15 +33,19 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
   const checkpoint = nextProductionCheckpoint(flow.proposal);
   return <section id="production-plan" className="production-plan-composer" aria-label="Guided production">
     <header><p className="section-kicker">{applied ? 'PRODUCTION PLAN APPROVED' : flow.proposal ? 'REVIEW THE PROPOSED PLAN' : 'STEP 1 · STORY BRIEF'}</p><h2>{applied ? 'Screenplay and scene plan' : flow.proposal ? 'Review your film plan' : 'Start your film here'}</h2>
-      <p>Describe the characters, setting, conflict and ending. The planner turns your brief into a screenplay, scenes and five-second shot prompts for a 5–15 minute film.</p>
-      <ol className="production-plan-composer__steps"><li><strong>Write the brief</strong><span>Describe the story below.</span></li><li><strong>Propose a plan</strong><span>Use the selected writing model.</span></li><li><strong>Approve each step</strong><span>Review the screenplay, scenes and shot prompts.</span></li><li><strong>Make scene 1</strong><span>Return to the story reel to generate and review shots.</span></li></ol></header>
+      <p>Describe your story. OpenScene will plan the scenes and five-second shots; you approve each step before video generation.</p>
+      <details className="production-plan-composer__help"><summary>How the film is made</summary><ol className="production-plan-composer__steps"><li><strong>Write the brief</strong><span>Describe the story below.</span></li><li><strong>Propose a plan</strong><span>Use the selected writing model.</span></li><li><strong>Approve each step</strong><span>Review the screenplay, scenes and shot prompts.</span></li><li><strong>Make scene 1</strong><span>Return to the story reel to generate and review shots.</span></li></ol></details></header>
     <label className="studio-field"><span>Production brief</span><textarea id="production-brief" rows={5} value={brief} disabled={busy} onChange={event => setBrief(event.target.value)} placeholder="A ten-minute mystery: two characters cross paths at a rainy station, uncover a secret, and face a final choice…" /></label>
-    <div className="writer-workspace__row">
-      <label className="studio-field"><span>Target runtime (seconds; 300–900 in five-second steps)</span><input type="number" min={request.shotDurationSeconds === 5 ? 300 : 4} max={request.shotDurationSeconds === 5 ? 900 : 7200} step={request.shotDurationSeconds === 5 ? 5 : 1} value={seconds} disabled={busy} onChange={event => setSeconds(event.target.value)} /></label>
+    <label className="studio-field"><span>Film length</span><select value={customLength ? 'custom' : seconds} disabled={busy} onChange={event => {
+      if (event.target.value === 'custom') { setCustomLength(true); setSeconds(''); }
+      else { setCustomLength(false); setSeconds(event.target.value); }
+    }}><option value="300">5 minutes</option><option value="600">10 minutes</option><option value="900">15 minutes</option><option value="custom">Custom length</option></select></label>
+    {customLength && <label className="studio-field"><span>Custom length · 300–900 seconds, in five-second steps</span><input type="number" min={300} max={900} step={5} value={seconds} disabled={busy} onChange={event => setSeconds(event.target.value)} /></label>}
+    <details className="production-plan-composer__help"><summary>Dialogue language</summary>
       <label className="studio-field"><span>Dialogue language</span><input value={language} disabled={busy} onChange={event => setLanguage(event.target.value)} /></label>
-    </div>
+    </details>
     <DomainModelPicker domain="writer" ariaLabel="Production planner model" />
-    <p>Planning uses your connected writing model and may incur text-model charges. Media generation has a separate cost confirmation.</p>
+    <small>Planning may use paid text-model credits. Video generation asks separately.</small>
     <button className="button" disabled={busy || !valid || !connected} onClick={() => {
       if (!window.confirm('Generate a complete production plan using the selected writing model? Text-model charges may apply. This replaces the current planning draft, not existing media. No media generation will start.')) return;
       void flow.generate(request, model.id, async input => {

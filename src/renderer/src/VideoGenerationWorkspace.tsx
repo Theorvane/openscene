@@ -1142,11 +1142,11 @@ export function VideoGenerationWorkspace({
       }}>
     {tools}
     {isBatchGenerating && <div role="status" className="production-director-toolbar"><span>{batchStopRequested ? 'Stopping after the submitted job is saved…' : 'Production queue running. Submitted jobs may incur charges.'}</span><button className="button" disabled={batchStopRequested} onClick={() => { productionQueue.current.requestStop(); setBatchStopRequested(true); }}>Stop after current shot</button></div>}
-    {toolActive && <div className="production-director-toolbar"><strong>STUDIO / {showAdvanced ? 'SHOT WORKBENCH' : 'STORY REEL'}</strong>{!showAdvanced && productionShotRows(writerDocument).length === 0 && <button className="button" onClick={() => setShowAdvanced(true)}>Quick clip tools</button>}</div>}
+    {toolActive && <div className="production-director-toolbar"><strong>{showAdvanced ? 'Shot workbench' : productionShotRows(writerDocument).length === 0 ? 'Plan your film' : 'Make your film'}</strong>{!showAdvanced && productionShotRows(writerDocument).length === 0 && <button className="button" onClick={() => setShowAdvanced(true)}>Make a single clip instead</button>}</div>}
     <div className="production-director" hidden={!toolActive || showAdvanced}>
       {writerDocument && onSaveAi && productionShotRows(writerDocument).length === 0 &&
         <ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} />}
-        {writerDocument !== null && writerDocument !== undefined && onSaveAi !== undefined && projectId !== null && projectId !== undefined &&
+        {writerDocument !== null && writerDocument !== undefined && onSaveAi !== undefined && projectId !== null && projectId !== undefined && productionShotRows(writerDocument).length > 0 &&
           <ProductionBoard
             projectId={projectId}
             projectName={projectName}

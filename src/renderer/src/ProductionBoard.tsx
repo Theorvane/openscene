@@ -160,12 +160,11 @@ export function ProductionBoard({
         <StatusCard tone={assembly.ok ? 'success' : 'neutral'}>{rows.length > 0 ? `${rows.filter((row) => row.state === 'approved').length}/${rows.length} shots approved` : 'Planning'}</StatusCard>
       </header>
 
+      <details className="production-board__production-notes"><summary>Film progress, screenplay and activity</summary>
       <nav className="production-board__pipeline" aria-label="Production stages">{dashboard.stages.map((stage, index) => <div key={stage.id} className={`production-board__pipeline-step production-board__pipeline-step--${stage.state}`} title={stage.detail}>
         <span>{stage.state === 'complete' ? '✓' : String(index + 1).padStart(2, '0')}</span><strong>{stage.label}</strong><small>{stage.detail}</small>
       </div>)}</nav>
       <div className="production-board__status" role="status"><span className="production-board__status-light" />{dashboard.status}</div>
-      <details key={rows.length === 0 ? 'planning-notes' : 'scene-notes'} className="production-board__production-notes" open={rows.length === 0}>
-      <summary>Screenplay, style decisions and activity</summary>
       <div className="production-board__overview">
         <section className="production-board__script" aria-label="Screenplay">
           <div className="production-board__script-meta"><span>THE SCREENPLAY</span><span>{dashboard.screenplayApproved ? 'APPROVED SCRIPT' : 'WORKING SCRIPT'}</span></div>
@@ -232,15 +231,18 @@ export function ProductionBoard({
             return <>
               <div className="production-board__scene-guide"><small>{guide.step}</small><strong>{guide.title}</strong><p>{guide.detail}</p></div>
               <span>{selectedScene.approvedShotCount}/{selectedScene.shotCount} shots approved · {summary.pendingCount} pending · {summary.reviewCount} to review</span>
-              {!selectedScene.approved && <Button variant="primary" disabled={busy || saving || batchBusy || !selectedScene.canApprove} onClick={() => {
+              {summary.stage === 'approval' && <Button variant="primary" disabled={busy || saving || batchBusy || !selectedScene.canApprove} onClick={() => {
                 if (!window.confirm(`Approve scene ${selectedScene.order + 1}: ${selectedScene.title} for production? Media generation has a separate cost confirmation.`)) return;
                 void persist(approveProductionScene(document, selectedScene.sceneId, new Date().toISOString()), `${selectedScene.title} is ready for production.`);
-              }}>{selectedScene.canApprove ? 'Approve this scene' : 'Finish previous scene first'}</Button>}
-              {selectedScene.canProduce && summary.pendingCount > 0 && <Button variant="primary" disabled={busy || saving || batchBusy || pendingVideoShotIds.length === 0} onClick={() => void runVideoBatch()}>Generate {pendingVideoShotIds.length} pending shot(s) in this scene</Button>}
-              {selectedScene.canProduce && missingStoryboardTargets.length > 0 && <Button variant="default" disabled={busy || saving || batchBusy} onClick={() => void runImages(missingStoryboardTargets)}>Generate storyboards for approved scene</Button>}
-              {summary.reviewCount > 0 && <Button variant="ghost" onClick={() => { const shot = visibleRows.find((row) => row.state === 'needs_review' || row.state === 'needs_import'); if (shot) void onOpenShot(shot.shotId); }}>Review pending take</Button>}
-              {selectedScene.complete && scenes[scenes.findIndex((scene) => scene.sceneId === selectedScene.sceneId) + 1] && <Button variant="primary" onClick={() => setSelectedSceneId(scenes[scenes.findIndex((scene) => scene.sceneId === selectedScene.sceneId) + 1]!.sceneId)}>Continue to next scene</Button>}
-              {selectedScene.complete && !scenes[scenes.findIndex((scene) => scene.sceneId === selectedScene.sceneId) + 1] && <span>All scenes complete. Assemble and review the final cut below.</span>}
+              }}>Approve scene {selectedScene.order + 1}</Button>}
+              {summary.stage === 'generate' && <Button variant="primary" disabled={busy || saving || batchBusy || pendingVideoShotIds.length === 0} onClick={() => void runVideoBatch()}>Generate {pendingVideoShotIds.length} shots · review cost</Button>}
+              {summary.stage === 'review' && <Button variant="primary" onClick={() => { const shot = visibleRows.find((row) => row.state === 'needs_review' || row.state === 'needs_import'); if (shot) void onOpenShot(shot.shotId); }}>Review next take</Button>}
+              {summary.stage === 'complete' && scenes.some((scene) => scene.order > selectedScene.order) && <Button variant="primary" onClick={() => setSelectedSceneId(scenes[scenes.findIndex((scene) => scene.sceneId === selectedScene.sceneId) + 1]!.sceneId)}>Continue to scene {selectedScene.order + 2}</Button>}
+              {summary.stage === 'complete' && !scenes.some((scene) => scene.order > selectedScene.order) && <Button variant="primary" disabled={busy || saving || !assembly.ok} onClick={() => {
+                const assembled = onAssemble();
+                setMessage({ tone: assembled ? 'success' : 'warning', text: assembled ? 'Approved shots are on the timeline. Review the cut before export.' : 'The cut could not be assembled. Check the final-cut requirements below.' });
+              }}>Assemble final cut</Button>}
+              {selectedScene.canProduce && missingStoryboardTargets.length > 0 && <details className="production-board__scene-options"><summary>Optional · create storyboard frames</summary><Button variant="default" disabled={busy || saving || batchBusy} onClick={() => void runImages(missingStoryboardTargets)}>Generate {missingStoryboardTargets.length} storyboard frame(s)</Button></details>}
             </>;
           })()}
         </div>
@@ -365,7 +367,7 @@ export function ProductionBoard({
         </li>; })}
       </ol>
 
-      <h4 className="production-board__final-heading">Final cut <span>{dashboard.assemblyReady ? 'READY TO ASSEMBLE' : 'AWAITING APPROVED TAKES'}</span></h4>
+      <details className="production-board__final-panel"><summary>Final cut <span>{dashboard.assemblyReady ? 'READY TO ASSEMBLE' : 'AWAITING APPROVED TAKES'}</span></summary>
       {!assembly.ok && <StatusCard tone="neutral">Assembly blocked: {assembly.reason}</StatusCard>}
       {assembly.ok && <StatusCard tone="neutral">Film sequence: {assembly.shots.length} shots · {(assembly.totalDurationMs / 1000).toFixed(1)}s in script order. Extra generated footage is trimmed without changing the original files; short takes must be replaced or the plan revised.</StatusCard>}
       <div className="production-board__actions">
@@ -382,6 +384,7 @@ export function ProductionBoard({
         }}>Assemble approved shots on timeline</Button>
         <span>Video results are saved automatically. Continuity approval, image-reference assignment, assembly and export remain explicit.</span>
       </div>
+      </details>
       </>}
     </section>
   );

@@ -22,6 +22,8 @@ export function ProductionPlanComposer({ document, onSave, disabled, connections
   const base = pipelineBaseRequest(document.writerPipeline);
   const [brief, setBrief] = useState(base?.sourceText ?? '');
   const [seconds, setSeconds] = useState(String(base?.targetDurationSeconds ?? 600));
+  const [showCustomLength, setShowCustomLength] = useState(![300, 600, 900].includes(base?.targetDurationSeconds ?? 600));
+  const [showPlanOptions, setShowPlanOptions] = useState(false);
   const [language, setLanguage] = useState(base?.language ?? 'Korean');
   const [modelId, setModelId] = useState(getDomainModels('writer')[0]?.id ?? '');
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
@@ -39,11 +41,17 @@ export function ProductionPlanComposer({ document, onSave, disabled, connections
   const action = (label: string, callback: () => void, off = false) => <Pressable accessibilityRole="button" disabled={off} onPress={callback} style={press([styles.button, off && { opacity: .5 }])}><Text style={styles.text}>{label}</Text></Pressable>;
   return <View style={styles.card}>
     <Text style={styles.title}>{applied ? 'Screenplay and scene plan' : flow.proposal ? 'Review your film plan' : 'Start your film here'}</Text>
-    <Text style={styles.text}>1. Describe the characters, setting, conflict and ending below. 2. Create the screenplay and scene plan. 3. Approve the screenplay, scenes and five-second shot prompts one step at a time. 4. Open scene 1 in the story reel to generate and review its shots.</Text>
+    <Text style={styles.text}>Describe your story. Approve its plan, then make each scene from five-second shots.</Text>
     <TextInput accessibilityLabel="Production brief" placeholder="Describe a 5–15 minute story, its characters, scene changes and ending…" placeholderTextColor={theme.textWeak} multiline value={brief} onChangeText={setBrief} editable={!busy} style={[styles.input, { minHeight: 110 }]} />
-    <Text style={styles.text}>Target runtime (seconds; 300–900 in five-second steps)</Text><TextInput accessibilityLabel="Target runtime (seconds; 300–900 in five-second steps)" value={seconds} onChangeText={setSeconds} keyboardType="number-pad" editable={!busy} style={styles.input} />
-    <Text style={styles.text}>Dialogue language</Text><TextInput accessibilityLabel="Dialogue language" value={language} onChangeText={setLanguage} editable={!busy} style={styles.input} />
-    <ModelSelect domain="writer" selectedId={modelId} connected={connected} onSelect={item => setModelId(item.id)} onConnectionChange={() => { void readProviderConnections().then(setConnected); }} />
+    <Text style={styles.text}>Film length</Text>
+    <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>{[300, 600, 900].map(value => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: seconds === String(value) && !showCustomLength }} disabled={busy} onPress={() => { setSeconds(String(value)); setShowCustomLength(false); }} style={press([styles.lengthChoice, seconds === String(value) && !showCustomLength && styles.lengthChoiceActive])}><Text style={styles.text}>{value / 60} min</Text></Pressable>)}
+      <Pressable accessibilityRole="button" onPress={() => setShowCustomLength(true)} style={press(styles.lengthChoice)}><Text style={styles.text}>Other</Text></Pressable></View>
+    {showCustomLength && <TextInput accessibilityLabel="Custom film length in seconds" placeholder="300–900 seconds, in steps of 5" placeholderTextColor={theme.textWeak} value={seconds} onChangeText={setSeconds} keyboardType="number-pad" editable={!busy} style={styles.input} />}
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlanOptions }} onPress={() => setShowPlanOptions(value => !value)} style={press(styles.lengthChoice)}><Text style={styles.text}>{showPlanOptions ? 'Hide' : 'Show'} language and writing model</Text></Pressable>
+    {(showPlanOptions || !connected[model?.providerId ?? '']) && <>
+      <Text style={styles.text}>Dialogue language</Text><TextInput accessibilityLabel="Dialogue language" value={language} onChangeText={setLanguage} editable={!busy} style={styles.input} />
+      <ModelSelect domain="writer" selectedId={modelId} connected={connected} onSelect={item => setModelId(item.id)} onConnectionChange={() => { void readProviderConnections().then(setConnected); }} />
+    </>}
     {action(flow.busy ? 'Working…' : flow.proposal ? 'Revise screenplay and scene plan' : 'Create screenplay and scene plan', () => {
       if (!model) return;
       Alert.alert('Generate production plan?', 'Text-model charges may apply. This replaces the planning draft, not existing media. No video generation starts.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Propose plan', onPress: () => {
@@ -74,5 +82,7 @@ const styles = StyleSheet.create({
   card: { gap: 10, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 12 },
   title: { color: theme.text, fontSize: 20, fontWeight: '600' }, text: { color: theme.text, fontSize: 13 },
   input: { color: theme.text, borderWidth: 1, borderColor: theme.line, borderRadius: 8, padding: 10, minHeight: MIN_TAP },
-  button: { borderWidth: 1, borderColor: theme.accent, borderRadius: 8, padding: 10, minHeight: MIN_TAP, justifyContent: 'center' }
+  button: { borderWidth: 1, borderColor: theme.accent, borderRadius: 8, padding: 10, minHeight: MIN_TAP, justifyContent: 'center' },
+  lengthChoice: { borderWidth: 1, borderColor: theme.line, borderRadius: 8, paddingHorizontal: 12, minHeight: MIN_TAP, justifyContent: 'center' },
+  lengthChoiceActive: { borderColor: theme.accent, backgroundColor: theme.surface }
 });

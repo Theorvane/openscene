@@ -7249,3 +7249,37 @@ button {
 .production-shot-workbench .studio-surface__body { min-height: 380px; }
 .production-shot-workbench .studio-composer { max-height: none; }
 @media (max-width: 700px) { .production-shot-workbench__context { padding: 16px; } }
+
+/* Creation keeps one next action visible; production evidence stays reachable on demand. */
+.production-plan-composer__help {
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.production-plan-composer__help > summary {
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-weak);
+  cursor: pointer;
+  font-size: var(--text-caption);
+}
+.production-plan-composer__help[open] > :not(summary) { margin: var(--space-3); }
+.production-board__scene-options,
+.production-board__final-panel {
+  border: 1px solid var(--board-line);
+  border-radius: var(--radius-sm);
+  background: var(--board-card);
+}
+.production-board__scene-options > summary,
+.production-board__final-panel > summary {
+  padding: var(--space-3);
+  cursor: pointer;
+  color: var(--board-text);
+  font-weight: 600;
+}
+.production-board__scene-options[open] > :not(summary),
+.production-board__final-panel[open] > :not(summary) { margin: var(--space-3); }
+.production-board__final-panel > summary span {
+  margin-left: var(--space-2);
+  color: var(--board-muted);
+  font: 600 11px var(--font-mono);
+}
