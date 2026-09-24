@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { readSlot, writeSlot } from '../lib/credentials';
+import { alibabaVideoBaseUrl } from '@openvideo/shared/videoGeneration';
 import { useRevealOnFocus } from './KeyboardAwareScroll';
 import { isSignedIn, signInWithChatGpt, signOut } from '../lib/openAiSignIn';
 import { theme } from '../lib/theme';
@@ -45,6 +46,8 @@ export function ProviderConnect({
   const reveal = useRevealOnFocus();
   const input = useRef<TextInput>(null);
   const [draft, setDraft] = useState('');
+  const [workspaceDraft, setWorkspaceDraft] = useState('');
+  const [workspaceStored, setWorkspaceStored] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -55,6 +58,13 @@ export function ProviderConnect({
   useEffect(() => {
     setOpen(!connected);
   }, [connected]);
+
+  useEffect(() => {
+    if (slot === 'dashscopeApiKey') void readSlot('alibabaWorkspaceId').then((value) => {
+      setWorkspaceStored(value !== null);
+      if (value === null) setOpen(true);
+    });
+  }, [slot, connected]);
 
   useEffect(() => {
     if (chatGptSignIn === true) void isSignedIn().then(setSignedIn);
@@ -85,7 +95,7 @@ export function ProviderConnect({
           {meta !== undefined && <Text style={styles.meta}>{meta}</Text>}
         </View>
         <Text style={[styles.badge, connected ? styles.badgeOn : styles.badgeOff]}>
-          {connected ? 'connected' : 'not connected'}
+          {slot === 'dashscopeApiKey' && connected && !workspaceStored ? 'needs Workspace ID' : connected ? 'connected' : 'not connected'}
         </Text>
       </Pressable>
 
@@ -122,6 +132,26 @@ export function ProviderConnect({
             </Pressable>
             {note !== null && <Text style={styles.note}>{note}</Text>}
           </View>
+          {slot === 'dashscopeApiKey' && (
+            <View style={styles.actions}>
+              <Text style={styles.footnote}>Singapore Workspace ID {workspaceStored ? '✓ saved' : '· required for video'}</Text>
+              <TextInput style={styles.input} value={workspaceDraft} onChangeText={setWorkspaceDraft}
+                placeholder="llm-..." placeholderTextColor={theme.textWeaker} autoCapitalize="none"
+                autoCorrect={false} accessibilityLabel="Alibaba Singapore Workspace ID" />
+              <Pressable accessibilityRole="button" style={press(styles.save)} onPress={() => {
+                try {
+                  alibabaVideoBaseUrl(workspaceDraft);
+                  void writeSlot('alibabaWorkspaceId', workspaceDraft.trim()).then(() => {
+                    setWorkspaceDraft(''); setWorkspaceStored(true); setNote('Workspace ID stored.'); onChange();
+                  });
+                } catch {
+                  setNote('Enter a valid Singapore Workspace ID, such as llm-123.');
+                }
+              }}>
+                <Text style={styles.saveText}>Save Workspace ID</Text>
+              </Pressable>
+            </View>
+          )}
           {chatGptSignIn === true && (
             <>
               <Text style={styles.or}>or</Text>

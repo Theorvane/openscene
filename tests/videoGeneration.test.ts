@@ -4,6 +4,7 @@ import {
   requestGeminiOmniVideo,
   requestGrokVideo,
   requestAlibabaVideo,
+  alibabaVideoBaseUrl,
   requestLumaVideo,
   requestRunwayVideo,
   requestSoraVideo,
@@ -409,10 +410,22 @@ describe('shared video generation', () => {
     })).rejects.toThrow(/expired/);
   });
 
+  it('rejects a missing or unsafe Alibaba workspace before any provider request', async () => {
+    expect(() => alibabaVideoBaseUrl('llm-studio123')).not.toThrow();
+    expect(() => alibabaVideoBaseUrl('bad.example.com')).toThrow(/Workspace ID/);
+    const fetchMock = vi.fn();
+    await expect(requestAlibabaVideo({
+      apiKey: 'k', modelId: 'wan2.7-t2v', prompt: 'a kite', durationSeconds: 5,
+      aspectRatio: '16:9', fetchImpl: fetchMock as unknown as typeof fetch
+    })).rejects.toThrow(/Workspace ID/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('creates a five-second Alibaba Wan shot and polls DashScope', async () => {
     let polls = 0;
     const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
       expect(url).not.toContain('ali-secret');
+      expect(url).toContain('https://llm-studio123.ap-southeast-1.maas.aliyuncs.com/api/v1/');
       expect((init.headers as Record<string, string>).Authorization).toBe('Bearer ali-secret');
       if (url.endsWith('/video-synthesis')) {
         expect((init.headers as Record<string, string>)['X-DashScope-Async']).toBe('enable');
@@ -428,7 +441,7 @@ describe('shared video generation', () => {
         : { task_status: 'SUCCEEDED', video_url: 'https://cdn.example/wan.mp4' } }), { status: 200 });
     });
     const ready = await requestAlibabaVideo({
-      apiKey: 'ali-secret', modelId: 'wan2.7-t2v', prompt: 'a kite',
+      apiKey: 'ali-secret', alibabaWorkspaceId: 'llm-studio123', modelId: 'wan2.7-t2v', prompt: 'a kite',
       durationSeconds: 5, aspectRatio: '16:9', pollIntervalMs: 0,
       fetchImpl: fetchMock as unknown as typeof fetch
     });
@@ -448,7 +461,7 @@ describe('shared video generation', () => {
       return new Response(JSON.stringify({ output: { task_status: 'SUCCEEDED', video_url: 'https://cdn.example/wan-i2v.mp4' } }), { status: 200 });
     });
     const ready = await requestAlibabaVideo({
-      apiKey: 'k', modelId: 'wan2.7-i2v', prompt: 'continue',
+      apiKey: 'k', alibabaWorkspaceId: 'llm-studio123', modelId: 'wan2.7-i2v', prompt: 'continue',
       durationSeconds: 5, aspectRatio: '16:9', referenceImage: { mimeType: 'image/png', base64: 'QUJD' },
       pollIntervalMs: 0, fetchImpl: fetchMock as unknown as typeof fetch
     });
@@ -468,7 +481,7 @@ describe('shared video generation', () => {
       return new Response(JSON.stringify({ output: { task_status: 'FAILED' }, message: 'quota exceeded' }), { status: 200 });
     });
     await expect(requestAlibabaVideo({
-      apiKey: 'k', modelId: 'happyhorse-1.1-i2v', prompt: 'continue',
+      apiKey: 'k', alibabaWorkspaceId: 'llm-studio123', modelId: 'happyhorse-1.1-i2v', prompt: 'continue',
       durationSeconds: 5, aspectRatio: '16:9', referenceImage: { mimeType: 'image/jpeg', base64: 'QUJD' },
       pollIntervalMs: 0, fetchImpl: fetchMock as unknown as typeof fetch
     })).rejects.toThrow(/quota exceeded/);

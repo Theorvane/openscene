@@ -15,7 +15,7 @@ import type {
 import { getDefaultDomainModelId, getDomainModel, type AiDomainModelConfig } from '../shared/aiDomainModels';
 import { estimateImageCost, estimateSpeechCost, estimateVideoCost, type CostEstimate } from '../shared/mediaGenerationPricing';
 import { getVideoOperationConstraints, getVideoProviderBinding, validateVideoRequest } from '../shared/mediaCapabilityRegistry';
-import { resolveVideoOperation, validateVideoInputSet } from '../shared/videoGeneration';
+import { alibabaVideoBaseUrl, resolveVideoOperation, validateVideoInputSet } from '../shared/videoGeneration';
 import { GenerationSpendStore } from './generationSpendStore';
 import { discoverFfmpeg } from './ffmpegDiscovery';
 import type { CredentialStore } from './credentialStore';
@@ -321,11 +321,13 @@ async function invokeCloudVideoProvider(
   model: AiDomainModelConfig,
   apiKey: string,
   request: VideoGenerationRequest & { readonly durationSeconds: number },
-  outputFilePath: string
+  outputFilePath: string,
+  alibabaWorkspaceId?: string
 ): Promise<CloudProviderResult> {
   let lastProgressLogMs = -10_000;
   const synthesisInput = {
     apiKey,
+    ...(alibabaWorkspaceId === undefined ? {} : { alibabaWorkspaceId }),
     modelId: model.id,
     prompt: request.prompt,
     aspectRatio: request.aspectRatio ?? ('16:9' as const),
@@ -562,6 +564,12 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
         throw new Error(`API key is required for ${VIDEO_PROVIDER_LABELS[provider]} cloud generation. Connect the provider in Settings first.`);
       }
 
+      const alibabaWorkspaceId = mode === 'api' && providerMapping.adapterId === 'alibaba_video'
+        ? await activeCredentialStore?.getCredentialValue('alibabaWorkspaceId')
+        : undefined;
+      if (mode === 'api' && providerMapping.adapterId === 'alibaba_video') {
+        alibabaVideoBaseUrl(alibabaWorkspaceId);
+      }
       if (mode === 'api') await settleSpend(reservationId, 'charged');
       logVideoJob(id, 'provider.request.started', { provider: VIDEO_PROVIDER_LABELS[provider] });
       let cloudResult: CloudProviderResult;
@@ -609,7 +617,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
           throw error;
         }
       } else {
-        cloudResult = await invokeCloudVideoProvider(id, model, apiKey!, normalizedRequest, join(videoDir, `${id}.mp4`));
+        cloudResult = await invokeCloudVideoProvider(id, model, apiKey!, normalizedRequest, join(videoDir, `${id}.mp4`), alibabaWorkspaceId);
       }
       if (!cloudResult.ok) {
         throw new Error(cloudResult.error);

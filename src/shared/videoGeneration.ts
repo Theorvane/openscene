@@ -49,6 +49,8 @@ export type VideoProgressStage = 'submitting' | 'generating' | 'ready';
 
 export type VideoRequestInput = {
   readonly apiKey: string;
+  /** Alibaba Model Studio Singapore workspace ID, stored outside project files. */
+  readonly alibabaWorkspaceId?: string;
   readonly modelId: string;
   readonly prompt: string;
   readonly aspectRatio: VideoAspectRatio;
@@ -499,13 +501,22 @@ const ALIBABA_VIDEO_API_MODEL_IDS: Readonly<Record<string, string>> = {
   'wan2.7-i2v': 'wan2.7-i2v-2026-04-25'
 };
 
+/** Construct only the Singapore workspace host; never accept a user-supplied URL. */
+export function alibabaVideoBaseUrl(workspaceId: string | undefined): string {
+  const id = workspaceId?.trim();
+  if (!id || !/^[A-Za-z0-9][A-Za-z0-9-]{0,63}$/.test(id)) {
+    throw new Error('Alibaba video needs a Singapore Workspace ID. Add it in Settings before generating.');
+  }
+  return `https://${id}.ap-southeast-1.maas.aliyuncs.com/api/v1`;
+}
+
 /** Alibaba Model Studio Singapore: submit Wan/HappyHorse, then poll DashScope. */
 export async function requestAlibabaVideo(input: VideoRequestInput): Promise<VideoDownload> {
   assertImplementedVideoRequest(input);
   const fetchImpl = input.fetchImpl ?? fetch;
   const pollIntervalMs = input.pollIntervalMs ?? 15_000;
   const pollTimeoutMs = input.pollTimeoutMs ?? VIDEO_POLL_TIMEOUT_MS;
-  const base = 'https://dashscope-intl.aliyuncs.com/api/v1';
+  const base = alibabaVideoBaseUrl(input.alibabaWorkspaceId);
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${input.apiKey}`, 'X-DashScope-Async': 'enable' };
   const startedAt = Date.now();
   input.onProgress?.('submitting', 0);

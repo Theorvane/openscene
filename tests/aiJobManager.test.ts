@@ -73,6 +73,22 @@ describe('AI Job Manager and cloud provider seams', () => {
     expect(getCompletedAiSource(elevenJob.id)).toBeNull();
   }, 10_000);
 
+  it('fails an Alibaba video before network work when its workspace is not configured', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const job = await createVideoGenerationJob({
+        prompt: 'Five-second shot', aspectRatio: '16:9', durationSeconds: 5,
+        modelId: 'wan2.7-t2v', apiKey: 'test-key'
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      expect(getVideoGenerationJob(job.id)).toMatchObject({ status: 'failed', error: expect.stringContaining('Workspace ID') });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }, 10_000);
+
   it('defaults each media domain to an available cloud model when no model id is supplied', async () => {
     const videoJob = await createVideoGenerationJob({
       prompt: 'Default model scene',
