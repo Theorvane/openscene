@@ -32,6 +32,12 @@ export type ProductionShotRow = {
 };
 
 /** Media selected for a storyboard slate. The approved take leads; its first frame remains available as a fallback. */
+/** Standalone generation must not bypass scene approval and take review for an applied film plan. */
+export function standaloneGenerationBlockReason(document: AiProjectDocument | null | undefined, writerShotId?: string): string | null {
+  if (writerShotId || productionShotRows(document).length === 0) return null;
+  return 'This project has an approved film plan. Generate its shots from the scene production board so each take stays attached to its scene and review.';
+}
+
 export function productionShotVisual(row: ProductionShotRow): { readonly takeAssetId: string | null; readonly storyboardAssetId: string | null } {
   return {
     takeAssetId: row.approvedGeneration?.status === 'completed' ? row.approvedGeneration.outputAssetIds[0] ?? null : null,

@@ -58,6 +58,7 @@ import {
   batchableProductionVideoShotIds,
   planProductionVideoReferences,
   productionShotRows,
+  standaloneGenerationBlockReason,
   productionShotRegenerationBlockReason,
   productionSourceDurationSeconds,
   PRODUCTION_BATCH_LIMIT,
@@ -536,6 +537,8 @@ export function VideoGenerationWorkspace({
     }
     const candidateOperation = overrides?.inputs?.operation ?? selectedOperation;
     const targetWriterShotId = overrides?.writerShotId ?? loadedWriterShotId;
+    const standaloneBlock = standaloneGenerationBlockReason(documentRef.current, targetWriterShotId);
+    if (standaloneBlock !== null) { setStatusMsg({ text: standaloneBlock, tone: 'warning' }); return null; }
     if (targetWriterShotId !== '' && documentRef.current !== null) {
       const sceneBlock = productionShotRegenerationBlockReason(documentRef.current, targetWriterShotId);
       if (sceneBlock !== null) {
@@ -1607,13 +1610,14 @@ export function VideoGenerationWorkspace({
               ? `${Math.ceil(drivingVideo.metadata.durationMs / 1_000)}s · ${motionAspectRatio} · ${motionMode} · workflow controlled`
               : `${effectiveDuration}s · ${effectiveAspectRatio} · ${effectiveStylePreset} · ${selectedOperation}`}
           </span>
-          <Button variant="primary" onClick={() => void handleGenerate()} disabled={isGenerating || isBatchGenerating || (prompt.trim().length === 0 && selectedOperation !== 'motion_control') || !operationAvailable
+          <Button variant="primary" onClick={() => void handleGenerate()} disabled={standaloneGenerationBlockReason(writerDocument, loadedWriterShotId) !== null || isGenerating || isBatchGenerating || (prompt.trim().length === 0 && selectedOperation !== 'motion_control') || !operationAvailable
             || ((selectedOperation === 'image_to_video' || selectedOperation === 'start_end' || selectedOperation === 'motion_control') && referenceImage === null)
             || (selectedOperation === 'start_end' && lastFrame === null)
             || (selectedOperation === 'reference_to_video' && referenceImages.length === 0)
             || (selectedOperation === 'motion_control' && (!projectId || !drivingVideoAssetId || !drivingVideo?.metadata || drivingVideo.metadata.durationMs > 30_000 || motionWorker?.modes[motionMode].ready !== true))}>
             {isBatchGenerating ? 'Batch generating…' : isGenerating ? 'Generating…' : 'Generate'}
           </Button>
+          {standaloneGenerationBlockReason(writerDocument, loadedWriterShotId) && <span>{standaloneGenerationBlockReason(writerDocument, loadedWriterShotId)}</span>}
         </div>
       </div>
     </section>

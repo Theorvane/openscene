@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyAiProjectDocument } from '../src/shared/aiProjectDomain';
 import { productionDashboard } from '../src/shared/productionDashboard';
 import { approveProductionPlan, proposeProductionPlan } from '../src/shared/productionPlan';
-import { approveProductionScene } from '../src/shared/productionWorkflow';
+import { approveProductionScene, standaloneGenerationBlockReason } from '../src/shared/productionWorkflow';
 import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
 
 const at = '2026-09-24T00:00:00.000Z';
@@ -21,6 +21,10 @@ describe('production dashboard', () => {
     const document = approveProductionPlan(createEmptyAiProjectDocument(), request, proposeProductionPlan(request, draft, 'test'), at, 'film');
     const before = productionDashboard(document, []);
     expect(before.title).toBe('The letter');
+    expect(before.screenplayApproved).toBe(true);
+    expect(standaloneGenerationBlockReason(document)).toContain('scene production board');
+    expect(standaloneGenerationBlockReason(document, document.shots[0]!.id)).toBeNull();
+    expect(standaloneGenerationBlockReason(createEmptyAiProjectDocument())).toBeNull();
     expect(before.scenes.map(scene => [scene.title, scene.startMs, scene.endMs])).toEqual([['Station', 0, 5000], ['Home', 5000, 10000]]);
     expect(before.stages.find(stage => stage.id === 'scenes')).toMatchObject({ state: 'active', detail: '0/2 scenes approved' });
     expect(before.stages.find(stage => stage.id === 'assembly')?.state).toBe('waiting');

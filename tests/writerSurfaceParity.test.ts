@@ -55,16 +55,19 @@ describe('Writer surface parity', () => {
     expect(workflow.slice(workflow.indexOf('export type WriterGenerationInput'), workflow.indexOf('export type WriterDraftCharacter'))).not.toContain('apiKey');
   });
 
-  it('offers the same explicit approved-shot handoff without automatically rendering', async () => {
-    const [desktop, mobile] = await Promise.all([
-      readRepo('src/renderer/src/VideoGenerationWorkspace.tsx'), readRepo('mobile/src/screens/PlanScreen.tsx')
+  it('keeps Writer shots in the explicit scene workflow on both surfaces', async () => {
+    const [desktop, mobile, mobileBoard] = await Promise.all([
+      readRepo('src/renderer/src/VideoGenerationWorkspace.tsx'),
+      readRepo('mobile/src/screens/PlanScreen.tsx'),
+      readRepo('mobile/src/components/ProductionRunBoard.tsx')
     ]);
     expect(desktop).toContain('approvedWriterShots(writerDocument)');
-    expect(mobile).toContain('approvedWriterShots(activeProject?.ai)');
-    expect(desktop).toContain('durationOptions.filter((seconds) => seconds >= shot.durationSeconds)');
-    expect(mobile).toContain("productionSourceDurationSeconds(model.id, 'text_to_video', shot.durationSeconds)");
-    expect(desktop).toContain('setPrompt(shot.prompt)');
-    expect(mobile).toContain('setPrompt(shot.prompt)');
+    expect(desktop).toContain('productionShotRegenerationBlockReason(documentRef.current, targetWriterShotId)');
+    expect(mobileBoard).toContain('approvedWriterShots(project?.ai)');
+    expect(mobileBoard).toContain('productionTextShot(project.ai, model.id, row.shotId)');
+    expect(mobileBoard).toContain('start({ shotId: row.shotId })');
+    expect(mobile).not.toContain('setPrompt(shot.prompt)');
+    expect(mobile).toContain('standaloneBlock === null');
     expect(mobile).toContain('<SpendPrompt');
   });
 });

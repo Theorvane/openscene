@@ -101,6 +101,6 @@ export function productionDashboard(document: AiProjectDocument, assets: readonl
     : shotRows.some((shot) => shot.state === 'needs_review' || shot.state === 'needs_import') ? 'Awaiting take review'
     : currentScene?.canApprove ? `Awaiting ${currentScene.title} approval`
     : 'In production';
-  return { title: script?.title ?? 'Short-film production', screenplay: script?.screenplay ?? '', screenplayApproved: script?.status === 'approved',
+  return { title: script?.title ?? 'Short-film production', screenplay: script?.screenplay ?? '', screenplayApproved: script?.status === 'approved' || (script !== undefined && document.writerPipeline?.appliedScriptId === script.id && WRITER_STAGES.every((stage) => document.writerPipeline?.artifacts.some((artifact) => artifact.stage === stage && artifact.approved))),
     scenes, stages, decisions, activity, status, totalDurationMs: startMs, assemblyReady };
 }

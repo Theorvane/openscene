@@ -36,6 +36,14 @@ describe('production board surface parity', () => {
     expect(desktopEditor).toContain('buildApprovedProductionAssemblyPlan(project.ai');
     expect(desktopEditor).toContain('assembleApprovedProductionCut({');
     expect(mobile).toContain('productionShotRows(activeProject?.ai)');
+    const mobileSubmission = mobile.slice(mobile.indexOf('const runGeneration ='), mobile.indexOf('const approveTake ='));
+    expect(mobileSubmission.indexOf('standaloneGenerationBlockReason(current.ai)')).toBeLessThan(mobileSubmission.indexOf('generateShot({'));
+    expect(mobileSubmission).toContain('standaloneGenerationBlockReason(latest.ai)');
+    expect(mobile).toContain('standaloneBlock === null');
+    expect(mobile).not.toContain('setPrompt(shot.prompt)');
+    const desktopWorkspace = await source('src/renderer/src/VideoGenerationWorkspace.tsx');
+    const desktopSubmission = desktopWorkspace.slice(desktopWorkspace.indexOf('const handleGenerate ='), desktopWorkspace.indexOf('const openProductionShot ='));
+    expect(desktopSubmission.indexOf('standaloneGenerationBlockReason(documentRef.current, targetWriterShotId)')).toBeLessThan(desktopSubmission.indexOf('setIsGenerating(true)'));
     const mobileRunBoard = await source('mobile/src/components/ProductionRunBoard.tsx');
     expect(mobileRunBoard).toContain('approveProductionScene');
     expect(mobileRunBoard).toContain('productionSceneRows(project?.ai)');
