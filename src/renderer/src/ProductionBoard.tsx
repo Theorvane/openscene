@@ -85,7 +85,7 @@ export function ProductionBoard({
   const [batchBusy, setBatchBusy] = useState(false);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string } | null>(null);
-  const sequential = pipelineBaseRequest(document.writerPipeline)?.productionScope === 'scene';
+  const sequential = pipelineBaseRequest(document.writerPipeline)?.productionScope !== undefined;
   const rows = productionShotRows(document);
   const scenes = productionSceneRows(document);
   const selectedScene = scenes.find((scene) => scene.sceneId === selectedSceneId) ?? scenes.find((scene) => !scene.complete) ?? scenes[0];

@@ -9,14 +9,14 @@ const MAX_SCENE_SECONDS = 180;
 
 function activeSequentialRequest(document: AiProjectDocument): WriterRequest {
   const request = pipelineBaseRequest(document.writerPipeline);
-  if (request?.productionScope !== 'scene' || !document.writerPipeline?.appliedScriptId) {
+  if (request?.productionScope === undefined || !document.writerPipeline?.appliedScriptId) {
     throw new Error('Start a scene-by-scene film before adding another scene.');
   }
   return request;
 }
 
 export function canPlanNextSequentialScene(document: AiProjectDocument): boolean {
-  if (pipelineBaseRequest(document.writerPipeline)?.productionScope !== 'scene') return false;
+  if (pipelineBaseRequest(document.writerPipeline)?.productionScope === undefined) return false;
   const scenes = productionSceneRows(document);
   return scenes.length > 0 && scenes.every(scene => scene.complete);
 }
@@ -41,7 +41,7 @@ export function buildNextSequentialSceneRequest(document: AiProjectDocument, bri
     'VISUAL STYLE: ' + JSON.stringify(draft.styleBible),
     'NEXT SCENE BRIEF: ' + brief.trim()
   ].join('\n');
-  return { ...base, sourceText: context, targetDurationSeconds: seconds };
+  return { ...base, productionScope: 'scene', sourceText: context, targetDurationSeconds: seconds };
 }
 
 function checkedDraft(request: WriterRequest, value: unknown): WriterDraft {
@@ -122,7 +122,7 @@ export function approveNextSequentialScene(document: AiProjectDocument, createdA
     scenes: [...previous.scenes, nextScene]
   };
   const totalSeconds = writerDraftDurationSeconds(merged);
-  const aggregateRequest = parseWriterRequest({ ...base, targetDurationSeconds: totalSeconds });
+  const aggregateRequest = parseWriterRequest({ ...base, productionScope: 'sequence', targetDurationSeconds: totalSeconds });
   if (!aggregateRequest) throw new Error('The combined film plan is invalid.');
   const { productionScope: _scope, ...filmRequest } = aggregateRequest;
   const result = validateWriterResponse(merged, filmRequest);

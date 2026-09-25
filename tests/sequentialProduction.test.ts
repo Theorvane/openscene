@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyAiProjectDocument, parseAiProjectDocument } from '../src/shared/aiProjectDomain';
 import { approveProductionPlan, proposeProductionPlan } from '../src/shared/productionPlan';
 import { approveProductionScene, assembleApprovedProductionCut, productionSceneRows, productionShotRows } from '../src/shared/productionWorkflow';
-import { approvedWriterShots } from '../src/shared/writerPipeline';
+import { approvedWriterShots, pipelineBaseRequest } from '../src/shared/writerPipeline';
 import { approveNextSequentialScene, buildNextSequentialSceneRequest, canPlanNextSequentialScene, discardNextSequentialScene, proposeNextSequentialScene } from '../src/shared/sequentialProduction';
 import { createInitialTimeline } from '../src/shared/timelineLogic';
-import type { WriterDraft, WriterRequest } from '../src/shared/writerWorkflow';
+import { applyWriterDraft, parseWriterRequest, validateWriterResponse, type WriterDraft, type WriterRequest } from '../src/shared/writerWorkflow';
 
 const at = '2026-09-25T00:00:00.000Z';
 const request: WriterRequest = {
@@ -43,6 +43,24 @@ function finishedFirstScene() {
 }
 
 describe('sequential scene production', () => {
+  it('caps one-scene writer requests at 180 seconds while allowing a longer saved sequence', () => {
+    expect(parseWriterRequest({ ...request, targetDurationSeconds: 180 })).not.toBeNull();
+    expect(parseWriterRequest({ ...request, targetDurationSeconds: 185 })).toBeNull();
+    expect(parseWriterRequest({ ...request, targetDurationSeconds: 900 })).toBeNull();
+    expect(parseWriterRequest({ ...request, productionScope: 'sequence', targetDurationSeconds: 185 })).not.toBeNull();
+    expect(parseWriterRequest({ ...request, productionScope: 'sequence', targetDurationSeconds: 905 })).toBeNull();
+    const oversized = {
+      ...first,
+      scenes: [
+        { ...first.scenes[0]!, shots: Array.from({ length: 37 }, () => first.scenes[0]!.shots[0]!) },
+        { ...second.scenes[0]! }
+      ]
+    };
+    const aggregate = { ...request, productionScope: 'sequence' as const, targetDurationSeconds: 190 };
+    expect(validateWriterResponse(oversized, aggregate)).toMatchObject({ ok: false, issue: { message: expect.stringContaining('at most 180') } });
+    expect(applyWriterDraft({ document: createEmptyAiProjectDocument(), request: aggregate, draft: oversized, createdAt: at, idPrefix: 'oversized' })).toMatchObject({ ok: false, message: expect.stringContaining('at most 180') });
+  });
+
   it('plans one five-second-shot scene and requires the current scene to finish before continuing', () => {
     expect(proposeProductionPlan(request, first, 'writer').artifacts).toHaveLength(4);
     expect(() => proposeProductionPlan(request, { ...first, scenes: [...first.scenes, ...first.scenes] }, 'writer')).toThrow('exactly one scene');
@@ -70,6 +88,7 @@ describe('sequential scene production', () => {
     expect(result.shots[0]).toEqual(original.shots[0]);
     expect(result.styleBible).toEqual(first.styleBible);
     expect(result.writerPipeline?.appliedScriptId).toBe(original.writerPipeline?.appliedScriptId);
+    expect(pipelineBaseRequest(result.writerPipeline)?.productionScope).toBe('sequence');
     expect(parseAiProjectDocument(result)).not.toBeNull();
   });
 

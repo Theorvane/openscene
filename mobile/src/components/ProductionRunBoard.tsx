@@ -59,7 +59,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const scenes = productionSceneRows(project?.ai);
   const shotRows = productionShotRows(project?.ai);
   const selectedScene = scenes.find((scene) => scene.sceneId === selectedSceneId) ?? scenes.find((scene) => !scene.complete) ?? scenes[0];
-  const sequential = pipelineBaseRequest(project?.ai.writerPipeline)?.productionScope === 'scene';
+  const sequential = pipelineBaseRequest(project?.ai.writerPipeline)?.productionScope !== undefined;
   const visibleShotIds = new Set(project?.ai.shots.filter((shot) => shot.sceneId === selectedScene?.sceneId).map((shot) => shot.id) ?? []);
   if (!project) return null;
   const dashboard = productionDashboard(project.ai, project.assets.map(asset => ({ id: asset.id, kind: asset.kind, durationMs: asset.durationMs ?? null })), project.name);

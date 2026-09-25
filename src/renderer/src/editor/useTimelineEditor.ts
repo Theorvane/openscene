@@ -391,7 +391,7 @@ export function useTimelineEditor() {
       timeline: project.timeline,
       plan,
       targetTrackId: target.id,
-      allowExistingPrefix: pipelineBaseRequest(project.ai.writerPipeline)?.productionScope === 'scene',
+      allowExistingPrefix: pipelineBaseRequest(project.ai.writerPipeline)?.productionScope !== undefined,
       clipIdForShot: () => createOpaqueId('production-clip')
     });
     if (!assembled.ok) {

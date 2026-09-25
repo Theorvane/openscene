@@ -59,7 +59,7 @@ export type WriterModelId = GeminiWriterModelId | AgentRouterModelId;
 
 export type WriterRequest = {
   /** Plan exactly one short scene in an unfinished film. */
-  readonly productionScope?: 'scene';
+  readonly productionScope?: 'scene' | 'sequence';
   readonly stage?: WriterStage;
   readonly approvedContext?: readonly { readonly stage: WriterStage; readonly content: string }[];
   readonly revisionInstructions?: string;
@@ -231,7 +231,7 @@ export function parseWriterRequest(value: unknown): WriterRequest | null {
   const tone = exactText(value.tone, MAX_SHORT_TEXT_LENGTH);
   const targetDurationSeconds = value.targetDurationSeconds;
   const shotDurationSeconds = value.shotDurationSeconds === undefined ? undefined : value.shotDurationSeconds === 5 ? 5 as const : null;
-  const productionScope = value.productionScope === undefined ? undefined : value.productionScope === 'scene' ? 'scene' as const : null;
+  const productionScope = value.productionScope === undefined ? undefined : value.productionScope === 'scene' || value.productionScope === 'sequence' ? value.productionScope as 'scene' | 'sequence' : null;
   const parentScriptId = value.parentScriptId === undefined ? undefined : exactText(value.parentScriptId, MAX_SHORT_TEXT_LENGTH);
   const currentScreenplay = value.currentScreenplay === undefined ? undefined : exactText(value.currentScreenplay, MAX_SOURCE_LENGTH);
   const videoStyle = value.videoStyle === undefined
@@ -251,8 +251,8 @@ export function parseWriterRequest(value: unknown): WriterRequest | null {
     mode === null || sourceText === null || language === null || audience === null || tone === null ||
     typeof targetDurationSeconds !== 'number' || !Number.isSafeInteger(targetDurationSeconds) ||
     targetDurationSeconds < 4 || targetDurationSeconds > 7_200 || shotDurationSeconds === null || productionScope === null ||
-    (productionScope === 'scene' && shotDurationSeconds !== 5) ||
-    (shotDurationSeconds !== undefined && (targetDurationSeconds < (productionScope === 'scene' ? 5 : 300) || targetDurationSeconds > 900 || targetDurationSeconds % shotDurationSeconds !== 0)) || parentScriptId === null ||
+    (productionScope !== undefined && shotDurationSeconds !== 5) ||
+    (shotDurationSeconds !== undefined && (targetDurationSeconds < (productionScope === undefined ? 300 : 5) || targetDurationSeconds > (productionScope === 'scene' ? 180 : 900) || targetDurationSeconds % shotDurationSeconds !== 0)) || parentScriptId === null ||
     currentScreenplay === null || videoStyle === null || customVideoStyle === null || emotionalGoal === null
   ) return null;
   if (mode === 'rewrite' && (parentScriptId === undefined || currentScreenplay === undefined)) return null;
@@ -736,6 +736,10 @@ export function validateWriterResponse(value: unknown, request: WriterRequest): 
     const result = validateWriterDraft(value);
     if (!result.ok) return result;
     if (request.productionScope === 'scene' && request.stage === undefined && result.value.scenes.length !== 1) return draftFailure('scenes', 'invalid_shape', 'Scene mode must return exactly one scene.');
+    if (request.productionScope === 'sequence' && result.value.scenes.length < 2) return draftFailure('scenes', 'invalid_shape', 'An accumulated sequence must contain at least two scenes.');
+    if (request.productionScope !== undefined && result.value.scenes.some(scene => scene.shots.reduce((sum, shot) => sum + shot.durationSeconds, 0) > 180)) {
+      return draftFailure('scenes', 'invalid_number', 'Each scene in a sequential film must be at most 180 seconds.');
+    }
     if (request.shotDurationSeconds !== undefined) {
       for (const [sceneIndex, scene] of result.value.scenes.entries()) {
         for (const [shotIndex, shot] of scene.shots.entries()) {
@@ -785,6 +789,13 @@ export function applyWriterDraft(input: {
     return { ok: false, message: 'Only the reviewed video-prompt stage can create production scenes and shots.' };
   }
   const draft = parseWriterDraft(input.draft);
+  if (request?.productionScope !== undefined && draft !== null && (
+    (request.productionScope === 'scene' && draft.scenes.length !== 1) ||
+    (request.productionScope === 'sequence' && draft.scenes.length < 2) ||
+    draft.scenes.some(scene => scene.shots.reduce((sum, shot) => sum + shot.durationSeconds, 0) > 180)
+  )) {
+    return { ok: false, message: 'A sequential film needs scenes of at most 180 seconds; a scene request contains exactly one.' };
+  }
   if (request?.shotDurationSeconds !== undefined && draft?.scenes.some((scene) => scene.shots.some((shot) => shot.durationSeconds !== request.shotDurationSeconds))) {
     return { ok: false, message: `Every finished shot must be exactly ${request.shotDurationSeconds} seconds.` };
   }

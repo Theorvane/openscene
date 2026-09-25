@@ -15,10 +15,10 @@ export function ProductionPlanComposer({ document, onSave, disabled }: {
   document: AiProjectDocument; onSave: (document: AiProjectDocument) => Promise<boolean>; disabled: boolean;
 }) {
   const base = pipelineBaseRequest(document.writerPipeline);
-  const [mode, setMode] = useState<'film' | 'scene'>(base?.productionScope === 'scene' ? 'scene' : 'film');
+  const [mode, setMode] = useState<'film' | 'scene'>(base?.productionScope !== undefined ? 'scene' : 'film');
   const [brief, setBrief] = useState(base?.sourceText ?? '');
   const [seconds, setSeconds] = useState(String(base?.targetDurationSeconds ?? 600));
-  const [customLength, setCustomLength] = useState(!(base?.productionScope === 'scene' ? [15, 30, 60] : [300, 600, 900]).includes(base?.targetDurationSeconds ?? 600));
+  const [customLength, setCustomLength] = useState(!(base?.productionScope !== undefined ? [15, 30, 60] : [300, 600, 900]).includes(base?.targetDurationSeconds ?? 600));
   const [language, setLanguage] = useState(base?.language ?? 'Korean');
   const { selectedModel } = useAiDomainModel();
   const { credentialStatus } = useLlmModel();

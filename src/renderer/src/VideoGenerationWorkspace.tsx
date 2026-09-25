@@ -1170,7 +1170,7 @@ export function VideoGenerationWorkspace({
               requestAnimationFrame(() => (document.getElementById('production-plan-review') ?? document.getElementById('production-brief'))?.focus());
             }}
           />}
-      {writerDocument && onSaveAi && productionShotRows(writerDocument).length > 0 && pipelineBaseRequest(writerDocument.writerPipeline)?.productionScope !== 'scene' &&
+      {writerDocument && onSaveAi && productionShotRows(writerDocument).length > 0 && pipelineBaseRequest(writerDocument.writerPipeline)?.productionScope === undefined &&
         <details className="production-director__secondary"><summary>Screenplay and plan controls</summary><ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} /></details>}
       {writerDocument && onSelectProductionTool && <details className="production-director__secondary"><summary>Production tools and references</summary><ProductionCompanions document={writerDocument} assets={projectAssets} disabled={isGenerating || isBatchGenerating || isSavingCandidate} onSelect={onSelectProductionTool} /></details>}
     </div>

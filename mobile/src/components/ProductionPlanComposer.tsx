@@ -20,10 +20,10 @@ export function ProductionPlanComposer({ document, onSave, disabled, connections
   document: AiProjectDocument; onSave: (document: AiProjectDocument) => Promise<boolean>; disabled: boolean; connectionsVersion: number;
 }) {
   const base = pipelineBaseRequest(document.writerPipeline);
-  const [mode, setMode] = useState<'film' | 'scene'>(base?.productionScope === 'scene' ? 'scene' : 'film');
+  const [mode, setMode] = useState<'film' | 'scene'>(base?.productionScope !== undefined ? 'scene' : 'film');
   const [brief, setBrief] = useState(base?.sourceText ?? '');
   const [seconds, setSeconds] = useState(String(base?.targetDurationSeconds ?? 600));
-  const [showCustomLength, setShowCustomLength] = useState(!(base?.productionScope === 'scene' ? [15, 30, 60] : [300, 600, 900]).includes(base?.targetDurationSeconds ?? 600));
+  const [showCustomLength, setShowCustomLength] = useState(!(base?.productionScope !== undefined ? [15, 30, 60] : [300, 600, 900]).includes(base?.targetDurationSeconds ?? 600));
   const [showPlanOptions, setShowPlanOptions] = useState(false);
   const [language, setLanguage] = useState(base?.language ?? 'Korean');
   const [modelId, setModelId] = useState(getDomainModels('writer')[0]?.id ?? '');

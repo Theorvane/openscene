@@ -461,7 +461,7 @@ export function assembleApprovedWriterShots(project: MobileProject):
     timeline: project.timeline,
     plan,
     targetTrackId: track.id,
-    allowExistingPrefix: pipelineBaseRequest(project.ai.writerPipeline)?.productionScope === 'scene',
+    allowExistingPrefix: pipelineBaseRequest(project.ai.writerPipeline)?.productionScope !== undefined,
     clipIdForShot: () => `production-${assemblyId}-${++clipOrder}`
   });
   if (!assembled.ok) return assembled;
