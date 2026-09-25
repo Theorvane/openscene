@@ -2,6 +2,9 @@
 
 ## Guided production
 
+The current AI Creation entrance offers **Plan the whole film** and **Build scene by scene**. Both begin with a production brief and lead to explicit five-second shot planning. The first route reviews a complete screenplay and scene plan up front; the second decides the next scene after the current one. **Make a single clip instead** opens the shot workbench directly. See [workspace modes](workspace-modes.md) and the [current start screen](assets/screenshot-video.png).
+
+
 The default desktop video entry starts with one production brief, target duration and dialogue language. One writing-model request proposes a complete screenplay, scene breakdown and shot-prompt package. The package is saved unapproved in the existing Writer contract. Users inspect the displayed documents, then explicitly approve the entire package to prepare production shots. A changed brief, incomplete package or duration mismatch blocks approval. Planning confirmation warns about writing-model charges; plan approval never authorizes media spend.
 
 The production board then prices a sequential video batch. Completed videos are imported automatically with their exact prompts and remain unapproved. Import failure or a changed plan stops further submissions. Continuity review and assembly remain explicit; desktop arrangement saving and final export are separate actions. Individual settings, Writer stages, frame tools and voice tools remain available as advanced controls.
@@ -25,3 +28,5 @@ Timed Writer shots and narration cues use their start/duration rather than unifo
 ## Voice placement
 
 Saved audio can be explicitly appended to the first audio track using existing timeline placement rules. Desktop placement participates in editor undo/unsaved state; **Save arrangement** saves the current timeline, including other pending edits. Mobile appends and saves immediately using its existing project store. Both navigators read placed audio from the real timeline, preserving repeated clips, source trim, and speed-adjusted duration; unplaced audio stays separate. Selecting a placed voice previews its source from the trim start on desktop, not a processed/mixed render. Mobile inline audio remains unavailable. Plan scrubbing still inspects video/captions only. Arbitrary voice positioning, multitrack playback, and copying this arrangement during the generation-to-editing handoff are not implemented in this slice.
+
+Voice & captions defaults to local Qwen3-TTS on desktop when no model has been saved; its [wrapper setup](local-qwen-tts.md) is separate from the optional VieNeu runtime. Choosing a voice model never generates audio. A narration plan must be approved before the Generate action, and a finished take is reviewed before import or placement.

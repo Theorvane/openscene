@@ -84,6 +84,7 @@ const IMAGE_RATES: Readonly<Record<string, GenerationRate>> = {
  * local runtime is explicitly zero provider cost.
  */
 const SPEECH_RATES: Readonly<Record<string, GenerationRate>> = {
+  'local-qwen-tts': { kind: 'free', reason: 'Runs through a user-configured local Qwen wrapper.' },
   'vieneu-v3-turbo': { kind: 'free', reason: 'Runs on the OpenScene-managed local VieNeu-TTS runtime.' }
 };
 

@@ -65,10 +65,10 @@ describe('OpenScene branding source contract', () => {
     expect(timelineCanvasSource).toContain("'application/x-window-loom-timeline'");
     expect(preloadSource).toContain("exposeInMainWorld('videoTool', videoTool)");
     expect(captureRecorderSource).toContain('window.videoTool');
-    // VieNeu is the explicit local voice seam; legacy placeholder ids stay absent.
+    // Qwen and VieNeu are explicit local voice seams; legacy video placeholder stays absent.
     expect(providerSeamsSource).toContain("'elevenlabs'");
     expect(providerSeamsSource).toContain("'vieneu_local'");
-    expect(providerSeamsSource).not.toContain("'local_qwen'");
+    expect(providerSeamsSource).toContain("'local_qwen'");
     expect(providerSeamsSource).not.toContain("'local_video'");
   });
 });

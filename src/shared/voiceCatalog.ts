@@ -14,7 +14,7 @@ const ELEVENLABS: readonly VoiceChoice[] = [
   { id: 'pNInz6obpgDQGcFmaJgB', label: 'Adam', description: 'Clear executive' }
 ];
 export function voiceChoices(providerId: string): readonly VoiceChoice[] {
-  return providerId === 'openai' ? OPENAI : providerId === 'elevenlabs' ? ELEVENLABS : [];
+  return providerId === 'local_qwen' ? [{ id: 'configured-sample', label: 'Configured voice sample', description: 'Authorized sample path in the local Qwen config' }] : providerId === 'openai' ? OPENAI : providerId === 'elevenlabs' ? ELEVENLABS : [];
 }
 
 /** VieNeu voices are intentionally not frozen here; the local runtime owns its current preset catalog. */

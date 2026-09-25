@@ -23,7 +23,7 @@ import { BrowserSessionSettings } from './BrowserSessionSettings';
 const SETTINGS_SECTIONS = [
   { id: 'appearance', title: 'Appearance', description: 'Theme mode and command desk presets.' },
   { id: 'local-tools', title: 'Local Tools', description: 'Local runtime readiness for desktop capture, narration, and final export.' },
-  { id: 'voice', title: 'Voice', description: 'Cloud voice generation boundaries and where its models are managed.' },
+  { id: 'voice', title: 'Voice', description: 'Local and cloud voice models and their setup.' },
   { id: 'video', title: 'Video', description: 'Video model preference and local result import boundaries.' },
   { id: 'providers', title: 'Providers', description: 'Connected providers, and popular providers to connect.' },
   { id: 'models', title: 'Models', description: 'Search the model catalog and choose which models appear in pickers.' },
@@ -230,14 +230,14 @@ export function SettingsWorkspace({ onReplayFirstRunOnboarding }: SettingsWorksp
         return (
           <>
             <StatusCard tone={ffmpegView.tone}>{ffmpegView.text}</StatusCard>
-            <MetadataList items={[{ term: 'Screen permission', description: 'Checked by the recorder when capture starts.' }, { term: 'Ollama', description: 'User-managed local engine for the Edit Agent; OpenScene downloads no model.' }, { term: 'VieNeu-TTS', description: 'User-managed local Vietnamese speech server at http://127.0.0.1:8001 by default; OpenScene downloads no model.' }]} />
+            <MetadataList items={[{ term: 'Screen permission', description: 'Checked by the recorder when capture starts.' }, { term: 'Ollama', description: 'User-managed local engine for the Edit Agent; OpenScene downloads no model.' }, { term: 'Qwen TTS', description: 'Default local voice option. Configure a local wrapper and authorized voice sample through VIDEO_TOOL_TTS_CONFIG_PATH; OpenScene downloads no model.' }, { term: 'VieNeu-TTS', description: 'Optional local Vietnamese voice server, started only after you select VieNeu.' }]} />
           </>
         );
       case 'voice':
         return (
           <>
-            <StatusCard tone="neutral">Voice generation models are managed inside the Voice Generation workspace. Connect a cloud provider there, or run <code>npm run setup:local-ai</code> once; OpenScene then starts VieNeu-TTS v3 Turbo automatically.</StatusCard>
-            <StatusCard tone="neutral">Scripts leave the app only when you generate with a cloud model. VieNeu requests stay on loopback; all generated audio is written to local app storage.</StatusCard>
+            <StatusCard tone="neutral">Voice generation models are managed inside the Voice Generation workspace. Qwen TTS is the default local option and needs <code>VIDEO_TOOL_TTS_CONFIG_PATH</code> (see <code>docs/local-qwen-tts.md</code>). Choose VieNeu-TTS explicitly if you prefer it; its runtime starts when selected.</StatusCard>
+            <StatusCard tone="neutral">Scripts leave the app only when you generate with a cloud model. Qwen runs your configured local wrapper; VieNeu requests stay on loopback. Generated audio is written to local app storage.</StatusCard>
           </>
         );
       case 'video':
