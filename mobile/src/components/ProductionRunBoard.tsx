@@ -1,3 +1,4 @@
+import { pipelineBaseRequest } from '@openvideo/shared/writerPipeline';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -58,6 +59,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
   const scenes = productionSceneRows(project?.ai);
   const shotRows = productionShotRows(project?.ai);
   const selectedScene = scenes.find((scene) => scene.sceneId === selectedSceneId) ?? scenes.find((scene) => !scene.complete) ?? scenes[0];
+  const sequential = pipelineBaseRequest(project?.ai.writerPipeline)?.productionScope !== undefined;
   const visibleShotIds = new Set(project?.ai.shots.filter((shot) => shot.sceneId === selectedScene?.sceneId).map((shot) => shot.id) ?? []);
   if (!project) return null;
   const dashboard = productionDashboard(project.ai, project.assets.map(asset => ({ id: asset.id, kind: asset.kind, durationMs: asset.durationMs ?? null })), project.name);
@@ -170,7 +172,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
       <Text style={{ color: theme.text }}>{selectedScene.objective}</Text>
       <Text style={{ color: theme.textWeak }}>{selectedScene.setting} · {selectedScene.timeOfDay} · {Math.round(selectedScene.durationMs / 1000)}s · {selectedScene.shotCount} shots</Text>
       {!!selectedScene.continuityNotes && <Text style={{ color: theme.textWeak }}>Continuity: {selectedScene.continuityNotes}</Text>}
-      {(() => { const summary = productionSceneSummary(selectedScene, shotRows); const guide = productionSceneGuide(selectedScene, shotRows, scenes.some(scene => scene.order > selectedScene.order)); return <>
+      {(() => { const summary = productionSceneSummary(selectedScene, shotRows); const guide = productionSceneGuide(selectedScene, shotRows, scenes.some(scene => scene.order > selectedScene.order), sequential); return <>
         <View style={{ padding: 12, borderLeftWidth: 3, borderColor: theme.warn, backgroundColor: theme.surface, gap: 5 }}><Text style={{ color: theme.warn, fontSize: 11, fontWeight: '700' }}>{guide.step}</Text><Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>{guide.title}</Text><Text style={{ color: theme.textWeak, lineHeight: 19 }}>{guide.detail}</Text></View>
         <Text style={{ color: theme.textWeak }}>{summary.pendingCount} pending · {summary.reviewCount} to review · {selectedScene.approvedShotCount} approved</Text>
         {summary.stage === 'approval' && action('Approve scene', () => {
@@ -182,7 +184,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
         {summary.stage === 'generate' && action(`Generate ${summary.pendingCount} shot(s) · review cost`, () => start({ sceneId: selectedScene.sceneId }))}
         {summary.stage === 'review' && <Text style={{ color: theme.textWeak }}>Review the next take below, then approve it.</Text>}
         {summary.stage === 'complete' && scenes.some(scene => scene.order > selectedScene.order) && action('Continue to next scene', () => setSelectedSceneId(scenes[scenes.findIndex(scene => scene.sceneId === selectedScene.sceneId) + 1]!.sceneId))}
-        {summary.stage === 'complete' && !scenes.some(scene => scene.order > selectedScene.order) && action('Assemble final cut', () => {
+        {summary.stage === 'complete' && !scenes.some(scene => scene.order > selectedScene.order) && action(sequential ? 'Assemble current cut' : 'Assemble final cut', () => {
           try {
             const latest = readProject(projectId);
             if (!latest) throw new Error('Project is no longer available.');
@@ -226,7 +228,7 @@ export function ProductionRunBoard({ projectId, model, aspectRatio, disabled, co
     })}
     <Pressable accessibilityRole="button" accessibilityState={{ expanded: showFinalCut }} onPress={() => setShowFinalCut(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text, fontWeight: '700' }}>{showFinalCut ? 'Hide' : 'Show'} final-cut details</Text></Pressable>
     {showFinalCut && <>
-    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 18 }}>Final cut</Text>
+    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 18 }}>{sequential ? 'Current cut' : 'Final cut'}</Text>
     <Text style={{ color: theme.textWeak }}>{dashboard.assemblyReady ? 'Approved takes are ready to assemble.' : 'Awaiting approved takes for every planned shot.'}</Text>
     {action('Assemble approved cut', () => {
       try {

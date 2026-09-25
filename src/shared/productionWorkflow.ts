@@ -494,7 +494,8 @@ export type ProductionSceneGuide = {
 export function productionSceneGuide(
   scene: ProductionSceneRow,
   shots: readonly ProductionShotRow[],
-  hasNextScene: boolean
+  hasNextScene: boolean,
+  canAddScene = false
 ): ProductionSceneGuide {
   const summary = productionSceneSummary(scene, shots);
   const progress = `${scene.approvedShotCount}/${scene.shotCount} five-second shots approved`;
@@ -512,7 +513,9 @@ export function productionSceneGuide(
     case 'complete':
       return hasNextScene
         ? { step: '4 / 4 · NEXT SCENE', title: `Scene ${scene.order + 1} is ready`, detail: `All ${scene.shotCount} shots have approved takes. Continue to scene ${scene.order + 2}; the final assembly will place scenes in story order.` }
-        : { step: '4 / 4 · CONNECT', title: 'Connect the finished scenes', detail: 'Every scene has approved takes. Assemble them on the timeline in story order, then review and export the cut.' };
+        : canAddScene
+          ? { step: '4 / 4 · CHOOSE', title: 'Continue the story or review the current cut', detail: 'Every shot in this scene has an approved take. Plan the next scene above, or assemble the approved scenes into a working cut.' }
+          : { step: '4 / 4 · CONNECT', title: 'Connect the finished scenes', detail: 'Every scene has approved takes. Assemble them on the timeline in story order, then review and export the cut.' };
   }
 }
 
@@ -695,16 +698,39 @@ export function assembleApprovedProductionCut(input: {
   readonly plan: Extract<ProductionAssemblyPlan, { readonly ok: true }>;
   readonly targetTrackId: string;
   readonly clipIdForShot: (shotId: string) => string;
+  /** Append only after an exact unedited prefix of a sequential film. */
+  readonly allowExistingPrefix?: boolean;
 }): { readonly ok: true; readonly timeline: TimelineDocument } | { readonly ok: false; readonly reason: string } {
   const track = input.timeline.tracks.find((entry) => entry.id === input.targetTrackId);
   if (track === undefined || track.kind !== 'video') return { ok: false, reason: 'Choose an existing video track for the production cut.' };
   const approvedAssets = new Set(input.plan.shots.map((entry) => entry.assetId));
-  if (input.timeline.tracks.some((entry) => entry.clips.some((clip) => approvedAssets.has(clip.assetId)))) {
+  const elsewhere = input.timeline.tracks.some((entry) => entry.id !== track.id && entry.clips.some((clip) => approvedAssets.has(clip.assetId)));
+  if (elsewhere) return { ok: false, reason: 'An approved shot is already on another track. Arrange production clips manually before assembling again.' };
+  const existing = track.clips.filter(clip => approvedAssets.has(clip.assetId)).slice()
+    .sort((left, right) => left.timelineStartMs - right.timelineStartMs);
+  if (existing.length > 0 && !input.allowExistingPrefix) {
     return { ok: false, reason: 'At least one approved shot is already on the timeline. Remove or arrange existing production clips manually before assembling again.' };
+  }
+  if (existing.length === input.plan.shots.length) return { ok: false, reason: 'All approved shots are already assembled.' };
+  for (const [index, clip] of existing.entries()) {
+    const shot = input.plan.shots[index];
+    const previous = existing[index - 1];
+    const defaultEffects = clip.effects !== undefined &&
+      Object.keys(clip.effects).length === Object.keys(DEFAULT_CLIP_EFFECTS).length &&
+      Object.entries(DEFAULT_CLIP_EFFECTS).every(([key, value]) => clip.effects?.[key as keyof typeof DEFAULT_CLIP_EFFECTS] === value);
+    if (!shot || clip.assetId !== shot.assetId || clip.sourceStartMs !== 0 || clip.sourceEndMs !== shot.durationMs ||
+      !defaultEffects || clip.keyframes.length !== 0 ||
+      (previous && clip.timelineStartMs !== previous.timelineStartMs + input.plan.shots[index - 1]!.durationMs)) {
+      return { ok: false, reason: 'The existing production clips are not an unedited scene-order prefix. Arrange them manually before assembling again.' };
+    }
+  }
+  const last = existing[existing.length - 1];
+  if (last && track.clips.some(clip => !approvedAssets.has(clip.assetId) && clip.timelineStartMs >= last.timelineStartMs + input.plan.shots[existing.length - 1]!.durationMs)) {
+    return { ok: false, reason: 'Other footage follows the assembled scene. Arrange it before appending another scene.' };
   }
   let timeline = input.timeline;
   let cursor = trackAppendStartMs(track);
-  for (const shot of input.plan.shots) {
+  for (const shot of input.plan.shots.slice(existing.length)) {
     const next = placeClip(timeline, {
       trackId: track.id,
       clip: {

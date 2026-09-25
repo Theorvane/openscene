@@ -154,7 +154,16 @@ export type ProvenanceRecord = {
   readonly rightsNote?: string;
 };
 
+export type PendingSequentialScene = {
+  readonly baseScriptId: string;
+  readonly baseShotCount: number;
+  readonly requestJson: string;
+  readonly draftJson: string;
+  readonly modelId: string;
+};
+
 export type AiProjectDocument = {
+  readonly pendingSequentialScene?: PendingSequentialScene;
   readonly videoHistory?: readonly VideoRecipe[];
   readonly writerPipeline?: WriterPipelineState;
   readonly narrationPlan?: NarrationPlan;
@@ -174,6 +183,16 @@ export type SaveAiProjectDocumentInput = {
   readonly projectId: string;
   readonly ai: AiProjectDocument;
 };
+
+function parsePendingSequentialScene(value: unknown): PendingSequentialScene | null {
+  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['baseScriptId', 'baseShotCount', 'requestJson', 'draftJson', 'modelId']) ||
+    typeof value.baseScriptId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(value.baseScriptId) ||
+    typeof value.baseShotCount !== 'number' || !Number.isSafeInteger(value.baseShotCount) || value.baseShotCount < 1 || value.baseShotCount > 10_000 ||
+    typeof value.requestJson !== 'string' || !value.requestJson || value.requestJson.length > 500_000 ||
+    typeof value.draftJson !== 'string' || !value.draftJson || value.draftJson.length > 2_000_000 ||
+    typeof value.modelId !== 'string' || !value.modelId || value.modelId.length > 200) return null;
+  return { baseScriptId: value.baseScriptId, baseShotCount: value.baseShotCount, requestJson: value.requestJson, draftJson: value.draftJson, modelId: value.modelId };
+}
 
 const LIMITS = {
   scripts: 100,
@@ -545,7 +564,9 @@ function relationsAreValid(document: AiProjectDocument, availableAssetIds?: Read
 }
 
 export function parseAiProjectDocument(value: unknown, availableAssetIds?: ReadonlySet<string>): AiProjectDocument | null {
-  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['schemaVersion', 'scripts', 'scenes', 'shots', 'characters', 'styleBible', 'referenceAssets', 'generations', 'provenance', 'writerPipeline', 'narrationPlan', 'transcriptionDraft', 'videoHistory']) || value.schemaVersion !== AI_PROJECT_SCHEMA_VERSION) return null;
+  if (!isPlainRecord(value) || !hasAllowedKeys(value, ['schemaVersion', 'scripts', 'scenes', 'shots', 'characters', 'styleBible', 'referenceAssets', 'generations', 'provenance', 'writerPipeline', 'narrationPlan', 'transcriptionDraft', 'videoHistory', 'pendingSequentialScene']) || value.schemaVersion !== AI_PROJECT_SCHEMA_VERSION) return null;
+  const pendingSequentialScene = value.pendingSequentialScene === undefined ? undefined : parsePendingSequentialScene(value.pendingSequentialScene);
+  if (pendingSequentialScene === null) return null;
   const videoHistory = value.videoHistory === undefined ? undefined : parseVideoRecipeHistory(value.videoHistory);
   if (videoHistory === null) return null;
   const writerPipeline = value.writerPipeline === undefined ? undefined : parseWriterPipelineState(value.writerPipeline);
@@ -564,6 +585,7 @@ export function parseAiProjectDocument(value: unknown, availableAssetIds?: Reado
   const provenance = parseCollection(value.provenance, LIMITS.provenance, parseProvenance);
   if (scripts === null || scenes === null || shots === null || characters === null || styleBible === null || referenceAssets === null || generations === null || provenance === null) return null;
   const document: AiProjectDocument = {
+    ...(pendingSequentialScene === undefined ? {} : { pendingSequentialScene }),
     ...(videoHistory === undefined ? {} : { videoHistory }),
     ...(writerPipeline === undefined ? {} : { writerPipeline }),
     ...(narrationPlan === undefined ? {} : { narrationPlan }),

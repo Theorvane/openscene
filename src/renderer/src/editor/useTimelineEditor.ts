@@ -47,6 +47,7 @@ import { useTimelinePlayback } from './useTimelinePlayback';
 import type { AiProjectDocument } from '../../../shared/aiProjectDomain';
 import { detachVideoAudioOnTimeline } from '../../../shared/detachVideoAudio';
 import { assembleApprovedProductionCut, buildApprovedProductionAssemblyPlan } from '../../../shared/productionWorkflow';
+import { pipelineBaseRequest } from '../../../shared/writerPipeline';
 
 type TimelineUpdate = (timeline: TimelineDocument) => TimelineDocument | null;
 
@@ -390,6 +391,7 @@ export function useTimelineEditor() {
       timeline: project.timeline,
       plan,
       targetTrackId: target.id,
+      allowExistingPrefix: pipelineBaseRequest(project.ai.writerPipeline)?.productionScope !== undefined,
       clipIdForShot: () => createOpaqueId('production-clip')
     });
     if (!assembled.ok) {
