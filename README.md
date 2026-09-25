@@ -30,7 +30,7 @@
 </p>
 
 > [!IMPORTANT]
-> **Early.** There are signed installers on the [releases page](https://github.com/Theorvane/openscene/releases) for macOS, Windows and Linux, and the app updates itself once installed. The mobile app is on the [App Store](https://apps.apple.com/us/app/openscene-ai-video-editor/id6796586657) and [Google Play](https://play.google.com/store/apps/details?id=com.sloki9637.openscene). Running from source is still the fastest way to follow `dev`. The hero and screenshots below show the real interface.
+> **Early.** There are signed installers on the [releases page](https://github.com/Theorvane/openscene/releases) for macOS, Windows and Linux, and the app updates itself once installed. The mobile app is on the [App Store](https://apps.apple.com/us/app/openscene-ai-video-editor/id6796586657) and [Google Play](https://play.google.com/store/apps/details?id=com.sloki9637.openscene). Running from source is still the fastest way to follow `dev`. The screenshots below are captures of the desktop app; the hero is an illustration.
 >
 > The desktop app was called **OpenVideo** through 0.2.0. Because the rename changes the application id, an existing OpenVideo install will not update itself to OpenScene — download 0.3.0 once and the old one can be removed.
 
@@ -87,13 +87,13 @@ Project folders, imports, generated results, chats, and exports remain local. A 
 
 ## The workspace
 
-Open a folder and you land in the workspace. One tab strip switches between editing and the two generation studios; the agent chat stays docked beside all three.
+The Projects page asks what you want to make. **Video Editing** opens a timeline project; **AI Creation** opens a story and scene production project. Existing projects keep their saved type when reopened. Chats stay with their project.
 
-![The OpenScene editing workspace on a new project: media bin, program monitor, inspector, timeline tracks, and the Edit Agent chat panel docked on the right](docs/assets/screenshot-editor.png)
+![The current Projects page with Video Editing and AI Creation choices and two sample projects](docs/assets/screenshot-projects.png)
 
-Projects and past conversations live on the start page. Picking a chat reopens its project and restores the transcript.
+In Video Editing, the media bin, Program Monitor, inspector, timeline and Edit Agent share one workspace.
 
-![The Projects page listing project folders beside Edit Agent chat history](docs/assets/screenshot-projects.png)
+![The current Video Editing workspace with an empty timeline, media bin, Program Monitor, inspector and Edit Agent](docs/assets/screenshot-editor.png)
 
 ### Editing
 
@@ -106,27 +106,29 @@ Projects and past conversations live on the start page. Picking a chat reopens i
 - Deliver reviewed automatic captions by burning them into the MP4, exporting a UTF-8 SRT/WebVTT/ASS sidecar, doing both, or doing neither. Manual titles always remain independent.
 - Style titles and approved captions with shared Clean, Boxed, Cinema or Social presets, bounded outline/background controls, and aspect-aware title-safe anchors used by preview and final renderers.
 
+### AI Creation: story to scenes
+
+Start with a production brief. Choose **Plan the whole film** to review a screenplay and scene plan before making shots, or **Build scene by scene** to make one scene and decide what comes next. The planning UI offers 5, 10 and 15 minute targets; shots are planned in five-second units. Connect the selected writing provider in Settings before requesting a plan. Planning and media generation are separate actions with separate cost checks.
+
+![The AI Creation start screen with the two planning modes, production brief and film length](docs/assets/screenshot-video.png)
+
+Open a planned shot to inspect its prompt, references, candidate videos and approval state. Generate or regenerate a take explicitly, review it, then assemble approved material on the project sequence. **Make a single clip instead** opens the shot workbench without requiring a full film plan. Provider-supported clip lengths may differ from the planned shot length.
+
 ### Voice generation
 
-Write a script, pick a voice model, generate, and import the result straight into the project. OpenAI and ElevenLabs use your connected API key; VieNeu-TTS v3 Turbo can run locally without a key.
+Open **Advanced tools → Voice & captions** in an AI Creation project. **Qwen3-TTS (local)** is the default desktop voice model. It runs a user-configured local wrapper with an authorized reference sample; OpenScene does not install the model. [Configure local Qwen TTS](docs/local-qwen-tts.md) before generating, then write a script, prepare and approve the narration plan, generate a WAV take, listen to it and import it into the project. A missing configuration produces a setup error rather than switching to a cloud model.
 
-For local voice and automatic subtitles, place the [official VieNeu-TTS project](https://github.com/pnnbao97/VieNeu-TTS) beside OpenScene and run `npm run setup:local-ai` once. The command synchronizes VieNeu's CPU/ONNX environment and installs a checksum-verified official whisper.cpp Windows runtime plus multilingual model under ignored `.local-runtimes/`. OpenScene then starts and stops its owned VieNeu process automatically, discovers voices at `http://127.0.0.1:8001`, and launches Whisper per transcription job. Set `OPENSCENE_VIENEU_PROJECT_DIR` only for a different checkout; remote VieNeu URLs are rejected.
+**VieNeu-TTS v3 Turbo** is another selectable local model for Vietnamese voices. Select it to start or connect to its loopback server and discover its available voices. On Windows, `npm run setup:local-ai` prepares the optional managed VieNeu and whisper.cpp runtimes; it does **not** install Qwen. OpenAI and ElevenLabs remain cloud choices that require your connected API keys. Automatic transcription uses whisper.cpp separately from speech synthesis.
 
-![The Voice Generation studio with a voice picker and a script composer](docs/assets/screenshot-voice.png)
+![The Voice and captions tool with Qwen3-TTS selected, a configured-sample choice and narration script](docs/assets/screenshot-voice.png)
 
-### Video generation
-
-Prompt with a style, aspect ratio, and duration — and optionally a reference image to seed image-to-video.
-
-After the Writer prompt stage is approved, the storyboard production board turns those saved shots into a manual production checklist. Assign imported storyboard frames and character references, open one shot at a time, generate and review candidates, then explicitly assemble the complete approved set on the timeline. The board never starts a provider job, replaces a take, exports, or spends credits on its own.
-
-![The Video Generation studio with style, aspect ratio, duration, and reference image controls](docs/assets/screenshot-video.png)
+Mobile can edit, approve and apply the same narration and caption plan. Speech synthesis and desktop-local Qwen/VieNeu runtimes are unavailable on mobile; their choices show the platform limit.
 
 ### Image generation
 
-Stills from a prompt, at the aspect ratio you need — and a seed for image-to-video on the engines that accept one.
+Under **Advanced tools → Scenes → Reference frames**, create stills from a prompt and aspect ratio. A saved or approved reference can then be used by a video model that accepts image input. Generation is an explicit action.
 
-![The Image Generation studio with model, aspect ratio, and prompt controls](docs/assets/screenshot-image.png)
+![The current Reference frames tool with an image prompt, model, style and aspect ratio controls](docs/assets/screenshot-image.png)
 
 ## The Edit Agent
 
@@ -160,12 +162,11 @@ Projects live inside the app rather than in a folder you file away, because a ph
 filesystem they think in. Export hands you the finished MP4 through the share sheet.
 
 - A timeline with a preview, playback, pinch-to-zoom, draggable clips and trim handles, and a media bin
-- Video, image and voice generation against the same provider catalog, with any OpenAI-compatible
-  endpoint addable yourself
+- Video and image generation against the shared provider catalog; narration planning and captions share the desktop project format, while speech synthesis remains desktop-only
 - A tool-calling assistant that shows every call for approval before it runs
 - Spending permission asked **per kind** — allowing every image is a different decision from allowing
   every video, and they do not cost the same
-- Multi-shot video that continues each shot from the last frame of the one before
+- Multi-shot planning and reviewed candidates using shared shot and continuity rules
 
 Export renders natively on both: AVFoundation on iOS, Media3 Transformer on Android. Where a
 surface genuinely cannot do something it says so rather than failing quietly — holding a still image

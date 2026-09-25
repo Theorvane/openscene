@@ -1,49 +1,30 @@
-# Editing and AI Creation workspaces
+# Video Editing and AI Creation
 
-Both workspaces operate on the same project, assets and timeline. Navigation
-does not generate media, approve a candidate or replace an edited clip.
+OpenScene starts on **Projects**, where a new project is saved as either Video Editing or AI Creation. Opening an existing project uses its saved type. The two workspaces share project, asset and timeline rules in `src/shared/`, but they present different starting workflows.
 
-- **Video Editing** opens the existing timeline and media bin.
-- **AI Creation** starts with Video for direct generation, or Writer for a
-  reviewed script workflow. Image and Voice remain independently accessible.
-- Switching back to Creation remembers the last creation tool for this open
-  session. Existing desktop `openvideo-workspace-tab` values are still readable.
-- Desktop Creation includes a Project media drawer backed by the same assets
-  as the editor's media bin, with explicit **Add & open editor** placement.
-- Desktop completed video results offer **Import & open editor**. Import makes
-  the asset available in the editor's media bin; it does not insert a clip.
-  Approved Writer candidates offer **Add approved & open editor**, which uses
-  the existing explicit placement operation.
-- Mobile Library is available in either mode. **Add & open editor** uses the
-  existing append operation and changes mode only on success.
+![Projects page with both project types](assets/screenshot-projects.png)
 
-Desktop studios remain mounted as before. Mobile editing and creation screens
-mount lazily and remain mounted while the project is open, preserving drafts
-and pending generation across mode changes. Hidden editing pauses playback.
-Returning to editing reloads externally changed assets/timelines; an unchanged
-document retains its editing state. External changes invalidate local undo.
-The editor also observes background job completion while it is already visible;
-its own saved edits do not trigger a reload or reset undo.
-Leaving the project still ends this screen session; this is not cross-project
-or process-restart draft persistence.
+## Video Editing
 
-Provider consent, spend prompts, approval gates and unsupported-platform notices
-are unchanged. This phase does not redesign the storyboard board, introduce
-automatic paid generation, change agent permissions, or publish a release.
+Import local footage, arrange it on the timeline, review it in the Program Monitor, and export through local FFmpeg. The Edit Agent is docked beside the editor. [See the editing workspace](../README.md#editing).
 
-## Manual acceptance checks
+## AI Creation
 
-On desktop and a mobile development client:
+AI Creation starts at **Plan your film**. Enter a production brief, choose a target length, and choose one of two routes:
 
-1. Open a project, switch to Creation, enter a prompt without generating, then
-   switch to Editing and back. The same tool and draft should remain.
-2. Edit a timeline, move the playhead and switch modes without changing media.
-   Returning should preserve editing state; mobile hidden playback must pause.
-3. Import a completed video on desktop or select a saved result in mobile
-   Library. Confirm the documented import/placement distinction above.
-4. Add media from another screen, return to mobile Editing and confirm the
-   updated timeline is visible. Re-generating alone must not replace a cut.
-5. Check keyboard navigation on desktop and screen reader navigation on mobile.
-   Hidden screens must not receive accessibility focus.
-6. Verify provider consent still precedes generation. No mode switch should
-   issue a generation request.
+1. **Plan the whole film** proposes a screenplay and scene plan for review before you generate takes.
+2. **Build scene by scene** lets you finish one scene and then decide the next one.
+
+The planned sequence uses five-second shot units. A provider may produce a longer supported clip; its output still needs review and placement. A writing request, a video generation request, candidate approval and final assembly are separate steps. None is triggered by entering a workspace or selecting a shot.
+
+![AI Creation start screen](assets/screenshot-video.png)
+
+**Make a single clip instead** opens the shot workbench without a full plan. **Advanced tools** contains Story, Scenes (Video takes and Reference frames), and Voice & captions. A saved video result enters the shared project media library; it does not silently replace a timeline clip. The project sequence distinguishes planned timing, unplaced takes, placed voice and captions. Saving an arrangement and exporting are explicit operations.
+
+**Create editing project** makes an editing copy when the generation project is ready for timeline finishing. The source generation project and its prompts stay intact; the new editing timeline starts empty. Review its media placement before export.
+
+## Voice and platform limits
+
+Qwen3-TTS is the default local voice model on desktop and needs a [user-configured wrapper and authorized reference sample](local-qwen-tts.md). VieNeu-TTS is a separate selectable local choice and starts only when selected. Cloud voice models require their own connection. Mobile can prepare and approve narration and captions, but speech synthesis and desktop-local runtimes are unavailable there.
+
+Switching views does not authorize provider spending. Provider consent and model capability checks happen at the generation action. Desktop and mobile read the same shared project rules; platform-bound operations stay visible with a reason when unavailable.
