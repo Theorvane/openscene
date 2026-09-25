@@ -1,4 +1,5 @@
 import { constants } from 'node:fs';
+import { generateLocalQwenSpeech } from './localQwenTts';
 import { lstat, mkdir, open, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { app } from 'electron';
@@ -313,6 +314,7 @@ const SPEECH_MODEL_PROVIDERS: Record<string, { seam: TextToSpeechJob['provider']
   openai: { seam: 'openai_tts', credentialKey: 'openaiApiKey', label: 'OpenAI' },
   google_gemini: { seam: 'gemini_tts', credentialKey: 'geminiApiKey', label: 'Google Gemini' },
   groq: { seam: 'groq_tts', credentialKey: 'groq', label: 'Groq' },
+  local_qwen: { seam: 'local_qwen', label: 'Qwen TTS' },
   vieneu_local: { seam: 'vieneu_local', label: 'VieNeu-TTS' }
 };
 
@@ -384,7 +386,10 @@ async function invokeSpeechProvider(
 ): Promise<CloudProviderResult> {
   try {
     let bytes: Buffer;
-    if (model.providerId === 'vieneu_local') {
+    if (model.providerId === 'local_qwen') {
+      await generateLocalQwenSpeech({ script: request.delivery?.performanceScript ?? request.script, outputPath: outputFilePath, ...(request.language === undefined ? {} : { language: request.language }) });
+      return { ok: true, outputFilePath };
+    } else if (model.providerId === 'vieneu_local') {
       await activeVieNeuRuntime?.ensureReady();
       bytes = await generateVieNeuSpeech({ voiceId: request.voiceId ?? '', script: request.script, ...(request.delivery === undefined ? {} : { delivery: request.delivery }) });
     } else if (model.providerId === 'elevenlabs' && apiKey !== undefined) {
@@ -885,7 +890,7 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
 
       if (model.executionPath === 'api') await settleSpend(reservationId, 'charged');
       logSpeechJob(id, 'provider.request.started', { executionPath: model.executionPath });
-      const extension = provider === 'vieneu_local' ? 'wav' : 'mp3';
+      const extension = provider === 'vieneu_local' || provider === 'local_qwen' ? 'wav' : 'mp3';
       const heartbeat = setInterval(() => {
         logSpeechJob(id, 'process.working', { elapsedSeconds: Math.round((Date.now() - startedAt) / 1_000) });
       }, 10_000);
@@ -988,7 +993,7 @@ export async function openCompletedSpeechPreviewSource(jobId: string): Promise<O
   return openCompletedPreviewSource(
     job.outputFilePath,
     join(getAiStorageDir(), 'speech'),
-    job.provider === 'vieneu_local' ? 'audio/wav' : 'audio/mpeg'
+    job.provider === 'vieneu_local' || job.provider === 'local_qwen' ? 'audio/wav' : 'audio/mpeg'
   );
 }
 
@@ -1026,7 +1031,7 @@ export function getCompletedAiSource(jobId: string): { sourcePath: string; displ
 
   const speechJob = speechJobs.get(jobId);
   if (speechJob && speechJob.status === 'completed' && speechJob.outputFilePath) {
-    const isWav = speechJob.provider === 'vieneu_local';
+    const isWav = speechJob.provider === 'vieneu_local' || speechJob.provider === 'local_qwen';
     return {
       sourcePath: speechJob.outputFilePath,
       displayName: `AI_Voice_${speechJob.id.slice(-6)}.${isWav ? 'wav' : 'mp3'}`,

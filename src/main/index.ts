@@ -618,7 +618,6 @@ app.whenReady().then(async () => {
   });
   await installIpcHandlers();
   createWindow();
-  managedVieNeuRuntime.warmUp();
 
   // Checked after the window exists so the first result has somewhere to land,
   // and left unawaited so a slow or unreachable GitHub never delays startup.

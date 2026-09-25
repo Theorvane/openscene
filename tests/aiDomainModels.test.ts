@@ -4,16 +4,21 @@ import {
   AI_DOMAIN_MODEL_STORAGE_KEY,
   getAvailableDomainModels,
   getDomainModel,
+  getDefaultDomainModelId,
   getDomainModels,
   isDomainModelAvailableOnRuntime,
   parseAiDomainModelPreferences
 } from '../src/shared/aiDomainModels';
 
 describe('AI domain model catalog', () => {
-  it('exposes available cloud voice models and the desktop-local VieNeu model', () => {
+  it('defaults to local Qwen and keeps VieNeu as an optional desktop model', () => {
     const voiceModels = getAvailableDomainModels('voice-generation');
     expect(voiceModels.map((model) => model.id)).toContain('eleven_multilingual_v2');
     expect(voiceModels.map((model) => model.id)).toContain('gpt-4o-mini-tts');
+    expect(getDefaultDomainModelId('voice-generation')).toBe('local-qwen-tts');
+    const qwen = voiceModels.find((model) => model.id === 'local-qwen-tts');
+    expect(qwen).toMatchObject({ providerId: 'local_qwen', executionPath: 'local' });
+    expect(isDomainModelAvailableOnRuntime(qwen!, 'mobile')).toBe(false);
     const vieneu = voiceModels.find((model) => model.id === 'vieneu-v3-turbo');
     expect(vieneu).toMatchObject({ providerId: 'vieneu_local', executionPath: 'local' });
     expect(isDomainModelAvailableOnRuntime(vieneu!, 'desktop')).toBe(true);
@@ -82,7 +87,7 @@ describe('AI domain model catalog', () => {
         'edit-agent': 'unknown-model'
       })
     ).toEqual({
-      'voice-generation': 'eleven_v3',
+      'voice-generation': 'local-qwen-tts',
       'video-generation': 'veo-3.1-generate-preview',
       'image-generation': 'gpt-image-1',
       writer: 'gemini-3.1-pro-preview',
@@ -105,7 +110,7 @@ describe('AI domain model catalog', () => {
     // Agent keeps the local Ollama engine.
     expect(parseAiDomainModelPreferences(null)).toEqual({
       writer: 'gemini-3.1-pro-preview',
-      'voice-generation': 'eleven_v3',
+      'voice-generation': 'local-qwen-tts',
       'video-generation': 'veo-3.1-generate-preview',
       'image-generation': 'gpt-image-1',
       'edit-agent': 'qwen2.5-coder'

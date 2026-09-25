@@ -443,7 +443,7 @@ export class OpenVideoMcpServer {
   @McpTool({
     description:
       'Create AI speech job with the selected voice-generation model. Cloud models use the provider connected ' +
-      'in Settings; VieNeu v3 Turbo uses the automatically managed local server.',
+      'in Settings; Qwen uses a user-configured local wrapper, while VieNeu starts its local server when selected.',
     input: z.object({
       script: z.string().min(1, 'Script is required'),
       voiceId: z.string().default(''),

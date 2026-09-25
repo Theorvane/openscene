@@ -53,7 +53,6 @@ describe('AI Job Manager and cloud provider seams', () => {
       voiceId: '',
       modelId: 'eleven_multilingual_v2'
     });
-    // Every media job is a cloud job now — there is no local runner to fall back on.
     expect(soraJob.mode).toBe('api');
     expect(soraJob.provider).toBe('openai_sora');
     expect(elevenJob.mode).toBe('api');
@@ -89,7 +88,7 @@ describe('AI Job Manager and cloud provider seams', () => {
     }
   }, 10_000);
 
-  it('defaults each media domain to an available cloud model when no model id is supplied', async () => {
+  it('defaults speech to local Qwen when no model id is supplied', async () => {
     const videoJob = await createVideoGenerationJob({
       prompt: 'Default model scene',
       aspectRatio: '16:9'
@@ -98,7 +97,8 @@ describe('AI Job Manager and cloud provider seams', () => {
 
     expect(videoJob.mode).toBe('api');
     expect(videoJob.durationSeconds).toBe(4);
-    expect(speechJob.mode).toBe('api');
+    expect(speechJob.mode).toBe('local');
+    expect(speechJob.provider).toBe('local_qwen');
     expect(videoJob.modelId).toBeDefined();
     expect(speechJob.modelId).toBeDefined();
   });
