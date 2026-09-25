@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 
 import {
+  alibabaVideoBaseUrl,
   resolveVideoOperation,
   validateVideoInputSet,
   videoAdapterFor,
@@ -12,7 +13,7 @@ import { getVideoProviderBinding, validateVideoRequest, type VideoOperation } fr
 
 import { estimateVideoCost } from '@openvideo/shared/mediaGenerationPricing';
 
-import { readKey } from './credentials';
+import { readKey, readSlot } from './credentials';
 import { chargeReservation, releaseReservation, reserveAgainstCap } from './spendLedger';
 import { projectMediaDir, type MobileAsset } from './projectStore';
 import videoExport, { isFrameExtractionAvailable } from '../../modules/video-export';
@@ -93,12 +94,25 @@ export async function generateShot(input: GenerateShotInput): Promise<GenerateSh
     return { ok: false, message: `${model.providerLabel} is not connected. Add its key in Settings.` };
   }
 
+  const alibabaWorkspaceId = model.providerId === 'alibaba_dashscope'
+    ? await readSlot('alibabaWorkspaceId')
+    : null;
+  if (model.providerId === 'alibaba_dashscope') {
+    try {
+      alibabaVideoBaseUrl(alibabaWorkspaceId ?? undefined);
+    } catch (error) {
+      releaseReservation(reservation.id);
+      return { ok: false, message: error instanceof Error ? error.message : 'Alibaba Workspace ID is invalid.' };
+    }
+  }
+
   try {
     // Kept as the request goes out: that is where the money is committed, and
     // a shot refused for a missing key cost nothing.
     chargeReservation(reservation.id);
     const ready = await adapter({
       apiKey,
+      ...(alibabaWorkspaceId === null ? {} : { alibabaWorkspaceId }),
       modelId: model.id,
       prompt: input.prompt,
       aspectRatio: input.aspectRatio,

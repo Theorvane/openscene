@@ -1,12 +1,19 @@
+import { pipelineBaseRequest } from '@openvideo/shared/writerPipeline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ProductionNavigator } from '../components/ProductionNavigator';
+import { ProductionPlanComposer } from '../components/ProductionPlanComposer';
+import { NextSceneComposer } from '../components/NextSceneComposer';
+import { canPlanNextSequentialScene } from '@openvideo/shared/sequentialProduction';
+import { ProductionRunBoard } from '../components/ProductionRunBoard';
+import { ProductionCompanions } from '../components/ProductionCompanions';
+import { writeProject } from '../lib/projectStore';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { planVideoStoryboard, supportedShotSeconds, CONTINUITY_KEYS } from '@openvideo/shared/videoStoryboardPlan';
 import { composeShotPrompt, refineShotPrompt, revisionsOf, takeLabel } from '@openvideo/shared/shotPrompt';
 import { getDomainModels, isDomainModelAvailableOnRuntime } from '@openvideo/shared/aiDomainModels';
-import { approvedWriterShots } from '@openvideo/shared/writerPipeline';
 import {
   CONTINUITY_REVIEW_FIELDS,
   type ContinuityReview,
@@ -14,7 +21,7 @@ import {
   type ContinuityReviewValue
 } from '@openvideo/shared/aiProjectDomain';
 import { candidateApprovalBlockReason, emptyContinuityReview } from '@openvideo/shared/generationReview';
-import { activeStyleReference, productionShotRows } from '@openvideo/shared/productionWorkflow';
+import { productionShotRows, standaloneGenerationBlockReason } from '@openvideo/shared/productionWorkflow';
 import { getVideoOperationConstraints, isVideoOperationImplemented, type VideoOperation } from '@openvideo/shared/mediaCapabilityRegistry';
 import { ModelSelect } from '../components/ModelSelect';
 import { supportsReferenceImage, type VideoAspectRatio, type VideoProgressStage } from '@openvideo/shared/videoGeneration';
@@ -22,8 +29,9 @@ import { isFrameExtractionAvailable } from '../../modules/video-export';
 import { readProviderConnections } from '../lib/mediaProviders';
 import { useSpendPermissions, type Decision } from '../lib/permissions';
 import { generateShot } from '../lib/videoGeneration';
-import { appendAssetToTimeline, assembleApprovedWriterShots, assetUri, clipIdForAsset, readProject, replaceTakeInTimeline, saveGeneratedVideoCandidate, type MobileAsset } from '../lib/projectStore';
+import { appendAssetToTimeline, assetUri, clipIdForAsset, readProject, replaceTakeInTimeline, saveGeneratedVideoCandidate, type MobileAsset } from '../lib/projectStore';
 import { SpendPrompt } from '../components/SpendPrompt';
+import { ProductionMemoryPanel } from '../components/ProductionMemoryPanel';
 import { FormScreen } from '../components/FormScreen';
 import { useRevealOnFocus } from '../components/KeyboardAwareScroll';
 import { theme } from '../lib/theme';
@@ -78,29 +86,38 @@ const INPUT_MODES: readonly { readonly id: VideoOperation; readonly label: strin
 type PickedReference = { readonly displayName: string; readonly base64: string; readonly mimeType: string };
 
 export function PlanScreen({
+  active = true,
   topInset,
   keyboardOffset,
   projectId,
-  connectionsVersion
+  connectionsVersion,
+  onSelectProductionTool
 }: {
+  readonly active?: boolean;
   readonly topInset: number;
   /** Height of the chrome above this screen; see FormScreen. */
   readonly keyboardOffset: number;
   readonly projectId: string | null;
   /** Changes when Settings closes, so stored keys are picked up. */
   readonly connectionsVersion: number;
+  readonly onSelectProductionTool?: (tool: 'image' | 'voice') => void;
 }) {
   const catalog = getDomainModels('video-generation');
   const [totalSeconds, setTotalSeconds] = useState<number>(30);
   const [modelId, setModelId] = useState<string>(() => catalog.find((entry) => isDomainModelAvailableOnRuntime(entry, 'mobile'))?.id ?? '');
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
   const [prompt, setPrompt] = useState('');
+  const [recipeParentId, setRecipeParentId] = useState<string | undefined>();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyCount, setHistoryCount] = useState(20);
+  useEffect(() => { setRecipeParentId(undefined); setHistoryCount(20); }, [projectId]);
   const [writerMessage, setWriterMessage] = useState('');
+  const [showPlanControls, setShowPlanControls] = useState(false);
+  const [showQuickClip, setShowQuickClip] = useState(false);
+  useEffect(() => { setShowPlanControls(false); setShowQuickClip(false); }, [projectId]);
   const activeProject = projectId === null ? null : readProject(projectId);
-  const writerShots = approvedWriterShots(activeProject?.ai);
   const productionRows = productionShotRows(activeProject?.ai);
-  const styleReference = activeProject === null || activeProject === undefined ? undefined : activeStyleReference(activeProject.ai);
-  const styleReferenceAsset = activeProject?.assets.find((asset) => asset.id === styleReference?.assetId);
+  const standaloneBlock = standaloneGenerationBlockReason(activeProject?.ai);
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>('16:9');
   const [shotStates, setShotStates] = useState<readonly ShotState[]>([]);
   // Keyed by shot index, because the plan can change under them and an array
@@ -188,6 +205,10 @@ export function PlanScreen({
    */
   const runGeneration = async (): Promise<void> => {
     if (projectId === null || model === undefined) return;
+    const current = readProject(projectId);
+    if (current === null) { setWriterMessage('Project is no longer available. Open it again before generating.'); return; }
+    const block = standaloneGenerationBlockReason(current.ai);
+    if (block !== null) { setWriterMessage(block); return; }
     setRunning(true);
     setShotStates(plan.shots.map(() => ({ kind: 'idle' })));
     let carriedFrame: { base64: string; mimeType: string } | undefined;
@@ -195,6 +216,9 @@ export function PlanScreen({
     for (const [index, shot] of plan.shots.entries()) {
       const mark = (state: ShotState): void =>
         setShotStates((current) => current.map((entry, position) => (position === index ? state : entry)));
+      const latest = readProject(projectId);
+      const latestBlock = latest === null ? 'Project is no longer available. Generation stopped before the next shot.' : standaloneGenerationBlockReason(latest.ai);
+      if (latestBlock !== null) { mark({ kind: 'failed', message: latestBlock }); break; }
       mark({ kind: 'running', stage: 'submitting' });
 
       // Composed by the shared rule rather than here, so the phone, the desktop
@@ -242,7 +266,17 @@ export function PlanScreen({
         mark({ kind: 'failed', message: 'The project could not be read to save this shot.' });
         break;
       }
-      saveGeneratedVideoCandidate(project, result.asset);
+      try {
+        saveGeneratedVideoCandidate(project, result.asset, {
+          id: result.asset.id, assetId: result.asset.id, prompt: shotPrompt,
+          modelId: model.id, providerId: model.providerId, operation: shotOperation,
+          durationSeconds: shot.durationSeconds, aspectRatio: effectiveAspectRatio, createdAt: new Date().toISOString(),
+          ...(recipeParentId === undefined ? {} : { parentId: recipeParentId })
+        });
+      } catch (error) {
+        mark({ kind: 'failed', message: 'Video history save failed: ' + String(error) });
+        break;
+      }
       // Kept so this shot can be asked for again with a change: the prompt to
       // build on, the clip the next take stands in for, and the frame this one
       // started from.
@@ -278,6 +312,9 @@ export function PlanScreen({
     const take = takes[index];
     const shot = plan.shots.find((candidate) => candidate.index === index);
     if (projectId === null || model === undefined || take === undefined || shot === undefined) return;
+    const current = readProject(projectId);
+    const block = current === null ? 'Project is no longer available. Open it again before generating.' : standaloneGenerationBlockReason(current.ai);
+    if (block !== null) { setWriterMessage(block); return; }
 
     const refined = refineShotPrompt(take.prompt, changeNote);
     if (!refined.ok) {
@@ -321,7 +358,17 @@ export function PlanScreen({
 
     // Keep the new take in the library. The existing approved clip stays on the
     // timeline until this candidate passes review and the user approves it.
-    saveGeneratedVideoCandidate(project, result.asset);
+    try {
+      saveGeneratedVideoCandidate(project, result.asset, {
+        id: result.asset.id, assetId: result.asset.id, prompt: refined.prompt,
+        modelId: model.id, providerId: model.providerId,
+        operation: take.operation ?? (take.startFrame === undefined ? 'text_to_video' : 'image_to_video'),
+        durationSeconds: shot.durationSeconds, aspectRatio: effectiveAspectRatio, createdAt: new Date().toISOString(), parentId: take.assetId
+      });
+    } catch (error) {
+      mark({ kind: 'failed', message: 'Video history save failed: ' + String(error) });
+      return;
+    }
 
     setTakes((current) => ({
       ...current,
@@ -414,7 +461,7 @@ export function PlanScreen({
 
   const runLine = `${plan.shots.length} shot${plan.shots.length === 1 ? '' : 's'} · ${plan.totalSeconds}s`;
   const canGenerate =
-    projectId !== null && !running && prompt.trim().length > 0 && connected[model?.providerId ?? ''] === true
+    projectId !== null && standaloneBlock === null && !running && prompt.trim().length > 0 && connected[model?.providerId ?? ''] === true
     && isVideoOperationImplemented(model.id, operation)
     && (operation !== 'image_to_video' || firstFrame !== null)
     && (operation !== 'start_end' || (plan.shots.length === 1 && firstFrame !== null && lastFrame !== null))
@@ -422,41 +469,58 @@ export function PlanScreen({
 
   return (
     <FormScreen topInset={topInset} keyboardOffset={keyboardOffset}>
-      {productionRows.length > 0 && <View style={styles.reviewCard}>
-        <Text style={styles.label}>Storyboard production board</Text>
-        <Text style={styles.body}>{productionRows.filter((row) => row.state === 'approved').length}/{productionRows.length} Writer shots approved. Opening and generation remain manual.</Text>
-        <Text style={styles.body}>World/style reference: {styleReferenceAsset?.displayName ?? styleReference?.label ?? 'Not assigned'}</Text>
-        {productionRows.map((row, index) => <View style={styles.shot} key={row.shotId}>
-          <Text style={styles.shotIndex}>{String(index + 1).padStart(2, '0')}</Text>
-          <Text style={styles.shotBody}>{row.label}</Text>
-          <Text style={styles.shotLen}>{row.state.replace('_', ' ')}</Text>
-        </View>)}
-        <Pressable accessibilityRole="button" disabled={running || activeProject === null}
-          onPress={() => {
-            if (activeProject === null) return;
-            const result = assembleApprovedWriterShots(activeProject);
-            setWriterMessage(result.ok
-              ? `Placed ${productionRows.length} approved shots on the timeline in Writer order.`
-              : result.reason);
-          }} style={press([styles.approve, (running || activeProject === null) && styles.approveOff])}>
-          <Text style={styles.approveText}>Assemble approved Writer cut</Text>
-        </Pressable>
-        <Text style={styles.footnote}>Assigning the world/style image and imported storyboard or character images is currently done in the desktop production board; mobile reads the same saved mapping and assembly rules. Batch image/video generation and signed-in browser automation remain desktop-only, so this screen never starts a hidden queue or silently charges a provider.</Text>
+      {productionRows.length > 0 && <View style={styles.filmModelControls}>
+        <Text style={styles.quickClipTitle}>Film shot model</Text>
+        <Text style={styles.body}>This model and framing are used for scene and shot generation below. Each run still asks for cost approval.</Text>
+        <ModelSelect domain="video-generation" selectedId={modelId} connected={connected}
+          onSelect={next => setPlan(() => setModelId(next.id))} onConnectionChange={refreshConnections} />
+        <Text style={styles.label}>Frame ratio</Text>
+        <View style={styles.row}>{aspectRatioOptions.map(ratio => <Chip key={ratio} label={ratio} selected={ratio === effectiveAspectRatio} onPress={() => setPlan(() => setAspectRatio(ratio))} />)}</View>
       </View>}
-      {writerShots.length > 0 && <View>
-        <Text style={styles.label}>Approved Writer shots — choose one to load, not generate</Text>
-        {writerShots.map((shot) => <Pressable key={shot.id} accessibilityRole="button" disabled={running || redoing !== null || asking}
-          style={press({ minHeight: MIN_TAP, padding: 10 })} onPress={() => {
-            if (!supportedShotSeconds(model.id).includes(shot.durationSeconds)) {
-              setWriterMessage(`This shot needs ${shot.durationSeconds}s; the model accepts ${supportedShotSeconds(model.id).join('/')}s. Choose a compatible model or revise the Writer shot.`);
-              return;
-            }
-            setPlan(() => { setPrompt(shot.prompt); setTotalSeconds(shot.durationSeconds); setDescriptions({}); });
-            setWriterMessage('Shot loaded, not generated. Review the prompt, references and spend confirmation before rendering.');
-          }}><Text style={{ color: theme.text }}>{shot.label}</Text></Pressable>)}
-        {!!writerMessage && <Text style={{ color: theme.textWeak }}>{writerMessage}</Text>}
-      </View>}
-      <Text style={styles.h1}>Plan a video</Text>
+      {projectId && activeProject && productionRows.length === 0 && <ProductionPlanComposer key={'plan-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
+        const latest = readProject(projectId);
+        if (!latest) return false;
+        writeProject({ ...latest, ai });
+        return true;
+      }} />}
+      {projectId && activeProject && canPlanNextSequentialScene(activeProject.ai) && <NextSceneComposer key={'next-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
+        const latest = readProject(projectId);
+        if (!latest) return false;
+        writeProject({ ...latest, ai });
+        return true;
+      }} />}
+      {projectId && <ProductionRunBoard key={'run-' + projectId} projectId={projectId} model={model} aspectRatio={effectiveAspectRatio} disabled={running || asking || redoing !== null} connected={connected[model.providerId] === true} onBusy={setRunning} active={active} />}
+      {projectId && activeProject && productionRows.length > 0 && pipelineBaseRequest(activeProject.ai.writerPipeline)?.productionScope === undefined && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlanControls }} onPress={() => setShowPlanControls(value => !value)} style={press({ minHeight: MIN_TAP, padding: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8 })}><Text style={{ color: theme.text }}>{showPlanControls ? 'Hide screenplay and plan controls' : 'Screenplay and plan controls'}</Text></Pressable>}
+      {projectId && activeProject && productionRows.length > 0 && pipelineBaseRequest(activeProject.ai.writerPipeline)?.productionScope === undefined && showPlanControls && <ProductionPlanComposer key={'plan-' + projectId} document={activeProject.ai} disabled={running || asking || redoing !== null} connectionsVersion={connectionsVersion} onSave={async ai => {
+        const latest = readProject(projectId);
+        if (!latest) return false;
+        writeProject({ ...latest, ai });
+        return true;
+      }} />}
+      {activeProject && onSelectProductionTool && <ProductionCompanions project={activeProject} disabled={running || asking || redoing !== null} onSelect={onSelectProductionTool} />}
+      {productionRows.length === 0 && projectId !== null && activeProject !== null && <ProductionNavigator key={projectId} projectId={projectId} document={activeProject.ai} assets={activeProject.assets}
+        timeline={activeProject.timeline} onPlaceVoice={assetId => {
+          try {
+            const latest = readProject(projectId);
+            const asset = latest?.assets.find(entry => entry.id === assetId && entry.kind === 'audio');
+            setWriterMessage(latest && asset && appendAssetToTimeline(latest, asset) ? 'Voice appended and arrangement saved locally.' : 'Could not place audio. Check media duration and available audio track.');
+          } catch { setWriterMessage('Could not save the audio placement. Please try again.'); }
+        }}
+        active={active} busy={running || asking || redoing !== null} onLoad={item => {
+          const load = () => {
+            setPlan(() => { setPrompt(item.prompt); setRecipeParentId(item.recipeId); setDescriptions({}); });
+            setFirstFrame(null); setLastFrame(null); setAssetReferences([]);
+            setWriterMessage('Prompt loaded only. Review model, shot lengths and reference media before generating.');
+          };
+          if (prompt.trim()) Alert.alert('Replace prompt?', 'Your saved media stays unchanged.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Load prompt', onPress: load }]);
+          else load();
+        }} />}
+      {productionRows.length === 0 && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showQuickClip }} onPress={() => setShowQuickClip(value => !value)} style={press(styles.quickClipToggle)}>
+        <Text style={styles.quickClipTitle}>{showQuickClip ? 'Hide quick clip tools' : 'Quick clip · separate from this film'}</Text>
+        <Text style={styles.footnote}>For a one-off video. The screenplay and scene board above are the film production flow.</Text>
+      </Pressable>}
+      {productionRows.length === 0 && showQuickClip && <>
+      <Text style={styles.h1}>Quick clip</Text>
       <Text style={styles.sub}>Shot lengths and prices come from the same modules the desktop app uses.</Text>
       <Text style={styles.body}>Signed-in Google Flow video automation is desktop-only. Grok Imagine browser automation is desktop-only too. Login, CAPTCHA, verification, and account-limit states must be resolved on desktop; mobile continues to use supported official API-key routes.</Text>
 
@@ -552,6 +616,33 @@ export function PlanScreen({
       )}
 
       <Text style={styles.label}>Scenario · carried by every shot</Text>
+      {projectId !== null && activeProject !== null && <ProductionMemoryPanel key={projectId}
+        projectId={projectId} document={activeProject.ai} prompt={prompt}
+        onChange={value => setPlan(() => setPrompt(value))} disabled={running || asking || redoing !== null} />}
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: historyOpen }}
+        style={press(styles.redo)} onPress={() => setHistoryOpen(value => !value)}>
+        <Text style={styles.redoText}>Saved videos & prompts ({activeProject?.ai.videoHistory?.length ?? 0})</Text>
+      </Pressable>
+      {historyOpen && <>
+        <Text style={styles.body}>Prepare regeneration loads the saved prompt only, without spending. Reselect model, duration, operation and reference media before generating a new candidate. Original videos are kept.</Text>
+        {activeProject?.ai.videoHistory?.slice(-historyCount).reverse().map(recipe => {
+          const asset = activeProject.assets.find(item => item.id === recipe.assetId);
+          return <View key={recipe.id}>
+            <Text style={styles.label}>{recipe.modelId} · {recipe.durationSeconds}s · {recipe.aspectRatio} · {recipe.operation}</Text>
+            {asset !== undefined && projectId !== null ? <CandidateVideo active={active} projectId={projectId} asset={asset} /> : <Text style={styles.body}>Media removed. Prompt retained.</Text>}
+            <Text selectable style={styles.body}>{recipe.prompt}</Text>
+            <Pressable accessibilityRole="button" disabled={running || redoing !== null || asking} style={press(styles.redo)}
+              onPress={() => {
+                setPlan(() => { setPrompt(recipe.prompt); setRecipeParentId(recipe.id); setDescriptions({}); });
+                setFirstFrame(null); setLastFrame(null); setAssetReferences([]);
+                setWriterMessage('Prompt loaded, not generated. Check model, length, operation and reference media before approving a new generation.');
+              }}><Text style={styles.redoText}>Prepare regeneration</Text></Pressable>
+          </View>;
+        })}
+        {historyCount < (activeProject?.ai.videoHistory?.length ?? 0) && <Pressable accessibilityRole="button" style={press(styles.redo)} onPress={() => setHistoryCount(value => value + 20)}>
+          <Text style={styles.redoText}>Show older videos</Text>
+        </Pressable>}
+      </>}
       <TextInput
         ref={promptInput}
         onFocus={() => reveal(promptInput.current)}
@@ -618,7 +709,7 @@ export function PlanScreen({
             {take !== undefined && (
               <View style={styles.reviewCard}>
                 <Text style={styles.label}>Continuity review</Text>
-                {candidateAsset !== undefined && projectId !== null && <CandidateVideo key={candidateAsset.id} projectId={projectId} asset={candidateAsset} />}
+                {candidateAsset !== undefined && projectId !== null && <CandidateVideo active={active} key={candidateAsset.id} projectId={projectId} asset={candidateAsset} />}
                 {CONTINUITY_REVIEW_FIELDS.map((field) => (
                   <View key={field}>
                     <Text style={styles.body}>{REVIEW_LABELS[field]}</Text>
@@ -728,6 +819,7 @@ export function PlanScreen({
         <Text style={styles.footnote}>If the phone closes during a provider request, it is never submitted again automatically. Only a returned result saved into the project is treated as completed.</Text>
       </View>
 
+      </>}
       <SpendPrompt
         feature="video-generation"
         headline={runLine}
@@ -773,8 +865,9 @@ function ReferenceRow({ value, empty, onPick, onRemove }: {
   </View>;
 }
 
-function CandidateVideo({ projectId, asset }: { readonly projectId: string; readonly asset: MobileAsset }) {
+function CandidateVideo({ projectId, asset, active }: { readonly projectId: string; readonly asset: MobileAsset; readonly active: boolean }) {
   const player = useVideoPlayer(assetUri(projectId, asset));
+  useEffect(() => { if (!active) player.pause(); }, [active, player]);
   return <VideoView player={player} style={styles.candidateVideo} contentFit="contain" nativeControls />;
 }
 
@@ -794,6 +887,9 @@ function Chip({ label, selected, disabled = false, onPress }: { label: string; s
 
 const styles = StyleSheet.create({
   h1: { color: theme.text, fontSize: 26, fontWeight: '700' },
+  filmModelControls: { gap: 8, marginBottom: 16, padding: 14, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  quickClipToggle: { marginTop: 18, minHeight: MIN_TAP, padding: 14, gap: 4, borderRadius: 10, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  quickClipTitle: { color: theme.text, fontSize: 15, fontWeight: '700' },
   sub: { color: theme.textWeak, fontSize: 13, lineHeight: 19, marginBottom: 8 },
   label: { color: theme.text, fontSize: 13, fontWeight: '600', marginTop: 20, marginBottom: 8 },
   body: { color: theme.textWeak, fontSize: 13, lineHeight: 19 },

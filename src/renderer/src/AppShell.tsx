@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode } from 'react';
 
 import type { EditAgentProjectContext } from '../../shared/editAgentContext';
 import {
@@ -36,6 +36,7 @@ type AppShellProps = {
   readonly hasActiveProject: boolean;
   readonly onPageChange: (pageId: AppPageId) => void;
   readonly activeProjectContext: EditAgentProjectContext | null;
+  readonly studioLayout?: boolean;
   readonly projectTabs?: readonly ProjectTab[];
   readonly activeProjectId?: string | null;
   readonly onSelectProjectTab?: (projectId: string) => void;
@@ -71,13 +72,14 @@ function FolderIcon(): ReactElement {
   );
 }
 
-function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext, projectTabs = [], activeProjectId = null, onSelectProjectTab, onCloseProjectTab, chatRestoreRequest = null, canNavigateBack = false, onNavigateBack }: AppShellProps): ReactElement {
+function AppShellContent({ activePage, children, hasActiveProject, onPageChange, activeProjectContext, studioLayout = false, projectTabs = [], activeProjectId = null, onSelectProjectTab, onCloseProjectTab, chatRestoreRequest = null, canNavigateBack = false, onNavigateBack }: AppShellProps): ReactElement {
   const { isBusy } = useAgentChat();
   const { layoutPreference, updateLayoutPreference } = useAgentChatLayoutPreference();
   const shellBodyRef = useRef<HTMLDivElement | null>(null);
   const dragOriginRef = useRef<ChatPanelDragOrigin | null>(null);
   const chatPanelWidth = layoutPreference.chatPanelWidth;
-  const chatPanelCollapsed = layoutPreference.chatPanelCollapsed;
+  const [studioChatExpanded, setStudioChatExpanded] = useState(false);
+  const chatPanelCollapsed = studioLayout ? !studioChatExpanded : layoutPreference.chatPanelCollapsed;
   const projectsIsActive = activePage.id === 'projects';
   const settingsIsActive = activePage.id === 'settings';
   const showChatPanel = isWorkspacePageId(activePage.id);
@@ -91,6 +93,7 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
   };
 
   const setChatPanelCollapsed = (collapsed: boolean): void => {
+    if (studioLayout) { setStudioChatExpanded(!collapsed); return; }
     updateLayoutPreference((currentPreference) => ({
       ...currentPreference,
       chatPanelCollapsed: collapsed
@@ -101,6 +104,7 @@ function AppShellContent({ activePage, children, hasActiveProject, onPageChange,
     // Opening a saved chat from the home screen should always land in a
     // visible chat panel, even if it was collapsed last time.
     if (chatRestoreRequest === null) return;
+    setStudioChatExpanded(true);
     updateLayoutPreference((currentPreference) => ({
       ...currentPreference,
       chatPanelCollapsed: false

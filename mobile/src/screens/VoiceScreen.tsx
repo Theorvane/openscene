@@ -4,7 +4,7 @@ import { checkNarrationFit } from '@openvideo/shared/narrationTiming';
 import { narrationScriptFromCues, type NarrationPlan, type SubtitleCue } from '@openvideo/shared/narrationPlan';
 import { applySubtitleCues, createNarrationPlan, narrationFromApprovedWriter, narrationPlanMatchesWriter, updateNarrationPlan } from '@openvideo/shared/subtitleWorkflow';
 import { usesRuntimeVoiceCatalog, voiceChoices } from '@openvideo/shared/voiceCatalog';
-import { getDomainModels } from '@openvideo/shared/aiDomainModels';
+import { getDomainModels, isDomainModelAvailableOnRuntime } from '@openvideo/shared/aiDomainModels';
 import { createVoiceDeliverySettings, voiceDeliveryCapabilities, type VoiceDeliverySettings } from '@openvideo/shared/voiceDelivery';
 import { applyTranscriptionCues, updateTranscriptionDraft, type TranscriptionDraft } from '@openvideo/shared/transcription';
 import { ModelSelect } from '../components/ModelSelect';
@@ -21,7 +21,7 @@ export function VoiceScreen(props: Props) { return <ProjectVoiceScreen key={prop
 function ProjectVoiceScreen({ topInset, keyboardOffset, targetSeconds, connectionsVersion, projectId }: Props) {
   const catalog = getDomainModels('voice-generation');
   const project = projectId === null ? null : readProject(projectId);
-  const [modelId, setModelId] = useState(project?.ai.narrationPlan?.voiceModelId ?? catalog.find((entry) => entry.available)?.id ?? '');
+  const [modelId, setModelId] = useState(project?.ai.narrationPlan?.voiceModelId ?? catalog.find((entry) => isDomainModelAvailableOnRuntime(entry, 'mobile'))?.id ?? '');
   const model = catalog.find((entry) => entry.id === modelId) ?? catalog[0];
   const choices = voiceChoices(model?.providerId ?? '');
   const [connected, setConnected] = useState<Readonly<Record<string, boolean>>>({});
@@ -152,7 +152,7 @@ function ProjectVoiceScreen({ topInset, keyboardOffset, targetSeconds, connectio
     <Text style={styles.note}>Timing follows Writer shots or is distributed across the script. It is not word-level audio alignment; listen and fine-tune after creating voice on desktop.</Text>
     <View style={styles.row}>{action('Save draft', () => save(false), !cues.length)}{action('Approve', () => save(true), !cues.length)}{action('Apply captions', apply, saved?.status !== 'approved' || dirty || stale)}</View>
     {!!message && <Text style={styles.message}>{message}</Text>}
-    <Text style={styles.note}>Mobile can edit, approve, and apply the same narration plan. Speech synthesis stays disabled until its binary result transport is implemented; VieNeu-TTS also requires the desktop-local server. This screen cannot charge any provider.</Text>
+    <Text style={styles.note}>Mobile can edit, approve, and apply the same narration plan. Speech synthesis stays disabled until its binary result transport is implemented; Qwen TTS needs the desktop-local wrapper and VieNeu-TTS needs its desktop-local server. This screen cannot charge any provider.</Text>
   </FormScreen>;
 }
 

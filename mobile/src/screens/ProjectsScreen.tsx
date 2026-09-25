@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -12,11 +13,13 @@ import {
 } from 'react-native';
 
 import { track } from '../lib/analyticsClient';
-import { createProject, deleteProject, listProjects, renameProject, type ProjectSummary } from '../lib/projectStore';
+import { assetUri, createProject, deleteProject, listProjects, readProject, renameProject, type ProjectSummary } from '../lib/projectStore';
 import { CloseIcon, GearIcon, PencilIcon } from '../components/Icon';
 import { FormScreen } from '../components/FormScreen';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
+import { WORKSPACE_MODES, WORKSPACE_EXPERIENCES, type WorkspaceMode } from '@openvideo/shared/workspaceModes';
+import { modeForProjectType, projectTypeForMode } from '@openvideo/shared/projectTypes';
 
 export function ProjectsScreen({
   topInset,
@@ -26,11 +29,13 @@ export function ProjectsScreen({
 }: {
   readonly topInset: number;
   readonly activeProjectId: string | null;
-  readonly onOpen: (projectId: string) => void;
+  readonly onOpen: (projectId: string, mode: WorkspaceMode) => void;
   readonly onOpenSettings?: () => void;
 }) {
   const [projects, setProjects] = useState<readonly ProjectSummary[]>([]);
   const [draftName, setDraftName] = useState('');
+  const [entrance, setEntrance] = useState<WorkspaceMode>('create');
+  const visibleProjects = projects;
   /** The project being renamed, and the name being typed for it. */
   const [renaming, setRenaming] = useState<{ readonly project: ProjectSummary; readonly name: string } | null>(null);
 
@@ -64,13 +69,13 @@ export function ProjectsScreen({
   };
 
   const create = (): void => {
-    const project = createProject(draftName);
+    const project = createProject(draftName, projectTypeForMode(entrance));
     // No name: what someone calls their project is theirs, and `name` is a
     // forbidden key besides.
     track('project_created');
     setDraftName('');
     refresh();
-    onOpen(project.id);
+    onOpen(project.id, entrance);
   };
 
   return (
@@ -80,7 +85,7 @@ export function ProjectsScreen({
       refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={theme.textWeak} />}
     >
       <View style={styles.headRow}>
-        <Text style={styles.h1}>Projects</Text>
+        <Text style={styles.h1}>Project library</Text>
         {onOpenSettings !== undefined && (
           <Pressable
             accessibilityRole="button"
@@ -97,6 +102,15 @@ export function ProjectsScreen({
         from your library.
       </Text>
 
+      <Text style={styles.cardTitle}>Choose a project type</Text>
+      {WORKSPACE_MODES.map(mode => <Pressable key={mode} accessibilityRole="button"
+        accessibilityState={{ selected: entrance === mode }}
+        onPress={() => setEntrance(mode)} style={press([styles.entrance, entrance === mode && styles.cardActive])}>
+        <Text style={styles.cardTitle}>{WORKSPACE_EXPERIENCES[mode].title}{entrance === mode ? ' · Selected' : ''}</Text>
+        <Text style={styles.sub}>{WORKSPACE_EXPERIENCES[mode].description}</Text>
+        <Text style={styles.cardMeta}>{WORKSPACE_EXPERIENCES[mode].tools}</Text>
+      </Pressable>)}
+      <Text style={styles.sub}>New projects keep this type. Send generated media to a separate editing project when ready. All projects remain visible; opening one uses its saved workspace type.</Text>
       <View style={styles.newRow}>
         <TextInput
           style={styles.input}
@@ -113,17 +127,18 @@ export function ProjectsScreen({
         </Pressable>
       </View>
 
-      {projects.length === 0 ? (
-        <Text style={styles.empty}>No projects yet. Create one to start editing.</Text>
+      {visibleProjects.length === 0 ? (
+        <Text style={styles.empty}>No projects yet. Create one to get started.</Text>
       ) : (
-        projects.map((project) => (
+        visibleProjects.map((project) => (
           <View key={project.id} style={[styles.card, project.id === activeProjectId && styles.cardActive]}>
-            <Pressable style={press(styles.cardMain)} accessibilityRole="button" onPress={() => onOpen(project.id)}>
-              <Text style={styles.cardTitle}>{project.name}</Text>
-              <Text style={styles.cardMeta}>
-                {project.id === activeProjectId ? 'open · ' : ''}
-                edited {project.updatedAt.slice(0, 16).replace('T', ' ')}
-              </Text>
+            <Pressable style={press(styles.cardMain)} accessibilityRole="button" onPress={() => onOpen(project.id, modeForProjectType(project.projectType, entrance))}>
+              {(() => { const still = readProject(project.id)?.assets.find(asset => asset.kind === 'image'); return <View style={styles.cover}>
+                {still ? <Image source={{ uri: assetUri(project.id, still) }} resizeMode="cover" style={styles.coverImage} /> : <Text style={styles.coverEmpty}>NO IMAGE COVER</Text>}
+                <Text style={styles.coverType}>{(project.projectType ?? 'legacy').toUpperCase()}</Text>
+              </View>; })()}
+              <View style={styles.cardInfo}><Text style={styles.cardTitle}>{project.name}</Text>
+              <Text style={styles.cardMeta}>{project.id === activeProjectId ? 'OPEN · ' : ''}edited {project.updatedAt.slice(0, 16).replace('T', ' ')}</Text></View>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -215,9 +230,15 @@ const styles = StyleSheet.create({
   create: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 18, borderRadius: 10, backgroundColor: theme.accent },
   createText: { color: theme.bg, fontSize: 14, fontWeight: '700' },
   empty: { color: theme.textWeak, fontSize: 14, marginTop: 12 },
-  card: { flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingVertical: 6, paddingRight: 4, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  card: { flexDirection: 'row', alignItems: 'center', padding: 6, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  cover: { height: 126, backgroundColor: theme.bg, borderRadius: 7, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  coverImage: { width: '100%', height: '100%' },
+  coverEmpty: { color: theme.textWeak, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  coverType: { position: 'absolute', left: 8, top: 8, padding: 5, backgroundColor: '#09090cbb', color: '#ffffff', fontSize: 11, fontWeight: '700' },
+  cardInfo: { paddingHorizontal: 8, paddingVertical: 10 },
   cardActive: { borderColor: theme.accent },
-  cardMain: { flex: 1, justifyContent: 'center', minHeight: MIN_TAP, paddingVertical: 4 },
+  entrance: { padding: 16, gap: 8, borderRadius: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.surface },
+  cardMain: { flex: 1, justifyContent: 'center', minHeight: MIN_TAP },
   cardTitle: { color: theme.text, fontSize: 15, fontWeight: '600' },
   cardMeta: { color: theme.textWeaker, fontSize: 12, marginTop: 3 },
   iconButton: { width: MIN_TAP, height: MIN_TAP, alignItems: 'center', justifyContent: 'center' },

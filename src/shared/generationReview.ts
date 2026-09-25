@@ -10,6 +10,7 @@ import {
 } from './aiProjectDomain';
 import type { VideoOperation } from './mediaCapabilityRegistry';
 import { approvedWriterShots } from './writerPipeline';
+import { productionShotRegenerationBlockReason } from './productionWorkflow';
 import type { VideoContinuityControls } from './videoContinuitySettings';
 
 export function emptyContinuityReview(): ContinuityReview {
@@ -120,6 +121,8 @@ export function addGenerationCandidate(
 ): GenerationReviewResult {
   const shot = document.shots.find((entry) => entry.id === input.shotId);
   if (shot === undefined) return { ok: false, reason: 'The Writer shot no longer exists.' };
+  const sceneBlock = productionShotRegenerationBlockReason(document, input.shotId);
+  if (sceneBlock !== null) return { ok: false, reason: sceneBlock };
   if (document.generations.some((entry) => entry.id === input.id)) return { ok: false, reason: 'This generation attempt is already recorded.' };
   if (input.parentGenerationId !== undefined) {
     const parent = document.generations.find((entry) => entry.id === input.parentGenerationId);

@@ -17,7 +17,7 @@
 export const PRICING_AS_OF = '2026-09-09';
 
 export type GenerationRate =
-  | { readonly kind: 'per-second'; readonly usd: number }
+  | { readonly kind: 'per-second'; readonly usd: number; readonly asOf?: string }
   | { readonly kind: 'per-image'; readonly usd: number }
   | { readonly kind: 'free'; readonly reason: string }
   | { readonly kind: 'unknown'; readonly reason: string };
@@ -53,6 +53,12 @@ const VIDEO_RATES: Readonly<Record<string, GenerationRate>> = {
   'veo3.1': { kind: 'per-second', usd: 0.4 },
   'veo3.1_fast': { kind: 'per-second', usd: 0.15 },
   happyhorse_1_0: { kind: 'per-second', usd: 0.15 },
+  'wan2.7-t2v': { kind: 'per-second', usd: 0.10, asOf: '2026-09-24' },
+  'wan2.7-i2v': { kind: 'per-second', usd: 0.10, asOf: '2026-09-24' },
+  'happyhorse-1.1-t2v': { kind: 'per-second', usd: 0.14, asOf: '2026-09-24' },
+  'happyhorse-1.1-i2v': { kind: 'per-second', usd: 0.14, asOf: '2026-09-24' },
+  // 720p is $0.14/s; $0.01/s headroom covers the one-image input fee.
+  'grok-imagine-video-1.5': { kind: 'per-second', usd: 0.15, asOf: '2026-09-24' },
   gemini_omni_flash: { kind: 'per-second', usd: 0.1 },
   aleph2: { kind: 'per-second', usd: 0.28 },
   // Luma publishes no public per-second list price for the Dream Machine API,
@@ -78,6 +84,7 @@ const IMAGE_RATES: Readonly<Record<string, GenerationRate>> = {
  * local runtime is explicitly zero provider cost.
  */
 const SPEECH_RATES: Readonly<Record<string, GenerationRate>> = {
+  'local-qwen-tts': { kind: 'free', reason: 'Runs through a user-configured local Qwen wrapper.' },
   'vieneu-v3-turbo': { kind: 'free', reason: 'Runs on the OpenScene-managed local VieNeu-TTS runtime.' }
 };
 
@@ -121,8 +128,8 @@ export function estimateVideoCost(input: { readonly modelId: string; readonly du
     priced: true,
     amountUsd: round(seconds * rate.usd),
     basis: `${seconds}s × $${rate.usd.toFixed(2)}/s`,
-    asOf: PRICING_AS_OF,
-    caveat: LIST_PRICE_CAVEAT
+    asOf: rate.asOf ?? PRICING_AS_OF,
+    caveat: `List price recorded ${rate.asOf ?? PRICING_AS_OF}; your actual rate can differ by account, region, and resolution. Treat this as an estimate, not a quote.`
   };
 }
 

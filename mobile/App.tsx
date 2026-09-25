@@ -1,22 +1,25 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { timelineDurationMs } from '@openvideo/shared/timelineLogic';
+import { WORKSPACE_MODES, WORKSPACE_MODE_LABELS, WORKSPACE_EXPERIENCES, isCreationTool, isTabInWorkspace, workspaceModeForTab, workspaceTabForMode, type CreationTool, type WorkspaceMode } from '@openvideo/shared/workspaceModes';
 import { AgentScreen } from './src/screens/AgentScreen';
 import { EditScreen } from './src/screens/EditScreen';
 import { ImageScreen } from './src/screens/ImageScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
 import { AdBanner } from './src/components/AdBanner';
 import { PlanScreen } from './src/screens/PlanScreen';
+import { CreationStageNav } from './src/components/CreationStageNav';
 import { ProjectsScreen } from './src/screens/ProjectsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { VoiceScreen } from './src/screens/VoiceScreen';
 import { WriterScreen } from './src/screens/WriterScreen';
-import { assetUri, readProject } from './src/lib/projectStore';
+import { assetUri, readProject, createEditingCopy } from './src/lib/projectStore';
+import { modeForProjectType } from '@openvideo/shared/projectTypes';
 import { useProject } from './src/lib/useProject';
 import { exportReviewSummary } from '@openvideo/shared/exportReview';
 import { deliverExport, exportTimeline } from './src/lib/exportComposition';
@@ -50,9 +53,9 @@ import { MIN_TAP, press } from './src/lib/touch';
 const PROJECT_TABS = [
   { id: 'edit', label: 'Edit', Icon: TimelineIcon },
   { id: 'writer', label: 'Writer', Icon: PencilIcon },
+  { id: 'image', label: 'Image', Icon: PictureIcon },
   { id: 'video', label: 'Video', Icon: ClapperIcon },
   { id: 'voice', label: 'Voice', Icon: WaveIcon },
-  { id: 'image', label: 'Image', Icon: PictureIcon },
   { id: 'agent', label: 'AI', Icon: SparkIcon },
   // Last, because it is where things end up rather than where work starts.
   { id: 'library', label: 'Library', Icon: StackIcon }
@@ -86,7 +89,16 @@ export default function App() {
 function Shell() {
   const insets = useSafeAreaInsets();
   const [route, setRoute] = useState<Route>({ name: 'projects' });
-  const [tab, setTab] = useState<ProjectTab>('edit');
+  const [preferredTab, setTab] = useState<ProjectTab>('edit');
+  const [preferredMode, setWorkspaceMode] = useState<WorkspaceMode>('edit');
+  const [lastCreationTool, setLastCreationTool] = useState<CreationTool>('video');
+  const selectTab = (next: ProjectTab): void => {
+    const type = route.name === 'project' ? readProject(route.projectId)?.projectType : undefined;
+    if (type !== undefined && !isTabInWorkspace(next, modeForProjectType(type))) return;
+    setTab(next);
+    setWorkspaceMode((current) => workspaceModeForTab(next, current));
+    if (isCreationTool(next)) setLastCreationTool(next);
+  };
   const [settingsOpen, setSettingsOpen] = useState(false);
   /**
    * Bumped when Settings closes.
@@ -150,6 +162,21 @@ function Shell() {
     where there is no project to read.
   */
   const project = useProject(route.name === 'project' ? route.projectId : null);
+  const workspaceMode = modeForProjectType(project?.projectType, preferredMode);
+  const tab: ProjectTab = isTabInWorkspace(preferredTab, workspaceMode) ? preferredTab : WORKSPACE_EXPERIENCES[workspaceMode].entryTab;
+  const sendToEditing = (): void => {
+    if (!project) return;
+    if (project.projectType === undefined) { selectTab('edit'); return; }
+    Alert.alert('Create editing project?', 'Copy all saved media into a new editing project with an empty timeline. Original videos and prompts stay here.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Copy media', onPress: () => {
+        try {
+          const copied = createEditingCopy(project.id);
+          setRoute({ name: 'project', projectId: copied.id }); setTab('edit'); setWorkspaceMode('edit'); setExportState({ kind: 'idle' });
+        } catch (error) { Alert.alert('Copy failed', String(error)); }
+      } }
+    ]);
+  };
 
   if (route.name === 'projects') {
     return (
@@ -158,9 +185,11 @@ function Shell() {
         <ProjectsScreen
           topInset={insets.top}
           activeProjectId={null}
-          onOpen={(id) => {
+          onOpen={(id, mode) => {
             setRoute({ name: 'project', projectId: id });
-            setTab('edit');
+            setTab(WORKSPACE_EXPERIENCES[mode].entryTab);
+            setWorkspaceMode(mode);
+            setLastCreationTool('video');
             setExportState({ kind: 'idle' });
           }}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -342,27 +371,44 @@ function Shell() {
         </Pressable>
       )}
 
-      <View style={styles.body} onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}>
-        {tab === 'edit' && <EditScreen topInset={0} projectId={route.projectId} />}
-        {tab === 'writer' && (
+      <Text style={styles.workspaceIdentity}>OPENSCENE / {workspaceMode === 'edit' ? 'EDIT' : 'CREATE'} · {WORKSPACE_EXPERIENCES[workspaceMode].title}</Text>
+      {project?.projectType === undefined && <View accessibilityRole="tablist" style={styles.modeBar}>
+        {WORKSPACE_MODES.map((mode) => (
+          <Pressable key={mode} accessibilityRole="tab"
+            accessibilityState={{ selected: workspaceMode === mode }}
+            onPress={() => selectTab(workspaceTabForMode(mode, lastCreationTool))}
+            style={press([styles.modeButton, workspaceMode === mode && styles.modeButtonOn])}>
+            <Text style={[styles.modeLabel, workspaceMode === mode && styles.tabOn]}>{WORKSPACE_MODE_LABELS[mode]}</Text>
+          </Pressable>
+        ))}
+      </View>}
+      {workspaceMode === 'create' && (
+        <Pressable accessibilityRole="button" disabled={project === null || project.assets.length === 0} onPress={sendToEditing} style={press(styles.editorLink)}>
+          <Text style={styles.tabOn}>{project?.projectType === undefined ? 'Open in editor →' : 'Create editing project →'}</Text>
+        </Pressable>
+      )}
+      {workspaceMode === 'create' && isCreationTool(tab) && <CreationStageNav tool={tab} onSelect={selectTab} document={project?.ai} assets={project?.assets ?? []} />}
+      <View key={route.projectId} style={styles.body} onLayout={(event) => setBodyTop(event.nativeEvent.layout.y)}>
+        <RetainedScreen active={tab === 'edit'}><EditScreen active={tab === 'edit'} topInset={0} projectId={route.projectId} /></RetainedScreen>
+        <RetainedScreen active={tab === 'writer'}>
           <WriterScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
-        )}
-        {tab === 'video' && (
-          <PlanScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} />
-        )}
-        {tab === 'voice' && (
+        </RetainedScreen>
+        <RetainedScreen active={tab === 'video'}>
+          <PlanScreen active={tab === 'video'} topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} connectionsVersion={connectionsVersion} onSelectProductionTool={selectTab} />
+        </RetainedScreen>
+        <RetainedScreen active={tab === 'voice'}>
           <VoiceScreen topInset={0} keyboardOffset={bodyTop} targetSeconds={pictureSeconds} connectionsVersion={connectionsVersion} projectId={route.projectId} />
-        )}
-        {tab === 'image' && (
+        </RetainedScreen>
+        <RetainedScreen active={tab === 'image'}>
           <ImageScreen
             topInset={0}
             keyboardOffset={bodyTop}
             projectId={route.projectId}
             connectionsVersion={connectionsVersion}
           />
-        )}
+        </RetainedScreen>
         {tab === 'agent' && <AgentScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} />}
-        {tab === 'library' && <LibraryScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} />}
+        {tab === 'library' && <LibraryScreen topInset={0} keyboardOffset={bodyTop} projectId={route.projectId} onOpenEditor={sendToEditing} />}
       </View>
 
       {/* Above the bar rather than over the content: it never covers the
@@ -370,21 +416,23 @@ function Shell() {
       <AdBanner />
 
       <View accessibilityRole="tablist" style={[styles.tabBar, { paddingBottom: insets.bottom, height: 60 + insets.bottom }]}>
-        {PROJECT_TABS.map(({ id, label, Icon }) => {
-          const selected = id === tab;
+        {PROJECT_TABS.filter(({ id }) => isTabInWorkspace(id, workspaceMode) && (workspaceMode !== 'create' || !isCreationTool(id) || id === 'video')).map(({ id, label, Icon }) => {
+          const studio = workspaceMode === 'create' && id === 'video';
+          const selected = studio ? isCreationTool(tab) : id === tab;
+          const title = studio ? 'Studio' : label;
           return (
             <Pressable
               key={id}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
-              accessibilityLabel={label}
-              onPress={() => setTab(id)}
+              accessibilityLabel={title}
+              onPress={() => selectTab(studio ? lastCreationTool : id)}
               style={press(styles.tab)}
             >
               <View style={[styles.tabIcon, selected && styles.tabIconOn]}>
                 <Icon size={19} color={selected ? theme.accent : theme.textWeaker} />
               </View>
-              <Text style={[styles.tabLabel, selected && styles.tabOn]}>{label}</Text>
+              <Text style={[styles.tabLabel, selected && styles.tabOn]}>{title}</Text>
             </Pressable>
           );
         })}
@@ -393,6 +441,17 @@ function Shell() {
       <SettingsModal open={settingsOpen} onClose={() => closeSettings()} topInset={insets.top} bottomInset={insets.bottom} />
     </View>
   );
+}
+
+/** Mount on first visit; hidden studios retain drafts and in-flight jobs. */
+function RetainedScreen({ active, children }: { active: boolean; children: ReactNode }) {
+  const [visited, setVisited] = useState(active);
+  useEffect(() => { if (active) setVisited(true); }, [active]);
+  if (!active && !visited) return null;
+  return <View style={{ flex: 1, display: active ? 'flex' : 'none' }}
+    accessibilityElementsHidden={!active} importantForAccessibility={active ? 'auto' : 'no-hide-descendants'}>
+    {children}
+  </View>;
 }
 
 function SettingsModal({ open, onClose, topInset, bottomInset }: { open: boolean; onClose: () => void; topInset: number; bottomInset: number }) {
@@ -414,6 +473,12 @@ function SettingsModal({ open, onClose, topInset, bottomInset }: { open: boolean
 }
 
 const styles = StyleSheet.create({
+  workspaceIdentity: { color: theme.textWeak, fontSize: 12, paddingHorizontal: 12, paddingTop: 8 },
+  modeBar: { flexDirection: 'row', padding: 8, gap: 8 },
+  modeButton: { flex: 1, minHeight: MIN_TAP, justifyContent: 'center', alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: theme.line },
+  modeButtonOn: { borderColor: theme.accent },
+  modeLabel: { color: theme.textWeaker, fontSize: 14, fontWeight: '600' },
+  editorLink: { minHeight: MIN_TAP, justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 16 },
   root: { flex: 1, backgroundColor: theme.bg },
   bar: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: theme.line },
   barButton: { width: MIN_TAP, height: MIN_TAP, alignItems: 'center', justifyContent: 'center' },

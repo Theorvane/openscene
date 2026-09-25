@@ -227,6 +227,7 @@ export function NarrationPanel({ projectId, assets, timeline, document, targetSe
       </fieldset>)}</div>
       <p className="studio-reference__empty">Subtitle timing is derived from approved shot timing or distributed across the script. It is not word-level audio alignment; listen after synthesis and adjust before final export.</p>
       <div className="writer-preview__actions"><Button disabled={!script.trim() || !cues.length} onClick={() => void savePlan(false)}>Save draft</Button><Button variant="primary" disabled={!script.trim() || !cues.length || (!dirty && savedPlan?.status === 'approved')} onClick={() => void savePlan(true)}>Approve narration & subtitles</Button><Button disabled={savedPlan?.status !== 'approved' || dirty || stale} onClick={apply}>Apply captions to timeline</Button></div>
+      {voiceModel.providerId === 'local_qwen' && <StatusCard tone="neutral">Qwen TTS uses your local wrapper and authorized voice sample. Set VIDEO_TOOL_TTS_CONFIG_PATH to its JSON config before generating. See docs/local-qwen-tts.md.</StatusCard>}
       {status && <StatusCard tone={status.tone}>{status.text}</StatusCard>}
       {completedJobId && <section className="speech-result-review" aria-labelledby="speech-result-review-title">
         <div><strong id="speech-result-review-title">Review generated voice</strong><p>Play, pause, seek and adjust volume before adding this take to the project.</p></div>

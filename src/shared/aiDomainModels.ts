@@ -18,6 +18,7 @@ export type AiDomainProvider = {
 
 export const AI_DOMAIN_PROVIDERS: readonly AiDomainProvider[] = [
   { id: 'local_ollama', label: 'Ollama', executionPath: 'local' },
+  { id: 'local_qwen', label: 'Qwen TTS', executionPath: 'local' },
   { id: 'vieneu_local', label: 'VieNeu-TTS', executionPath: 'local' },
   { id: 'comfyui_local', label: 'ComfyUI', executionPath: 'local' },
   { id: AGENT_ROUTER_PROVIDER_ID, label: 'AgentRouter', executionPath: 'api' },
@@ -61,6 +62,13 @@ export type AiDomainModelPreferences = Record<AiDomain, string>;
 export const AI_DOMAIN_MODEL_STORAGE_KEY = 'openvideo-ai-domain-model-preferences-v1';
 
 const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
+  // Qwen uses a user-configured local wrapper and an authorized voice sample.
+  {
+    id: 'local-qwen-tts', providerId: 'local_qwen', label: 'Qwen3-TTS (local)', providerLabel: 'Qwen TTS',
+    description: 'Local Qwen voice synthesis using your configured wrapper and authorized voice sample.',
+    executionPath: 'local', domains: ['voice-generation'], available: true,
+    availableOn: ['desktop'], unavailableReason: 'Qwen TTS requires the desktop app and a configured local wrapper.'
+  },
   // ── Voice generation: cloud TTS models. ElevenLabs and OpenAI adapters are
   // implemented; the rest stay honestly unavailable until an adapter lands.
   {
@@ -138,7 +146,7 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     providerId: 'vieneu_local',
     label: 'VieNeu-TTS v3 Turbo',
     providerLabel: 'VieNeu-TTS',
-    description: 'Local Vietnamese speech at 48 kHz; OpenScene starts VieNeu and discovers its voices automatically.',
+    description: 'Local Vietnamese speech at 48 kHz; OpenScene starts VieNeu only when selected and discovers its voices then.',
     executionPath: 'local',
     domains: ['voice-generation'],
     available: true,
@@ -426,16 +434,24 @@ const AI_DOMAIN_MODEL_CATALOG: readonly AiDomainModelConfig[] = [
     available: false,
     unavailableReason: 'MiniMax adapter is not implemented in this build.'
   },
+  ...([
+    ['wan2.7-t2v', 'Wan 2.7 · Text', 'Generate from a text prompt with Alibaba Wan 2.7.'],
+    ['wan2.7-i2v', 'Wan 2.7 · First frame', 'Animate a storyboard image with Alibaba Wan 2.7.'],
+    ['happyhorse-1.1-t2v', 'HappyHorse 1.1 · Text', 'Generate from a text prompt with Alibaba HappyHorse 1.1.'],
+    ['happyhorse-1.1-i2v', 'HappyHorse 1.1 · First frame', 'Animate a first frame with Alibaba HappyHorse 1.1.']
+  ] as const).map(([id, label, description]) => ({
+    id, providerId: 'alibaba_dashscope', label, providerLabel: 'Alibaba Model Studio',
+    description, executionPath: 'api' as const, domains: ['video-generation'] as const, available: true
+  })),
   {
     id: 'grok-imagine-video-1.5',
     providerId: 'xai',
     label: 'Grok Imagine Video 1.5',
     providerLabel: 'xAI Grok Imagine',
-    description: 'Desktop browser-session text/image-to-video using the signed-in Grok Imagine UI.',
+    description: 'Text or first-frame video through xAI API or the signed-in desktop Grok session.',
     executionPath: 'api',
     domains: ['video-generation'],
-    available: true,
-    availableOn: ['desktop']
+    available: true
   },
   {
     id: 'grok-imagine-video',

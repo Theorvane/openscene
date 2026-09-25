@@ -55,6 +55,7 @@ function sanitizeFolderName(name: string): string {
 }
 
 export type CreateProjectInFolderInput = {
+  readonly projectType?: import('../shared/projectTypes').ProjectType;
   readonly name: string;
   readonly parentDirectory: string;
 };
@@ -89,7 +90,7 @@ export class ProjectStore {
     if (this.locations === null) {
       throw new ProjectStoreError('Folder-backed projects are not configured.');
     }
-    const parsedInput = parseCreateProjectInput({ name: input.name });
+    const parsedInput = parseCreateProjectInput({ name: input.name, ...(input.projectType === undefined ? {} : { projectType: input.projectType }) });
     if (parsedInput === null) {
       throw new ProjectStoreError('Invalid project creation input.');
     }
@@ -101,6 +102,7 @@ export class ProjectStore {
       schemaVersion: PROJECT_SCHEMA_VERSION,
       id,
       name: parsedInput.name,
+      projectType: parsedInput.projectType ?? 'editing',
       createdAt: timestamp,
       updatedAt: timestamp,
       assets: [],
@@ -157,7 +159,8 @@ export class ProjectStore {
    * rejected so a real (possibly newer or corrupt) project is never
    * overwritten.
    */
-  async openOrInitializeFolder(directory: string, now = new Date()): Promise<OpenOrInitializeFolderResult | null> {
+  async openOrInitializeFolder(directory: string, now = new Date(), projectType: import('../shared/projectTypes').ProjectType = 'editing'): Promise<OpenOrInitializeFolderResult | null> {
+    if (projectType !== 'editing' && projectType !== 'generation') throw new ProjectStoreError('Invalid project type.');
     if (this.locations === null) {
       throw new ProjectStoreError('Folder-backed projects are not configured.');
     }
@@ -177,6 +180,7 @@ export class ProjectStore {
       schemaVersion: PROJECT_SCHEMA_VERSION,
       id,
       name: sanitizeFolderName(basename(resolved)),
+      projectType,
       createdAt: timestamp,
       updatedAt: timestamp,
       assets: [],
@@ -208,6 +212,7 @@ export class ProjectStore {
       schemaVersion: PROJECT_SCHEMA_VERSION,
       id,
       name: parsedInput.name,
+      projectType: parsedInput.projectType ?? 'editing',
       createdAt: timestamp,
       updatedAt: timestamp,
       assets: [],
@@ -241,11 +246,12 @@ export class ProjectStore {
     );
     const internalSummaries = internalSnapshots
       .filter((snapshot): snapshot is LocalProjectSnapshot => snapshot !== null)
-      .map(({ id, name, createdAt, updatedAt }): LocalProjectSummary => ({ id, name, createdAt, updatedAt, storage: 'internal' }));
+      .map(({ id, name, createdAt, updatedAt, projectType }): LocalProjectSummary => ({ id, name, createdAt, updatedAt, ...(projectType === undefined ? {} : { projectType }), storage: 'internal' }));
     const externalSummaries = externalSnapshots
       .filter((entry): entry is { snapshot: LocalProjectSnapshot; directory: string } => entry !== null)
-      .map(({ snapshot: { id, name, createdAt, updatedAt }, directory }): LocalProjectSummary => ({
+      .map(({ snapshot: { id, name, createdAt, updatedAt, projectType }, directory }): LocalProjectSummary => ({
         id,
+        ...(projectType === undefined ? {} : { projectType }),
         name,
         createdAt,
         updatedAt,

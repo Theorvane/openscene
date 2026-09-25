@@ -1,5 +1,6 @@
 import type { AiProjectDocument, GenerationRecord, ReferenceAsset } from './aiProjectDomain';
 import type { ImageAspectRatio } from './providerSeams';
+import { getVideoOperationConstraints, isVideoOperationImplemented, type VideoOperation } from './mediaCapabilityRegistry';
 import type { VideoContinuityControls } from './videoContinuitySettings';
 import { approvedWriterShots, pipelineBaseRequest } from './writerPipeline';
 import { writerVideoStyleDirection } from './writerWorkflow';
@@ -17,7 +18,9 @@ export type ProductionShotState =
 
 export type ProductionShotRow = {
   readonly shotId: string;
+  readonly sceneId: string;
   readonly label: string;
+  readonly prompt: string;
   readonly durationMs: number;
   readonly sceneTitle: string;
   readonly characterIds: readonly string[];
@@ -27,6 +30,20 @@ export type ProductionShotRow = {
   readonly state: ProductionShotState;
   readonly approvedGeneration?: GenerationRecord;
 };
+
+/** Media selected for a storyboard slate. The approved take leads; its first frame remains available as a fallback. */
+/** Standalone generation must not bypass scene approval and take review for an applied film plan. */
+export function standaloneGenerationBlockReason(document: AiProjectDocument | null | undefined, writerShotId?: string): string | null {
+  if (writerShotId || productionShotRows(document).length === 0) return null;
+  return 'This project has an approved film plan. Generate its shots from the scene production board so each take stays attached to its scene and review.';
+}
+
+export function productionShotVisual(row: ProductionShotRow): { readonly takeAssetId: string | null; readonly storyboardAssetId: string | null } {
+  return {
+    takeAssetId: row.approvedGeneration?.status === 'completed' ? row.approvedGeneration.outputAssetIds[0] ?? null : null,
+    storyboardAssetId: row.storyboardReference?.assetId ?? null
+  };
+}
 
 export type ProductionAssetSummary = {
   readonly id: string;
@@ -38,6 +55,7 @@ export type ProductionAssemblyShot = {
   readonly shotId: string;
   readonly assetId: string;
   readonly durationMs: number;
+  readonly sourceDurationMs: number;
 };
 
 export type ProductionAssemblyPlan =
@@ -51,6 +69,15 @@ export type ProductionMutationResult =
 export type ProductionImageTarget =
   | { readonly kind: 'character_reference'; readonly characterId: string }
   | { readonly kind: 'storyboard'; readonly shotId: string };
+
+/** Choose the shortest supported source that can fill the finished shot. Never stretch a short clip. */
+export function productionSourceDurationSeconds(modelId: string, operation: VideoOperation, finishedSeconds: number, browserDurations?: readonly number[]): number | null {
+  if (!Number.isFinite(finishedSeconds) || finishedSeconds <= 0) return null;
+  const options = browserDurations ?? (isVideoOperationImplemented(modelId, operation)
+    ? getVideoOperationConstraints(modelId, operation)?.durationSeconds
+    : undefined);
+  return options?.filter((seconds) => seconds >= finishedSeconds).sort((a, b) => a - b)[0] ?? null;
+}
 
 export const PRODUCTION_BATCH_LIMIT = 50;
 
@@ -285,6 +312,8 @@ export function buildStoryboardImageBrief(
   if (scene === undefined) return { ok: false, reason: 'The Writer scene no longer exists.' };
   const writerShot = approvedWriterShots(document).find((entry) => entry.id === shot.id);
   if (writerShot === undefined) return { ok: false, reason: 'Approve and save the Writer prompt stage before generating storyboard images.' };
+  const sceneBlock = productionSceneGenerationBlockReason(document, shot.id);
+  if (sceneBlock !== null) return { ok: false, reason: sceneBlock };
   const characters = scene.characterIds.flatMap((characterId) => {
     const character = document.characters.find((entry) => entry.id === characterId);
     return character === undefined ? [] : [`${character.name}: ${character.invariantDescription}`];
@@ -373,7 +402,9 @@ export function productionShotRows(document: AiProjectDocument | null | undefine
     ).filter((id, index, values) => values.indexOf(id) === index);
     return [{
       shotId: shot.id,
+      sceneId: scene.id,
       label: writerShot.label,
+      prompt: writerShot.prompt,
       durationMs: shot.durationMs,
       sceneTitle: scene.title,
       characterIds: scene.characterIds,
@@ -386,6 +417,147 @@ export function productionShotRows(document: AiProjectDocument | null | undefine
   });
 }
 
+export type ProductionSceneRow = {
+  readonly sceneId: string;
+  readonly order: number;
+  readonly title: string;
+  readonly objective: string;
+  readonly setting: string;
+  readonly timeOfDay: string;
+  readonly continuityNotes: string;
+  readonly durationMs: number;
+  readonly shotCount: number;
+  readonly approvedShotCount: number;
+  readonly approved: boolean;
+  readonly complete: boolean;
+  readonly canApprove: boolean;
+  readonly canProduce: boolean;
+};
+
+/** Ordered scenes in the active Writer plan, with approval and take progress. */
+export function productionSceneRows(document: AiProjectDocument | null | undefined): readonly ProductionSceneRow[] {
+  if (!document?.writerPipeline?.appliedScriptId) return [];
+  const shots = productionShotRows(document);
+  if (shots.length === 0) return [];
+  const scenes = document.scenes
+    .filter((scene) => scene.scriptVersionId === document.writerPipeline?.appliedScriptId)
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  const result: ProductionSceneRow[] = [];
+  for (const scene of scenes) {
+    const sceneShots = shots.filter((shot) => shot.sceneId === scene.id);
+    if (sceneShots.length !== scene.shotIds.length || sceneShots.length === 0) return [];
+    const approved = scene.productionApprovedAt !== undefined;
+    const approvedShotCount = sceneShots.filter((shot) => shot.approvedGeneration?.status === 'completed' && (shot.approvedGeneration.outputAssetIds.length > 0)).length;
+    const complete = approved && approvedShotCount === sceneShots.length;
+    const previousComplete = result.every((entry) => entry.complete);
+    result.push({
+      sceneId: scene.id, order: scene.order, title: scene.title, objective: scene.objective,
+      setting: scene.setting, timeOfDay: scene.timeOfDay, continuityNotes: scene.continuityNotes,
+      durationMs: sceneShots.reduce((total, shot) => total + shot.durationMs, 0),
+      shotCount: sceneShots.length, approvedShotCount, approved, complete,
+      canApprove: !approved && previousComplete,
+      canProduce: approved && previousComplete
+    });
+  }
+  return result;
+}
+
+export type ProductionSceneStage = 'locked' | 'approval' | 'generate' | 'generating' | 'review' | 'complete';
+
+/** The next visible action for a scene, derived from the same take states on both surfaces. */
+export function productionSceneSummary(scene: ProductionSceneRow, shots: readonly ProductionShotRow[]): {
+  readonly stage: ProductionSceneStage;
+  readonly pendingCount: number;
+  readonly generatingCount: number;
+  readonly reviewCount: number;
+} {
+  const own = shots.filter((shot) => shot.sceneId === scene.sceneId);
+  const pendingCount = own.filter((shot) => shot.state === 'not_started' || shot.state === 'failed').length;
+  const generatingCount = own.filter((shot) => shot.state === 'generating').length;
+  const reviewCount = own.filter((shot) => shot.state === 'needs_import' || shot.state === 'needs_review').length;
+  const stage: ProductionSceneStage = scene.complete ? 'complete'
+    : !scene.approved ? scene.canApprove ? 'approval' : 'locked'
+    : !scene.canProduce ? 'locked'
+    : generatingCount > 0 ? 'generating'
+    : reviewCount > 0 ? 'review'
+    : 'generate';
+  return { stage, pendingCount, generatingCount, reviewCount };
+}
+
+export type ProductionSceneGuide = {
+  readonly step: string;
+  readonly title: string;
+  readonly detail: string;
+};
+
+/** One next-action explanation for the scene, shared by desktop and mobile. */
+export function productionSceneGuide(
+  scene: ProductionSceneRow,
+  shots: readonly ProductionShotRow[],
+  hasNextScene: boolean,
+  canAddScene = false
+): ProductionSceneGuide {
+  const summary = productionSceneSummary(scene, shots);
+  const progress = `${scene.approvedShotCount}/${scene.shotCount} five-second shots approved`;
+  switch (summary.stage) {
+    case 'locked':
+      return { step: 'WAITING', title: `Finish the previous scene first`, detail: `Scenes are produced in story order. ${progress}.` };
+    case 'approval':
+      return { step: '1 / 4 · APPROVE', title: `Review and approve scene ${scene.order + 1}`, detail: 'Read the scene brief and shot prompts below. Approval unlocks this scene for media generation.' };
+    case 'generate':
+      return { step: '2 / 4 · GENERATE', title: `Make scene ${scene.order + 1} shot by shot`, detail: `${progress}. Generate the pending five-second shots, or open one shot to edit its prompt and first frame. Each paid run asks for cost approval.` };
+    case 'generating':
+      return { step: '2 / 4 · GENERATING', title: `Scene ${scene.order + 1} is rendering`, detail: `${summary.generatingCount} shot(s) are running. Review each take when it is saved.` };
+    case 'review':
+      return { step: '3 / 4 · REVIEW', title: `Choose the takes for scene ${scene.order + 1}`, detail: `${progress}. Review the pending takes and approve one for every shot before continuing.` };
+    case 'complete':
+      return hasNextScene
+        ? { step: '4 / 4 · NEXT SCENE', title: `Scene ${scene.order + 1} is ready`, detail: `All ${scene.shotCount} shots have approved takes. Continue to scene ${scene.order + 2}; the final assembly will place scenes in story order.` }
+        : canAddScene
+          ? { step: '4 / 4 · CHOOSE', title: 'Continue the story or review the current cut', detail: 'Every shot in this scene has an approved take. Plan the next scene above, or assemble the approved scenes into a working cut.' }
+          : { step: '4 / 4 · CONNECT', title: 'Connect the finished scenes', detail: 'Every scene has approved takes. Assemble them on the timeline in story order, then review and export the cut.' };
+  }
+}
+
+/** Checked again at submission, so a stale screen cannot spend on an unapproved scene. */
+export function productionSceneGenerationBlockReason(document: AiProjectDocument, shotId: string): string | null {
+  const shot = document.shots.find((entry) => entry.id === shotId);
+  const scene = shot === undefined ? undefined : document.scenes.find((entry) => entry.id === shot.sceneId);
+  if (scene === undefined) return 'The planned shot or scene no longer exists.';
+  if (scene.scriptVersionId !== document.writerPipeline?.appliedScriptId) return null;
+  const state = productionSceneRows(document).find((entry) => entry.sceneId === scene.id);
+  if (!state?.approved) return `Approve ${scene.title} for production before generating its shots.`;
+  return state.canProduce ? null : 'Finish and approve every take in the preceding scenes before generating this scene.';
+}
+
+/** A deliberate new take may coexist with an approved one, but not with an unresolved provider job. */
+export function productionShotRegenerationBlockReason(document: AiProjectDocument, shotId: string): string | null {
+  const sceneBlock = productionSceneGenerationBlockReason(document, shotId);
+  if (sceneBlock !== null) return sceneBlock;
+  const attempts = document.generations.filter((entry) => entry.shotId === shotId && entry.review?.decision !== 'rejected');
+  if (attempts.some((entry) => ['queued', 'running', 'needs_user_action'].includes(entry.status))) {
+    return 'Wait for the current shot generation to finish before starting another take.';
+  }
+  if (attempts.some((entry) => entry.status === 'completed' && entry.outputAssetIds.length === 0)) {
+    return 'Import the completed take before starting another generation.';
+  }
+  return null;
+}
+
+export function approveProductionScene(document: AiProjectDocument, sceneId: string, approvedAt: string): ProductionMutationResult {
+  const scene = productionSceneRows(document).find((entry) => entry.sceneId === sceneId);
+  if (scene === undefined) return { ok: false, reason: 'This scene is not in the active approved Writer plan.' };
+  if (scene.approved) return { ok: false, reason: 'This scene is already approved for production.' };
+  if (!scene.canApprove) return { ok: false, reason: 'Approve every take in the preceding scene before starting this one.' };
+  if (Number.isNaN(new Date(approvedAt).valueOf()) || new Date(approvedAt).toISOString() !== approvedAt) {
+    return { ok: false, reason: 'Scene approval needs a valid timestamp.' };
+  }
+  return { ok: true, document: {
+    ...document,
+    scenes: document.scenes.map((entry) => entry.id === sceneId ? { ...entry, productionApprovedAt: approvedAt } : entry)
+  } };
+}
+
 /** Targets that are actually missing; existing reviewed mappings are never overwritten by a batch. */
 export function missingProductionImageTargets(
   document: AiProjectDocument,
@@ -393,7 +565,8 @@ export function missingProductionImageTargets(
 ): readonly ProductionImageTarget[] {
   const rows = productionShotRows(document);
   if (kind === 'storyboard') {
-    return rows.filter((row) => row.storyboardReference === undefined)
+    const approvedScenes = new Set(productionSceneRows(document).filter((scene) => scene.canProduce).map((scene) => scene.sceneId));
+    return rows.filter((row) => approvedScenes.has(row.sceneId) && row.storyboardReference === undefined)
       .slice(0, PRODUCTION_BATCH_LIMIT)
       .map((row) => ({ kind: 'storyboard' as const, shotId: row.shotId }));
   }
@@ -405,9 +578,10 @@ export function missingProductionImageTargets(
 }
 
 /** Shots safe to enqueue without duplicating an active, reviewable, or approved take. */
-export function batchableProductionVideoShotIds(document: AiProjectDocument): readonly string[] {
+export function batchableProductionVideoShotIds(document: AiProjectDocument, sceneId?: string): readonly string[] {
+  const approvedScenes = new Set(productionSceneRows(document).filter((scene) => scene.canProduce).map((scene) => scene.sceneId));
   return productionShotRows(document)
-    .filter((row) => row.state === 'not_started' || row.state === 'failed')
+    .filter((row) => approvedScenes.has(row.sceneId) && (sceneId === undefined || row.sceneId === sceneId) && (row.state === 'not_started' || row.state === 'failed'))
     .slice(0, PRODUCTION_BATCH_LIMIT)
     .map((row) => row.shotId);
 }
@@ -497,6 +671,8 @@ export function buildApprovedProductionAssemblyPlan(
 ): ProductionAssemblyPlan {
   const rows = productionShotRows(document);
   if (rows.length === 0) return { ok: false, reason: 'Approve and save the Writer prompt stage before assembling a production cut.' };
+  const scenes = productionSceneRows(document);
+  if (scenes.length === 0 || scenes.some((scene) => !scene.approved)) return { ok: false, reason: 'Approve every planned scene before assembling the film.' };
   const byId = new Map(assets.map((asset) => [asset.id, asset]));
   const usedAssetIds = new Set<string>();
   const shots: ProductionAssemblyShot[] = [];
@@ -508,10 +684,11 @@ export function buildApprovedProductionAssemblyPlan(
     const asset = assetId === undefined ? undefined : byId.get(assetId);
     if (asset === undefined) return { ok: false, reason: `${row.label} has no available approved output asset.` };
     if (asset.kind !== 'video') return { ok: false, reason: `${row.label} approved output is not a video.` };
-    if (asset.durationMs === null || asset.durationMs <= 0) return { ok: false, reason: `Analyze ${row.label} video metadata before assembling the cut.` };
+    if (asset.durationMs === null || !Number.isFinite(asset.durationMs) || asset.durationMs <= 0) return { ok: false, reason: `Analyze ${row.label} video metadata before assembling the cut.` };
+    if (asset.durationMs < row.durationMs) return { ok: false, reason: `${row.label} needs ${row.durationMs / 1000}s but its take is only ${asset.durationMs / 1000}s. Generate a longer take or revise the plan before assembling; dialogue timing was not changed.` };
     if (usedAssetIds.has(asset.id)) return { ok: false, reason: `${row.label} reuses an approved video from another shot. Review the candidate mapping before assembling.` };
     usedAssetIds.add(asset.id);
-    shots.push({ shotId: row.shotId, assetId: asset.id, durationMs: asset.durationMs });
+    shots.push({ shotId: row.shotId, assetId: asset.id, durationMs: row.durationMs, sourceDurationMs: asset.durationMs });
   }
   return { ok: true, shots, totalDurationMs: shots.reduce((total, shot) => total + shot.durationMs, 0) };
 }
@@ -521,16 +698,39 @@ export function assembleApprovedProductionCut(input: {
   readonly plan: Extract<ProductionAssemblyPlan, { readonly ok: true }>;
   readonly targetTrackId: string;
   readonly clipIdForShot: (shotId: string) => string;
+  /** Append only after an exact unedited prefix of a sequential film. */
+  readonly allowExistingPrefix?: boolean;
 }): { readonly ok: true; readonly timeline: TimelineDocument } | { readonly ok: false; readonly reason: string } {
   const track = input.timeline.tracks.find((entry) => entry.id === input.targetTrackId);
   if (track === undefined || track.kind !== 'video') return { ok: false, reason: 'Choose an existing video track for the production cut.' };
   const approvedAssets = new Set(input.plan.shots.map((entry) => entry.assetId));
-  if (input.timeline.tracks.some((entry) => entry.clips.some((clip) => approvedAssets.has(clip.assetId)))) {
+  const elsewhere = input.timeline.tracks.some((entry) => entry.id !== track.id && entry.clips.some((clip) => approvedAssets.has(clip.assetId)));
+  if (elsewhere) return { ok: false, reason: 'An approved shot is already on another track. Arrange production clips manually before assembling again.' };
+  const existing = track.clips.filter(clip => approvedAssets.has(clip.assetId)).slice()
+    .sort((left, right) => left.timelineStartMs - right.timelineStartMs);
+  if (existing.length > 0 && !input.allowExistingPrefix) {
     return { ok: false, reason: 'At least one approved shot is already on the timeline. Remove or arrange existing production clips manually before assembling again.' };
+  }
+  if (existing.length === input.plan.shots.length) return { ok: false, reason: 'All approved shots are already assembled.' };
+  for (const [index, clip] of existing.entries()) {
+    const shot = input.plan.shots[index];
+    const previous = existing[index - 1];
+    const defaultEffects = clip.effects !== undefined &&
+      Object.keys(clip.effects).length === Object.keys(DEFAULT_CLIP_EFFECTS).length &&
+      Object.entries(DEFAULT_CLIP_EFFECTS).every(([key, value]) => clip.effects?.[key as keyof typeof DEFAULT_CLIP_EFFECTS] === value);
+    if (!shot || clip.assetId !== shot.assetId || clip.sourceStartMs !== 0 || clip.sourceEndMs !== shot.durationMs ||
+      !defaultEffects || clip.keyframes.length !== 0 ||
+      (previous && clip.timelineStartMs !== previous.timelineStartMs + input.plan.shots[index - 1]!.durationMs)) {
+      return { ok: false, reason: 'The existing production clips are not an unedited scene-order prefix. Arrange them manually before assembling again.' };
+    }
+  }
+  const last = existing[existing.length - 1];
+  if (last && track.clips.some(clip => !approvedAssets.has(clip.assetId) && clip.timelineStartMs >= last.timelineStartMs + input.plan.shots[existing.length - 1]!.durationMs)) {
+    return { ok: false, reason: 'Other footage follows the assembled scene. Arrange it before appending another scene.' };
   }
   let timeline = input.timeline;
   let cursor = trackAppendStartMs(track);
-  for (const shot of input.plan.shots) {
+  for (const shot of input.plan.shots.slice(existing.length)) {
     const next = placeClip(timeline, {
       trackId: track.id,
       clip: {
@@ -539,7 +739,7 @@ export function assembleApprovedProductionCut(input: {
         timelineStartMs: cursor,
         sourceStartMs: 0,
         sourceEndMs: shot.durationMs,
-        sourceDurationMs: shot.durationMs,
+        sourceDurationMs: shot.sourceDurationMs,
         effects: { ...DEFAULT_CLIP_EFFECTS },
         keyframes: []
       }

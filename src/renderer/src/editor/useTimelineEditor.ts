@@ -47,6 +47,7 @@ import { useTimelinePlayback } from './useTimelinePlayback';
 import type { AiProjectDocument } from '../../../shared/aiProjectDomain';
 import { detachVideoAudioOnTimeline } from '../../../shared/detachVideoAudio';
 import { assembleApprovedProductionCut, buildApprovedProductionAssemblyPlan } from '../../../shared/productionWorkflow';
+import { pipelineBaseRequest } from '../../../shared/writerPipeline';
 
 type TimelineUpdate = (timeline: TimelineDocument) => TimelineDocument | null;
 
@@ -179,8 +180,8 @@ export function useTimelineEditor() {
     return false;
   }, [invokeWhileBusy, newProjectName, refreshProjects, setLoadedProject]);
 
-  const openProjectFolder = useCallback(async (): Promise<boolean> => {
-    const response = await invokeWhileBusy(() => window.videoTool.openProjectFolder(), 'The project folder could not be opened.');
+  const openProjectFolder = useCallback(async (projectType: import('../../../shared/projectTypes').ProjectType = 'editing'): Promise<boolean> => {
+    const response = await invokeWhileBusy(() => window.videoTool.openProjectFolder({ projectType }), 'The project folder could not be opened.');
     if (response === null) return false;
     if (response.ok) {
       if (response.value.cancelled) {
@@ -390,6 +391,7 @@ export function useTimelineEditor() {
       timeline: project.timeline,
       plan,
       targetTrackId: target.id,
+      allowExistingPrefix: pipelineBaseRequest(project.ai.writerPipeline)?.productionScope !== undefined,
       clipIdForShot: () => createOpaqueId('production-clip')
     });
     if (!assembled.ok) {

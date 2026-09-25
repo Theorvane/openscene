@@ -1,4 +1,5 @@
 import { constants } from 'node:fs';
+import { generateLocalQwenSpeech } from './localQwenTts';
 import { lstat, mkdir, open, realpath, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { app } from 'electron';
@@ -15,7 +16,7 @@ import type {
 import { getDefaultDomainModelId, getDomainModel, type AiDomainModelConfig } from '../shared/aiDomainModels';
 import { estimateImageCost, estimateSpeechCost, estimateVideoCost, type CostEstimate } from '../shared/mediaGenerationPricing';
 import { getVideoOperationConstraints, getVideoProviderBinding, validateVideoRequest } from '../shared/mediaCapabilityRegistry';
-import { resolveVideoOperation, validateVideoInputSet } from '../shared/videoGeneration';
+import { alibabaVideoBaseUrl, resolveVideoOperation, validateVideoInputSet } from '../shared/videoGeneration';
 import { GenerationSpendStore } from './generationSpendStore';
 import { discoverFfmpeg } from './ffmpegDiscovery';
 import type { CredentialStore } from './credentialStore';
@@ -25,6 +26,8 @@ import {
   generateLumaVideo,
   generateOpenAiSpeech,
   generateRunwayVideo,
+  generateGrokVideo,
+  generateAlibabaVideo,
   generateSoraVideo,
   generateVeoVideo,
   generateVieNeuSpeech,
@@ -281,7 +284,8 @@ const VIDEO_PROVIDER_LABELS: Record<VideoGenerationProviderId, string> = {
   kling_v3: 'Kling',
   luma_dream: 'Luma',
   minimax_hailuo: 'MiniMax Hailuo',
-  comfyui_wan: 'ComfyUI Wan'
+  comfyui_wan: 'ComfyUI Wan',
+  alibaba_wan: 'Alibaba Model Studio'
 };
 
 const IMAGE_PROVIDER_LABELS: Record<ImageGenerationProviderId, string> = {
@@ -310,6 +314,7 @@ const SPEECH_MODEL_PROVIDERS: Record<string, { seam: TextToSpeechJob['provider']
   openai: { seam: 'openai_tts', credentialKey: 'openaiApiKey', label: 'OpenAI' },
   google_gemini: { seam: 'gemini_tts', credentialKey: 'geminiApiKey', label: 'Google Gemini' },
   groq: { seam: 'groq_tts', credentialKey: 'groq', label: 'Groq' },
+  local_qwen: { seam: 'local_qwen', label: 'Qwen TTS' },
   vieneu_local: { seam: 'vieneu_local', label: 'VieNeu-TTS' }
 };
 
@@ -318,11 +323,13 @@ async function invokeCloudVideoProvider(
   model: AiDomainModelConfig,
   apiKey: string,
   request: VideoGenerationRequest & { readonly durationSeconds: number },
-  outputFilePath: string
+  outputFilePath: string,
+  alibabaWorkspaceId?: string
 ): Promise<CloudProviderResult> {
   let lastProgressLogMs = -10_000;
   const synthesisInput = {
     apiKey,
+    ...(alibabaWorkspaceId === undefined ? {} : { alibabaWorkspaceId }),
     modelId: model.id,
     prompt: request.prompt,
     aspectRatio: request.aspectRatio ?? ('16:9' as const),
@@ -352,7 +359,9 @@ async function invokeCloudVideoProvider(
       google_omni: generateGeminiOmniVideo,
       openai_sora: generateSoraVideo,
       runway: generateRunwayVideo,
-      luma: generateLumaVideo
+      luma: generateLumaVideo,
+      xai_grok_api: generateGrokVideo,
+      alibaba_video: generateAlibabaVideo
     };
     const adapter = adapters[binding.adapterId];
     if (adapter === undefined) {
@@ -377,7 +386,10 @@ async function invokeSpeechProvider(
 ): Promise<CloudProviderResult> {
   try {
     let bytes: Buffer;
-    if (model.providerId === 'vieneu_local') {
+    if (model.providerId === 'local_qwen') {
+      await generateLocalQwenSpeech({ script: request.delivery?.performanceScript ?? request.script, outputPath: outputFilePath, ...(request.language === undefined ? {} : { language: request.language }) });
+      return { ok: true, outputFilePath };
+    } else if (model.providerId === 'vieneu_local') {
       await activeVieNeuRuntime?.ensureReady();
       bytes = await generateVieNeuSpeech({ voiceId: request.voiceId ?? '', script: request.script, ...(request.delivery === undefined ? {} : { delivery: request.delivery }) });
     } else if (model.providerId === 'elevenlabs' && apiKey !== undefined) {
@@ -466,8 +478,11 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
       if (flowModel === null) {
         throw new Error(`${model.label} has no exact counterpart in the current Google Flow video menu. Use the API lane instead.`);
       }
-    } else if (!(model.providerId === 'xai' && providerMapping.adapterId === 'grok_imagine_browser')) {
+    } else if (!(model.providerId === 'xai' && modelId === 'grok-imagine-video-1.5')) {
       throw new Error('Browser-session video generation is available only for an explicitly supported Google Flow or Grok Imagine model.');
+    }
+    if (model.providerId === 'xai' && ![6, 10, 15].includes(durationSeconds)) {
+      throw new Error('The signed-in Grok Imagine session supports 6, 10, or 15 second clips. Use the xAI API key lane for five-second shots.');
     }
     if (model.providerId === 'google_gemini') {
       if (!['text_to_video', 'image_to_video', 'reference_to_video', 'start_end'].includes(operation)) {
@@ -554,6 +569,12 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
         throw new Error(`API key is required for ${VIDEO_PROVIDER_LABELS[provider]} cloud generation. Connect the provider in Settings first.`);
       }
 
+      const alibabaWorkspaceId = mode === 'api' && providerMapping.adapterId === 'alibaba_video'
+        ? await activeCredentialStore?.getCredentialValue('alibabaWorkspaceId')
+        : undefined;
+      if (mode === 'api' && providerMapping.adapterId === 'alibaba_video') {
+        alibabaVideoBaseUrl(alibabaWorkspaceId);
+      }
       if (mode === 'api') await settleSpend(reservationId, 'charged');
       logVideoJob(id, 'provider.request.started', { provider: VIDEO_PROVIDER_LABELS[provider] });
       let cloudResult: CloudProviderResult;
@@ -601,7 +622,7 @@ export async function createVideoGenerationJob(request: VideoGenerationRequest):
           throw error;
         }
       } else {
-        cloudResult = await invokeCloudVideoProvider(id, model, apiKey!, normalizedRequest, join(videoDir, `${id}.mp4`));
+        cloudResult = await invokeCloudVideoProvider(id, model, apiKey!, normalizedRequest, join(videoDir, `${id}.mp4`), alibabaWorkspaceId);
       }
       if (!cloudResult.ok) {
         throw new Error(cloudResult.error);
@@ -869,7 +890,7 @@ export async function createSpeechGenerationJob(request: TextToSpeechRequest): P
 
       if (model.executionPath === 'api') await settleSpend(reservationId, 'charged');
       logSpeechJob(id, 'provider.request.started', { executionPath: model.executionPath });
-      const extension = provider === 'vieneu_local' ? 'wav' : 'mp3';
+      const extension = provider === 'vieneu_local' || provider === 'local_qwen' ? 'wav' : 'mp3';
       const heartbeat = setInterval(() => {
         logSpeechJob(id, 'process.working', { elapsedSeconds: Math.round((Date.now() - startedAt) / 1_000) });
       }, 10_000);
@@ -972,7 +993,7 @@ export async function openCompletedSpeechPreviewSource(jobId: string): Promise<O
   return openCompletedPreviewSource(
     job.outputFilePath,
     join(getAiStorageDir(), 'speech'),
-    job.provider === 'vieneu_local' ? 'audio/wav' : 'audio/mpeg'
+    job.provider === 'vieneu_local' || job.provider === 'local_qwen' ? 'audio/wav' : 'audio/mpeg'
   );
 }
 
@@ -1010,7 +1031,7 @@ export function getCompletedAiSource(jobId: string): { sourcePath: string; displ
 
   const speechJob = speechJobs.get(jobId);
   if (speechJob && speechJob.status === 'completed' && speechJob.outputFilePath) {
-    const isWav = speechJob.provider === 'vieneu_local';
+    const isWav = speechJob.provider === 'vieneu_local' || speechJob.provider === 'local_qwen';
     return {
       sourcePath: speechJob.outputFilePath,
       displayName: `AI_Voice_${speechJob.id.slice(-6)}.${isWav ? 'wav' : 'mp3'}`,

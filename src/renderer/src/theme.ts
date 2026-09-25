@@ -61,15 +61,15 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
   },
   {
     id: 'obsidian-pro',
-    label: 'Obsidian Pro',
-    description: 'Deep OLED black & pro slate suite',
+    label: 'Graphite Pro',
+    description: 'Unified graphite workbench with blue controls',
     light: {
-      accentColor: '#2563eb',
-      bgPreview: '#f8fafc'
+      accentColor: '#245bc5',
+      bgPreview: '#e9edf3'
     },
     dark: {
-      accentColor: '#3b82f6',
-      bgPreview: '#000000'
+      accentColor: '#78a9ff',
+      bgPreview: '#191c22'
     }
   }
 ] as const;
@@ -92,7 +92,7 @@ export function parseThemePreset(storedPreset: string | null | undefined, defaul
     case 'obsidian-pro':
       return storedPreset;
     default:
-      return defaultMode === 'light' ? 'daylight-glass' : 'dark-zinc';
+      return 'obsidian-pro';
   }
 }
 

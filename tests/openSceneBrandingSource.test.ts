@@ -38,7 +38,8 @@ describe('OpenScene branding source contract', () => {
     expect(mainIndexSource).toContain('title: APP_NAME');
     expect(timelineEditorSource).toContain('<h1 id="timeline-editor-title">OpenScene</h1>');
     // The studio headings dropped the "AI" prefix with the chat-style redesign.
-    expect(videoGenWorkspaceSource).toContain('id="video-generation-title">Video Generation<');
+    expect(videoGenWorkspaceSource).toContain("id=\"video-generation-title\"");
+    expect(videoGenWorkspaceSource).toContain('Shot generation & review');
     expect(designSource).toContain('# OpenScene Design System');
     expect(designSource).toContain('The Edit workspace keeps `Local studio`, `OpenScene`, and the `Timeline editor` subtitle as visually hidden region labels for accessibility;');
   });
@@ -64,10 +65,10 @@ describe('OpenScene branding source contract', () => {
     expect(timelineCanvasSource).toContain("'application/x-window-loom-timeline'");
     expect(preloadSource).toContain("exposeInMainWorld('videoTool', videoTool)");
     expect(captureRecorderSource).toContain('window.videoTool');
-    // VieNeu is the explicit local voice seam; legacy placeholder ids stay absent.
+    // Qwen and VieNeu are explicit local voice seams; legacy video placeholder stays absent.
     expect(providerSeamsSource).toContain("'elevenlabs'");
     expect(providerSeamsSource).toContain("'vieneu_local'");
-    expect(providerSeamsSource).not.toContain("'local_qwen'");
+    expect(providerSeamsSource).toContain("'local_qwen'");
     expect(providerSeamsSource).not.toContain("'local_video'");
   });
 });

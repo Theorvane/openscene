@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { nextVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
 import { clipDurationMs, clipTimelineEndMs } from '@openvideo/shared/timelineClipGeometry';
+import { snapTimelinePosition } from '@openvideo/shared/timelineSnapping';
 import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
 import { DEFAULT_SUBTITLE_DELIVERY } from '@openvideo/shared/subtitleDelivery';
 import { metadataPrivacyPlan } from '@openvideo/shared/metadataPrivacy';
@@ -12,6 +13,7 @@ import { applyCaptionPreset, CAPTION_PLACEMENTS, CAPTION_STYLE_PRESETS, isAutoma
 import { track } from '../lib/analyticsClient';
 import { theme } from '../lib/theme';
 import { useMobileEditor, type EditorAsset } from '../lib/editorState';
+import { useProject } from '../lib/useProject';
 import {
   assetUri,
   deleteAsset,
@@ -143,21 +145,31 @@ function formatMs(ms: number): string {
 
 export function EditScreen({
   topInset,
-  projectId
+  projectId,
+  active = true
 }: {
   readonly topInset: number;
   readonly projectId: string | null;
+  readonly active?: boolean;
 }) {
+  const loadedSnapshot = useRef('');
+  // Retained generation screens can finish while the editor is visible.
+  const observedProject = useProject(projectId);
   const editor = useMobileEditor((timeline) => {
     if (projectId === null) return;
     const project = readProject(projectId);
-    if (project !== null) writeProject({ ...project, timeline });
+    if (project !== null) {
+      loadedSnapshot.current = JSON.stringify([timeline, project.assets]);
+      writeProject({ ...project, timeline });
+    }
   });
 
   const [pxPerSecond, setPxPerSecond] = useState(28);
+  const [snappingEnabled, setSnappingEnabled] = useState(true);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [storedAssets, setStoredAssets] = useState<readonly MobileAsset[]>([]);
   const [playing, setPlaying] = useState(false);
+  useEffect(() => { if (!active) setPlaying(false); }, [active]);
   const [reloadToken, setReloadToken] = useState(0);
   const [inspecting, setInspecting] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
@@ -170,7 +182,7 @@ export function EditScreen({
     if (projectId === null) return;
     setFramePreference(readProject(projectId)?.frame ?? 'source');
     setBurnAutomaticCaptions(readProject(projectId)?.subtitleDelivery?.burnAutomaticCaptions ?? DEFAULT_SUBTITLE_DELIVERY.burnAutomaticCaptions);
-  }, [projectId, reloadToken]);
+  }, [projectId, reloadToken, observedProject]);
 
   /*
     What this cut would export as, so the row shows a size rather than a word.
@@ -235,9 +247,13 @@ export function EditScreen({
   // Opening a project replaces the editor's document and its undo history.
   const { loadProject } = editor;
   useEffect(() => {
+    if (!active) return;
     if (projectId === null) return;
     const project = readProject(projectId);
     if (project === null) return;
+    const snapshot = JSON.stringify([project.timeline, project.assets]);
+    if (loadedSnapshot.current === snapshot) return;
+    loadedSnapshot.current = snapshot;
     setStoredAssets(project.assets);
     loadProject(
       project.timeline,
@@ -254,7 +270,7 @@ export function EditScreen({
         metadata: { durationMs: asset.durationMs, width: asset.width, height: asset.height }
       }))
     );
-  }, [projectId, loadProject, reloadToken]);
+  }, [projectId, loadProject, reloadToken, active, observedProject]);
 
   const timelineWidth = useMemo(
     () => Math.max(240, editor.durationMs * pxPerMs + 80),
@@ -550,6 +566,7 @@ export function EditScreen({
         contentContainerStyle={styles.toolbar}
       >
         <Tool label="Import" onPress={() => void importMedia()} disabled={projectId === null} />
+        <Tool label={snappingEnabled ? 'Snap: On' : 'Snap: Off'} onPress={() => setSnappingEnabled((value) => !value)} hint="Align clip edges with other clips and the playhead" />
         <Tool label="Split" onPress={editor.splitAtPlayhead} disabled={selected === null} />
         <Tool label="Adjust" onPress={() => setInspecting((open) => !open)} disabled={selected === null} />
         {selectedAsset?.kind === 'video' && (
@@ -709,8 +726,15 @@ export function EditScreen({
                     assetUri={editor.assetFor(clip.assetId)?.uri ?? null}
                     still={editor.assetFor(clip.assetId)?.kind === 'image'}
                     onSelect={() => editor.setSelectedClipId(clip.id)}
-                    onMove={(startMs) => editor.moveClipTo(clip.id, track.id, startMs)}
-                    onTrim={(edge, atMs) => editor.trimClipTo(clip.id, edge, atMs)}
+                    onMove={(startMs) => editor.moveClipTo(clip.id, track.id, snapTimelinePosition({
+                      timeline: editor.timeline, positionMs: startMs, pixelsPerMs: pxPerMs,
+                      playheadMs: editor.playheadMs, enabled: snappingEnabled,
+                      excludeClipId: clip.id, movingDurationMs: clipDurationMs(clip)
+                    }))}
+                    onTrim={(edge, atMs) => editor.trimClipTo(clip.id, edge, snapTimelinePosition({
+                      timeline: editor.timeline, positionMs: atMs, pixelsPerMs: pxPerMs,
+                      playheadMs: editor.playheadMs, enabled: snappingEnabled, excludeClipId: clip.id
+                    }))}
                     scrollGesture={laneScroll}
                     onDragStateChange={setDragging}
                   />

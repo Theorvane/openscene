@@ -5,6 +5,8 @@ import { approvedWriterShots, applyWriterPipeline, applyWriterStyleLock, artifac
 import { applyWriterDraft, compileWriterPrompt, parseWriterRequest, validateWriterResponse, writerResponseSchema, writerSystemPrompt, type WriterDraft, type WriterRequest } from '../src/shared/writerWorkflow';
 import { requestGeminiWriter } from '../src/shared/writerGeneration';
 import { chainContinuationFrame, nextApprovedWriterShotId } from '../src/shared/generationReview';
+import { buildProductionMemory, searchProductionMemory } from '../src/shared/productionMemory';
+import { productionEditorItems } from '../src/shared/productionEditor';
 
 const brief: WriterRequest = { mode: 'idea_to_script', sourceText: 'The first social network was yelling.', language: 'English', audience: 'Adults', tone: 'Deadpan satire', targetDurationSeconds: 16, videoStyle: 'cinematic-narrative', emotionalGoal: 'entertain' };
 const artifact = (stage: WriterStageArtifact['stage'], content = `Complete ${stage} document`): WriterStageArtifact => ({ stage, title: 'The Stone Age Scroll', content, modelId: 'gemini-3.1-flash-lite', approved: false });
@@ -25,6 +27,39 @@ function approvedWriting() {
 function approvedAll() { return saveWriterArtifact(approvedWriting(), artifactFromWriterDraft('prompts', production, 'test-model'), true); }
 
 describe('manual Writer pipeline', () => {
+  it('retrieves applied draft lineage only while all Writer stages are approved', () => {
+    const imported = applyWriterPipeline(createEmptyAiProjectDocument(), approvedAll(), '2026-09-05T00:00:00.000Z', 'memory');
+    if (!imported.ok) throw new Error(imported.message);
+    const applied = imported.document;
+    expect(applied.scripts.find(script => script.id === applied.writerPipeline?.appliedScriptId)?.status).toBe('draft');
+    const doc = { ...applied, generations: [{
+      id: 'memory-take', shotId: applied.shots[0]!.id, providerId: 'provider', modelId: 'model', capability: 'text_to_video' as const,
+      status: 'completed' as const, prompt: 'retrievable approved take', referenceAssetIds: [], outputAssetIds: [],
+      createdAt: '2026-09-05T00:00:00.000Z', updatedAt: '2026-09-05T00:00:00.000Z',
+      review: { decision: 'approved' as const, notes: '', continuity: { identity: 'pass' as const, wardrobeProps: 'pass' as const, settingPalette: 'pass' as const, motionDirection: 'pass' as const, boundaryMatch: 'pass' as const } }
+    }] };
+    const index = buildProductionMemory('p', doc);
+    const planned = productionEditorItems(doc, []);
+    expect(planned.filter(item => item.shotId).map(item => item.startMs)).toEqual([0, 8000]);
+    expect(planned.filter(item => item.shotId).every(item => item.durationMs === 8000 && item.assetId === undefined)).toBe(true);
+    for (const prefix of ['script/', 'scene/', 'shot/', 'generation/']) {
+      expect(index.entries.some(entry => entry.sourceId.startsWith(prefix))).toBe(true);
+    }
+    expect(searchProductionMemory(index, 'p', 'mammoth').some(entry => entry.sourceId.startsWith('shot/'))).toBe(true);
+    expect(searchProductionMemory(index, 'p', 'retrievable')[0]?.sourceId).toBe('generation/memory-take:0');
+    for (const stage of WRITER_STAGES) {
+      const revoked = { ...doc, writerPipeline: { ...doc.writerPipeline!, artifacts: doc.writerPipeline!.artifacts.map(artifact => ({ ...artifact, approved: artifact.stage !== stage })) } };
+      const gated = buildProductionMemory('p', revoked);
+      expect(gated.entries.every(entry => entry.sourceId.startsWith('character/') || entry.sourceId.startsWith('style:'))).toBe(true);
+    }
+    // Fully approved but not applied (or dangling applied id) must not expose a different approved script.
+    const legacyApproved = { ...doc, scripts: doc.scripts.map(script => ({ ...script, status: 'approved' as const })) };
+    for (const state of [approvedAll(), { ...approvedAll(), appliedScriptId: 'missing' }]) {
+      expect(buildProductionMemory('p', { ...legacyApproved, writerPipeline: state }).entries.every(entry => entry.sourceId.startsWith('character/') || entry.sourceId.startsWith('style:'))).toBe(true);
+    }
+    const { writerPipeline: _pipeline, ...legacyDraft } = doc;
+    expect(buildProductionMemory('p', legacyDraft).entries.some(entry => entry.sourceId.startsWith('script/'))).toBe(false);
+  });
   it('reapplies the approved Style Bible exactly once at the generation boundary', () => {
     const first = applyWriterStyleLock('Grog raises the stone.\nAvoid: phones', production.styleBible);
     expect(first).toContain('[OPENSCENE_STYLE_LOCK]');

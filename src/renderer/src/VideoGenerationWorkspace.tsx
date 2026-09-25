@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
   CONTINUITY_REVIEW_FIELDS,
   type AiProjectDocument,
@@ -16,7 +16,7 @@ import {
   updateGenerationCandidate,
   type GenerationReviewResult
 } from '../../shared/generationReview';
-import { approvedWriterShots } from '../../shared/writerPipeline';
+import { approvedWriterShots, pipelineBaseRequest } from '../../shared/writerPipeline';
 import { compileVideoContinuityPrompt, stripVideoContinuityLocks, videoContinuityAvailability } from '../../shared/videoContinuity';
 import {
   DEFAULT_VIDEO_CONTINUITY_CONTROLS,
@@ -40,6 +40,15 @@ import {
   type BrowserSessionStatus
 } from '../../shared/browserSession';
 import type { MediaAsset } from '../../shared/timelineTypes';
+import { ProductionMemoryPanel } from './ProductionMemoryPanel';
+import { recordVideoRecipe } from '../../shared/videoRecipeHistory';
+import { VideoRecipeHistory } from './VideoRecipeHistory';
+import { PromptProductionLayout } from './PromptProductionLayout';
+import { ProductionPlanComposer } from './ProductionPlanComposer';
+import { NextSceneComposer } from './NextSceneComposer';
+import { canPlanNextSequentialScene } from '../../shared/sequentialProduction';
+import { ProductionCompanions } from './ProductionCompanions';
+import { createProductionQueueControl } from '../../shared/productionQueueControl';
 import type { ComfyUiMotionWorkerStatus, MotionControlMode } from '../../shared/comfyUiMotion';
 import { DomainModelPicker } from './DomainModelPicker';
 import { useAiDomainModel } from './AiDomainModelContext';
@@ -51,6 +60,9 @@ import {
   batchableProductionVideoShotIds,
   planProductionVideoReferences,
   productionShotRows,
+  standaloneGenerationBlockReason,
+  productionShotRegenerationBlockReason,
+  productionSourceDurationSeconds,
   PRODUCTION_BATCH_LIMIT,
   type ProductionImageTarget
 } from '../../shared/productionWorkflow';
@@ -105,6 +117,11 @@ type VideoInputSnapshot = {
   readonly motionMode?: MotionControlMode;
 };
 type VideoGenerationWorkspaceProps = {
+  readonly tools?: ReactNode;
+  readonly toolActive?: boolean;
+  readonly onActivateVideo?: () => void;
+  readonly onSelectProductionTool?: (tool: 'image' | 'voice') => void;
+  readonly active?: boolean;
   readonly writerDocument?: AiProjectDocument | null;
   readonly projectId?: string | null;
   readonly projectAssets?: readonly MediaAsset[];
@@ -121,6 +138,7 @@ type VideoGenerationWorkspaceProps = {
   /** Starts one or more Writer-derived stills without leaving Video Generation. */
   readonly onGenerateProductionImages: (targets: readonly ProductionImageTarget[], aspectRatio?: ImageAspectRatio) => Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }>;
   readonly onOpenImageResults: () => void;
+  readonly onOpenEditor?: () => void;
   /** Local project folder/name mirrored to the signed-in Flow workspace. */
   readonly projectName?: string | undefined;
 };
@@ -136,6 +154,11 @@ function showGoogleFlowWindow(): boolean {
 }
 
 export function VideoGenerationWorkspace({
+  tools,
+  toolActive = true,
+  onActivateVideo,
+  onSelectProductionTool,
+  active = true,
   writerDocument,
   onSaveAi,
   projectId,
@@ -145,19 +168,27 @@ export function VideoGenerationWorkspace({
   onGenerateProductionImage,
   onGenerateProductionImages,
   onOpenImageResults,
+  onOpenEditor,
   projectName
 }: VideoGenerationWorkspaceProps): ReactElement {
   const { selectedModel } = useAiDomainModel();
+  const activeProjectIdRef = useRef(projectId);
+  activeProjectIdRef.current = projectId;
   const videoModel = selectedModel('video-generation');
   const flowVideoModel = googleFlowVideoModelFor(videoModel.id);
   const grokImagineBrowser = videoModel.id === 'grok-imagine-video-1.5';
   const browserSessionSupported = flowVideoModel !== null || grokImagineBrowser;
   const [generationMode, setGenerationMode] = useState<ProviderExecutionMode>(
-    browserSessionSupported ? 'browser_session' : videoModel.executionPath
+    flowVideoModel !== null ? 'browser_session' : videoModel.executionPath
   );
   const [flowSession, setFlowSession] = useState<BrowserSessionStatus | null>(null);
   const { importAiResult, placeAiAssetOnTimeline, assembleApprovedWriterShots } = useProjectResultImport();
   const [prompt, setPrompt] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [recipeParentId, setRecipeParentId] = useState<string | undefined>();
+  const recipeParents = useRef(new Map<string, string>());
+  const importingRecipes = useRef(new Set<string>());
+  useEffect(() => { setRecipeParentId(undefined); setShowAdvanced(false); setWriterShotId(''); setLoadedWriterShotId(''); }, [projectId]);
   const [writerShotId, setWriterShotId] = useState('');
   const [loadedWriterShotId, setLoadedWriterShotId] = useState('');
   const writerShots = approvedWriterShots(writerDocument);
@@ -222,6 +253,8 @@ export function VideoGenerationWorkspace({
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+  const productionQueue = useRef(createProductionQueueControl());
+  const [batchStopRequested, setBatchStopRequested] = useState(false);
   const previousVideoModelId = useRef(videoModel.id);
   // Which take is being refined, and what to change about it. A note belongs to
   // one job: applying the last one to a different take would be a change nobody
@@ -231,6 +264,7 @@ export function VideoGenerationWorkspace({
   // Nothing to report until something happens; an idle card is just noise.
   const [statusMsg, setStatusMsg] = useState<{ text: string; tone: 'neutral' | 'success' | 'warning' | 'danger' } | null>(null);
   const selectedCandidates = writerShotId === '' ? [] : (writerDocument?.generations ?? []).filter((entry) => entry.shotId === writerShotId).slice().reverse();
+  const selectedProductionShot = productionShotRows(writerDocument).find((row) => row.shotId === writerShotId);
 
   useEffect(() => {
     documentRef.current = writerDocument ?? null;
@@ -255,7 +289,7 @@ export function VideoGenerationWorkspace({
   useEffect(() => {
     if (previousVideoModelId.current === videoModel.id) return;
     previousVideoModelId.current = videoModel.id;
-    setGenerationMode(videoModel.id === 'grok-imagine-video-1.5' || googleFlowVideoModelFor(videoModel.id) !== null ? 'browser_session' : videoModel.executionPath);
+    setGenerationMode(googleFlowVideoModelFor(videoModel.id) !== null ? 'browser_session' : videoModel.executionPath);
     setSelectedOperation('text_to_video');
   }, [videoModel.id, videoModel.executionPath]);
 
@@ -326,7 +360,7 @@ export function VideoGenerationWorkspace({
           if (targetWriterShotId !== '') await persistCandidateChange((document) => updateGenerationCandidate(document, job.id, {
             status: 'completed', updatedAt: updatedJob.updatedAt
           }));
-          setStatusMsg({ text: 'Video generation completed! Asset ready.', tone: 'success' });
+          await handleImportToProject(updatedJob);
         } else if (updatedJob.status === 'needs_user_action') {
           stopPolling(intervalId);
           setIsGenerating(activePollJobs.current.size > 0);
@@ -506,6 +540,15 @@ export function VideoGenerationWorkspace({
     }
     const candidateOperation = overrides?.inputs?.operation ?? selectedOperation;
     const targetWriterShotId = overrides?.writerShotId ?? loadedWriterShotId;
+    const standaloneBlock = standaloneGenerationBlockReason(documentRef.current, targetWriterShotId);
+    if (standaloneBlock !== null) { setStatusMsg({ text: standaloneBlock, tone: 'warning' }); return null; }
+    if (targetWriterShotId !== '' && documentRef.current !== null) {
+      const sceneBlock = productionShotRegenerationBlockReason(documentRef.current, targetWriterShotId);
+      if (sceneBlock !== null) {
+        setStatusMsg({ text: sceneBlock, tone: 'warning' });
+        return null;
+      }
+    }
     const editablePrompt = overrides?.prompt ?? prompt;
     const targetContinuityControls = overrides?.continuityControls ?? continuityControls;
     const compiledContinuity = targetWriterShotId !== '' && documentRef.current !== null
@@ -591,6 +634,8 @@ export function VideoGenerationWorkspace({
 
       if (response.ok && response.value) {
         const job = response.value as VideoGenerationJob;
+        const parentRecipe = overrides?.parentGenerationId ?? recipeParentId;
+        if (parentRecipe !== undefined) recipeParents.current.set(job.id, parentRecipe);
         setJobs((prev) => [job, ...prev]);
         setJobInputs((current) => ({ ...current, [job.id]: inputs }));
         setJobContinuityControls((current) => ({ ...current, [job.id]: effectiveContinuityControls }));
@@ -692,19 +737,44 @@ export function VideoGenerationWorkspace({
     }
   };
 
-  const handleImportToProject = async (job: VideoGenerationJob): Promise<void> => {
-    if (job.status !== 'completed') return;
+  const handleImportToProject = async (job: VideoGenerationJob, openEditor = false): Promise<boolean> => {
+    if (job.status !== 'completed') return false;
+    if (!projectId || activeProjectIdRef.current !== projectId || importingRecipes.current.has(job.id)) return false;
+    if (documentRef.current?.videoHistory?.some(recipe => recipe.id === job.id)) {
+      if (openEditor) onOpenEditor?.();
+      return true;
+    }
+    importingRecipes.current.add(job.id);
     try {
       const status = await importAiResult(job.id);
+      if (activeProjectIdRef.current !== projectId) return false;
       setStatusMsg(status);
-      if (status.importedAssetId !== undefined && documentRef.current?.generations.some((entry) => entry.id === job.id)) {
-        const saved = await persistCandidateChange((document) => updateGenerationCandidate(document, job.id, {
-          outputAssetIds: [status.importedAssetId!], updatedAt: new Date().toISOString()
-        }));
-        if (saved) setStatusMsg({ tone: 'success', text: 'Candidate imported. Complete the continuity review before approval.' });
+      if (status.importedAssetId !== undefined) {
+        const parentId = recipeParents.current.get(job.id);
+        const saved = await persistCandidateChange(document => {
+          if (activeProjectIdRef.current !== projectId) return { ok: false, reason: 'Project changed before history could be saved.' };
+          const candidate = document.generations.some(entry => entry.id === job.id)
+            ? updateGenerationCandidate(document, job.id, { status: 'completed', outputAssetIds: [status.importedAssetId!], updatedAt: new Date().toISOString() })
+            : { ok: true as const, document };
+          if (!candidate.ok) return candidate;
+          return { ok: true, document: recordVideoRecipe(candidate.document, {
+            id: job.id, assetId: status.importedAssetId!, prompt: job.prompt,
+            modelId: job.modelId ?? 'unknown', providerId: job.provider,
+            operation: job.operation ?? 'text_to_video', durationSeconds: job.durationSeconds,
+            aspectRatio: job.aspectRatio, createdAt: job.createdAt,
+            ...(parentId === undefined ? {} : { parentId })
+          }) };
+        });
+        if (!saved) { setStatusMsg({ tone: 'warning', text: 'Video imported, but prompt history was not saved. Retry Import to project before closing.' }); return false; }
+        setStatusMsg({ tone: 'success', text: 'Video and exact prompt saved to this project. Original timeline unchanged.' });
       }
+      if (openEditor && status.importedAssetId !== undefined && activeProjectIdRef.current === projectId) onOpenEditor?.();
+      return status.importedAssetId !== undefined;
     } catch (err) {
       setStatusMsg({ text: `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`, tone: 'danger' });
+      return false;
+    } finally {
+      importingRecipes.current.delete(job.id);
     }
   };
 
@@ -757,18 +827,23 @@ export function VideoGenerationWorkspace({
       setStatusMsg({ tone: 'warning', text: 'The selected production shot is no longer available.' });
       return;
     }
-    if (!durationOptions.includes(shot.durationSeconds)) {
-      setStatusMsg({ tone: 'warning', text: `This shot needs ${shot.durationSeconds}s; the selected model accepts ${durationOptions.join('/')}s. Choose a compatible model first.` });
-      return;
-    }
     setWriterShotId(shot.id);
-    setLoadedWriterShotId(shot.id);
     setPrompt(shot.prompt);
-    setDurationSeconds(shot.durationSeconds);
+    setLoadedWriterShotId('');
     setLoadedReferenceAssetIds([]);
     setAutoLoadedCharacterReferenceIds([]);
     setReferenceImages([]);
+    setLastFrame(null);
+    setDrivingVideoAssetId('');
     onReferenceImageChange(null);
+    const sourceDuration = durationOptions.filter((seconds) => seconds >= shot.durationSeconds).sort((a, b) => a - b)[0];
+    if (sourceDuration === undefined) {
+      setLoadedWriterShotId('');
+      setStatusMsg({ tone: 'warning', text: `This shot needs at least ${shot.durationSeconds}s; the selected model accepts ${durationOptions.join('/')}s. Choose a compatible model, then load this shot again.` });
+      return;
+    }
+    setLoadedWriterShotId(shot.id);
+    setDurationSeconds(sourceDuration);
 
     const persistedShot = current.shots.find((entry) => entry.id === shot.id);
     const scene = persistedShot === undefined ? undefined : current.scenes.find((entry) => entry.id === persistedShot.sceneId);
@@ -833,14 +908,18 @@ export function VideoGenerationWorkspace({
     return 'timeout';
   };
 
-  const prepareProductionVideoBatch = async (): Promise<{
+  const prepareProductionVideoBatch = async (selection: { readonly shotId?: string; readonly sceneId?: string }): Promise<{
     readonly items: readonly ProductionVideoBatchItem[];
     readonly skipped: readonly string[];
   }> => {
     const current = documentRef.current;
     if (current === null || projectId === null || projectId === undefined) return { items: [], skipped: ['Open a project first.'] };
-    const batchableShotIds = new Set(batchableProductionVideoShotIds(current));
-    const eligibleRows = productionShotRows(current).filter((row) => batchableShotIds.has(row.shotId));
+    const batchableShotIds = new Set(batchableProductionVideoShotIds(current, selection.sceneId));
+    const eligibleRows = productionShotRows(current).filter((row) => selection.shotId === undefined ? batchableShotIds.has(row.shotId) : row.shotId === selection.shotId);
+    if (selection.shotId !== undefined) {
+      const block = productionShotRegenerationBlockReason(current, selection.shotId);
+      if (block !== null) return { items: [], skipped: [block] };
+    }
     const items: ProductionVideoBatchItem[] = [];
     const skipped: string[] = [];
     for (const row of eligibleRows.slice(0, PRODUCTION_BATCH_LIMIT)) {
@@ -850,9 +929,6 @@ export function VideoGenerationWorkspace({
         skipped.push(`${row.label}: Writer data changed.`);
         continue;
       }
-      const nearestDurationFor = (operation: VideoOperation): number => durationOptionsForOperation(operation).reduce((best, candidate) =>
-        Math.abs(candidate - writerShot.durationSeconds) < Math.abs(best - writerShot.durationSeconds) ? candidate : best
-      );
       const referencePlan = planProductionVideoReferences(current, row.shotId, {
         controls: continuityControls,
         supportsImageToVideo: isVideoOperationImplemented(videoModel.id, 'image_to_video'),
@@ -861,6 +937,13 @@ export function VideoGenerationWorkspace({
       });
       if (referencePlan.kind === 'blocked') {
         skipped.push(`${row.label}: ${referencePlan.reason}`);
+        continue;
+      }
+      const operation: VideoOperation = referencePlan.kind === 'storyboard' ? 'image_to_video' : referencePlan.kind === 'characters' ? 'reference_to_video' : 'text_to_video';
+      const sourceSeconds = productionSourceDurationSeconds(videoModel.id, operation, writerShot.durationSeconds,
+        generationMode === 'browser_session' ? durationOptionsForOperation(operation) : undefined);
+      if (sourceSeconds === null) {
+        skipped.push(`${row.label}: this model cannot make a source clip long enough for the ${writerShot.durationSeconds}s finished shot.`);
         continue;
       }
       if (referencePlan.kind === 'storyboard') {
@@ -873,7 +956,7 @@ export function VideoGenerationWorkspace({
           shotId: row.shotId,
           label: row.label,
           prompt: writerShot.prompt,
-          durationSeconds: nearestDurationFor('image_to_video'),
+          durationSeconds: sourceSeconds,
           inputs: { operation: 'image_to_video', referenceImage: loaded.value },
           referenceAssetIds: [referencePlan.reference.id]
         });
@@ -892,7 +975,7 @@ export function VideoGenerationWorkspace({
           shotId: row.shotId,
           label: row.label,
           prompt: writerShot.prompt,
-          durationSeconds: nearestDurationFor('reference_to_video'),
+          durationSeconds: sourceSeconds,
           inputs: { operation: 'reference_to_video', referenceImages: loaded.flatMap((entry) => entry.response.ok ? [entry.response.value] : []) },
           referenceAssetIds: referencePlan.references.map((entry) => entry.id)
         });
@@ -902,7 +985,7 @@ export function VideoGenerationWorkspace({
         shotId: row.shotId,
         label: row.label,
         prompt: writerShot.prompt,
-        durationSeconds: nearestDurationFor('text_to_video'),
+        durationSeconds: sourceSeconds,
         inputs: { operation: 'text_to_video' },
         referenceAssetIds: []
       });
@@ -910,9 +993,18 @@ export function VideoGenerationWorkspace({
     return { items, skipped };
   };
 
-  const generateProductionVideoBatch = async (): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
-    if (isBatchGenerating || isGenerating) return { tone: 'warning', text: 'Another video generation job is already running.' };
-    const plan = await prepareProductionVideoBatch();
+  const generateProductionVideoBatch = async (selection: { readonly shotId?: string; readonly sceneId?: string }): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
+    if (isGenerating || !productionQueue.current.begin()) return { tone: 'warning', text: 'Another video generation job is already running.' };
+    setBatchStopRequested(false);
+    setIsBatchGenerating(true);
+    try { return await runProductionVideoBatch(selection); }
+    finally { productionQueue.current.finish(); setIsBatchGenerating(false); }
+  };
+
+  const runProductionVideoBatch = async (selection: { readonly shotId?: string; readonly sceneId?: string }): Promise<{ readonly tone: 'neutral' | 'success' | 'warning' | 'danger'; readonly text: string }> => {
+    const approvedPlan = JSON.stringify(documentRef.current?.writerPipeline);
+    const plan = await prepareProductionVideoBatch(selection);
+    if (!productionQueue.current.canSubmit()) return { tone: 'neutral', text: 'Production stopped before any provider job was submitted.' };
     if (plan.items.length === 0) {
       return { tone: 'neutral', text: plan.skipped[0] ?? 'No not-started or failed production shots need a new candidate.' };
     }
@@ -927,15 +1019,20 @@ export function VideoGenerationWorkspace({
         : `Estimated provider total: ~$${estimate.totalUsd?.toFixed(2)}.`
       : 'Provider total cannot be priced by OpenScene.';
     const confirmed = window.confirm(
-      `Generate ${plan.items.length} production video(s) sequentially with ${videoModel.label}?\n\n${price}\n${adjusted > 0 ? `${adjusted} shot duration(s) will use the nearest supported model duration.\n` : ''}${plan.skipped.length > 0 ? `${plan.skipped.length} target(s) will be skipped.\n` : ''}\nEach result still requires import and continuity review. Browser-session credits may be consumed.`
+      `${selection.shotId === undefined ? `Generate ${plan.items.length} shots for ${documentRef.current?.scenes.find((scene) => scene.id === selection.sceneId)?.title ?? 'this scene'}` : `${plan.items[0]!.label}: ${documentRef.current?.generations.some((candidate) => candidate.shotId === selection.shotId) ? 'Regenerate this shot' : 'Generate this shot'}`} with ${videoModel.label}?\n\n${selection.shotId === undefined ? '' : `Planned prompt: ${plan.items[0]!.prompt}\n\n`}${price}\n${adjusted > 0 ? `${adjusted} source clip(s) exceed the planned shot length and will be trimmed during assembly; cost uses full source lengths.\n` : ''}${plan.skipped.length > 0 ? `${plan.skipped.length} target(s) will be skipped.\n` : ''}\nThe existing approved take stays selected until a replacement is reviewed and approved. An assembled timeline cut is not changed automatically.\nEach result still requires import and continuity review. Browser-session credits may be consumed.`
     );
-    if (!confirmed) return { tone: 'neutral', text: 'Production video batch cancelled before any provider job was submitted.' };
-    setIsBatchGenerating(true);
+    if (!confirmed) return { tone: 'neutral', text: 'Production video generation cancelled before any provider job was submitted.' };
     let completed = 0;
     let failed = 0;
     let attempted = 0;
-    try {
-      for (const [index, item] of plan.items.entries()) {
+    for (const [index, item] of plan.items.entries()) {
+        if (!productionQueue.current.canSubmit()) break;
+        if (activeProjectIdRef.current !== projectId || JSON.stringify(documentRef.current?.writerPipeline) !== approvedPlan ||
+          (selection.shotId !== undefined && (!documentRef.current || productionShotRegenerationBlockReason(documentRef.current, selection.shotId) !== null)) ||
+          (selection.sceneId !== undefined && (!documentRef.current || !batchableProductionVideoShotIds(documentRef.current, selection.sceneId).includes(item.shotId)))) {
+          failed += 1;
+          break;
+        }
         setStatusMsg({ tone: 'neutral', text: `Production video ${index + 1}/${plan.items.length}: ${item.label}.` });
         const job = await handleGenerate({
           prompt: item.prompt,
@@ -952,21 +1049,29 @@ export function VideoGenerationWorkspace({
         if (job === null) {
           attempted += 1;
           failed += 1;
-          continue;
+          break;
         }
         attempted += 1;
+        if (!documentRef.current?.generations.some(candidate => candidate.id === job.id)) {
+          failed += 1;
+          break;
+        }
         const terminal = await waitForVideoTerminal(job.id);
-        if (terminal === 'completed') completed += 1;
+        if (terminal === 'completed') {
+          const result = await window.videoTool.aiGetVideoJob(job.id);
+          if (!result.ok || !result.value || !await handleImportToProject(result.value)) {
+            failed += 1;
+            break;
+          }
+          completed += 1;
+        }
         else {
           failed += 1;
-          if (terminal === 'needs_user_action' || terminal === 'timeout') break;
+          break;
         }
-      }
-    } finally {
-      setIsBatchGenerating(false);
     }
     const notSubmitted = plan.items.length - attempted;
-    const text = `${completed}/${attempted} submitted production video job(s) completed${failed > 0 ? `; ${failed} failed or need attention` : ''}${notSubmitted > 0 ? `; ${notSubmitted} not submitted after the queue stopped` : ''}${plan.skipped.length > 0 ? `; ${plan.skipped.length} ineligible target(s) skipped` : ''}. Import and review every candidate before approval.`;
+    const text = `${completed}/${attempted} submitted production video job(s) completed${failed > 0 ? `; ${failed} failed or need attention` : ''}${notSubmitted > 0 ? `; ${notSubmitted} not submitted after the queue stopped` : ''}${plan.skipped.length > 0 ? `; ${plan.skipped.length} ineligible target(s) skipped` : ''}. Completed results were saved with their prompts. Review every candidate before approval.${productionQueue.current.wasStopped() ? ' Stop requested; submitted jobs may still incur charges. Starting again requires fresh cost approval.' : ''}`;
     setStatusMsg({ tone: failed === 0 ? 'success' : completed > 0 ? 'warning' : 'danger', text });
     return { tone: failed === 0 ? 'success' : completed > 0 ? 'warning' : 'danger', text };
   };
@@ -1023,10 +1128,67 @@ export function VideoGenerationWorkspace({
   };
 
   return (
+    <PromptProductionLayout key={projectId ?? 'none'} projectId={projectId} document={writerDocument} assets={projectAssets}
+      active={active} directorMode={toolActive} busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
+      onLoad={item => {
+        if (prompt.trim() && !window.confirm('Replace the current prompt with this selection? Generated media stays unchanged.')) return;
+        onActivateVideo?.();
+        setShowAdvanced(true);
+        if (item.shotId) { void openProductionShot(item.shotId); return; }
+        const recipe = writerDocument?.videoHistory?.find(entry => entry.id === item.recipeId);
+        if (!recipe) return;
+        setPrompt(recipe.prompt); setRecipeParentId(recipe.id);
+        setWriterShotId(''); setLoadedWriterShotId(''); setLoadedReferenceAssetIds([]); setAutoLoadedCharacterReferenceIds([]);
+        onReferenceImageChange(null); setLastFrame(null); setReferenceImages([]); setDrivingVideoAssetId('');
+        setStatusMsg({ tone: 'neutral', text: 'Saved prompt loaded. Reselect model, duration and reference inputs before generating a new take.' });
+      }}>
+    {tools}
+    {isBatchGenerating && <div role="status" className="production-director-toolbar"><span>{batchStopRequested ? 'Stopping after the submitted job is saved…' : 'Production queue running. Submitted jobs may incur charges.'}</span><button className="button" disabled={batchStopRequested} onClick={() => { productionQueue.current.requestStop(); setBatchStopRequested(true); }}>Stop after current shot</button></div>}
+    {toolActive && <div className="production-director-toolbar"><strong>{showAdvanced ? 'Shot workbench' : productionShotRows(writerDocument).length === 0 ? 'Plan your film' : 'Make your film'}</strong>{!showAdvanced && productionShotRows(writerDocument).length === 0 && <button className="button" onClick={() => setShowAdvanced(true)}>Make a single clip instead</button>}</div>}
+    <div className="production-director" hidden={!toolActive || showAdvanced}>
+      {writerDocument && onSaveAi && productionShotRows(writerDocument).length === 0 &&
+        <ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} />}
+        {writerDocument && onSaveAi && canPlanNextSequentialScene(writerDocument) && <NextSceneComposer key={writerDocument.writerPipeline?.appliedScriptId} document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} />}
+        {writerDocument !== null && writerDocument !== undefined && onSaveAi !== undefined && projectId !== null && projectId !== undefined && productionShotRows(writerDocument).length > 0 &&
+          <ProductionBoard
+            projectId={projectId}
+            projectName={projectName}
+            modelLabel={videoModel.label}
+            document={writerDocument}
+            assets={projectAssets}
+            busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
+            onSave={onSaveAi}
+            onOpenShot={async id => { setShowAdvanced(true); await openProductionShot(id); }}
+            onGenerateCharacterImage={(characterId) => onGenerateProductionImage({ kind: 'character_reference', characterId })}
+            onGenerateStoryboardImage={(shotId) => onGenerateProductionImage({ kind: 'storyboard', shotId }, effectiveAspectRatio)}
+            onGenerateImages={(targets) => onGenerateProductionImages(targets, effectiveAspectRatio)}
+            onOpenImageResults={onOpenImageResults}
+            onGenerateVideoScene={(sceneId) => generateProductionVideoBatch({ sceneId })}
+            onGenerateVideoShot={(id) => generateProductionVideoBatch({ shotId: id })}
+            onAssemble={assembleApprovedWriterShots}
+            onOpenPlan={() => {
+              requestAnimationFrame(() => (document.getElementById('production-plan-review') ?? document.getElementById('production-brief'))?.focus());
+            }}
+          />}
+      {writerDocument && onSaveAi && productionShotRows(writerDocument).length > 0 && pipelineBaseRequest(writerDocument.writerPipeline)?.productionScope === undefined &&
+        <details className="production-director__secondary"><summary>Screenplay and plan controls</summary><ProductionPlanComposer document={writerDocument} onSave={onSaveAi} disabled={isGenerating || isBatchGenerating || isSavingCandidate} /></details>}
+      {writerDocument && onSelectProductionTool && <details className="production-director__secondary"><summary>Production tools and references</summary><ProductionCompanions document={writerDocument} assets={projectAssets} disabled={isGenerating || isBatchGenerating || isSavingCandidate} onSelect={onSelectProductionTool} /></details>}
+    </div>
+    <div hidden={!toolActive || !showAdvanced} className="production-shot-workbench">
+      <header className="production-shot-workbench__context">
+        <div><span className="production-board__eyebrow">OPENSCENE STUDIO / {selectedProductionShot ? selectedProductionShot.sceneTitle : 'VIDEO'}</span>
+          <h2>{selectedProductionShot ? selectedProductionShot.label : 'Shot workbench'}</h2>
+          <p>{selectedProductionShot ? `Planned ${Math.round(selectedProductionShot.durationMs / 1000)}s shot · ${selectedProductionShot.candidateCount} saved take(s). Adjust inputs, generate, review, then return to the scene board.` : 'Choose a planned shot from the scene board to attach generation and review to this film.'}</p>
+        </div>
+        <div className="production-shot-workbench__actions">
+          {selectedCandidates.length > 0 && <a className="button" href="#shot-candidate-review">Review {selectedCandidates.length} take{selectedCandidates.length === 1 ? '' : 's'}</a>}
+          <button type="button" className="button" onClick={() => setShowAdvanced(false)}>← Scene board</button>
+        </div>
+      </header>
     <section className="studio-surface" aria-labelledby="video-generation-title">
       <header className="studio-surface__header">
         <div className="studio-surface__title">
-          <h2 className="studio-surface__title-label" id="video-generation-title">Video Generation</h2>
+          <h2 className="studio-surface__title-label" id="video-generation-title">{selectedProductionShot ? 'Shot generation & review' : 'Quick clip generation'}</h2>
           {/* The picker beside it already names the model and provider. */}
           <span className="studio-surface__title-meta">
             {generationMode === 'browser_session' ? `Signed-in ${grokImagineBrowser ? 'Grok Imagine' : 'Google Flow'} worker` : 'Cloud + user-managed local generation'}
@@ -1044,20 +1206,6 @@ export function VideoGenerationWorkspace({
       </header>
 
       <div className="studio-surface__body">
-        {writerDocument !== null && writerDocument !== undefined && onSaveAi !== undefined && projectId !== null && projectId !== undefined &&
-          <ProductionBoard
-            document={writerDocument}
-            assets={projectAssets}
-            busy={isGenerating || isBatchGenerating || isSavingCandidate || isChainingFrame}
-            onSave={onSaveAi}
-            onOpenShot={openProductionShot}
-            onGenerateCharacterImage={(characterId) => onGenerateProductionImage({ kind: 'character_reference', characterId })}
-            onGenerateStoryboardImage={(shotId) => onGenerateProductionImage({ kind: 'storyboard', shotId }, effectiveAspectRatio)}
-            onGenerateImages={(targets) => onGenerateProductionImages(targets, effectiveAspectRatio)}
-            onOpenImageResults={onOpenImageResults}
-            onGenerateVideoBatch={generateProductionVideoBatch}
-            onAssemble={assembleApprovedWriterShots}
-          />}
         {browserSessionSupported && (
           <div className="studio-field">
             <span className="studio-field__label">Connection</span>
@@ -1073,7 +1221,6 @@ export function VideoGenerationWorkspace({
               <button
                 type="button"
                 aria-pressed={generationMode === 'api'}
-                disabled={grokImagineBrowser}
                 className={`studio-chip${generationMode === 'api' ? ' studio-chip--selected' : ''}`}
                 onClick={() => setGenerationMode('api')}
               >
@@ -1321,6 +1468,11 @@ export function VideoGenerationWorkspace({
                       {(writerDocument?.generations.find((entry) => entry.id === job.id)?.outputAssetIds.length ?? 0) > 0 ? 'Imported' : 'Import to project'}
                     </Button>
                   )}
+                  {job.status === 'completed' && onOpenEditor !== undefined && (
+                    <Button variant="ghost" onClick={() => void handleImportToProject(job, true)}>
+                      Import & open editor
+                    </Button>
+                  )}
                   {(job.status === 'failed' || job.status === 'needs_user_action') && job.error !== undefined && (
                     <p className="studio-job__error">{job.error}</p>
                   )}
@@ -1357,7 +1509,7 @@ export function VideoGenerationWorkspace({
           )}
         </div>
 
-        <div className="studio-field">
+        <div className="studio-field" id="shot-candidate-review">
           <span className="studio-field__label">Shot candidates & continuity approval</span>
           {writerShotId === '' ? (
             <p className="studio-empty">Choose an approved Writer shot below. Generations without a Writer shot remain ad-hoc jobs and cannot be continuity-approved.</p>
@@ -1415,10 +1567,11 @@ export function VideoGenerationWorkspace({
                       <Button variant="ghost" disabled={isSavingCandidate || review.decision === 'rejected'} onClick={() => void decideCandidate(candidate.id, 'rejected')}>Reject</Button>
                       {review.decision === 'approved' && candidate.outputAssetIds[0] !== undefined && <Button variant="ghost" disabled={isSavingCandidate} onClick={() => {
                         const placed = placeAiAssetOnTimeline(candidate.outputAssetIds[0]!);
+                        if (placed) onOpenEditor?.();
                         setStatusMsg({ tone: placed ? 'success' : 'warning', text: placed
                           ? 'Approved candidate added to the timeline. Review the cut, then save the timeline.'
                           : 'The approved asset could not be placed. Wait for metadata probing or add a compatible video track.' });
-                      }}>Add approved to timeline</Button>}
+                      }}>Add approved & open editor</Button>}
                       {review.decision === 'approved' && candidate.outputAssetIds[0] !== undefined && nextApprovedWriterShotId(writerDocument!, candidate.shotId) !== null &&
                         <Button variant="ghost" disabled={isSavingCandidate || isChainingFrame} onClick={() => void chainCandidateToNextShot(candidate.id)}>
                           {isChainingFrame ? 'Extracting frame…' : 'Chain final frame to next shot'}
@@ -1434,6 +1587,19 @@ export function VideoGenerationWorkspace({
 
       {/* Composer mirrors the chat prompt card: write, then act. */}
       <div className="studio-composer">
+        {projectId && writerDocument && <ProductionMemoryPanel key={projectId} projectId={projectId}
+          document={writerDocument} prompt={prompt} onChange={setPrompt} disabled={isGenerating || isBatchGenerating} />}
+        {projectId && <VideoRecipeHistory key={projectId} projectId={projectId}
+          records={writerDocument?.videoHistory ?? []} assetIds={projectAssets.map(asset => asset.id)}
+          disabled={isGenerating || isBatchGenerating || isSavingCandidate}
+          onReuse={recipe => {
+            setPrompt(recipe.prompt); setRecipeParentId(recipe.id);
+            setWriterShotId(''); setLoadedWriterShotId('');
+            setLoadedReferenceAssetIds([]); setAutoLoadedCharacterReferenceIds([]);
+            onReferenceImageChange(null); setLastFrame(null); setReferenceImages([]);
+            setDrivingVideoAssetId('');
+            setStatusMsg({ tone: 'neutral', text: 'Saved prompt loaded, not generated. Reselect model, duration, operation and references; then Generate. The saved original is unchanged.' });
+          }} />}
         {writerShots.length > 0 && <div className="studio-field">
           <label className="studio-field__label" htmlFor="writer-video-shot">Approved Writer shot</label>
           <select id="writer-video-shot" disabled={isGenerating} value={writerShotId} onChange={(e) => {
@@ -1468,15 +1634,18 @@ export function VideoGenerationWorkspace({
               ? `${Math.ceil(drivingVideo.metadata.durationMs / 1_000)}s · ${motionAspectRatio} · ${motionMode} · workflow controlled`
               : `${effectiveDuration}s · ${effectiveAspectRatio} · ${effectiveStylePreset} · ${selectedOperation}`}
           </span>
-          <Button variant="primary" onClick={() => void handleGenerate()} disabled={isGenerating || isBatchGenerating || (prompt.trim().length === 0 && selectedOperation !== 'motion_control') || !operationAvailable
+          <Button variant="primary" onClick={() => void handleGenerate()} disabled={standaloneGenerationBlockReason(writerDocument, loadedWriterShotId) !== null || isGenerating || isBatchGenerating || (prompt.trim().length === 0 && selectedOperation !== 'motion_control') || !operationAvailable
             || ((selectedOperation === 'image_to_video' || selectedOperation === 'start_end' || selectedOperation === 'motion_control') && referenceImage === null)
             || (selectedOperation === 'start_end' && lastFrame === null)
             || (selectedOperation === 'reference_to_video' && referenceImages.length === 0)
             || (selectedOperation === 'motion_control' && (!projectId || !drivingVideoAssetId || !drivingVideo?.metadata || drivingVideo.metadata.durationMs > 30_000 || motionWorker?.modes[motionMode].ready !== true))}>
             {isBatchGenerating ? 'Batch generating…' : isGenerating ? 'Generating…' : 'Generate'}
           </Button>
+          {standaloneGenerationBlockReason(writerDocument, loadedWriterShotId) && <span>{standaloneGenerationBlockReason(writerDocument, loadedWriterShotId)}</span>}
         </div>
       </div>
     </section>
+    </div>
+    </PromptProductionLayout>
   );
 }

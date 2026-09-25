@@ -1,6 +1,7 @@
 import type { CSSProperties, ChangeEvent, ReactElement } from 'react';
 
 import { formatTimestamp } from '../format';
+import { ProjectCover } from '../ProjectCover';
 import type { TimelineEditorController } from './useTimelineEditor';
 
 type ProjectRailProps = {
@@ -22,6 +23,8 @@ const COMPACT_PANEL_TITLE_STYLE = {
   lineHeight: 1.12,
   margin: 0
 } as const satisfies CSSProperties;
+
+
 
 export function ProjectRail({ editor }: ProjectRailProps): ReactElement {
   const onNameChange = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -53,8 +56,8 @@ export function ProjectRail({ editor }: ProjectRailProps): ReactElement {
             onClick={() => void editor.openProject(project.id)}
             disabled={editor.isBusy}
           >
-            <strong>{project.name}</strong>
-            <small>{formatTimestamp(project.updatedAt)}</small>
+            <ProjectCover projectId={project.id} updatedAt={project.updatedAt} />
+            <span className="project-card__info"><strong>{project.name}</strong><small>{editor.project?.id === project.id ? 'OPEN · ' : ''}{formatTimestamp(project.updatedAt)}</small></span>
           </button>
         ))}
       </div>

@@ -38,16 +38,35 @@ describe('versioned media capability registry', () => {
     });
   });
 
-  it('lists current xAI capabilities with an explicitly scoped signed-in browser lane', () => {
+  it('lists current xAI capabilities with a direct API binding and a separate browser lane', () => {
     const grok = getVideoModelCapabilities('grok-imagine-video-1.5');
     expect(grok?.providerId).toBe('xai');
     expect(Object.keys(grok?.operations ?? {})).toEqual(['text_to_video', 'image_to_video', 'reference_to_video']);
-    expect(grok?.operations.text_to_video?.resolutions).toEqual(['480p']);
+    expect(grok?.operations.text_to_video?.resolutions).toEqual(['480p', '720p', '1080p']);
+    expect(grok?.operations.text_to_video?.durationSeconds).toContain(5);
     expect(grok?.implemented).toEqual(['text_to_video', 'image_to_video']);
     expect(grok?.sourceUrls).toContain('https://docs.x.ai/developers/model-capabilities/video/generation');
     expect(getVideoProviderBinding(grok!.modelId)).toEqual({
-      adapterId: 'grok_imagine_browser', seamProviderId: 'grok_imagine'
+      adapterId: 'xai_grok_api', credentialKey: 'xai', seamProviderId: 'grok_imagine'
     });
+  });
+
+  it('registers Alibaba Wan and HappyHorse as explicit text or first-frame paths', () => {
+    for (const family of ['wan2.7', 'happyhorse-1.1']) {
+      const text = getVideoModelCapabilities(`${family}-t2v`);
+      const image = getVideoModelCapabilities(`${family}-i2v`);
+      expect(text?.implemented).toEqual(['text_to_video']);
+      expect(image?.implemented).toEqual(['image_to_video']);
+      expect(getVideoProviderBinding(text!.modelId)).toEqual({
+        adapterId: 'alibaba_video', credentialKey: 'dashscopeApiKey', seamProviderId: 'alibaba_wan'
+      });
+      expect(validateVideoRequest({ modelId: text!.modelId, operation: 'text_to_video', durationSeconds: 5,
+        aspectRatio: '16:9', referenceImageCount: 0 }).ok).toBe(true);
+      expect(validateVideoRequest({ modelId: image!.modelId, operation: 'image_to_video', durationSeconds: 5,
+        aspectRatio: '16:9', referenceImageCount: 1 }).ok).toBe(true);
+      expect(validateVideoRequest({ modelId: text!.modelId, operation: 'image_to_video', durationSeconds: 5,
+        aspectRatio: '16:9', referenceImageCount: 1 }).ok).toBe(false);
+    }
   });
 
   it('validates every constraint before execution and distinguishes not implemented', () => {
