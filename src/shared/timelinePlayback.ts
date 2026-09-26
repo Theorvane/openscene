@@ -87,3 +87,18 @@ export function nextVisualBoundaryMs(timeline: TimelineDocument, playheadMs: num
   }
   return soonest;
 }
+
+/** The nearest earlier video clip edge, or null at the start of the timeline. */
+export function previousVisualBoundaryMs(timeline: TimelineDocument, playheadMs: number): number | null {
+  let latest: number | null = null;
+  for (const track of timeline.tracks) {
+    if (track.kind !== 'video') continue;
+    for (const clip of track.clips) {
+      for (const edge of [clip.timelineStartMs, clipTimelineEndMs(clip)]) {
+        if (edge >= playheadMs - 1) continue;
+        if (latest === null || edge > latest) latest = edge;
+      }
+    }
+  }
+  return latest;
+}

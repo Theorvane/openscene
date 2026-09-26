@@ -3,7 +3,7 @@ import { Dimensions, PanResponder, Platform, Pressable, ScrollView, StyleSheet, 
 import { Gesture, GestureDetector, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 
-import { nextVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
+import { nextVisualBoundaryMs, previousVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
 import { clipDurationMs, clipTimelineEndMs } from '@openvideo/shared/timelineClipGeometry';
 import { snapTimelinePosition } from '@openvideo/shared/timelineSnapping';
 import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
@@ -387,11 +387,7 @@ export function EditScreen({
       setPlayheadMs(next ?? editor.durationMs);
       return;
     }
-    const edges = editor.timeline.tracks
-      .filter((track) => track.kind === 'video')
-      .flatMap((track) => track.clips.flatMap((clip) => [clip.timelineStartMs, clipTimelineEndMs(clip)]))
-      .filter((edge) => edge < editor.playheadMs - 1);
-    setPlayheadMs(edges.length === 0 ? 0 : Math.max(...edges));
+    setPlayheadMs(previousVisualBoundaryMs(editor.timeline, editor.playheadMs) ?? 0);
   };
 
   const importMedia = async (): Promise<void> => {
