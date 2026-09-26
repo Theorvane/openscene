@@ -3279,7 +3279,7 @@ button {
 }
 
 .asset-bin {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
 }
 
 .asset-bin .panel-heading {
@@ -3290,6 +3290,25 @@ button {
   flex-wrap: nowrap;
   overflow-x: auto;
   justify-content: flex-start;
+}
+
+.asset-bin__find {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: var(--space-1);
+}
+
+.asset-bin__find input,
+.asset-bin__find select {
+  min-width: 0;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface-inset);
+  color: var(--text-strong);
+  font-size: var(--text-caption);
 }
 
 /* Media dock header: slim title row with a grid/list segmented toggle */

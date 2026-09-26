@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactElement } from 'react';
 
 import { formatBytes, formatDuration } from '../format';
+import { mediaLibraryView, MEDIA_LIBRARY_SORTS, type MediaLibrarySort } from '../../../shared/mediaLibraryView';
 import type { MediaAsset } from '../../../shared/timelineTypes';
 import { mediaAssetReady } from './editorTimelineView';
 import type { TimelineEditorController } from './useTimelineEditor';
@@ -34,8 +35,15 @@ function assetGlyph(asset: MediaAsset): string {
 
 export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
   const project = editor.project;
-  const assets = project?.assets.filter((asset) => filter !== 'audio' || asset.kind === 'audio') ?? [];
   const [viewMode, setViewMode] = useState<AssetViewMode>('grid');
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<MediaLibrarySort>('project');
+  const availableAssets = project?.assets.filter((asset) => filter !== 'audio' || asset.kind === 'audio') ?? [];
+  const assets = mediaLibraryView(availableAssets, {
+    query,
+    sort,
+    durationMs: (asset) => asset.metadata?.durationMs ?? null
+  });
 
   const onAssetDragStart = (event: React.DragEvent, assetId: string): void => {
     event.dataTransfer.setData(TIMELINE_DRAG_TYPE, JSON.stringify({ kind: 'asset', assetId }));
@@ -69,6 +77,27 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
         </div>
       </div>
 
+      <div className="asset-bin__find">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          placeholder="Search…"
+          aria-label={filter === 'audio' ? 'Search audio by name' : 'Search media by name'}
+          disabled={project === null}
+        />
+        <select
+          value={sort}
+          onChange={(event) => setSort(event.currentTarget.value as MediaLibrarySort)}
+          aria-label="Sort media"
+          disabled={project === null}
+        >
+          {MEDIA_LIBRARY_SORTS.map((key) => (
+            <option key={key} value={key}>{key === 'project' ? 'Original' : key === 'name' ? 'Name A–Z' : key === 'type' ? 'Type' : 'Longest'}</option>
+          ))}
+        </select>
+      </div>
+
       {/* Compact import toolbar */}
       <div className="asset-bin__toolbar">
         {filter !== 'audio' && <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['video'])} disabled={project === null || editor.isBusy}>
@@ -80,14 +109,14 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
         {filter !== 'audio' && <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['image'])} disabled={project === null || editor.isBusy}>
           + Image
         </button>}
-        <button className="button button--primary asset-bin__toolbar-button" type="button" onClick={editor.placeSelectedAsset} disabled={editor.selectedAsset === null || !mediaAssetReady(editor.selectedAsset) || (filter === 'audio' && editor.selectedAsset.kind !== 'audio')}>
+        <button className="button button--primary asset-bin__toolbar-button" type="button" onClick={editor.placeSelectedAsset} disabled={editor.selectedAsset === null || !mediaAssetReady(editor.selectedAsset) || !assets.some((asset) => asset.id === editor.selectedAsset?.id)}>
           Place
         </button>
       </div>
 
       {project === null ? (
         <div className="empty-slate">Create or open a project before importing local media.</div>
-      ) : assets.length === 0 ? (
+      ) : availableAssets.length === 0 ? (
         <button
           className="asset-bin__dropzone"
           type="button"
@@ -98,6 +127,8 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
           <strong>{filter === 'audio' ? 'Import audio' : 'Import media'}</strong>
           <span>{filter === 'audio' ? 'Add local audio files to this project.' : 'Local video, audio and images stay on this machine.'}</span>
         </button>
+      ) : assets.length === 0 ? (
+        <div className="empty-slate">No {filter === 'audio' ? 'audio' : 'media'} matches “{query.trim()}”.</div>
       ) : viewMode === 'grid' ? (
         <div className="asset-grid asset-grid--tiles" aria-label="Imported project assets">
           {assets.map((asset) => {
