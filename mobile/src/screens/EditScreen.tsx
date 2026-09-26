@@ -10,6 +10,7 @@ import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
 import { DEFAULT_SUBTITLE_DELIVERY } from '@openvideo/shared/subtitleDelivery';
 import { metadataPrivacyPlan } from '@openvideo/shared/metadataPrivacy';
 import { applyCaptionPreset, CAPTION_PLACEMENTS, CAPTION_STYLE_PRESETS, isAutomaticCaptionId, resolvedTitleStyle, type CaptionPresetId } from '@openvideo/shared/captionStyle';
+import { countTimelineAssetUsage } from '@openvideo/shared/mediaLibraryView';
 import { track } from '../lib/analyticsClient';
 import { theme } from '../lib/theme';
 import { useMobileEditor, type EditorAsset } from '../lib/editorState';
@@ -442,14 +443,8 @@ export function EditScreen({
   const selected = editor.selectedClip;
   const selectedAsset = selected === null ? null : editor.assetFor(selected.clip.assetId);
 
-  /** How many clips reference each asset, so the library can say what is in use. */
-  const usage = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const track of editor.timeline.tracks) {
-      for (const clip of track.clips) counts[clip.assetId] = (counts[clip.assetId] ?? 0) + 1;
-    }
-    return counts;
-  }, [editor.timeline]);
+  /** The library and desktop editor share the same clip reference count rule. */
+  const usage = useMemo(() => countTimelineAssetUsage(editor.timeline), [editor.timeline]);
 
   return (
     <View style={[styles.root, { paddingTop: topInset }]}>

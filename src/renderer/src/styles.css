@@ -3279,7 +3279,7 @@ button {
 }
 
 .asset-bin {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
 }
 
 .asset-bin .panel-heading {
@@ -3308,6 +3308,14 @@ button {
   border-radius: var(--radius-xs);
   background: var(--surface-inset);
   color: var(--text-strong);
+  font-size: var(--text-caption);
+}
+
+.asset-bin__unused {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-weak);
   font-size: var(--text-caption);
 }
 

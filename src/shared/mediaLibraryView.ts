@@ -14,13 +14,25 @@ type MediaLibraryViewOptions<T extends LibraryAsset> = {
   readonly sort: MediaLibrarySort;
   readonly kind?: MediaKind;
   readonly durationMs: (asset: T) => number | null;
+  readonly usage: ReadonlyMap<string, number>;
+  readonly unusedOnly?: boolean;
 };
+
+/** Count every timeline clip reference, including repeated placements of one asset. */
+export function countTimelineAssetUsage(timeline: { readonly tracks: readonly { readonly clips: readonly { readonly assetId: string }[] }[] }): ReadonlyMap<string, number> {
+  const usage = new Map<string, number>();
+  for (const track of timeline.tracks) {
+    for (const clip of track.clips) usage.set(clip.assetId, (usage.get(clip.assetId) ?? 0) + 1);
+  }
+  return usage;
+}
 
 /** One library view rule for desktop and mobile; never changes the stored order. */
 export function mediaLibraryView<T extends LibraryAsset>(assets: readonly T[], options: MediaLibraryViewOptions<T>): readonly T[] {
   const query = options.query.trim().toLowerCase();
   const matches = assets.filter((asset) =>
     (options.kind === undefined || asset.kind === options.kind)
+    && (!options.unusedOnly || (options.usage.get(asset.id) ?? 0) === 0)
     && asset.displayName.toLowerCase().includes(query)
   );
   if (options.sort === 'project') return matches;

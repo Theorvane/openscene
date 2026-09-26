@@ -31,14 +31,15 @@ export function MediaLibrary({
   readonly projectId: string;
   readonly assets: readonly MobileAsset[];
   /** How many clips reference each asset id. */
-  readonly usage: Readonly<Record<string, number>>;
+  readonly usage: ReadonlyMap<string, number>;
   readonly onAdd: (assetId: string) => void;
   readonly onDelete: (assetId: string) => void;
 }) {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<MediaLibrarySort>('project');
-  const visibleAssets = mediaLibraryView(assets, { query, sort, durationMs: (asset) => asset.durationMs });
+  const [unusedOnly, setUnusedOnly] = useState(false);
+  const visibleAssets = mediaLibraryView(assets, { query, sort, usage, unusedOnly, durationMs: (asset) => asset.durationMs });
   const sortLabel = sort === 'project' ? 'Project' : sort === 'name' ? 'Name' : sort === 'type' ? 'Type' : 'Longest';
 
   if (assets.length === 0) {
@@ -65,9 +66,18 @@ export function MediaLibrary({
           <Text style={styles.sortText}>{sortLabel} ▾</Text>
         </Pressable>
       </View>
-      {visibleAssets.length === 0 && <Text style={styles.empty}>No media matches “{query.trim()}”.</Text>}
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: unusedOnly }}
+        accessibilityLabel="Unused media only"
+        onPress={() => setUnusedOnly((value) => !value)}
+        style={press(styles.unused)}
+      >
+        <Text style={styles.sortText}>{unusedOnly ? '☑' : '□'} Unused only</Text>
+      </Pressable>
+      {visibleAssets.length === 0 && <Text style={styles.empty}>No media matches the current filters.</Text>}
       {visibleAssets.map((asset) => {
-        const used = usage[asset.id] ?? 0;
+        const used = usage.get(asset.id) ?? 0;
         return (
           <View key={asset.id} style={styles.row}>
             <View style={styles.info}>
@@ -132,6 +142,7 @@ const styles = StyleSheet.create({
   search: { flex: 1, minHeight: MIN_TAP, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8, color: theme.text, fontSize: 14 },
   sort: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 },
   sortText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
+  unused: { minHeight: MIN_TAP, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.line },
   info: { flex: 1 },
   name: { color: theme.text, fontSize: 14, fontWeight: '600' },
