@@ -7,6 +7,7 @@ import type { TimelineEditorController } from './useTimelineEditor';
 
 type AssetBinProps = {
   readonly editor: TimelineEditorController;
+  readonly filter?: 'audio';
 };
 
 type AssetViewMode = 'grid' | 'list';
@@ -31,8 +32,9 @@ function assetGlyph(asset: MediaAsset): string {
   return '🎵';
 }
 
-export function AssetBin({ editor }: AssetBinProps): ReactElement {
+export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
   const project = editor.project;
+  const assets = project?.assets.filter((asset) => filter !== 'audio' || asset.kind === 'audio') ?? [];
   const [viewMode, setViewMode] = useState<AssetViewMode>('grid');
 
   const onAssetDragStart = (event: React.DragEvent, assetId: string): void => {
@@ -44,7 +46,7 @@ export function AssetBin({ editor }: AssetBinProps): ReactElement {
     <section className="asset-bin" aria-labelledby="assets-title" style={COMPACT_PANEL_STYLE}>
       {/* Slim dock header: title left, view toggle right */}
       <div className="panel-heading asset-bin__header">
-        <h2 id="assets-title" className="asset-bin__title">Media</h2>
+        <h2 id="assets-title" className="asset-bin__title">{filter === 'audio' ? 'Audio' : 'Media'}</h2>
         <div className="asset-bin__view-toggle" role="group" aria-label="Media view mode">
           <button
             className={`asset-bin__view-button${viewMode === 'grid' ? ' asset-bin__view-button--active' : ''}`}
@@ -69,36 +71,36 @@ export function AssetBin({ editor }: AssetBinProps): ReactElement {
 
       {/* Compact import toolbar */}
       <div className="asset-bin__toolbar">
-        <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['video'])} disabled={project === null || editor.isBusy}>
+        {filter !== 'audio' && <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['video'])} disabled={project === null || editor.isBusy}>
           + Video
-        </button>
+        </button>}
         <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['audio'])} disabled={project === null || editor.isBusy}>
           + Audio
         </button>
-        <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['image'])} disabled={project === null || editor.isBusy}>
+        {filter !== 'audio' && <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['image'])} disabled={project === null || editor.isBusy}>
           + Image
-        </button>
-        <button className="button button--primary asset-bin__toolbar-button" type="button" onClick={editor.placeSelectedAsset} disabled={editor.selectedAsset === null || !mediaAssetReady(editor.selectedAsset)}>
+        </button>}
+        <button className="button button--primary asset-bin__toolbar-button" type="button" onClick={editor.placeSelectedAsset} disabled={editor.selectedAsset === null || !mediaAssetReady(editor.selectedAsset) || (filter === 'audio' && editor.selectedAsset.kind !== 'audio')}>
           Place
         </button>
       </div>
 
       {project === null ? (
         <div className="empty-slate">Create or open a project before importing local media.</div>
-      ) : project.assets.length === 0 ? (
+      ) : assets.length === 0 ? (
         <button
           className="asset-bin__dropzone"
           type="button"
-          onClick={() => void editor.importAssets()}
+          onClick={() => void editor.importAssets(filter === 'audio' ? ['audio'] : undefined)}
           disabled={editor.isBusy}
         >
           <span aria-hidden="true" className="asset-bin__dropzone-icon">⬆</span>
-          <strong>Import media</strong>
-          <span>Local video, audio and images stay on this machine.</span>
+          <strong>{filter === 'audio' ? 'Import audio' : 'Import media'}</strong>
+          <span>{filter === 'audio' ? 'Add local audio files to this project.' : 'Local video, audio and images stay on this machine.'}</span>
         </button>
       ) : viewMode === 'grid' ? (
         <div className="asset-grid asset-grid--tiles" aria-label="Imported project assets">
-          {project.assets.map((asset) => {
+          {assets.map((asset) => {
             const failureMessage = editor.metadataProbeFailuresByAssetId[asset.id];
             const selected = editor.selectedAssetId === asset.id;
 
@@ -129,7 +131,7 @@ export function AssetBin({ editor }: AssetBinProps): ReactElement {
         </div>
       ) : (
         <div className="asset-grid asset-grid--list" aria-label="Imported project assets">
-          {project.assets.map((asset) => {
+          {assets.map((asset) => {
             const failureMessage = editor.metadataProbeFailuresByAssetId[asset.id];
             const selected = editor.selectedAssetId === asset.id;
 

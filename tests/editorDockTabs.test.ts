@@ -44,7 +44,7 @@ function makeProject(overrides: Partial<LocalProjectSnapshot> = {}): LocalProjec
 }
 
 describe('editor dock tabs', () => {
-  it('returns stable left project/media and inspector selection/asset defaults', () => {
+  it('returns stable left tool categories and inspector selection/asset defaults', () => {
     // Given
     const project = makeProject();
 
@@ -52,8 +52,8 @@ describe('editor dock tabs', () => {
     const dockTabs = getDefaultEditorDockTabs(project);
 
     // Then
-    expect(dockTabs.left.map((tab) => tab.id)).toEqual(['project', 'media']);
-    expect(dockTabs.left.map((tab) => tab.label)).toEqual(['Project', 'Media']);
+    expect(dockTabs.left.map((tab) => tab.id)).toEqual(['project', 'media', 'audio', 'text']);
+    expect(dockTabs.left.map((tab) => tab.label)).toEqual(['Project', 'Media', 'Audio', 'Text']);
     // Project settings live on the workspace tab line, not in the inspector.
     expect(dockTabs.inspector.map((tab) => tab.id)).toEqual(['selection', 'asset']);
     expect(dockTabs.inspector.map((tab) => tab.label)).toEqual(['Selection', 'Asset']);
@@ -69,14 +69,15 @@ describe('editor dock tabs', () => {
     ] as const;
 
     // When / Then
-    // This project's asset still lacks metadata, so the Asset tab is disabled;
-    // enabled tabs are project, media, selection.
+    // This project's asset still lacks metadata, so the Asset tab is disabled.
     expect(getNextEditorDockTabId({ currentTabId: 'project', key: 'ArrowRight', tabs })).toBe('media');
-    expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'ArrowRight', tabs })).toBe('selection');
+    expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'ArrowRight', tabs })).toBe('audio');
+    expect(getNextEditorDockTabId({ currentTabId: 'audio', key: 'ArrowRight', tabs })).toBe('text');
+    expect(getNextEditorDockTabId({ currentTabId: 'text', key: 'ArrowRight', tabs })).toBe('selection');
     expect(getNextEditorDockTabId({ currentTabId: 'selection', key: 'ArrowRight', tabs })).toBe('project');
     expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'Home', tabs })).toBe('project');
     expect(getNextEditorDockTabId({ currentTabId: 'media', key: 'End', tabs })).toBe('selection');
-    expect(getNextEditorDockTabId({ currentTabId: 'selection', key: 'ArrowLeft', tabs })).toBe('media');
+    expect(getNextEditorDockTabId({ currentTabId: 'selection', key: 'ArrowLeft', tabs })).toBe('text');
     expect(getNextEditorDockTabId({ currentTabId: 'inspector', key: 'ArrowRight', tabs })).toBe('selection');
   });
 

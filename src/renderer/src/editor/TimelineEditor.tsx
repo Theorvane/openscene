@@ -100,7 +100,6 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   const inspectorTabs = getInspectorTabs(editor);
   const projectIdentity = editor.project?.id ?? '';
   const selectedAssetIdentity = editor.selectedAsset?.id ?? '';
-  const selectedAssetId = editor.selectedAssetId;
   const selectedClipIdentity = editor.selectedClip?.clip.id ?? '';
 
   useEffect(() => {
@@ -108,8 +107,8 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   }, [projectIdentity, selectedAssetIdentity, selectedClipIdentity]);
 
   useEffect(() => {
-    setLeftDockTabId(getDefaultEditorLeftDockTabId({ hasProject: projectIdentity.length > 0, selectedAssetId }));
-  }, [projectIdentity, selectedAssetId]);
+    setLeftDockTabId(getDefaultEditorLeftDockTabId({ hasProject: projectIdentity.length > 0, selectedAssetId: '' }));
+  }, [projectIdentity]);
 
   const setProgramPercent = (programPercent: number): void => {
     updateLayoutPreference((currentPreference) => ({ ...currentPreference, programPercent: clampEditorProgramPercent(programPercent) }));
@@ -212,7 +211,13 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
 
   return (
     <section className={workspaceClassName} style={workspaceStyle} aria-labelledby="timeline-editor-title">
-      <TimelineEditorLeftDock editor={editor} leftDockVisible={layoutPreference.leftDockVisible} />
+      <TimelineEditorLeftDock
+        activeTabId={leftDockTabId}
+        editor={editor}
+        leftDockVisible={layoutPreference.leftDockVisible}
+        projectPanelFloating={layoutPreference.floatingPanels.project.floating}
+        onActiveTabChange={setLeftDockTabId}
+      />
 
       <EditorLeftDockSplitter leftDockVisible={layoutPreference.leftDockVisible} leftDockWidth={layoutPreference.leftDockWidth} onLeftDockWidthChange={setLeftDockWidth} />
 
