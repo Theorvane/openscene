@@ -1,5 +1,6 @@
-import type { CSSProperties, KeyboardEvent, ReactElement, ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 
+import { DEFAULT_MEDIA_LIBRARY_FILTERS, type MediaLibraryFilters } from '../../../shared/mediaLibraryView';
 import { AssetBin } from './AssetBin';
 import { EDITOR_LEFT_DOCK_TAB_IDS, getNextEditorDockTabId, type EditorLeftDockTabId } from './dockTabs';
 import { ProjectRail } from './ProjectRail';
@@ -29,6 +30,13 @@ const TOOLS: Readonly<Record<EditorLeftDockTabId, { label: string; icon: ReactNo
 };
 
 export function TimelineEditorLeftDock({ activeTabId, editor, leftDockVisible, projectPanelFloating, onActiveTabChange }: TimelineEditorLeftDockProps): ReactElement {
+  const [mediaFilters, setMediaFilters] = useState<MediaLibraryFilters>(DEFAULT_MEDIA_LIBRARY_FILTERS);
+  const [audioFilters, setAudioFilters] = useState<MediaLibraryFilters>(DEFAULT_MEDIA_LIBRARY_FILTERS);
+  const projectId = editor.project?.id ?? null;
+  useEffect(() => {
+    setMediaFilters(DEFAULT_MEDIA_LIBRARY_FILTERS);
+    setAudioFilters(DEFAULT_MEDIA_LIBRARY_FILTERS);
+  }, [projectId]);
   const tabs = EDITOR_LEFT_DOCK_TAB_IDS.map((id) => ({ id, label: TOOLS[id].label }));
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
     if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
@@ -68,9 +76,9 @@ export function TimelineEditorLeftDock({ activeTabId, editor, leftDockVisible, p
         {activeTabId === 'project'
           ? (projectPanelFloating ? <div className="empty-slate">The project panel is floating above the editor.</div> : <ProjectRail editor={editor} />)
           : activeTabId === 'media'
-            ? <AssetBin editor={editor} />
+            ? <AssetBin editor={editor} filters={mediaFilters} onFiltersChange={setMediaFilters} />
             : activeTabId === 'audio'
-              ? <AssetBin editor={editor} filter="audio" />
+              ? <AssetBin editor={editor} filter="audio" filters={audioFilters} onFiltersChange={setAudioFilters} />
               : <TitleToolPanel editor={editor} />}
       </div>
     </div>

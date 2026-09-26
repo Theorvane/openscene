@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { countTimelineAssetUsage, mediaLibraryView } from '../src/shared/mediaLibraryView';
+import { countTimelineAssetUsage, DEFAULT_MEDIA_LIBRARY_FILTERS, mediaLibraryFiltersActive, mediaLibraryView } from '../src/shared/mediaLibraryView';
 
 type Asset = { id: string; displayName: string; kind: 'video' | 'audio' | 'image'; durationMs: number | null };
 const assets: readonly Asset[] = [
@@ -15,6 +15,14 @@ const usage = new Map([['a', 2], ['z', 1]]);
 const ids = (items: readonly Asset[]): readonly string[] => items.map((asset) => asset.id);
 
 describe('shared project media view', () => {
+  it('recognizes when filters differ from the shared reset state', () => {
+    expect(mediaLibraryFiltersActive(DEFAULT_MEDIA_LIBRARY_FILTERS)).toBe(false);
+    expect(mediaLibraryFiltersActive({ ...DEFAULT_MEDIA_LIBRARY_FILTERS, query: '  ' })).toBe(false);
+    expect(mediaLibraryFiltersActive({ ...DEFAULT_MEDIA_LIBRARY_FILTERS, query: 'clip' })).toBe(true);
+    expect(mediaLibraryFiltersActive({ ...DEFAULT_MEDIA_LIBRARY_FILTERS, sort: 'name' })).toBe(true);
+    expect(mediaLibraryFiltersActive({ ...DEFAULT_MEDIA_LIBRARY_FILTERS, unusedOnly: true })).toBe(true);
+  });
+
   it('searches names without changing the stored order or matching case', () => {
     expect(ids(mediaLibraryView(assets, { query: ' ALPhA ', sort: 'project', durationMs, usage }))).toEqual(['a', 'a2']);
     expect(ids(assets)).toEqual(['z', 'a', 'a2', 'still']);
