@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactElement } from 'react';
 
 import { formatBytes, formatDuration } from '../format';
-import { mediaLibraryView, MEDIA_LIBRARY_SORTS, type MediaLibrarySort } from '../../../shared/mediaLibraryView';
+import { countTimelineAssetUsage, mediaLibraryView, MEDIA_LIBRARY_SORTS, type MediaLibrarySort } from '../../../shared/mediaLibraryView';
 import type { MediaAsset } from '../../../shared/timelineTypes';
 import { mediaAssetReady } from './editorTimelineView';
 import type { TimelineEditorController } from './useTimelineEditor';
@@ -38,10 +38,14 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
   const [viewMode, setViewMode] = useState<AssetViewMode>('grid');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<MediaLibrarySort>('project');
+  const [unusedOnly, setUnusedOnly] = useState(false);
+  const usage = project === null ? new Map<string, number>() : countTimelineAssetUsage(project.timeline);
   const availableAssets = project?.assets.filter((asset) => filter !== 'audio' || asset.kind === 'audio') ?? [];
   const assets = mediaLibraryView(availableAssets, {
     query,
     sort,
+    usage,
+    unusedOnly,
     durationMs: (asset) => asset.metadata?.durationMs ?? null
   });
 
@@ -98,6 +102,11 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
         </select>
       </div>
 
+      <label className="asset-bin__unused">
+        <input type="checkbox" checked={unusedOnly} onChange={(event) => setUnusedOnly(event.currentTarget.checked)} disabled={project === null} />
+        Unused only
+      </label>
+
       {/* Compact import toolbar */}
       <div className="asset-bin__toolbar">
         {filter !== 'audio' && <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['video'])} disabled={project === null || editor.isBusy}>
@@ -128,7 +137,7 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
           <span>{filter === 'audio' ? 'Add local audio files to this project.' : 'Local video, audio and images stay on this machine.'}</span>
         </button>
       ) : assets.length === 0 ? (
-        <div className="empty-slate">No {filter === 'audio' ? 'audio' : 'media'} matches “{query.trim()}”.</div>
+        <div className="empty-slate">No {filter === 'audio' ? 'audio' : 'media'} matches the current filters.</div>
       ) : viewMode === 'grid' ? (
         <div className="asset-grid asset-grid--tiles" aria-label="Imported project assets">
           {assets.map((asset) => {
@@ -151,7 +160,7 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
                     <span className="asset-tile__duration">{assetDurationLabel(asset, failureMessage)}</span>
                   </span>
                   <strong className="asset-tile__name">{asset.displayName}</strong>
-                  <small className="asset-tile__meta">{formatBytes(asset.byteLength)}</small>
+                  <small className="asset-tile__meta">{formatBytes(asset.byteLength)} · {usage.get(asset.id) ?? 0} on timeline</small>
                 </button>
                 {selected && failureMessage !== undefined ? (
                   <button className="button asset-bin__retry" type="button" onClick={() => editor.retryAssetMetadataProbe(asset.id)}>Retry metadata</button>
@@ -179,7 +188,7 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
                   <span className={`asset-row__thumb asset-row__thumb--${asset.kind}`} aria-hidden="true">{assetGlyph(asset)}</span>
                   <span className="asset-row__body">
                     <strong className="asset-row__name">{asset.displayName}</strong>
-                    <small className="asset-row__meta">{asset.kind} · {formatBytes(asset.byteLength)}</small>
+                    <small className="asset-row__meta">{asset.kind} · {formatBytes(asset.byteLength)} · {usage.get(asset.id) ?? 0} on timeline</small>
                   </span>
                   <span className="asset-row__duration">{assetDurationLabel(asset, failureMessage)}</span>
                 </button>
