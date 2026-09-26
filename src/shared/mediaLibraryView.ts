@@ -3,6 +3,18 @@ import type { MediaKind } from './timelineTypes';
 export const MEDIA_LIBRARY_SORTS = ['project', 'name', 'type', 'duration'] as const;
 export type MediaLibrarySort = (typeof MEDIA_LIBRARY_SORTS)[number];
 
+export type MediaLibraryFilters = {
+  readonly query: string;
+  readonly sort: MediaLibrarySort;
+  readonly unusedOnly: boolean;
+};
+
+export const DEFAULT_MEDIA_LIBRARY_FILTERS: MediaLibraryFilters = Object.freeze({ query: '', sort: 'project', unusedOnly: false });
+
+export function mediaLibraryFiltersActive(filters: MediaLibraryFilters): boolean {
+  return filters.query.trim().length > 0 || filters.sort !== 'project' || filters.unusedOnly;
+}
+
 type LibraryAsset = {
   readonly id: string;
   readonly displayName: string;

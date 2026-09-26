@@ -3311,12 +3311,24 @@ button {
   font-size: var(--text-caption);
 }
 
+.asset-bin__filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
 .asset-bin__unused {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   color: var(--text-weak);
   font-size: var(--text-caption);
+}
+
+.asset-bin__reset {
+  min-height: 26px;
+  padding: 2px 8px;
 }
 
 /* Media dock header: slim title row with a grid/list segmented toggle */

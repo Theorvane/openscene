@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { mediaLibraryView, MEDIA_LIBRARY_SORTS, type MediaLibrarySort } from '@openvideo/shared/mediaLibraryView';
+import { DEFAULT_MEDIA_LIBRARY_FILTERS, mediaLibraryFiltersActive, mediaLibraryView, MEDIA_LIBRARY_SORTS, type MediaLibraryFilters } from '@openvideo/shared/mediaLibraryView';
 import { assetByteLength, type MobileAsset } from '../lib/projectStore';
 import { theme } from '../lib/theme';
 import { MIN_TAP, press } from '../lib/touch';
@@ -25,6 +25,8 @@ export function MediaLibrary({
   projectId,
   assets,
   usage,
+  filters,
+  onFiltersChange,
   onAdd,
   onDelete
 }: {
@@ -32,26 +34,22 @@ export function MediaLibrary({
   readonly assets: readonly MobileAsset[];
   /** How many clips reference each asset id. */
   readonly usage: ReadonlyMap<string, number>;
+  readonly filters: MediaLibraryFilters;
+  readonly onFiltersChange: (filters: MediaLibraryFilters) => void;
   readonly onAdd: (assetId: string) => void;
   readonly onDelete: (assetId: string) => void;
 }) {
   const [confirming, setConfirming] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<MediaLibrarySort>('project');
-  const [unusedOnly, setUnusedOnly] = useState(false);
-  const visibleAssets = mediaLibraryView(assets, { query, sort, usage, unusedOnly, durationMs: (asset) => asset.durationMs });
-  const sortLabel = sort === 'project' ? 'Project' : sort === 'name' ? 'Name' : sort === 'type' ? 'Type' : 'Longest';
-
-  if (assets.length === 0) {
-    return <Text style={styles.empty}>No media yet. Import a clip, or generate one under Video.</Text>;
-  }
+  const visibleAssets = mediaLibraryView(assets, { ...filters, usage, durationMs: (asset) => asset.durationMs });
+  const filtersActive = mediaLibraryFiltersActive(filters);
+  const sortLabel = filters.sort === 'project' ? 'Project' : filters.sort === 'name' ? 'Name' : filters.sort === 'type' ? 'Type' : 'Longest';
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.findRow}>
         <TextInput
-          value={query}
-          onChangeText={setQuery}
+          value={filters.query}
+          onChangeText={(query) => onFiltersChange({ ...filters, query })}
           placeholder="Search media"
           placeholderTextColor={theme.textWeaker}
           accessibilityLabel="Search media by name"
@@ -60,22 +58,35 @@ export function MediaLibrary({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Sort media: ${sortLabel}. Tap to change`}
-          onPress={() => setSort(MEDIA_LIBRARY_SORTS[(MEDIA_LIBRARY_SORTS.indexOf(sort) + 1) % MEDIA_LIBRARY_SORTS.length] ?? 'project')}
+          onPress={() => onFiltersChange({ ...filters, sort: MEDIA_LIBRARY_SORTS[(MEDIA_LIBRARY_SORTS.indexOf(filters.sort) + 1) % MEDIA_LIBRARY_SORTS.length] ?? 'project' })}
           style={press(styles.sort)}
         >
           <Text style={styles.sortText}>{sortLabel} ▾</Text>
         </Pressable>
       </View>
-      <Pressable
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: unusedOnly }}
-        accessibilityLabel="Unused media only"
-        onPress={() => setUnusedOnly((value) => !value)}
-        style={press(styles.unused)}
-      >
-        <Text style={styles.sortText}>{unusedOnly ? '☑' : '□'} Unused only</Text>
-      </Pressable>
-      {visibleAssets.length === 0 && <Text style={styles.empty}>No media matches the current filters.</Text>}
+      <View style={styles.filterRow}>
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: filters.unusedOnly }}
+          accessibilityLabel="Unused media only"
+          onPress={() => onFiltersChange({ ...filters, unusedOnly: !filters.unusedOnly })}
+          style={press(styles.unused)}
+        >
+          <Text style={styles.sortText}>{filters.unusedOnly ? '☑' : '□'} Unused only</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reset media filters"
+          disabled={!filtersActive}
+          onPress={() => onFiltersChange(DEFAULT_MEDIA_LIBRARY_FILTERS)}
+          style={press(styles.reset)}
+        >
+          <Text style={[styles.sortText, !filtersActive && styles.disabled]}>Reset</Text>
+        </Pressable>
+      </View>
+      {assets.length === 0
+        ? <Text style={styles.empty}>No media yet. Import a clip, or generate one under Video.</Text>
+        : visibleAssets.length === 0 && <Text style={styles.empty}>No media matches the current filters.</Text>}
       {visibleAssets.map((asset) => {
         const used = usage.get(asset.id) ?? 0;
         return (
@@ -142,7 +153,10 @@ const styles = StyleSheet.create({
   search: { flex: 1, minHeight: MIN_TAP, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 8, color: theme.text, fontSize: 14 },
   sort: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 10, borderWidth: 1, borderColor: theme.line, borderRadius: 8 },
   sortText: { color: theme.textWeak, fontSize: 13, fontWeight: '600' },
+  filterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   unused: { minHeight: MIN_TAP, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 4 },
+  reset: { minHeight: MIN_TAP, justifyContent: 'center', paddingHorizontal: 4 },
+  disabled: { opacity: 0.4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.line },
   info: { flex: 1 },
   name: { color: theme.text, fontSize: 14, fontWeight: '600' },

@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactElement } from 'react';
 
 import { formatBytes, formatDuration } from '../format';
-import { countTimelineAssetUsage, mediaLibraryView, MEDIA_LIBRARY_SORTS, type MediaLibrarySort } from '../../../shared/mediaLibraryView';
+import { countTimelineAssetUsage, DEFAULT_MEDIA_LIBRARY_FILTERS, mediaLibraryFiltersActive, mediaLibraryView, MEDIA_LIBRARY_SORTS, type MediaLibraryFilters } from '../../../shared/mediaLibraryView';
 import type { MediaAsset } from '../../../shared/timelineTypes';
 import { mediaAssetReady } from './editorTimelineView';
 import type { TimelineEditorController } from './useTimelineEditor';
@@ -9,6 +9,8 @@ import type { TimelineEditorController } from './useTimelineEditor';
 type AssetBinProps = {
   readonly editor: TimelineEditorController;
   readonly filter?: 'audio';
+  readonly filters: MediaLibraryFilters;
+  readonly onFiltersChange: (filters: MediaLibraryFilters) => void;
 };
 
 type AssetViewMode = 'grid' | 'list';
@@ -33,19 +35,14 @@ function assetGlyph(asset: MediaAsset): string {
   return '🎵';
 }
 
-export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
+export function AssetBin({ editor, filter, filters, onFiltersChange }: AssetBinProps): ReactElement {
   const project = editor.project;
   const [viewMode, setViewMode] = useState<AssetViewMode>('grid');
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<MediaLibrarySort>('project');
-  const [unusedOnly, setUnusedOnly] = useState(false);
   const usage = project === null ? new Map<string, number>() : countTimelineAssetUsage(project.timeline);
   const availableAssets = project?.assets.filter((asset) => filter !== 'audio' || asset.kind === 'audio') ?? [];
   const assets = mediaLibraryView(availableAssets, {
-    query,
-    sort,
+    ...filters,
     usage,
-    unusedOnly,
     durationMs: (asset) => asset.metadata?.durationMs ?? null
   });
 
@@ -84,15 +81,15 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
       <div className="asset-bin__find">
         <input
           type="search"
-          value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
+          value={filters.query}
+          onChange={(event) => onFiltersChange({ ...filters, query: event.currentTarget.value })}
           placeholder="Search…"
           aria-label={filter === 'audio' ? 'Search audio by name' : 'Search media by name'}
           disabled={project === null}
         />
         <select
-          value={sort}
-          onChange={(event) => setSort(event.currentTarget.value as MediaLibrarySort)}
+          value={filters.sort}
+          onChange={(event) => onFiltersChange({ ...filters, sort: event.currentTarget.value as MediaLibraryFilters['sort'] })}
           aria-label="Sort media"
           disabled={project === null}
         >
@@ -102,10 +99,13 @@ export function AssetBin({ editor, filter }: AssetBinProps): ReactElement {
         </select>
       </div>
 
-      <label className="asset-bin__unused">
-        <input type="checkbox" checked={unusedOnly} onChange={(event) => setUnusedOnly(event.currentTarget.checked)} disabled={project === null} />
-        Unused only
-      </label>
+      <div className="asset-bin__filter-row">
+        <label className="asset-bin__unused">
+          <input type="checkbox" checked={filters.unusedOnly} onChange={(event) => onFiltersChange({ ...filters, unusedOnly: event.currentTarget.checked })} disabled={project === null} />
+          Unused only
+        </label>
+        <button className="button button--ghost asset-bin__reset" type="button" onClick={() => onFiltersChange(DEFAULT_MEDIA_LIBRARY_FILTERS)} disabled={project === null || !mediaLibraryFiltersActive(filters)}>Reset</button>
+      </div>
 
       {/* Compact import toolbar */}
       <div className="asset-bin__toolbar">

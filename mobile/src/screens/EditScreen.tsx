@@ -10,7 +10,7 @@ import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
 import { DEFAULT_SUBTITLE_DELIVERY } from '@openvideo/shared/subtitleDelivery';
 import { metadataPrivacyPlan } from '@openvideo/shared/metadataPrivacy';
 import { applyCaptionPreset, CAPTION_PLACEMENTS, CAPTION_STYLE_PRESETS, isAutomaticCaptionId, resolvedTitleStyle, type CaptionPresetId } from '@openvideo/shared/captionStyle';
-import { countTimelineAssetUsage } from '@openvideo/shared/mediaLibraryView';
+import { countTimelineAssetUsage, DEFAULT_MEDIA_LIBRARY_FILTERS, type MediaLibraryFilters } from '@openvideo/shared/mediaLibraryView';
 import { track } from '../lib/analyticsClient';
 import { theme } from '../lib/theme';
 import { useMobileEditor, type EditorAsset } from '../lib/editorState';
@@ -168,6 +168,8 @@ export function EditScreen({
   const [pxPerSecond, setPxPerSecond] = useState(28);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
   const [mediaOpen, setMediaOpen] = useState(false);
+  const [mediaFilters, setMediaFilters] = useState<MediaLibraryFilters>(DEFAULT_MEDIA_LIBRARY_FILTERS);
+  useEffect(() => { setMediaFilters(DEFAULT_MEDIA_LIBRARY_FILTERS); }, [projectId]);
   const [storedAssets, setStoredAssets] = useState<readonly MobileAsset[]>([]);
   const [playing, setPlaying] = useState(false);
   useEffect(() => { if (!active) setPlaying(false); }, [active]);
@@ -609,9 +611,12 @@ export function EditScreen({
 
       {mediaOpen && projectId !== null && (
         <MediaLibrary
+          key={projectId}
           projectId={projectId}
           assets={storedAssets}
           usage={usage}
+          filters={mediaFilters}
+          onFiltersChange={setMediaFilters}
           onAdd={editor.placeExisting}
           onDelete={(assetId) => {
             deleteAsset(projectId, assetId);
