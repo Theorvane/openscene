@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isClipActiveAt,
   nextVisualBoundaryMs,
+  previousVisualBoundaryMs,
   resolveAudibleClips,
   resolveVisibleClip,
   sourceTimeForClip
@@ -123,5 +124,9 @@ describe('what plays at a moment', () => {
     expect(nextVisualBoundaryMs(document, 0)).toBe(1_000);
     expect(nextVisualBoundaryMs(document, 1_000)).toBe(3_000);
     expect(nextVisualBoundaryMs(document, 4_000)).toBeNull();
+    expect(previousVisualBoundaryMs(document, 4_000)).toBe(3_000);
+    expect(previousVisualBoundaryMs(document, 3_000)).toBe(1_000);
+    expect(previousVisualBoundaryMs(document, 500)).toBe(0);
+    expect(previousVisualBoundaryMs(document, 0)).toBeNull();
   });
 });
