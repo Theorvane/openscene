@@ -10,7 +10,7 @@ survive `expo prebuild` belongs in a config plugin, as the release signing does.
 | --- | --- |
 | Display name | OpenScene |
 | iOS bundle id / Android applicationId | `com.sloki9637.openscene` |
-| Version | `0.8.0` (`expo.version`) |
+| Version | `0.9.0` (`expo.version`) |
 | iOS build number | `expo.ios.buildNumber` |
 | Android version code | `expo.android.versionCode` |
 
@@ -231,13 +231,10 @@ Android emulator, with the Test Suite's Live/Test switch set to Test, the banner
 unit renders a creative and the interstitial unit loads and plays one. The app
 keys and all four unit ids match the dashboard.
 
-What that does not prove is the app's own banner view. The Test Suite renders ads
-with its own views; `AdBanner` mounts `LevelPlayBannerAdView`, which
-`ironsource-mediation` registers as a legacy view manager while this app runs the
-New Architecture. The failure mode is a banner that never appears rather than a
-build error, so it still needs a look before a store build ships one — a release
-that reaches users with a silently broken banner earns nothing and still declares
-ad collection.
+The Test Suite renders ads with its own views, so it cannot verify the app's
+`AdBanner` view. The publisher confirmed that the in-app banner appears on a
+real Android device before the 0.9.0 release. Check it again after changing the
+ad SDK or React Native architecture.
 
 **Only four of the five networks are actually bidding.** The Test Suite lists
 ironSource, Meta, Pangle and UnityAds against both ad units; **AppLovin is
@@ -274,35 +271,22 @@ nowhere else. Each one only ever serves the placement and the platform it was
 made for — an interstitial id in a banner slot, or the reverse, is a policy
 violation rather than a rendering bug, so a test asserts they stay distinct.
 
-**Android export is implemented but unverified.** The Media3 Transformer path
-is written, compiles, and installs; no export has been seen to produce a file.
-Two attempts on an emulator ended with the emulator itself dying, which is a
-resource problem rather than evidence either way — but it is not evidence that
-it works.
-
-Run one on a real device before submitting Android: import a clip, tap Export,
-and confirm a playable file arrives in the photo library. If it does not, set
-`isSupported` back to `false` in `VideoExportModule.kt` so the app says so
-plainly rather than handing the user a path to nothing, and ship iOS first.
+**Android export has a real-device preflight for 0.9.0.** The publisher confirmed
+that a clip exports to a playable file on a real Android device. Repeat that
+check after changing the Media3 export path. If it fails, set `isSupported` back
+to `false` in `VideoExportModule.kt` so the app says so plainly.
 
 Overlapping video layers are composited now rather than refused: the plan says
 which layer a segment belongs to and Android builds one Media3 sequence per
-layer. That is the part with the least evidence behind it in this release — it
-compiles and it is assembled the way `Composition` documents, and no device has
-been seen to render two stacked clips. The preflight above is where that gets
-answered: put one clip over another on a second track before deciding the feature
-works.
+layer. The publisher also confirmed an export with two overlapping video tracks
+on a real Android device before 0.9.0. Repeat this case after changing the
+layered export path.
 
-**The published privacy policy has to say the app shows ads, before this
-ships.** The app now states it in Settings — "OpenScene is free. Ads pay for it"
-— and names Unity LevelPlay. The policy at `https://www.sloki9637.com/privacy`
-says nothing about advertising, mediated networks, advertising identifiers, or
-advertising as a purpose. An in-app disclosure the policy contradicts is worse
-than neither: it is the app telling a reviewer where to look.
-
-`store/privacy-policy-ads.md` holds the section to publish. Publishing it is not
-a repository change and nothing here can check it, so it belongs on this list
-rather than in a test.
+**The published privacy policy now covers mobile ads.** The OpenScene notice at
+`https://www.sloki9637.com/en/privacy` describes the banner, post-export
+interstitial, Unity LevelPlay mediation, and device identifiers. Recheck the
+published policy and store privacy answers when changing an ad SDK or placement.
+`store/privacy-policy-ads.md` keeps the source text for that disclosure.
 
 **Age rating** — user-supplied prompts reach a generative model, so both stores
 treat it as user-generated content. Expect questions about moderation; the
