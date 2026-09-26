@@ -11,8 +11,7 @@ import type { SpawnFfmpegProcess } from '../src/main/ffmpegExportProcess';
 const FAKE_FFMPEG = `
 const mode = process.argv[2];
 if (mode === 'complete') {
-  process.stdout.write('out_time_us=500000\\nprogress=continue\\n');
-  setTimeout(() => process.exit(0), 10);
+  require('node:fs').writeSync(1, 'out_time_us=500000\\nprogress=continue\\n');
 } else if (mode === 'wait') {
   process.on('SIGTERM', () => process.exit(143));
   setInterval(() => {}, 1000);

@@ -1,6 +1,6 @@
 import type { LocalProjectSnapshot, MediaAsset } from '../../../shared/timelineTypes';
 
-const LEFT_DOCK_TAB_IDS = ['project', 'media'] as const;
+const LEFT_DOCK_TAB_IDS = ['project', 'media', 'audio', 'text'] as const;
 const INSPECTOR_DOCK_TAB_IDS = ['selection', 'asset'] as const;
 
 export const LEFT_EDITOR_DOCK_TAB_IDS = LEFT_DOCK_TAB_IDS;
@@ -69,7 +69,9 @@ export function getDefaultEditorDockTabs(project: LocalProjectSnapshot): EditorD
   return {
     left: [
       { id: 'project', label: 'Project' },
-      { id: 'media', label: 'Media' }
+      { id: 'media', label: 'Media' },
+      { id: 'audio', label: 'Audio' },
+      { id: 'text', label: 'Text' }
     ],
     inspector: [
       { id: 'selection', label: 'Selection' },

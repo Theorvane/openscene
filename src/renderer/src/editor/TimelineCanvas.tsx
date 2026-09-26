@@ -7,6 +7,7 @@ import { useClipThumbnails } from './clipThumbnails';
 import { useClipWaveform } from './clipWaveform';
 import type { ThumbnailClip } from '../../../shared/clipThumbnails';
 import { clipDurationMs } from '../../../shared/timelineClipGeometry';
+import { nextVisualBoundaryMs, previousVisualBoundaryMs } from '../../../shared/timelinePlayback';
 import { snapTimelinePosition } from '../../../shared/timelineSnapping';
 import type { TimelineEditorController } from './useTimelineEditor';
 
@@ -90,6 +91,9 @@ const ICONS = {
   separateAudio: toolIcon(<><path d="M4 14v-4M8 17V7M12 20V4M16 17V7M20 14v-4" /></>),
   freeze: toolIcon(<><path d="M12 2v20M4 6l16 12M20 6L4 18" /></>),
   magnet: toolIcon(<><path d="M6 4v7a6 6 0 0012 0V4" /><path d="M6 4h4v5H6zM14 4h4v5h-4z" fill="currentColor" stroke="none" /></>),
+  previousEdit: toolIcon(<><path d="M5 5v14M18 6l-9 6 9 6z" /></>),
+  nextEdit: toolIcon(<><path d="M19 5v14M6 6l9 6-9 6z" /></>),
+  fitTimeline: toolIcon(<><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /><path d="M8 12h8" /></>),
   volumeOn: toolIcon(<><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11" /></>, 12),
   volumeOff: toolIcon(<><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9l5 6M21 9l-5 6" /></>, 12),
   headphones: toolIcon(<><path d="M4 14v-2a8 8 0 0116 0v2" /><rect x="3" y="14" width="4" height="6" rx="1.5" /><rect x="17" y="14" width="4" height="6" rx="1.5" /></>, 12),
@@ -334,6 +338,19 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
     setZoomLevel((current) => clampZoom(current * factor));
   };
 
+  const stepToEditPoint = (direction: 'previous' | 'next'): void => {
+    if (project === null || view === null) return;
+    const boundary = direction === 'previous'
+      ? previousVisualBoundaryMs(project.timeline, editor.playheadMs)
+      : nextVisualBoundaryMs(project.timeline, editor.playheadMs);
+    editor.setPlayheadMs(boundary ?? (direction === 'previous' ? 0 : view.durationMs));
+  };
+
+  const fitTimeline = (): void => {
+    setZoomLevel(1);
+    if (stackRef.current !== null) stackRef.current.scrollLeft = 0;
+  };
+
   // Ctrl/Cmd + wheel (or trackpad pinch) zooms around the cursor: the time under
   // the pointer stays anchored while the content width scales. Plain and shift
   // wheel keep native scrolling. Attached natively so preventDefault is honored.
@@ -559,8 +576,29 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
           </div>
         </div>
 
-        {/* Right cluster: snapping toggle + zoom */}
+        {/* Right cluster: edit-point navigation, snapping, and zoom */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+          <button
+            type="button"
+            onClick={() => stepToEditPoint('previous')}
+            disabled={project === null}
+            style={project === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
+            aria-label="Previous edit point"
+            title="Previous edit point"
+          >
+            {ICONS.previousEdit}
+          </button>
+          <button
+            type="button"
+            onClick={() => stepToEditPoint('next')}
+            disabled={project === null}
+            style={project === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
+            aria-label="Next edit point"
+            title="Next edit point"
+          >
+            {ICONS.nextEdit}
+          </button>
+          <span aria-hidden="true" style={{ width: '1px', height: '18px', background: 'var(--border)' }} />
           <button
             type="button"
             onClick={() => setSnappingEnabled((enabled) => !enabled)}
@@ -600,6 +638,16 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
             title="Zoom in"
           >
             +
+          </button>
+          <button
+            type="button"
+            onClick={fitTimeline}
+            disabled={project === null}
+            style={project === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
+            aria-label="Fit the whole timeline"
+            title="Fit the whole timeline"
+          >
+            {ICONS.fitTimeline}
           </button>
         </div>
       </div>

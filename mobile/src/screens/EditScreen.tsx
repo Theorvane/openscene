@@ -3,13 +3,14 @@ import { Dimensions, PanResponder, Platform, Pressable, ScrollView, StyleSheet, 
 import { Gesture, GestureDetector, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 
-import { nextVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
+import { nextVisualBoundaryMs, previousVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
 import { clipDurationMs, clipTimelineEndMs } from '@openvideo/shared/timelineClipGeometry';
 import { snapTimelinePosition } from '@openvideo/shared/timelineSnapping';
 import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
 import { DEFAULT_SUBTITLE_DELIVERY } from '@openvideo/shared/subtitleDelivery';
 import { metadataPrivacyPlan } from '@openvideo/shared/metadataPrivacy';
 import { applyCaptionPreset, CAPTION_PLACEMENTS, CAPTION_STYLE_PRESETS, isAutomaticCaptionId, resolvedTitleStyle, type CaptionPresetId } from '@openvideo/shared/captionStyle';
+import { countTimelineAssetUsage, DEFAULT_MEDIA_LIBRARY_FILTERS, type MediaLibraryFilters } from '@openvideo/shared/mediaLibraryView';
 import { track } from '../lib/analyticsClient';
 import { theme } from '../lib/theme';
 import { useMobileEditor, type EditorAsset } from '../lib/editorState';
@@ -167,6 +168,8 @@ export function EditScreen({
   const [pxPerSecond, setPxPerSecond] = useState(28);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
   const [mediaOpen, setMediaOpen] = useState(false);
+  const [mediaFilters, setMediaFilters] = useState<MediaLibraryFilters>(DEFAULT_MEDIA_LIBRARY_FILTERS);
+  useEffect(() => { setMediaFilters(DEFAULT_MEDIA_LIBRARY_FILTERS); }, [projectId]);
   const [storedAssets, setStoredAssets] = useState<readonly MobileAsset[]>([]);
   const [playing, setPlaying] = useState(false);
   useEffect(() => { if (!active) setPlaying(false); }, [active]);
@@ -387,11 +390,7 @@ export function EditScreen({
       setPlayheadMs(next ?? editor.durationMs);
       return;
     }
-    const edges = editor.timeline.tracks
-      .filter((track) => track.kind === 'video')
-      .flatMap((track) => track.clips.flatMap((clip) => [clip.timelineStartMs, clipTimelineEndMs(clip)]))
-      .filter((edge) => edge < editor.playheadMs - 1);
-    setPlayheadMs(edges.length === 0 ? 0 : Math.max(...edges));
+    setPlayheadMs(previousVisualBoundaryMs(editor.timeline, editor.playheadMs) ?? 0);
   };
 
   const importMedia = async (): Promise<void> => {
@@ -446,14 +445,8 @@ export function EditScreen({
   const selected = editor.selectedClip;
   const selectedAsset = selected === null ? null : editor.assetFor(selected.clip.assetId);
 
-  /** How many clips reference each asset, so the library can say what is in use. */
-  const usage = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const track of editor.timeline.tracks) {
-      for (const clip of track.clips) counts[clip.assetId] = (counts[clip.assetId] ?? 0) + 1;
-    }
-    return counts;
-  }, [editor.timeline]);
+  /** The library and desktop editor share the same clip reference count rule. */
+  const usage = useMemo(() => countTimelineAssetUsage(editor.timeline), [editor.timeline]);
 
   return (
     <View style={[styles.root, { paddingTop: topInset }]}>
@@ -618,9 +611,12 @@ export function EditScreen({
 
       {mediaOpen && projectId !== null && (
         <MediaLibrary
+          key={projectId}
           projectId={projectId}
           assets={storedAssets}
           usage={usage}
+          filters={mediaFilters}
+          onFiltersChange={setMediaFilters}
           onAdd={editor.placeExisting}
           onDelete={(assetId) => {
             deleteAsset(projectId, assetId);

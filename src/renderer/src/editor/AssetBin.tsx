@@ -1,12 +1,16 @@
 import { useState, type CSSProperties, type ReactElement } from 'react';
 
 import { formatBytes, formatDuration } from '../format';
+import { countTimelineAssetUsage, DEFAULT_MEDIA_LIBRARY_FILTERS, mediaLibraryFiltersActive, mediaLibraryView, MEDIA_LIBRARY_SORTS, type MediaLibraryFilters } from '../../../shared/mediaLibraryView';
 import type { MediaAsset } from '../../../shared/timelineTypes';
 import { mediaAssetReady } from './editorTimelineView';
 import type { TimelineEditorController } from './useTimelineEditor';
 
 type AssetBinProps = {
   readonly editor: TimelineEditorController;
+  readonly filter?: 'audio';
+  readonly filters: MediaLibraryFilters;
+  readonly onFiltersChange: (filters: MediaLibraryFilters) => void;
 };
 
 type AssetViewMode = 'grid' | 'list';
@@ -31,9 +35,16 @@ function assetGlyph(asset: MediaAsset): string {
   return '🎵';
 }
 
-export function AssetBin({ editor }: AssetBinProps): ReactElement {
+export function AssetBin({ editor, filter, filters, onFiltersChange }: AssetBinProps): ReactElement {
   const project = editor.project;
   const [viewMode, setViewMode] = useState<AssetViewMode>('grid');
+  const usage = project === null ? new Map<string, number>() : countTimelineAssetUsage(project.timeline);
+  const availableAssets = project?.assets.filter((asset) => filter !== 'audio' || asset.kind === 'audio') ?? [];
+  const assets = mediaLibraryView(availableAssets, {
+    ...filters,
+    usage,
+    durationMs: (asset) => asset.metadata?.durationMs ?? null
+  });
 
   const onAssetDragStart = (event: React.DragEvent, assetId: string): void => {
     event.dataTransfer.setData(TIMELINE_DRAG_TYPE, JSON.stringify({ kind: 'asset', assetId }));
@@ -44,7 +55,7 @@ export function AssetBin({ editor }: AssetBinProps): ReactElement {
     <section className="asset-bin" aria-labelledby="assets-title" style={COMPACT_PANEL_STYLE}>
       {/* Slim dock header: title left, view toggle right */}
       <div className="panel-heading asset-bin__header">
-        <h2 id="assets-title" className="asset-bin__title">Media</h2>
+        <h2 id="assets-title" className="asset-bin__title">{filter === 'audio' ? 'Audio' : 'Media'}</h2>
         <div className="asset-bin__view-toggle" role="group" aria-label="Media view mode">
           <button
             className={`asset-bin__view-button${viewMode === 'grid' ? ' asset-bin__view-button--active' : ''}`}
@@ -67,38 +78,69 @@ export function AssetBin({ editor }: AssetBinProps): ReactElement {
         </div>
       </div>
 
+      <div className="asset-bin__find">
+        <input
+          type="search"
+          value={filters.query}
+          onChange={(event) => onFiltersChange({ ...filters, query: event.currentTarget.value })}
+          placeholder="Search…"
+          aria-label={filter === 'audio' ? 'Search audio by name' : 'Search media by name'}
+          disabled={project === null}
+        />
+        <select
+          value={filters.sort}
+          onChange={(event) => onFiltersChange({ ...filters, sort: event.currentTarget.value as MediaLibraryFilters['sort'] })}
+          aria-label="Sort media"
+          disabled={project === null}
+        >
+          {MEDIA_LIBRARY_SORTS.map((key) => (
+            <option key={key} value={key}>{key === 'project' ? 'Original' : key === 'name' ? 'Name A–Z' : key === 'type' ? 'Type' : 'Longest'}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="asset-bin__filter-row">
+        <label className="asset-bin__unused">
+          <input type="checkbox" checked={filters.unusedOnly} onChange={(event) => onFiltersChange({ ...filters, unusedOnly: event.currentTarget.checked })} disabled={project === null} />
+          Unused only
+        </label>
+        <button className="button button--ghost asset-bin__reset" type="button" onClick={() => onFiltersChange(DEFAULT_MEDIA_LIBRARY_FILTERS)} disabled={project === null || !mediaLibraryFiltersActive(filters)}>Reset</button>
+      </div>
+
       {/* Compact import toolbar */}
       <div className="asset-bin__toolbar">
-        <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['video'])} disabled={project === null || editor.isBusy}>
+        {filter !== 'audio' && <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['video'])} disabled={project === null || editor.isBusy}>
           + Video
-        </button>
+        </button>}
         <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['audio'])} disabled={project === null || editor.isBusy}>
           + Audio
         </button>
-        <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['image'])} disabled={project === null || editor.isBusy}>
+        {filter !== 'audio' && <button className="button button--ghost asset-bin__toolbar-button" type="button" onClick={() => void editor.importAssets(['image'])} disabled={project === null || editor.isBusy}>
           + Image
-        </button>
-        <button className="button button--primary asset-bin__toolbar-button" type="button" onClick={editor.placeSelectedAsset} disabled={editor.selectedAsset === null || !mediaAssetReady(editor.selectedAsset)}>
+        </button>}
+        <button className="button button--primary asset-bin__toolbar-button" type="button" onClick={editor.placeSelectedAsset} disabled={editor.selectedAsset === null || !mediaAssetReady(editor.selectedAsset) || !assets.some((asset) => asset.id === editor.selectedAsset?.id)}>
           Place
         </button>
       </div>
 
       {project === null ? (
         <div className="empty-slate">Create or open a project before importing local media.</div>
-      ) : project.assets.length === 0 ? (
+      ) : availableAssets.length === 0 ? (
         <button
           className="asset-bin__dropzone"
           type="button"
-          onClick={() => void editor.importAssets()}
+          onClick={() => void editor.importAssets(filter === 'audio' ? ['audio'] : undefined)}
           disabled={editor.isBusy}
         >
           <span aria-hidden="true" className="asset-bin__dropzone-icon">⬆</span>
-          <strong>Import media</strong>
-          <span>Local video, audio and images stay on this machine.</span>
+          <strong>{filter === 'audio' ? 'Import audio' : 'Import media'}</strong>
+          <span>{filter === 'audio' ? 'Add local audio files to this project.' : 'Local video, audio and images stay on this machine.'}</span>
         </button>
+      ) : assets.length === 0 ? (
+        <div className="empty-slate">No {filter === 'audio' ? 'audio' : 'media'} matches the current filters.</div>
       ) : viewMode === 'grid' ? (
         <div className="asset-grid asset-grid--tiles" aria-label="Imported project assets">
-          {project.assets.map((asset) => {
+          {assets.map((asset) => {
             const failureMessage = editor.metadataProbeFailuresByAssetId[asset.id];
             const selected = editor.selectedAssetId === asset.id;
 
@@ -118,7 +160,7 @@ export function AssetBin({ editor }: AssetBinProps): ReactElement {
                     <span className="asset-tile__duration">{assetDurationLabel(asset, failureMessage)}</span>
                   </span>
                   <strong className="asset-tile__name">{asset.displayName}</strong>
-                  <small className="asset-tile__meta">{formatBytes(asset.byteLength)}</small>
+                  <small className="asset-tile__meta">{formatBytes(asset.byteLength)} · {usage.get(asset.id) ?? 0} on timeline</small>
                 </button>
                 {selected && failureMessage !== undefined ? (
                   <button className="button asset-bin__retry" type="button" onClick={() => editor.retryAssetMetadataProbe(asset.id)}>Retry metadata</button>
@@ -129,7 +171,7 @@ export function AssetBin({ editor }: AssetBinProps): ReactElement {
         </div>
       ) : (
         <div className="asset-grid asset-grid--list" aria-label="Imported project assets">
-          {project.assets.map((asset) => {
+          {assets.map((asset) => {
             const failureMessage = editor.metadataProbeFailuresByAssetId[asset.id];
             const selected = editor.selectedAssetId === asset.id;
 
@@ -146,7 +188,7 @@ export function AssetBin({ editor }: AssetBinProps): ReactElement {
                   <span className={`asset-row__thumb asset-row__thumb--${asset.kind}`} aria-hidden="true">{assetGlyph(asset)}</span>
                   <span className="asset-row__body">
                     <strong className="asset-row__name">{asset.displayName}</strong>
-                    <small className="asset-row__meta">{asset.kind} · {formatBytes(asset.byteLength)}</small>
+                    <small className="asset-row__meta">{asset.kind} · {formatBytes(asset.byteLength)} · {usage.get(asset.id) ?? 0} on timeline</small>
                   </span>
                   <span className="asset-row__duration">{assetDurationLabel(asset, failureMessage)}</span>
                 </button>
