@@ -124,11 +124,9 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   };
 
   const workspaceClassName = [
-    'editor-workspace',
-    'editor-workspace--nle',
-    layoutPreference.leftDockVisible ? null : 'editor-workspace--left-dock-hidden',
-    layoutPreference.inspectorVisible ? null : 'editor-workspace--inspector-hidden',
-    `editor-workspace--inspector-${layoutPreference.inspectorPlacement}`
+    layoutPreference.leftDockVisible ? null : 'oc-editor-host--left-hidden',
+    layoutPreference.inspectorVisible ? null : 'oc-editor-host--inspector-hidden',
+    `oc-editor-host--inspector-${layoutPreference.inspectorPlacement}`
   ].filter((className): className is string => className !== null).join(' ');
 
   const workspaceStyle: EditorWorkspaceStyle = {
@@ -216,6 +214,13 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
       className={workspaceClassName}
       style={workspaceStyle}
       labelledBy="timeline-editor-title"
+      header={<>
+        <strong className="oc-editor-host__brand">OpenScene</strong>
+        <span className="oc-editor-host__project" title={editor.project?.name ?? 'No project'}>{editor.project?.name ?? 'No project'}</span>
+        <span className="oc-editor-host__header-spacer" />
+        <button className="oc-editor-host__save" type="button" onClick={() => { void editor.saveTimeline(); }} disabled={editor.project === null || !editor.hasUnsavedTimeline}>Save{editor.hasUnsavedTimeline ? ' *' : ''}</button>
+        {!floatingExportVisible && <ExportPanel editor={editor} />}
+      </>}
       left={<TimelineEditorLeftDock
         activeTabId={leftDockTabId}
         editor={editor}
@@ -235,14 +240,13 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
       />}
 
       program={<main className="editor-program-region" id="editor-program-panel" aria-labelledby="timeline-editor-title">
-        {/* Branding stays for accessibility and region labeling but is no longer visible chrome. */}
+        {/* Keep the monitor's accessible heading while OpenCut renders the visible project header. */}
         <div className="visually-hidden">
           <p className="section-kicker">Local studio</p>
           <h1 id="timeline-editor-title">OpenScene</h1>
           <span className="editor-program-region__subtitle">Timeline editor</span>
         </div>
-        {floatingProgramVisible ? <div className="empty-slate">Program Monitor is floating above the workspace.</div> : <ProgramMonitor editor={editor} exportControl={floatingExportVisible ? null : <ExportPanel editor={editor} />} />}
-        {floatingProgramVisible && !floatingExportVisible && <ExportPanel editor={editor} />}
+        {floatingProgramVisible ? <div className="empty-slate">Program Monitor is floating above the workspace.</div> : <ProgramMonitor editor={editor} />}
       </main>}
 
       programSplitter={<EditorProgramSplitter programPercent={layoutPreference.programPercent} onProgramPercentChange={setProgramPercent} />}

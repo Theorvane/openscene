@@ -10,6 +10,7 @@ const NATIVE_MENU_COMMANDS_SOURCE_URL = new URL('../src/renderer/src/editor/useE
 const SHORTCUT_PREFERENCE_HOOK_SOURCE_URL = new URL('../src/renderer/src/editor/useEditorShortcutPreference.ts', import.meta.url);
 const TIMELINE_SHORTCUTS_SOURCE_URL = new URL('../src/renderer/src/editor/useTimelineShortcuts.ts', import.meta.url);
 const STYLES_SOURCE_URL = new URL('../src/renderer/src/styles.css', import.meta.url);
+const OPENCUT_HOST_STYLES_SOURCE_URL = new URL('../external/opencut/apps/web/src/components/editor/editor-workspace-host.css', import.meta.url);
 
 const normalizedSource = (source: string): string => source.replace(/\r\n/g, '\n');
 
@@ -24,6 +25,10 @@ async function readTimelineEditorSource(): Promise<string> {
 
 async function readStylesSource(): Promise<string> {
   return normalizedSource(await readFile(STYLES_SOURCE_URL, 'utf8'));
+}
+
+async function readOpenCutHostStylesSource(): Promise<string> {
+  return normalizedSource(await readFile(OPENCUT_HOST_STYLES_SOURCE_URL, 'utf8'));
 }
 
 async function readAppShellSource(): Promise<string> {
@@ -66,11 +71,12 @@ describe('timeline editor layout source contract', () => {
     expect(hookSource).not.toContain('ipcRenderer');
   });
 
-  it('Given product identity, When the app shell and editor render, Then OpenScene branding belongs to the program header', async () => {
+  it('Given product identity, When the app shell and editor render, Then OpenScene branding belongs to the OpenCut workbench header', async () => {
     const source = await readTimelineEditorSource();
     const appShellSource = await readAppShellSource();
 
-    expect(source).toContain('<p className="section-kicker">Local studio</p>');
+    expect(source).toContain('<strong className="oc-editor-host__brand">OpenScene</strong>');
+    expect(source).toContain('className="oc-editor-host__project"');
     expect(source).toContain('<h1 id="timeline-editor-title">OpenScene</h1>');
     expect(source).toContain('<span className="editor-program-region__subtitle">Timeline editor</span>');
     expect(appShellSource).not.toContain('product-chrome__eyebrow');
@@ -110,9 +116,10 @@ describe('timeline editor layout source contract', () => {
   it('Given inspector placement modes, When rendered, Then the inspector can dock left, dock right, or float in-app', async () => {
     const source = await readTimelineEditorSource();
     const styles = await readStylesSource();
+    const hostStyles = await readOpenCutHostStylesSource();
     const nativeMenuSource = await readNativeMenuCommandsSource();
 
-		expect(source).toContain('editor-workspace--inspector-${layoutPreference.inspectorPlacement}');
+		expect(source).toContain('oc-editor-host--inspector-${layoutPreference.inspectorPlacement}');
 		expect(source).toContain('layoutPreference.inspectorPlacement !== \'floating\'');
 		expect(source).toContain('layoutPreference.floatingPanels.inspector.floating');
 		expect(nativeMenuSource).toContain('toggleProjectFloating');
@@ -122,8 +129,8 @@ describe('timeline editor layout source contract', () => {
 		expect(nativeMenuSource).toContain('applyReviewDeckPreset');
 		expect(source).toContain('className="editor-floating-layer"');
 		expect(source).toContain('aria-label="Floating workspace panels"');
-		expect(styles).toContain('.editor-workspace--inspector-left');
-		expect(styles).toContain('.editor-workspace--inspector-floating');
+		expect(hostStyles).toContain('.oc-editor-host--inspector-left');
+		expect(hostStyles).toContain('.oc-editor-host--inspector-floating');
 		expect(styles).toContain('.editor-floating-layer');
 		expect(styles).toContain('.editor-floating-panel');
 		expect(styles).toContain('.editor-floating-panel__move-controls');
@@ -133,14 +140,18 @@ describe('timeline editor layout source contract', () => {
 
   it('Given responsive layout CSS, When sidebars are hidden or stacked, Then the desktop splitter is disabled at mobile width', async () => {
     const styles = await readStylesSource();
+    const hostStyles = await readOpenCutHostStylesSource();
 
-    expect(styles).toContain('.editor-workspace--left-dock-hidden');
-    expect(styles).toContain('.editor-workspace--inspector-hidden');
+    expect(hostStyles).toContain('.oc-editor-host--left-hidden');
+    expect(hostStyles).toContain('.oc-editor-host--inspector-hidden');
     expect(styles).toContain('.editor-program-splitter');
     expect(styles).toContain('.editor-left-dock-splitter');
     expect(styles).toContain('.editor-inspector-splitter');
-    expect(styles).toContain('@media (max-width: 1120px)');
-    expect(styles).toContain('"program"\n      "timeline"\n      "project"\n      "inspector"');
+    expect(hostStyles).toContain('@media (max-width: 1120px)');
+    expect(hostStyles).toContain('.oc-editor-host__program { flex: 0 0 300px; order: 1; }');
+    expect(hostStyles).toContain('.oc-editor-host__timeline { flex: 0 0 280px; order: 2; }');
+    expect(hostStyles).toContain('.oc-editor-host > .editor-floating-layer { order: 5; }');
+    expect(hostStyles).toContain('.oc-editor-host > [role="separator"] { display: none; }');
     expect(styles).not.toContain('grid-area: command;');
     expect(styles).toContain('.editor-program-splitter {');
     expect(styles).toContain('display: none;');

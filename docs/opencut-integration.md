@@ -12,7 +12,8 @@ The pinned commit is a reviewed merge on the independent `Theorvane/OpenCut`
 
 OpenCut's web `/editor` route supports a local Classic-inspired workflow.
 OpenScene renders its editor through OpenCut's `EditorWorkspace` component,
-which accepts the live host panels as slots. It also compiles these controls
+which now owns the visible header, panel frames, responsive workbench grid, and
+timeline frame. The host supplies the live panels as slots. It also compiles these controls
 directly from the same source:
 
 - `EditorToolRail` — project, media, audio, and text tabs with keyboard access;
@@ -25,6 +26,9 @@ They all receive the existing `TimelineEditorController`, so opening a project,
 editing clips, saving, agent actions, and native MP4 export still act on one
 OpenScene project. The OpenCut web route supplies its own browser panels to the
 same workspace; no browser-local clips or object URLs enter OpenScene.
+OpenCut's host stylesheet reads OpenScene theme tokens from the document root,
+so light, dark, and preset changes restyle the workspace without a second theme
+state. The standalone OpenCut web route retains its own dark canvas theme.
 
 The OpenScene adapters in `src/renderer/src/editor/` supply project assets,
 callbacks, labels, and drag payloads. Media filtering, usage counts, edit-point
