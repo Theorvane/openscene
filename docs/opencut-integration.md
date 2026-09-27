@@ -5,17 +5,26 @@ fork at `external/opencut` as a pinned Git submodule. Its upstream is
 [OpenCut-app/OpenCut](https://github.com/OpenCut-app/OpenCut). Initialize after
 cloning with `git submodule update --init external/opencut`.
 
-The pinned commit is the reviewed merge of [OpenCut PR #3](https://github.com/Theorvane/OpenCut/pull/3)
-on the independent `Theorvane/OpenCut` `main` branch. OpenScene does not track upstream changes automatically.
+The pinned commit is a reviewed merge on the independent `Theorvane/OpenCut`
+`main` branch. OpenScene does not track upstream changes automatically.
 
 ## Runtime boundary
 
-OpenCut's web `/editor` route now supports a local Classic-inspired workflow.
-OpenScene compiles three host-driven controls directly from that source:
+OpenCut's web `/editor` route supports a local Classic-inspired workflow.
+OpenScene renders its editor through OpenCut's `EditorWorkspace` component,
+which accepts the live host panels as slots. It also compiles these controls
+directly from the same source:
 
 - `EditorToolRail` — project, media, audio, and text tabs with keyboard access;
 - `MediaLibrary` — search, sort, unused filter, grid/list view, import, drag, and placement controls;
 - `EditPointNavigation` — previous/next timeline boundary buttons.
+
+OpenScene supplies its project dock, Program Monitor, inspector, timeline,
+layout splitters, floating panels, and metadata probe to the OpenCut workspace.
+They all receive the existing `TimelineEditorController`, so opening a project,
+editing clips, saving, agent actions, and native MP4 export still act on one
+OpenScene project. The OpenCut web route supplies its own browser panels to the
+same workspace; no browser-local clips or object URLs enter OpenScene.
 
 The OpenScene adapters in `src/renderer/src/editor/` supply project assets,
 callbacks, labels, and drag payloads. Media filtering, usage counts, edit-point
@@ -31,7 +40,7 @@ continues to use its own desktop FFmpeg pipeline, and mobile behavior stays on
 its existing path; advancing the submodule adds no new cross-surface editing rule.
 
 OpenCut UI source is bundled by Electron Vite, and `tsconfig.web.json` includes
-only the imported component files. The submodule must be initialized before
+the imported editor components. The submodule must be initialized before
 `npm run typecheck`, `npm test`, or `npm run build`.
 
 Keep local file paths and FFmpeg execution in Electron main. The renderer and

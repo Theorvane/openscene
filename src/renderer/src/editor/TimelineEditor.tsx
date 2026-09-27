@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
+import { EditorWorkspace } from '../../../../external/opencut/apps/web/src/components/editor/editor-workspace';
 
 import { AssetMetadataProbeHost } from './AssetMetadataProbeHost';
 import { EDITOR_INSPECTOR_DOCK_TAB_IDS, getDefaultEditorDockTabs, getDefaultEditorLeftDockTabId } from './dockTabs';
@@ -210,26 +211,30 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   });
 
   return (
-    <section className={workspaceClassName} style={workspaceStyle} aria-labelledby="timeline-editor-title">
-      <TimelineEditorLeftDock
+    <EditorWorkspace
+      mode="host"
+      className={workspaceClassName}
+      style={workspaceStyle}
+      labelledBy="timeline-editor-title"
+      left={<TimelineEditorLeftDock
         activeTabId={leftDockTabId}
         editor={editor}
         leftDockVisible={layoutPreference.leftDockVisible}
         projectPanelFloating={layoutPreference.floatingPanels.project.floating}
         onActiveTabChange={setLeftDockTabId}
-      />
+      />}
 
-      <EditorLeftDockSplitter leftDockVisible={layoutPreference.leftDockVisible} leftDockWidth={layoutPreference.leftDockWidth} onLeftDockWidthChange={setLeftDockWidth} />
+      leftSplitter={<EditorLeftDockSplitter leftDockVisible={layoutPreference.leftDockVisible} leftDockWidth={layoutPreference.leftDockWidth} onLeftDockWidthChange={setLeftDockWidth} />}
 
-      <AssetMetadataProbeHost
+      auxiliary={<AssetMetadataProbeHost
         failuresByAssetId={editor.metadataProbeFailuresByAssetId}
         onMetadata={editor.updateAssetMetadata}
         onProbeFailure={editor.reportMetadataProbeFailure}
         project={editor.project}
         retryRevisionsByAssetId={editor.metadataProbeRetryRevisionsByAssetId}
-      />
+      />}
 
-      <main className="editor-program-region" id="editor-program-panel" aria-labelledby="timeline-editor-title">
+      program={<main className="editor-program-region" id="editor-program-panel" aria-labelledby="timeline-editor-title">
         {/* Branding stays for accessibility and region labeling but is no longer visible chrome. */}
         <div className="visually-hidden">
           <p className="section-kicker">Local studio</p>
@@ -238,29 +243,29 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
         </div>
         {floatingProgramVisible ? <div className="empty-slate">Program Monitor is floating above the workspace.</div> : <ProgramMonitor editor={editor} exportControl={floatingExportVisible ? null : <ExportPanel editor={editor} />} />}
         {floatingProgramVisible && !floatingExportVisible && <ExportPanel editor={editor} />}
-      </main>
+      </main>}
 
-      <EditorProgramSplitter programPercent={layoutPreference.programPercent} onProgramPercentChange={setProgramPercent} />
+      programSplitter={<EditorProgramSplitter programPercent={layoutPreference.programPercent} onProgramPercentChange={setProgramPercent} />}
 
-      {dockedInspectorVisible && inspectorPanel}
+      inspector={dockedInspectorVisible ? inspectorPanel : null}
 
-      <EditorInspectorSplitter
+      inspectorSplitter={<EditorInspectorSplitter
         inspectorPlacement={layoutPreference.inspectorPlacement}
         inspectorVisible={layoutPreference.inspectorVisible}
         inspectorWidth={layoutPreference.inspectorWidth}
         leftDockVisible={layoutPreference.leftDockVisible}
         leftDockWidth={layoutPreference.leftDockWidth}
         onInspectorWidthChange={setInspectorWidth}
-      />
+      />}
 
-      <div className="editor-floating-layer" aria-label="Floating workspace panels">
+      floatingPanels={<div className="editor-floating-layer" aria-label="Floating workspace panels">
         {floatingProjectVisible && renderFloatingPanel({ child: <ProjectRail editor={editor} />, floatingPanel: layoutPreference.floatingPanels.project, panelId: 'project' })}
         {floatingProgramVisible && renderFloatingPanel({ child: <ProgramMonitor editor={editor} />, floatingPanel: layoutPreference.floatingPanels.program, panelId: 'program' })}
         {floatingInspectorVisible && renderFloatingPanel({ child: inspectorPanel, floatingPanel: layoutPreference.floatingPanels.inspector, panelId: 'inspector' })}
         {floatingExportVisible && renderFloatingPanel({ child: <ExportPanel editor={editor} />, floatingPanel: layoutPreference.floatingPanels.export, panelId: 'export' })}
-      </div>
+      </div>}
 
-      <TimelineCanvas id="editor-timeline-panel" editor={editor} />
-    </section>
+      timeline={<TimelineCanvas id="editor-timeline-panel" editor={editor} />}
+    />
   );
 }
