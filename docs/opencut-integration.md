@@ -5,8 +5,8 @@ fork at `external/opencut` as a pinned Git submodule. Its upstream is
 [OpenCut-app/OpenCut](https://github.com/OpenCut-app/OpenCut). Initialize after
 cloning with `git submodule update --init external/opencut`.
 
-The pinned commit currently belongs to [OpenCut PR #1](https://github.com/Theorvane/OpenCut/pull/1).
-Update this pointer to the reviewed fork `main` commit after that PR merges.
+The pinned commit is the reviewed merge of [OpenCut PR #1](https://github.com/Theorvane/OpenCut/pull/1)
+on the independent `Theorvane/OpenCut` `main` branch. OpenScene does not track upstream changes automatically.
 
 ## Runtime boundary
 
