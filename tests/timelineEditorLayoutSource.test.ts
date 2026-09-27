@@ -144,6 +144,8 @@ describe('timeline editor layout source contract', () => {
 
     expect(hostStyles).toContain('.oc-editor-host--left-hidden');
     expect(hostStyles).toContain('.oc-editor-host--inspector-hidden');
+    expect(styles).toContain('#app-workspace-panel-edit {\n  container-type: inline-size;');
+    expect(hostStyles).toContain('@container (max-width: 1100px)');
     expect(styles).toContain('.editor-program-splitter');
     expect(styles).toContain('.editor-left-dock-splitter');
     expect(styles).toContain('.editor-inspector-splitter');

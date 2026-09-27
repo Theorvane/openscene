@@ -3956,6 +3956,10 @@ button {
   box-shadow: none;
 }
 
+#app-workspace-panel-edit {
+  container-type: inline-size;
+}
+
 /*
   The frame the cut is rendered into, said as a choice and as a number.
 
