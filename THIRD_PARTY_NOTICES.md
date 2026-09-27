@@ -13,6 +13,19 @@ OpenScene is used as the application base under the MIT License.
 
 No source from CutAgent, Weave, AutoVio, Velorn, Milimo Video, ComfyUI, Wan, whisper.cpp or LTX-Video has been copied into this repository.
 
+## OpenCut editor source
+
+OpenScene compiles editor components from the pinned OpenCut submodule into its desktop renderer.
+
+- Upstream project: https://github.com/OpenCut-app/OpenCut
+- Maintained fork: https://github.com/Theorvane/OpenCut
+- Copyright: 2026 OpenCut
+- License: MIT
+- Pinned source and full license text: `external/opencut/LICENSE`
+- Desktop package license text: `licenses/OpenCut-LICENSE.txt`
+
+Keep the OpenCut copyright and MIT permission notice with redistributed copies of the desktop app. The packaged `THIRD_PARTY_NOTICES.md` and license text are included as resources.
+
 ## Direct JavaScript dependencies
 
 The installed direct dependencies were inspected from their package manifests on 2026-09-02.
