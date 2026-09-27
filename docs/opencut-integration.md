@@ -5,7 +5,7 @@ fork at `external/opencut` as a pinned Git submodule. Its upstream is
 [OpenCut-app/OpenCut](https://github.com/OpenCut-app/OpenCut). Initialize after
 cloning with `git submodule update --init external/opencut`.
 
-The pinned commit is the reviewed merge of [OpenCut PR #2](https://github.com/Theorvane/OpenCut/pull/2)
+The pinned commit is the reviewed merge of [OpenCut PR #3](https://github.com/Theorvane/OpenCut/pull/3)
 on the independent `Theorvane/OpenCut` `main` branch. OpenScene does not track upstream changes automatically.
 
 ## Runtime boundary
@@ -24,8 +24,9 @@ The desktop still owns its project, monitor, FFmpeg export, and agent tools.
 The OpenCut web route's browser-local timeline model is separate and is not
 used to decide OpenScene editing outcomes.
 
-The fork's web route can record its local timeline to a WebM file in the
-browser. This export path is limited to that standalone web editor. OpenScene
+The fork's web route can apply basic brightness, contrast, saturation, opacity,
+and overlapping clip fades in its preview and local WebM recording. These
+visual editing rules are limited to that standalone web editor. OpenScene
 continues to use its own desktop FFmpeg pipeline, and mobile behavior stays on
 its existing path; advancing the submodule adds no new cross-surface editing rule.
 
