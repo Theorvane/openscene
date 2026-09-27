@@ -25,6 +25,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+          submodules: true
           # Nothing here pushes, and everything after it runs `npm ci` and the
           # tooling that comes with it. A checkout credential left in the runner's
           # git config is one `npm` postinstall away from being someone else's.
@@ -120,6 +121,7 @@ jobs:
           # tooling to do it. None of that needs a token that can write to the
           # repository, so it does not get one.
           persist-credentials: false
+          submodules: true
 
       - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:

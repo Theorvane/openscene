@@ -220,7 +220,7 @@ Current boundaries:
 4. Executable, model, and working directory paths must be absolute.
 5. Wrapper args may receive `{modelPath}`, `{voiceSamplePath}`, `{textPath}`, `{outputPath}`, and `{language}` tokens.
 6. OpenScene only runs the wrapper and verifies the result file. Model compatibility, GPU VRAM, memory, and latency are runtime-dependent prerequisites.
-7. Voicebox is a reference for local profile workflow. The OpenCut rewrite is pinned as an isolated source submodule for integration work; it is not a runtime dependency or a replacement for the current editor.
+7. Voicebox is a reference for local profile workflow. The OpenCut rewrite is pinned as a source submodule; its reusable editor controls are compiled into the desktop renderer while OpenScene retains the shared editing rules and export engine.
 
 ## 8. Data Model Draft
 
@@ -625,7 +625,7 @@ The product is decision-ready when:
 5. The roadmap grows from capture and recording into local timeline editing and provider seams.
 6. Test plan and acceptance criteria are specific enough to judge implementation completion.
 7. Local voice profiles and local Qwen TTS are documented as local audio asset extensions, not cloud provider work.
-8. Voicebox and Qwen reference boundaries remain explicit; the OpenCut source submodule is isolated from the shipped editor until an integration meets the shared-core and platform requirements.
+8. Voicebox and Qwen reference boundaries remain explicit; OpenCut editor controls are integrated through the submodule; OpenScene shared rules still serve desktop and mobile.
 9. Static clip opacity, scale, position, rotation, and volume are stored as local editing values and applied only to the single active Program Monitor preview.
 10. Keyframes, transitions, audio mix, and local MP4 H.264/AAC export are documented as implemented scope, while multiple export formats, cloud export, final multitrack rendering, frame-perfect mastering, and AI video providers remain future work.
 
