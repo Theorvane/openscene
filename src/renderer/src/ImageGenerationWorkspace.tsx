@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactElement } from 'react';
+import { upsertGenerationJob } from '../../shared/generationJobList';
 
 import {
   DEFAULT_GOOGLE_FLOW_PREFERENCES,
@@ -160,7 +161,7 @@ export const ImageGenerationWorkspace = forwardRef<ImageGenerationWorkspaceHandl
       const response = await window.videoTool.aiGenerateImage(request);
       if (!response.ok) return { ok: false, error: response.error.message, haltQueue: false };
       const started = response.value;
-      setJobs((prev) => [started, ...prev]);
+      setJobs((prev) => upsertGenerationJob(prev, started));
       if (handoff !== null) {
         setProductionTargetByJob((current) => ({ ...current, [started.id]: handoff }));
       }
@@ -178,7 +179,7 @@ export const ImageGenerationWorkspace = forwardRef<ImageGenerationWorkspaceHandl
         const poll = await window.videoTool.aiGetImageJob(started.id);
         if (!poll.ok) return { ok: false, error: poll.error.message, haltQueue: true };
         updated = poll.value;
-        setJobs((prev) => prev.map((existing) => existing.id === updated.id ? updated : existing));
+        setJobs((prev) => upsertGenerationJob(prev, updated));
       }
       return { ok: false, error: 'Stopped waiting after 12 minutes. Check the terminal log before retrying.', haltQueue: true };
     } catch (error: unknown) {

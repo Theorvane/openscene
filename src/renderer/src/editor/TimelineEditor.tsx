@@ -37,6 +37,7 @@ import type { TimelineEditorController } from './useTimelineEditor';
 import { useTimelineShortcuts } from './useTimelineShortcuts';
 import { useAgentChat } from '../AgentChatContext';
 import { useTheme } from '../ThemeProvider';
+import { THEME_PRESETS, type ThemePresetId } from '../theme';
 import type { TabDefinition } from '../ui';
 
 export type InspectorTabId = (typeof EDITOR_INSPECTOR_DOCK_TAB_IDS)[number];
@@ -95,7 +96,7 @@ function getDefaultInspectorTabId({ selectedAssetId, selectedClipId }: Inspector
 
 export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
   const { isBusy: isAgentBusy } = useAgentChat();
-  const { mode: themeMode, toggleTheme } = useTheme();
+  const { mode: themeMode, preset, setPreset, toggleTheme } = useTheme();
   const [leftDockTabId, setLeftDockTabId] = useState<EditorLeftDockTabId>('project');
   const [inspectorTabId, setInspectorTabId] = useState<InspectorTabId>('selection');
   const { layoutPreference, updateLayoutPreference } = useEditorLayoutPreference();
@@ -220,6 +221,9 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
         <strong className="oc-editor-host__brand">OpenScene</strong>
         <span className="oc-editor-host__project" title={editor.project?.name ?? 'No project'}>{editor.project?.name ?? 'No project'}</span>
         <span className="oc-editor-host__header-spacer" />
+        <select className="oc-editor-theme-picker" aria-label="Editor theme preset" value={preset} onChange={(event) => setPreset(event.currentTarget.value as ThemePresetId)}>
+          {THEME_PRESETS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+        </select>
         <button className="oc-editor-host__save" type="button" onClick={toggleTheme} aria-label={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} theme`}>{themeMode === 'dark' ? '☀' : '☾'}</button>
         <button className="oc-editor-host__save" type="button" onClick={() => { void editor.saveTimeline(); }} disabled={editor.project === null || !editor.hasUnsavedTimeline}>Save{editor.hasUnsavedTimeline ? ' *' : ''}</button>
         {!floatingExportVisible && <ExportPanel editor={editor} />}

@@ -24,7 +24,7 @@ function rangeNotSatisfiable(fileSize: number): Response {
   });
 }
 
-function responseHeaders(source: OpenedAssetPlaybackSource, range: AssetByteRange | null): Headers {
+function responseHeaders(source: OpenedAssetPlaybackSource, range: AssetByteRange | null, origin: string | null): Headers {
   const headers = new Headers({
     'Accept-Ranges': 'bytes',
     'Content-Length': String(range?.length ?? source.byteLength),
@@ -32,6 +32,12 @@ function responseHeaders(source: OpenedAssetPlaybackSource, range: AssetByteRang
   });
   if (range !== null) {
     headers.set('Content-Range', `bytes ${range.start}-${range.end}/${source.byteLength}`);
+  }
+  // The sandboxed file:// renderer has an opaque Origin. No remote origin may
+  // read project bytes through the asset protocol's fetch endpoint.
+  if (origin === 'null') {
+    headers.set('Access-Control-Allow-Origin', 'null');
+    headers.set('Vary', 'Origin');
   }
   return headers;
 }
@@ -79,7 +85,7 @@ async function streamAssetResponse(request: Request, source: OpenedAssetPlayback
   }
   const range = parsedRange.kind === 'partial' ? parsedRange.range : null;
   const status = range === null ? 200 : 206;
-  const headers = responseHeaders(source, range);
+  const headers = responseHeaders(source, range, request.headers.get('origin'));
   if (request.method === 'HEAD' || source.byteLength === 0) {
     await source.file.close();
     return new Response(null, { status, headers });

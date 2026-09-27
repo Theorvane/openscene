@@ -47,6 +47,13 @@ export function clipTimelineEndMs(clip: TimelineClip): number {
   return clip.timelineStartMs + clipDurationMs(clip);
 }
 
+/** Reveal a selected clip while preserving the current frame when it is already inside that clip. */
+export function playheadForClipSelection(clip: TimelineClip, playheadMs: number): number {
+  return playheadMs >= clip.timelineStartMs && playheadMs < clipTimelineEndMs(clip)
+    ? playheadMs
+    : clip.timelineStartMs;
+}
+
 function compareClips(left: TimelineClip, right: TimelineClip): number {
   if (left.timelineStartMs !== right.timelineStartMs) {
     return left.timelineStartMs - right.timelineStartMs;

@@ -4,7 +4,7 @@ import { Gesture, GestureDetector, ScrollView as GestureScrollView } from 'react
 import * as ImagePicker from 'expo-image-picker';
 
 import { nextVisualBoundaryMs, previousVisualBoundaryMs } from '@openvideo/shared/timelinePlayback';
-import { clipDurationMs, clipTimelineEndMs } from '@openvideo/shared/timelineClipGeometry';
+import { clipDurationMs, clipTimelineEndMs, playheadForClipSelection } from '@openvideo/shared/timelineClipGeometry';
 import { snapTimelinePosition } from '@openvideo/shared/timelineSnapping';
 import { titlesAt } from '@openvideo/shared/titlePreviewLayout';
 import { DEFAULT_SUBTITLE_DELIVERY } from '@openvideo/shared/subtitleDelivery';
@@ -721,7 +721,10 @@ export function EditScreen({
                     label={editor.assetFor(clip.assetId)?.displayName ?? clip.assetId}
                     assetUri={editor.assetFor(clip.assetId)?.uri ?? null}
                     still={editor.assetFor(clip.assetId)?.kind === 'image'}
-                    onSelect={() => editor.setSelectedClipId(clip.id)}
+                    onSelect={() => {
+                      editor.setSelectedClipId(clip.id);
+                      setPlayheadMs(playheadForClipSelection(clip, editor.playheadMs));
+                    }}
                     onMove={(startMs) => editor.moveClipTo(clip.id, track.id, snapTimelinePosition({
                       timeline: editor.timeline, positionMs: startMs, pixelsPerMs: pxPerMs,
                       playheadMs: editor.playheadMs, enabled: snappingEnabled,

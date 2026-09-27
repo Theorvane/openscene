@@ -12,4 +12,8 @@ describe('renderer content security policy', () => {
   it('allows confined project images to load through the same path-free asset protocol', () => {
     expect(rootIndexHtml).toMatch(/img-src[^;]*'self'[^;]*data:[^;]*video-tool-asset:[^;]*/);
   });
+
+  it('allows timeline thumbnails to fetch only the confined local asset protocol', () => {
+    expect(rootIndexHtml).toMatch(/connect-src[^;]*'self'[^;]*video-tool-asset:[^;]*/);
+  });
 });

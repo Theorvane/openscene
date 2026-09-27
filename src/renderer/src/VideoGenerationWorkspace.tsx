@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { upsertGenerationJob } from '../../shared/generationJobList';
 import {
   CONTINUITY_REVIEW_FIELDS,
   type AiProjectDocument,
@@ -350,9 +351,7 @@ export function VideoGenerationWorkspace({
           return;
         }
         const updatedJob = pollRes.value;
-        setJobs((current) => current.some((entry) => entry.id === updatedJob.id)
-          ? current.map((entry) => entry.id === updatedJob.id ? updatedJob : entry)
-          : [updatedJob, ...current]);
+        setJobs((current) => upsertGenerationJob(current, updatedJob));
 
         if (updatedJob.status === 'completed') {
           stopPolling(intervalId);
@@ -416,9 +415,7 @@ export function VideoGenerationWorkspace({
         }
         const recoveredJob = response.ok ? response.value : null;
         if (recoveredJob !== null) {
-          setJobs((current) => current.some((job) => job.id === recoveredJob.id)
-            ? current.map((job) => job.id === recoveredJob.id ? recoveredJob : job)
-            : [recoveredJob, ...current]);
+          setJobs((current) => upsertGenerationJob(current, recoveredJob));
           if (recoveredJob.status === 'queued' || recoveredJob.status === 'running') {
             startPollingJob(
               recoveredJob,
@@ -636,7 +633,7 @@ export function VideoGenerationWorkspace({
         const job = response.value as VideoGenerationJob;
         const parentRecipe = overrides?.parentGenerationId ?? recipeParentId;
         if (parentRecipe !== undefined) recipeParents.current.set(job.id, parentRecipe);
-        setJobs((prev) => [job, ...prev]);
+        setJobs((prev) => upsertGenerationJob(prev, job));
         setJobInputs((current) => ({ ...current, [job.id]: inputs }));
         setJobContinuityControls((current) => ({ ...current, [job.id]: effectiveContinuityControls }));
         if (targetWriterShotId !== '') {
