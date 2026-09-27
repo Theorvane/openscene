@@ -9,7 +9,7 @@ export function registerTimelineAssetScheme(): void {
   protocol.registerSchemesAsPrivileged([
     {
       scheme: PLAYBACK_SCHEME,
-      privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true }
+      privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true }
     }
   ]);
 }

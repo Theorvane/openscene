@@ -353,6 +353,7 @@ export function useTimelineEditor() {
     if (timeline === null) return;
     playback.setPlayheadMs(placement.playheadMs, timeline);
     setSelectedClipId(placement.clip.id);
+    setSelectedClipIds([placement.clip.id]);
   }, [playback, project, replaceTimeline, selectedAsset]);
 
   const placeAssetOnTimeline = useCallback((assetId: string): boolean => {
@@ -363,11 +364,12 @@ export function useTimelineEditor() {
     if (track === null) return false;
     const placement = placeReadyAssetOnTimeline(project.timeline, asset, track.id, createOpaqueId('clip'), insertionStartForTrack(track));
     if (placement === null) return false;
-    const timeline = replaceTimeline(() => placement.timeline, `Placed approved candidate ${asset.displayName} on ${track.name}.`);
+    const timeline = replaceTimeline(() => placement.timeline, `Placed ${asset.displayName} on ${track.name}.`);
     if (timeline === null) return false;
     playback.setPlayheadMs(placement.playheadMs, timeline);
     setSelectedAssetId(asset.id);
     setSelectedClipId(placement.clip.id);
+    setSelectedClipIds([placement.clip.id]);
     return true;
   }, [playback, project, replaceTimeline]);
 
@@ -418,6 +420,7 @@ export function useTimelineEditor() {
     playback.setPlayheadMs(placement.playheadMs, timeline);
     setSelectedAssetId(asset.id);
     setSelectedClipId(placement.clip.id);
+    setSelectedClipIds([placement.clip.id]);
   }, [playback, project, replaceTimeline]);
 
   const addTimelineTrack = useCallback((kind: MediaKind) => {
@@ -721,14 +724,16 @@ export function useTimelineEditor() {
     );
     if (response === null) return false;
     if (response.ok) {
-      setLoadedProject(response.value);
+      // Saving before an Agent turn must not move the playhead or clear the
+      // current selection. The persisted timeline is the one already shown.
+      setProject(response.value);
       setHasUnsavedTimeline(false);
       setStatusMessage({ tone: 'success', text: 'Timeline saved locally.' });
       return true;
     }
     setStatusMessage({ tone: 'danger', text: errorMessage(response.error) });
     return false;
-  }, [invokeWhileBusy, project, setLoadedProject]);
+  }, [invokeWhileBusy, project]);
 
   const saveAiProjectDocument = useCallback(async (ai: AiProjectDocument): Promise<boolean> => {
     if (project === null) return false;

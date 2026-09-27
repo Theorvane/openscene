@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { compileFfmpegTimeline } from '../src/shared/ffmpegTimelineCompiler';
 import { splitClip, trimClipLeft, trimClipRight, updateClipEffects } from '../src/shared/timelineClipLogic';
 import { isValidClipEffects } from '../src/shared/timelineEffects';
-import { clipDurationMs, clipSourceSpanMs, clipSpeed, sourceTimeMsAt } from '../src/shared/timelineClipGeometry';
+import { clipDurationMs, clipSourceSpanMs, clipSpeed, playheadForClipSelection, sourceTimeMsAt } from '../src/shared/timelineClipGeometry';
 import { createInitialTimeline } from '../src/shared/timelineLogic';
 import { parseTimelineDocument } from '../src/shared/timelineDocumentValidators';
 import { DEFAULT_CLIP_EFFECTS, type TimelineDocument } from '../src/shared/timelineTypes';
@@ -56,6 +56,12 @@ function timelineWithSpeed(speed: number | undefined): TimelineDocument {
 const clipOf = (timeline: TimelineDocument) => timeline.tracks.find((track) => track.kind === 'video')!.clips[0]!;
 
 describe('how long a clip is', () => {
+  it('focuses a selected clip using its timeline duration, including speed', () => {
+    const clip = { ...clipOf(timelineWithSpeed(2)), timelineStartMs: 3_000 };
+    expect(playheadForClipSelection(clip, 0)).toBe(3_000);
+    expect(playheadForClipSelection(clip, 4_000)).toBe(4_000);
+    expect(playheadForClipSelection(clip, 5_000)).toBe(3_000);
+  });
   it('separates the source window from the time on the timeline', () => {
     const fast = clipOf(timelineWithSpeed(2));
     expect(clipSourceSpanMs(fast)).toBe(4_000);

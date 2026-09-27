@@ -17,7 +17,7 @@ timeline frame. The host supplies the live panels as slots. It also compiles the
 directly from the same source:
 
 - `EditorToolRail` — project, media, audio, and text tabs with keyboard access;
-- `MediaLibrary` — search, sort, unused filter, grid/list view, import, drag, and placement controls;
+- `MediaLibrary` — search, sort, unused filter, grid/list view, import, drag, and placement controls, including direct placement on a double-click;
 - `EditPointNavigation` — previous/next timeline boundary buttons.
 
 OpenScene supplies its project dock, Program Monitor, inspector, timeline,
@@ -32,8 +32,21 @@ state. The standalone OpenCut web route uses the same panel geometry and offers 
 persisted light/dark choice, initially following the system preference. Its
 theme stays local to that route; the OpenScene host follows the existing app
 theme and preset selectors without a second editor-specific setting. Both
-workbench headers provide a theme toggle; the OpenScene button calls its
-existing `ThemeProvider`, so the whole app follows the change.
+workbench headers provide a theme toggle and the four named preset choices.
+The OpenScene controls call its existing `ThemeProvider`, so the whole app
+follows either change. Selecting a timeline clip on desktop or mobile focuses
+the Program Monitor on that clip when the playhead was elsewhere, while keeping
+the current frame when it is already inside the clip.
+
+The side Agent uses OpenScene's existing approved timeline tools on the same
+project shown inside the OpenCut frame. Before an Agent turn or approved edit,
+the host saves any unsaved timeline so the tools read the current cut. Tool
+changes notify the open editor, which reloads the saved project. The Agent does
+not need access to OpenCut's browser storage or Electron internals.
+
+Filmstrip decoding and waveform sampling use the local `video-tool-asset:` URL.
+The asset protocol allows only the local renderer origin for these reads; it
+never exposes a filesystem path to the web component.
 
 The OpenScene adapters in `src/renderer/src/editor/` supply project assets,
 callbacks, labels, and drag payloads. Media filtering, usage counts, edit-point

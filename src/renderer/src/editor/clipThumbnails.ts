@@ -42,7 +42,14 @@ function remember(key: string, dataUrl: string): void {
 }
 
 /** Resolves when the element has the frame at `atMs` ready to be drawn. */
-function seek(video: HTMLVideoElement, atMs: number): Promise<void> {
+function seekThumbnailFrame(video: HTMLVideoElement, atMs: number): Promise<void> {
+  const targetSeconds = Math.max(0, atMs / 1_000);
+  // The first requested frame is often already current after loadeddata.
+  // Seeking to the same time emits no seeked event, which used to stall the
+  // serial thumbnail queue for every clip that began at source time zero.
+  if (video.readyState >= 2 && Math.abs(video.currentTime - targetSeconds) < 0.001) {
+    return Promise.resolve();
+  }
   return new Promise((resolve, reject) => {
     const done = (): void => {
       video.removeEventListener('seeked', done);
@@ -56,19 +63,20 @@ function seek(video: HTMLVideoElement, atMs: number): Promise<void> {
     };
     video.addEventListener('seeked', done);
     video.addEventListener('error', failed);
-    video.currentTime = Math.max(0, atMs / 1_000);
+    video.currentTime = targetSeconds;
   });
 }
 
 async function loaded(url: string): Promise<HTMLVideoElement> {
   const video = document.createElement('video');
-  video.src = url;
+  video.crossOrigin = 'anonymous';
   video.muted = true;
   video.preload = 'auto';
   // Not attached to the document: it is a decoder, not something to look at.
   await new Promise<void>((resolve, reject) => {
     video.addEventListener('loadeddata', () => resolve(), { once: true });
     video.addEventListener('error', () => reject(new Error('load failed')), { once: true });
+    video.src = url;
   });
   return video;
 }
@@ -108,7 +116,7 @@ function framesFor(assetId: string, url: string, timesMs: readonly number[]): Pr
           continue;
         }
         video ??= await loaded(url);
-        await seek(video, atMs);
+        await seekThumbnailFrame(video, atMs);
         const drawn = draw(video);
         if (drawn === null) continue;
         remember(key, drawn);

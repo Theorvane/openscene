@@ -7,7 +7,7 @@ import { buildRulerTicks } from './timelineRulerTicks';
 import { useClipThumbnails } from './clipThumbnails';
 import { useClipWaveform } from './clipWaveform';
 import type { ThumbnailClip } from '../../../shared/clipThumbnails';
-import { clipDurationMs } from '../../../shared/timelineClipGeometry';
+import { clipDurationMs, playheadForClipSelection } from '../../../shared/timelineClipGeometry';
 import { nextVisualBoundaryMs, previousVisualBoundaryMs } from '../../../shared/timelinePlayback';
 import { snapTimelinePosition } from '../../../shared/timelineSnapping';
 import type { TimelineEditorController } from './useTimelineEditor';
@@ -968,6 +968,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
                           return;
                         }
                         editor.setSelectedClipId(block.clip.id);
+                        editor.setPlayheadMs(playheadForClipSelection(block.clip, editor.playheadMs));
                       }}
                       onDragStart={(event) => {
                         if (lockedTracks[track.id] || activeTool !== 'select') return;

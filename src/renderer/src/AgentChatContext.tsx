@@ -63,12 +63,13 @@ export type AgentChatRestoreRequest = {
 
 type AgentChatProviderProps = {
   readonly activeProject: EditAgentProjectContext | null;
+  readonly prepareProject?: () => Promise<boolean>;
   readonly restoreRequest?: AgentChatRestoreRequest | null;
   readonly onRestoreHandled?: () => void;
   readonly children: ReactNode;
 };
 
-export function AgentChatProvider({ activeProject, restoreRequest = null, onRestoreHandled, children }: AgentChatProviderProps): ReactElement {
+export function AgentChatProvider({ activeProject, prepareProject, restoreRequest = null, onRestoreHandled, children }: AgentChatProviderProps): ReactElement {
   const { providerConfig, credentialStatus } = useLlmModel();
   const chatGptAuth = useChatGptAuth();
   const { selectedModel: getSelectedDomainModel } = useAiDomainModel();
@@ -209,6 +210,9 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
     setInput('');
 
     try {
+      if (activeProject !== null && prepareProject && !await prepareProject()) {
+        throw new Error('Save the open timeline before asking the agent to edit it.');
+      }
       const response = await window.videoTool.agentChatSend({
         conversationId: conversationIdRef.current,
         text,
@@ -250,6 +254,9 @@ export function AgentChatProvider({ activeProject, restoreRequest = null, onRest
 
     setIsBusy(true);
     try {
+      if (decision !== 'deny' && activeProject !== null && prepareProject && !await prepareProject()) {
+        throw new Error('Save the open timeline before approving the agent edit.');
+      }
       const response = await window.videoTool.agentChatApprove({
         conversationId: conversationIdRef.current,
         toolCallId: pendingApproval.toolCallId,

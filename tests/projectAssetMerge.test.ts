@@ -43,4 +43,15 @@ describe('mergeImportedAssets', () => {
     expect(mergedAssets[0]?.displayName).toBe('Fresh metadata');
     expect(mergedAssets[1]?.displayName).toBe('Stable audio');
   });
+
+  it('keeps one asset per id when an import batch repeats an id', () => {
+    const merged = mergeImportedAssets([asset('asset-1', 'Existing')], [
+      asset('asset-2', 'First result'),
+      asset('asset-2', 'Updated result'),
+      asset('asset-1', 'Updated existing')
+    ]);
+
+    expect(merged.map((item) => item.id)).toEqual(['asset-1', 'asset-2']);
+    expect(merged.map((item) => item.displayName)).toEqual(['Updated existing', 'Updated result']);
+  });
 });

@@ -52,8 +52,12 @@ export function AssetBin({ editor, filter, filters, onFiltersChange }: AssetBinP
     selectedAssetId={editor.selectedAssetId}
     onFiltersChange={onFiltersChange}
     onImport={(kind) => { void editor.importAssets(kind === undefined ? undefined : [kind]); }}
-    onSelect={editor.setSelectedAssetId}
+    onSelect={(assetId) => {
+      editor.setSelectedAssetId(assetId);
+      editor.setSelectedClipId('');
+    }}
     onPlace={editor.placeSelectedAsset}
+    onActivateAsset={(assetId) => { void editor.placeAssetOnTimeline(assetId); }}
     onRetry={editor.retryAssetMetadataProbe}
     onAssetDragStart={(event, assetId) => {
       event.dataTransfer.setData(TIMELINE_DRAG_TYPE, JSON.stringify({ kind: 'asset', assetId }));

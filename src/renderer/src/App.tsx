@@ -416,6 +416,7 @@ export function App(): ReactElement {
         hasActiveProject={hasActiveProject}
         onPageChange={setActivePage}
         activeProjectContext={activeProjectContext}
+        prepareAgentProject={() => editor.hasUnsavedTimeline ? editor.saveTimeline() : Promise.resolve(true)}
         studioLayout={workspaceMode === 'create' && workspaceIsVisible}
         projectTabs={projectTabs}
         activeProjectId={editor.project?.id ?? null}

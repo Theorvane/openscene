@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 async function withPlaybackFixture<T>(run: (fixture: {
-  readonly request: (range?: string) => Promise<Response>;
+  readonly request: (range?: string, origin?: string) => Promise<Response>;
   readonly playbackPath: string;
   readonly directory: string;
 }) => Promise<T>): Promise<T> {
@@ -48,7 +48,10 @@ async function withPlaybackFixture<T>(run: (fixture: {
     return await run({
       directory,
       playbackPath: playback.filePath,
-      request: (range) => handler(new Request(url, range === undefined ? {} : { headers: { Range: range } }))
+      request: (range, origin) => handler(new Request(url, { headers: {
+        ...(range === undefined ? {} : { Range: range }),
+        ...(origin === undefined ? {} : { Origin: origin })
+      } }))
     });
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -56,6 +59,18 @@ async function withPlaybackFixture<T>(run: (fixture: {
 }
 
 describe('timeline asset response', () => {
+  it('allows only the local opaque renderer origin to fetch confined asset bytes', async () => {
+    await withPlaybackFixture(async ({ request }) => {
+      const local = await request(undefined, 'null');
+      expect(local.headers.get('access-control-allow-origin')).toBe('null');
+      expect(local.headers.get('vary')).toBe('Origin');
+      await local.arrayBuffer();
+
+      const remote = await request(undefined, 'https://example.com');
+      expect(remote.headers.get('access-control-allow-origin')).toBeNull();
+      await remote.arrayBuffer();
+    });
+  });
   it('streams a generated speech preview by opaque job id without exposing its file path', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'video-speech-preview-'));
     const speechPath = join(directory, 'generated.wav');
