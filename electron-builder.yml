@@ -25,6 +25,12 @@ extraResources:
   # The window icon is read from resources/ at runtime on platforms that take one.
   - from: resources/icon.png
     to: icon.png
+  # OpenCut editor source is compiled into out/; ship its MIT text beside the
+  # inventory so redistributed desktop packages retain the upstream notice.
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
+  - from: external/opencut/LICENSE
+    to: licenses/OpenCut-LICENSE.txt
 mac:
   category: public.app-category.video
   icon: build/icon.png
