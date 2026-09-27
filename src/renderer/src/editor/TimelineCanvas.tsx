@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactElement, type ReactNode } from 'react';
 
 import { formatDuration } from '../format';
+import { EditPointNavigation } from '../../../../external/opencut/apps/web/src/components/editor/edit-point-navigation';
 import { buildTimelineView, clientXToTimelineMs } from './editorTimelineView';
 import { buildRulerTicks } from './timelineRulerTicks';
 import { useClipThumbnails } from './clipThumbnails';
@@ -91,8 +92,6 @@ const ICONS = {
   separateAudio: toolIcon(<><path d="M4 14v-4M8 17V7M12 20V4M16 17V7M20 14v-4" /></>),
   freeze: toolIcon(<><path d="M12 2v20M4 6l16 12M20 6L4 18" /></>),
   magnet: toolIcon(<><path d="M6 4v7a6 6 0 0012 0V4" /><path d="M6 4h4v5H6zM14 4h4v5h-4z" fill="currentColor" stroke="none" /></>),
-  previousEdit: toolIcon(<><path d="M5 5v14M18 6l-9 6 9 6z" /></>),
-  nextEdit: toolIcon(<><path d="M19 5v14M6 6l9 6-9 6z" /></>),
   fitTimeline: toolIcon(<><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /><path d="M8 12h8" /></>),
   volumeOn: toolIcon(<><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11" /></>, 12),
   volumeOff: toolIcon(<><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9l5 6M21 9l-5 6" /></>, 12),
@@ -578,26 +577,7 @@ export function TimelineCanvas({ editor, id }: TimelineCanvasProps): ReactElemen
 
         {/* Right cluster: edit-point navigation, snapping, and zoom */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-          <button
-            type="button"
-            onClick={() => stepToEditPoint('previous')}
-            disabled={project === null}
-            style={project === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
-            aria-label="Previous edit point"
-            title="Previous edit point"
-          >
-            {ICONS.previousEdit}
-          </button>
-          <button
-            type="button"
-            onClick={() => stepToEditPoint('next')}
-            disabled={project === null}
-            style={project === null ? DISABLED_TOOL_BUTTON_STYLE : TOOL_BUTTON_STYLE}
-            aria-label="Next edit point"
-            title="Next edit point"
-          >
-            {ICONS.nextEdit}
-          </button>
+          <EditPointNavigation disabled={project === null} onPrevious={() => stepToEditPoint('previous')} onNext={() => stepToEditPoint('next')} />
           <span aria-hidden="true" style={{ width: '1px', height: '18px', background: 'var(--border)' }} />
           <button
             type="button"
