@@ -28,7 +28,10 @@ OpenScene project. The OpenCut web route supplies its own browser panels to the
 same workspace; no browser-local clips or object URLs enter OpenScene.
 OpenCut's host stylesheet reads OpenScene theme tokens from the document root,
 so light, dark, and preset changes restyle the workspace without a second theme
-state. The standalone OpenCut web route retains its own dark canvas theme.
+state. The standalone OpenCut web route uses the same panel geometry and offers a
+persisted light/dark choice, initially following the system preference. Its
+theme stays local to that route; the OpenScene host follows the existing app
+theme and preset selectors without a second editor-specific setting.
 
 The OpenScene adapters in `src/renderer/src/editor/` supply project assets,
 callbacks, labels, and drag payloads. Media filtering, usage counts, edit-point
