@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { EditorWorkspace } from '../../../../external/opencut/apps/web/src/components/editor/editor-workspace';
+import { EditorHeader } from '../../../../external/opencut/apps/web/src/components/editor/editor-header';
 
 import { AssetMetadataProbeHost } from './AssetMetadataProbeHost';
 import { EDITOR_INSPECTOR_DOCK_TAB_IDS, getDefaultEditorDockTabs, getDefaultEditorLeftDockTabId } from './dockTabs';
@@ -217,17 +218,19 @@ export function TimelineEditor({ editor }: TimelineEditorProps): ReactElement {
       className={workspaceClassName}
       style={workspaceStyle}
       labelledBy="timeline-editor-title"
-      header={<>
-        <strong className="oc-editor-host__brand">OpenScene</strong>
-        <span className="oc-editor-host__project" title={editor.project?.name ?? 'No project'}>{editor.project?.name ?? 'No project'}</span>
-        <span className="oc-editor-host__header-spacer" />
-        <select className="oc-editor-theme-picker" aria-label="Editor theme preset" value={preset} onChange={(event) => setPreset(event.currentTarget.value as ThemePresetId)}>
-          {THEME_PRESETS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-        </select>
-        <button className="oc-editor-host__save" type="button" onClick={toggleTheme} aria-label={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} theme`}>{themeMode === 'dark' ? '☀' : '☾'}</button>
-        <button className="oc-editor-host__save" type="button" onClick={() => { void editor.saveTimeline(); }} disabled={editor.project === null || !editor.hasUnsavedTimeline}>Save{editor.hasUnsavedTimeline ? ' *' : ''}</button>
-        {!floatingExportVisible && <ExportPanel editor={editor} />}
-      </>}
+      header={<EditorHeader
+        brand="OpenScene"
+        projectName={editor.project?.name ?? 'No project'}
+        themeMode={themeMode}
+        themePreset={preset}
+        themeOptions={THEME_PRESETS}
+        onThemeModeToggle={toggleTheme}
+        onThemePresetChange={(next) => setPreset(next as ThemePresetId)}
+        actions={<>
+          <button className="oc-editor-host__save" type="button" onClick={() => { void editor.saveTimeline(); }} disabled={editor.project === null || !editor.hasUnsavedTimeline}>Save{editor.hasUnsavedTimeline ? ' *' : ''}</button>
+          {!floatingExportVisible && <ExportPanel editor={editor} />}
+        </>}
+      />}
       left={<TimelineEditorLeftDock
         activeTabId={leftDockTabId}
         editor={editor}

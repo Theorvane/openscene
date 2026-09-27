@@ -11,6 +11,7 @@ const SHORTCUT_PREFERENCE_HOOK_SOURCE_URL = new URL('../src/renderer/src/editor/
 const TIMELINE_SHORTCUTS_SOURCE_URL = new URL('../src/renderer/src/editor/useTimelineShortcuts.ts', import.meta.url);
 const STYLES_SOURCE_URL = new URL('../src/renderer/src/styles.css', import.meta.url);
 const OPENCUT_HOST_STYLES_SOURCE_URL = new URL('../external/opencut/apps/web/src/components/editor/editor-workspace-host.css', import.meta.url);
+const OPENCUT_HEADER_SOURCE_URL = new URL('../external/opencut/apps/web/src/components/editor/editor-header.tsx', import.meta.url);
 
 const normalizedSource = (source: string): string => source.replace(/\r\n/g, '\n');
 
@@ -74,9 +75,14 @@ describe('timeline editor layout source contract', () => {
   it('Given product identity, When the app shell and editor render, Then OpenScene branding belongs to the OpenCut workbench header', async () => {
     const source = await readTimelineEditorSource();
     const appShellSource = await readAppShellSource();
+    const headerSource = normalizedSource(await readFile(OPENCUT_HEADER_SOURCE_URL, 'utf8'));
 
-    expect(source).toContain('<strong className="oc-editor-host__brand">OpenScene</strong>');
-    expect(source).toContain('className="oc-editor-host__project"');
+    expect(source).toContain('<EditorHeader');
+    expect(source).toContain('brand="OpenScene"');
+    expect(source).toContain('projectName={editor.project?.name ?? \'No project\'}');
+    expect(source).toContain('onThemePresetChange={(next) => setPreset(next as ThemePresetId)}');
+    expect(headerSource).toContain('className="oc-editor-header__brand"');
+    expect(headerSource).toContain('className="oc-editor-header__project"');
     expect(source).toContain('<h1 id="timeline-editor-title">OpenScene</h1>');
     expect(source).toContain('<span className="editor-program-region__subtitle">Timeline editor</span>');
     expect(appShellSource).not.toContain('product-chrome__eyebrow');
