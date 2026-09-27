@@ -153,7 +153,9 @@ export function EditorProgramSplitter({ programPercent, onProgramPercentChange }
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const workspaceRect = event.currentTarget.parentElement?.getBoundingClientRect();
     if (workspaceRect === undefined) return;
-    onProgramPercentChange(((event.clientY - workspaceRect.top) / workspaceRect.height) * 100);
+    const headerBottom = event.currentTarget.parentElement?.querySelector('.oc-editor-host__header')?.getBoundingClientRect().bottom;
+    const contentTop = headerBottom ?? workspaceRect.top;
+    onProgramPercentChange(((event.clientY - contentTop) / (workspaceRect.bottom - contentTop)) * 100);
   };
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {

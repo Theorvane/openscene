@@ -3942,6 +3942,25 @@ button {
   box-shadow: var(--shadow-editorial);
 }
 
+.oc-editor-host__header .export-popover {
+  top: calc(100% + 6px);
+  bottom: auto;
+  max-height: min(55vh, 480px);
+}
+
+.oc-editor-host__left .editor-tool-rail,
+.oc-editor-host__left .project-rail,
+.oc-editor-host__left .asset-bin,
+.oc-editor-host__left .title-tool-panel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#app-workspace-panel-edit {
+  container-type: inline-size;
+}
+
 /*
   The frame the cut is rendered into, said as a choice and as a number.
 
