@@ -83,6 +83,8 @@ flowchart LR
 
 The **renderer** collects intent and renders editor state; it never receives raw IPC, FFmpeg execution paths or arguments, or stored provider credentials and OAuth tokens. The **preload** layer exposes only the typed `window.videoTool` bridge. The **main process** owns local projects, secrets, job lifecycle, local FFmpeg execution, and the TypeMCP tool surface. Editing rules, composition, validation, and generation planning live in the portable **shared core**, which desktop and mobile use together.
 
+The separate [OpenCut rewrite](https://github.com/Theorvane/OpenCut) is pinned at `external/opencut` as a Git submodule for integration work. Run `git submodule update --init external/opencut` if you need its source. It is not used by the shipped editor; see [the integration boundary](docs/opencut-integration.md).
+
 Project folders, imports, generated results, chats, and exports remain local. A connected provider is contacted only for an operation you explicitly start: in a generation studio, that is the visible **Generate** action; for an agent-initiated mutation or job, the Edit Agent asks for approval before execution. The Program Monitor is a best-effort review surface; local FFmpeg MP4 export is the authoritative saved output.
 
 ## The workspace

@@ -162,6 +162,17 @@ OpenScene is a compact local studio command desk for arranging recordings, impor
 - Local MP4 export depends on user provided FFmpeg availability through `VIDEO_TOOL_FFMPEG_PATH` or absolute `PATH` discovery. The renderer must not claim bundled FFmpeg, cloud export, multiple formats, or access to filesystem paths.
 - Provider seams for future Gemini Veo, OpenAI Sora, and ElevenLabs support are interfaces only unless implementation changes prove otherwise.
 
-## OpenCut Reference Boundary
+## OpenCut Integration Boundary
 
-OpenCut is high level inspiration for local asset and timeline UX only. OpenScene must not copy or claim OpenCut code, assets, branding, exact visual identity, interaction details, or unsupported feature scope. Any future reference to OpenCut must state that no OpenCut source, dependency, artwork, logo, name treatment, or branded design system is used in this renderer.
+The MIT-licensed OpenCut rewrite is pinned as a source submodule at
+`external/opencut` from `Theorvane/OpenCut`, with `OpenCut-app/OpenCut` as its
+upstream. This checkout is for isolated integration work; the current OpenCut
+web editor is a placeholder and its desktop timeline is a shell. OpenScene's
+working editor and `src/shared/` editing rules remain the source of truth.
+
+Do not import submodule code into the Electron renderer or main process, bundle
+its assets into OpenScene, or claim its unfinished features. A runtime
+integration needs a typed contract in `src/shared/`, callers on desktop and
+mobile (or a visible platform limit), local-first and security review, and
+verification on both surfaces. Keep OpenCut branding and visual assets inside
+the submodule unless a separately reviewed feature requires them.
