@@ -1,0 +1,3 @@
+[submodule "external/opencut"]
+	path = external/opencut
+	url = https://github.com/Theorvane/OpenCut.git
