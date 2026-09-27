@@ -10,6 +10,28 @@ The pinned commit is a reviewed merge on the independent `Theorvane/OpenCut`
 
 ## Runtime boundary
 
+| Responsibility | Owner |
+|---|---|
+| Workbench layout, shared header, tool rail, media list, and edit-point controls | OpenCut |
+| Project identity, media and timeline state, editing decisions, and desktop/mobile parity | OpenScene shared model and host adapter |
+| Local project files, asset URLs, FFmpeg MP4 export, and Agent tools | OpenScene main process |
+| Theme preference and save/export actions in the desktop workbench | OpenScene host, passed to OpenCut as values and callbacks |
+
+The host adapter in `src/renderer/src/editor/` converts one live OpenScene
+project into OpenCut presentation props and routes UI intent back into the
+OpenScene editor controller. OpenCut's `EditorHeader` renders the same project
+and theme controls in its web route and in the desktop host; it receives state
+and callbacks and does not save projects or run exports itself. The web route
+supplies its own browser session state and WebM action. It does not synchronize
+that session with an OpenScene desktop project.
+
+A desktop media import enters through OpenScene's local project store, appears
+in OpenCut's media list, and reaches the shared placement rule through the
+host callback. Selection and playback use that same project in the Program
+Monitor; saving and Agent tools then read or update the local project. The
+mobile editor uses the same shared editing rules while rendering its own
+phone-sized interface.
+
 OpenCut's web `/editor` route supports a local Classic-inspired workflow.
 OpenScene renders its editor through OpenCut's `EditorWorkspace` component,
 which now owns the visible header, panel frames, responsive workbench grid, and
